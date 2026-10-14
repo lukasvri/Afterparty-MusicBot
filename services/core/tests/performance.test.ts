@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {createHistogram} from 'node:perf_hooks';
 import {Store} from '../src/store.ts';
 import {Metrics} from '../src/metrics.ts';
+import {DatabaseSync} from 'node:sqlite';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 test('indexed queries retain ordering and pending filters',()=>{
  const s=new Store(':memory:');try{
   s.transaction(()=>{for(let i=0;i<200;i++){s.db.prepare('INSERT INTO history VALUES(?,?,?,?)').run(String(i),'{}',i,i<180?1:0);s.db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,?)').run(String(i),'{"bridge":true}','done','ok',i,i<180?1:0);}});
@@ -17,6 +21,33 @@ test('batch writes roll back on failure, including nested writes',()=>{
   assert.throws(()=>s.setMany({queue:['changed'],current:cyclic}));assert.deepEqual(s.get('queue',[]),['original']);assert.equal(s.get('current',''),'original');
   assert.throws(()=>s.transaction(()=>{s.setMany({queue:['nested'],current:'nested'});throw Error('rollback');}));assert.equal(s.get('current',''),'original');s.setMany({queue:[],current:null});assert.equal(s.get('current','fallback'),null);
  }finally{s.close();}
+});
+
+test('local command results cannot starve bridge results across batches',()=>{
+ const s=new Store(':memory:');try{
+  s.transaction(()=>{
+   for(let i=0;i<100;i++)s.db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,0)').run('local:'+i,'{}','done','ok',i);
+   for(let i=0;i<25;i++)s.db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,0)').run('bridge:'+i,'{"bridge":true}','done','ok',100+i);
+  });
+  const batch=s.bridgeResults();assert.equal(batch.length,20);assert.equal(batch[0].id,'bridge:0');
+  s.acknowledgeJobs(batch.map(job=>job.id));assert.equal(s.bridgeResults().length,5);
+  assert.equal(s.bridgeResults()[0].id,'bridge:20');
+  const plan=JSON.stringify(s.db.prepare("EXPLAIN QUERY PLAN SELECT id,status,result FROM jobs WHERE sent=0 AND status IN ('done','failed','unknown') AND json_extract(payload,'$.bridge')=1 ORDER BY at LIMIT 20").all());
+  assert.match(plan,/jobs_bridge_pending/);assert.doesNotMatch(plan,/TEMP B-TREE/);
+ }finally{s.close();}
+});
+
+test('an existing jobs table acquires the bridge index without rewriting saved payloads',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'gutta-jobs-upgrade-')),file=join(dir,'db.sqlite');
+ const old=new DatabaseSync(file);
+ old.exec('CREATE TABLE jobs(id TEXT PRIMARY KEY,payload TEXT NOT NULL,status TEXT NOT NULL,result TEXT NOT NULL,at INTEGER NOT NULL,sent INTEGER NOT NULL DEFAULT 0)');
+ const payload=JSON.stringify({bridge:true,action:'pause'});
+ old.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,0)').run('synthetic',payload,'done','ok',1);old.close();
+ const store=new Store(file);try{
+  assert.deepEqual(store.bridgeResults(),[{id:'synthetic',ok:true,message:'ok'}]);
+  assert.equal(store.db.prepare('SELECT payload FROM jobs WHERE id=?').get('synthetic')?.payload,payload);
+  assert(store.db.prepare("SELECT name FROM sqlite_master WHERE name='jobs_bridge_pending'").get());
+ }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('rolling metrics expire old samples and retain total request count',()=>{
  let now=1000;const m=new Metrics(()=>now);clearInterval(m.timer);clearInterval(m.loopTimer);try{
