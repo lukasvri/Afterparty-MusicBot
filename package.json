@@ -13,6 +13,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "test:fullscreen": "node --experimental-strip-types scripts/fullscreen.test.mjs",
+    "setup:cloud": "bash scripts/cloud.sh setup",
+    "check:all": "bash scripts/cloud.sh check",
     "project": "node scripts/project.mjs"
   },
   "dependencies": {

@@ -48,6 +48,7 @@ next-env.d.ts
 
 /dist/
 /.wrangler/
+/.wrangler
 # Checkout-local execution profile and tool state; never publish them.
 /.sites-runtime/
 /.agents/
@@ -73,3 +74,8 @@ services/core/data/
 !**/.dev.vars.example
 
 **/backups/
+
+# Private configuration belongs on the deployment host only.
+/services/core/compose.local.yml
+/.openai/hosting.local.json
+/.local/

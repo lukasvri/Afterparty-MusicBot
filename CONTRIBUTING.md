@@ -10,14 +10,16 @@ Thanks for considering a contribution. Start with an issue describing the concre
 4. From the repository root, run:
 
    ```bash
-   npm ci
-   npm run project -- check
-   npm run test:fullscreen
-   node --test scripts/audio-preferences.test.mjs
+   npm run setup:cloud
+   npm run check:all
    ```
 
 5. Open a pull request describing the problem, resulting behavior and checks performed. State anything you could not verify.
 
 Preserve per-server isolation, authorization, queue-version checks and the distinction between ordinary Discord music and public concerts. Audio changes must pass the real FFmpeg tests. Do not use production databases in tests.
+
+These commands require Node.js 24.17+ and FFmpeg. For cloud development, follow
+the [Codex Cloud workflow](docs/CODEX_CLOUD.md) and `AGENTS.md`. Production updates
+are performed separately on the deployment host after review and backup.
 
 New contributions are submitted under the project's MIT license. Keep third-party license notices intact. Never commit `.env`, `.dev.vars`, database files, backups or deployment-specific IDs.

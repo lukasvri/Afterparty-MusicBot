@@ -10,7 +10,7 @@ Play music in Discord, bring video into a shared room, and manage everything fro
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24.17%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-[Installation guide](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) · [Operations](services/core/PUBLIC_RELEASE.md) · [Report an issue](https://github.com/lukasvri/gutta-krutt-afterparty/issues)
+[Installation guide](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) · [Operations](services/core/PUBLIC_RELEASE.md) · [Codex Cloud](docs/CODEX_CLOUD.md) · [Report an issue](https://github.com/lukasvri/gutta-krutt-afterparty/issues)
 
 </div>
 
@@ -117,13 +117,11 @@ Data is stored in the `core-data` Docker volume. Back up the entire volume, incl
 From the repository root:
 
 ```bash
-npm ci
-npm run project -- check
-npm run test:fullscreen
-node --test scripts/audio-preferences.test.mjs
+npm run setup:cloud
+npm run check:all
 ```
 
-The project check typechecks the website and builds Core's validation image. Core currently has **60 automated tests**, including real FFmpeg/Opus audio, server isolation, permissions, queue behavior and database rollback. The fullscreen and audio-preference suites contain **16 additional tests**. GitHub Actions runs Core validation on pushes and pull requests.
+These commands need Node.js 24.17+ and FFmpeg. They install both locked dependency trees and run **60 Core tests**, **29 website behavior tests**, both typechecks and a website production build without production credentials or Docker. GitHub Actions validates Core's Docker image and the website on pushes and pull requests. See the [Codex Cloud workflow](docs/CODEX_CLOUD.md) for cloud setup and local production updates.
 
 <details>
 <summary><strong>Repository map</strong></summary>
