@@ -11,12 +11,36 @@ export function audioBitrate(channel:number,requestedKbps:number){
  return Math.max(8000,Math.min(384000,ceiling,requested));
 }
 export class PcmDecoder{
- child:ChildProcessWithoutNullStreams;ended=false;error:Error|null=null;disposed=false;pending=Buffer.alloc(0);iterator:AsyncIterator<Buffer>;
+ child:ChildProcessWithoutNullStreams;ended=false;error:Error|null=null;disposed=false;pending=Buffer.alloc(0);iterator:AsyncIterator<Buffer>;closed:Promise<void>;
  constructor(source:{url:string;headers:string},offset:number,signal:AbortSignal,ffmpeg=process.env.FFMPEG_PATH??'ffmpeg'){
   const args=['-hide_banner','-loglevel','error','-nostdin',...(/^https?:/.test(source.url)?['-reconnect','1','-reconnect_streamed','1','-reconnect_delay_max','2']:[]),...(source.headers?['-headers',source.headers]:[]),...(offset>0?['-ss',String(offset)]:[]),'-i',source.url,'-vn','-ac','2','-ar','48000','-f','s16le','pipe:1'];
-  this.child=spawn(ffmpeg,args,{stdio:['pipe','pipe','pipe'],signal});this.iterator=this.child.stdout[Symbol.asyncIterator]();this.child.stdin.end();this.child.stderr.on('data',()=>{});this.child.on('error',e=>{this.error=e;this.child.stdout.destroy(e);});this.child.on('close',code=>{if(code&& !this.disposed){this.error=new Error('Lyddekodingen stoppet.');}});this.child.stdout.on('error',()=>{});
+  this.child=spawn(ffmpeg,args,{stdio:['pipe','pipe','pipe'],signal});this.iterator=this.child.stdout[Symbol.asyncIterator]();this.child.stdin.end();this.child.stderr.on('data',()=>{});
+  this.child.on('error',e=>{this.error=e;this.child.stdout.destroy(e);});
+  this.closed=new Promise(resolve=>this.child.once('close',code=>{if(code!==0&&!this.disposed)this.error??=new Error('Lyddekodingen stoppet.');resolve();}));
+  this.child.stdout.on('error',()=>{});
  }
- async frame():Promise<Buffer|null>{while(this.pending.length<FRAME_BYTES&&!this.ended){if(this.error)throw this.error;let timer:ReturnType<typeof setTimeout>|undefined;try{const next=await Promise.race([this.iterator.next(),new Promise<never>((_resolve,reject)=>{timer=setTimeout(()=>reject(new Error('Lydstrømmen sluttet å levere data.')),6000);})]);if(next.done)this.ended=true;else this.pending=Buffer.concat([this.pending,next.value]);}finally{clearTimeout(timer);}}if(!this.pending.length)return null;const frame=this.pending.subarray(0,FRAME_BYTES);this.pending=this.pending.subarray(FRAME_BYTES);return frame.length===FRAME_BYTES?frame:pad(frame);}
+ async frame():Promise<Buffer|null>{
+  while(this.pending.length<FRAME_BYTES&&!this.ended){
+   let timer:ReturnType<typeof setTimeout>|undefined;
+   try{
+    if(this.error)throw this.error;
+    const next=await Promise.race([
+     (async()=>{
+      const next=await this.iterator.next();
+      // EOF alone cannot distinguish a successful decode from a subprocess crash.
+      if(next.done){await this.closed;if(this.error)throw this.error;}
+      return next;
+     })(),
+     new Promise<never>((_resolve,reject)=>{timer=setTimeout(()=>reject(new Error('Lydstrømmen sluttet å levere data.')),6000);}),
+    ]);
+    if(next.done)this.ended=true;else this.pending=Buffer.concat([this.pending,next.value]);
+   }catch(error){this.stop();throw error;}
+   finally{clearTimeout(timer);}
+  }
+  if(!this.pending.length)return null;
+  const frame=this.pending.subarray(0,FRAME_BYTES);this.pending=this.pending.subarray(FRAME_BYTES);
+  return frame.length===FRAME_BYTES?frame:pad(frame);
+ }
  stop(){this.disposed=true;this.child.stdout.destroy();this.child.kill('SIGKILL');}
 }
 function pad(data:Buffer){const b=Buffer.alloc(FRAME_BYTES);data.copy(b,0,0,FRAME_BYTES);return b;}
@@ -40,7 +64,13 @@ export class Mixer extends Readable{
 }
 export function encodeOpus(mixer:Mixer,bitrate:number){
  const process=spawn(processEnvFfmpeg(),['-hide_banner','-loglevel','error','-nostdin','-probesize','32','-analyzeduration','0','-f','s16le','-ar','48000','-ac','2','-i','pipe:0','-c:a','libopus','-b:a',String(bitrate),'-application','audio','-compression_level','10','-vbr','on','-frame_duration','20','-page_duration','20000','-flush_packets','1','-f','opus','pipe:1'],{stdio:['pipe','pipe','pipe']});
- const stream=new prism.opus.OggDemuxer();process.stderr.on('data',()=>{});process.on('error',()=>stream.destroy(new Error('Lydkodingen kunne ikke startes.')));process.on('close',code=>{if(code&& !stream.destroyed)stream.destroy(new Error('Lydkodingen stoppet.'));});process.stdin.on('error',()=>{});mixer.on('error',error=>stream.destroy(error));mixer.pipe(process.stdin);process.stdout.pipe(stream);stream.once('close',()=>{mixer.destroy();process.kill('SIGKILL');});return {stream,process};
+ const stream=new prism.opus.OggDemuxer();process.stderr.on('data',()=>{});process.on('error',()=>stream.destroy(new Error('Lydkodingen kunne ikke startes.')));
+ // stdout can end before the exit status arrives. Only a successful exit is EOF.
+ process.on('close',code=>{if(!stream.destroyed){if(code===0)stream.end();else stream.destroy(new Error('Lydkodingen stoppet.'));}});
+ process.stdin.on('error',()=>{});process.stdout.on('error',error=>stream.destroy(error));mixer.on('error',error=>stream.destroy(error));
+ mixer.once('close',()=>{if(!mixer.readableEnded)stream.destroy();});
+ mixer.pipe(process.stdin);process.stdout.pipe(stream,{end:false});
+ stream.once('close',()=>{mixer.unpipe(process.stdin);mixer.destroy();process.stdin.destroy();process.stdout.destroy();process.kill('SIGKILL');});return {stream,process};
 }
 function processEnvFfmpeg(){return process.env.FFMPEG_PATH??'ffmpeg';}
 export interface Sink{play(stream:Readable,id:string):void;pause():void;resume():void;stop():void;duration():number;advancing():boolean;buffering():boolean;onIdle:((id:string)=>void)|null;onError:((error:Error,id:string)=>void)|null;}

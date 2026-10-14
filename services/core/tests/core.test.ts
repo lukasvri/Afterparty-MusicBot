@@ -7,11 +7,12 @@ import {Store} from '../src/store.ts';
 import {Engine,positionFromSegments} from '../src/engine.ts';
 import {Commands} from '../src/commands.ts';
 import {Providers,scoreMatch,youtubeId} from '../src/providers.ts';
-import {mixPcm,FRAME_BYTES,type Sink} from '../src/audio.ts';
+import {mixPcm,FRAME_BYTES,type Sink,type Prepared,type PcmDecoder} from '../src/audio.ts';
+import {deferred} from './deferred.ts';
 import type {Track} from '../src/types.ts';
 import {parseTime} from '../src/discord.ts';
 const track=(id='abcdefghijk',entryId=id):Track=>({id,entryId,title:'Example song',artist:'Artist',duration:200,image:'',live:false,embeddable:true,source:'youtube'});
-class FakeSink implements Sink{ms=0;playing=true;onIdle:((id:string)=>void)|null=null;onError:((e:Error,id:string)=>void)|null=null;play(){this.ms=0;}pause(){this.playing=false;}resume(){this.playing=true;}stop(){this.ms=0;this.playing=false;}duration(){return this.ms;}advancing(){return this.playing;}buffering(){return false;}}
+class FakeSink implements Sink{ms=0;playing=true;onIdle:((id:string)=>void)|null=null;onError:((e:Error,id:string)=>void)|null=null;play(){this.ms=0;this.playing=true;}pause(){this.playing=false;}resume(){this.playing=true;}stop(){this.ms=0;this.playing=false;}duration(){return this.ms;}advancing(){return this.playing;}buffering(){return false;}}
 function setup(){const dir=mkdtempSync(join(tmpdir(),'gutta-core-')),store=new Store(join(dir,'db.sqlite')),providers=new Providers(store,{}),sink=new FakeSink(),engine=new Engine(store,providers,sink);return {store,providers,sink,engine,close:()=>{engine.close();store.close();rmSync(dir,{recursive:true,force:true});}};}
 test('media clock uses consumed audio, including incoming crossfade offset',()=>{const segments=[{track:track(),startFrame:0,offset:10},{track:track('bcdefghijkl'),startFrame:500,offset:0}];assert.equal(positionFromSegments(segments,9000).position,19);assert.equal(positionFromSegments(segments,10000).track?.id,'bcdefghijkl');assert.equal(positionFromSegments(segments,13000).position,3);});
 test('public state excludes requester identity and private fields',()=>{const t=setup();try{t.engine.current={...track(),requestedBy:'private-member-id'};t.engine.queue=[{...track('bcdefghijkl'),requestedBy:'private-member-id'}];const text=JSON.stringify(t.engine.snapshot());assert(!text.includes('private-member-id'));assert(!text.includes('requestedBy'));}finally{t.close();}});
@@ -72,5 +73,46 @@ test('clock and recovery avoid snapshots while preserving position and revision'
   assert.equal(t.engine.revision(),revision);t.engine.queue.push(track('bcdefghijkl'));assert.notEqual(t.engine.revision(),revision);
   const added=t.engine.revision();t.engine.queue[0].entryId='replacement';assert.notEqual(t.engine.revision(),added);
   t.engine.pause();t.engine.checkpoint();assert.equal(t.store.get<any>('recovery',null).paused,true);
+ }finally{t.close();}
+});
+
+test('a superseded paused seek cannot pause its replacement or reject after stop',async()=>{
+ for(const action of ['replace','stop']){
+  const t=setup(),pending=deferred<Prepared>(),replacement=deferred<Prepared>();let newer:Promise<void>|undefined;
+  try{
+   t.engine.current=track();t.engine.paused=true;
+   t.engine.prepare=async song=>song.id===track().id?pending.promise:replacement.promise;
+   const seek=t.engine.seek(10);
+   if(action==='replace')newer=t.engine.startTrack(track('bcdefghijkl'));else t.engine.stop();
+   pending.reject(Error('cancelled preparation'));await seek;
+   assert.equal(t.engine.paused,false);
+   assert.equal(t.engine.current?.id,action==='replace'?'bcdefghijkl':undefined);
+  }finally{t.engine.stop();if(newer){replacement.reject(Error('test cleanup'));await newer;}t.close();}
+ }
+});
+
+test('pause state remains visible during seek and accepts newer pause or resume intent',async()=>{
+ for(const paused of [false,true]){
+  const t=setup(),pending=deferred<Prepared>();try{
+   t.engine.connected=true;t.engine.current=track();t.engine.paused=!paused;
+   t.engine.prepare=()=>pending.promise;const seek=t.engine.seek(10);
+   assert.equal(t.engine.paused,!paused);
+   if(paused)t.engine.pause();else t.engine.resume();
+   pending.resolve({track:track(),decoder:{frame:async()=>null,stop:()=>{}} as PcmDecoder});
+   await seek;assert.equal(t.engine.paused,paused);assert.equal(t.sink.playing,!paused);
+  }finally{t.close();}
+ }
+});
+
+test('closing an engine rejects delayed adds and cannot restart playback',async()=>{
+ const t=setup();try{
+  t.engine.connected=true;t.engine.current=track();
+  const pending=deferred<Track[]>();t.providers.resolve=()=>pending.promise;
+  const result=new Commands(t.engine).add('delayed');
+  let starts=0;t.engine.startNext=async()=>{starts++;};
+  t.engine.close();pending.resolve([track('bcdefghijkl')]);
+  await assert.rejects(result,/stoppet før søket/);
+  assert.equal(t.engine.connected,false);assert.equal(starts,0);
+  assert.deepEqual(t.store.get('queue',[]),[]);
  }finally{t.close();}
 });
