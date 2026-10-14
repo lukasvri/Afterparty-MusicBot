@@ -67,8 +67,26 @@ test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions an
  }finally{t.close();}
 });
 
+test('concert radio falls back past incompatible recommendations to an embeddable video',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{LASTFM_API_KEY:'synthetic-key'}),seed={...track(),concert:true};
+  p.recommendations.similar=async()=>[{title:'Audio only',artist:'Artist',duration:200}];
+  p.matchSong=async()=>({...track('Artist - Audio only','audio'),source:'soundcloud',embeddable:false});
+  p.search=async()=>[{...track('Artist - Blocked','blocked'),embeddable:false},track('Artist - Next','next')];
+  assert.equal((await p.radio(seed,[]))?.id,'next');
+ }finally{t.close();}
+});
+
 test('Last.fm handles Topic tracks whose titles omit the artist',async()=>{
  const t=setup();try{let queried='';const r=new Recommendations(t.store,'test',async(url:any)=>{queried=String(url);return Response.json({similartracks:{track:[]}})});await r.similar(track('Example Song'));const query=new URL(queried);assert.equal(query.searchParams.get('track'),'Example Song');assert.equal(query.searchParams.get('artist'),'Artist');}finally{t.close();}
+});
+
+test('Last.fm preserves a hyphenated Topic title while using the actual artist',async()=>{
+ const t=setup();try{
+  let queried='';const r=new Recommendations(t.store,'synthetic-key',async(url:any)=>{queried=String(url);return Response.json({similartracks:{track:[]}});});
+  await r.similar(track('Example Song - Remastered'));
+  const query=new URL(queried);assert.equal(query.searchParams.get('artist'),'Artist');assert.equal(query.searchParams.get('track'),'Example Song - Remastered');
+ }finally{t.close();}
 });
 
 test('YouTube search falls back on quota failure and preserves literal query semantics in its cache',async()=>{

@@ -19,7 +19,21 @@ Dette strøymer ikkje Spotify sin originale lyd. Metadata og spelbar lydkjelde e
 
 `LASTFM_API_KEY` ligg berre i den lokale .env-fila. Last.fm sine relaterte songar blir brukte som førsteval, med lokale favorittar som ekstra prioritet. Resultata blir mellomlagra eitt døgn. Nyleg spelte songar og radioforslag hoppa over før 60 sekund blir filtrerte bort. Slike hopp gir sju dagars cooldown, men hindrar ikkje eit uttrykkeleg manuelt songval.
 
-Utan nøkkel, ved tenestefeil eller utan sikre treff går radioen tilbake til artistbasert utval. SoundCloud har også ein artistbasert reserve. Last.fm kan føre radioen vidare til ei anna spelbar kjelde. Eksisterande tidleg kølegging, eitt forslag om gongen og prioritet for manuelle val er bevarte. Konsertar og direktestraumar startar ikkje radio.
+Utan nøkkel, ved tenestefeil eller utan sikre treff går radioen tilbake til artistbasert utval. SoundCloud har også ein artistbasert reserve. Last.fm kan føre radioen vidare til ei anna spelbar kjelde. Eksisterande tidleg kølegging, eitt forslag om gongen og prioritet for manuelle val er bevarte.
+
+### Website concert radio
+
+With radio enabled, tracks queued from the website's Discord concert room now
+continue with embeddable YouTube recommendations. Those recommendations retain
+concert status so the video and Discord audio continue together. Ordinary
+Discord radio remains private; live streams do not start radio. SoundCloud and
+videos that cannot be embedded are excluded from concert recommendations.
+
+A failed or empty lookup can retry after 15 seconds, with at most three attempts
+per song. Switching radio off and back on starts a fresh selection and discards
+results from the disabled selection. The admin player shows a message when no
+recommendation is found. Radio needs a current track to choose related music;
+it does not start music in an empty player.
 
 ## Lyd og avgrensingar
 

@@ -1,6 +1,6 @@
 import type {Track} from './types.ts';
 import type {CatalogSong} from './matching.ts';
-import {radioArtist} from './radio.ts';
+import {radioArtist,radioTitle} from './radio.ts';
 import type {Store} from './store.ts';
 export class Recommendations{
  private store:Store;private key:string;private request:typeof fetch;
@@ -9,8 +9,7 @@ export class Recommendations{
  async similar(seed:Track):Promise<CatalogSong[]>{
   if(!this.key)return [];
   const artist=seed.catalog?.artist??radioArtist(seed);
-  const parts=seed.title.split(/\s[-\u2013\u2014]\s/);
-  const title=seed.catalog?.title??(parts.length>1?parts.slice(1).join(' - '):seed.title).split('|')[0].replace(/\([^)]*\)|\[[^\]]*\]/g,'').trim();
+  const title=radioTitle(seed);
   if(!artist||!title)return [];
   const cacheKey='similar:'+JSON.stringify([artist,title]);const cached=this.store.get<{at:number;songs:CatalogSong[]}|null>(cacheKey,null);
   if(cached&&Date.now()-cached.at<86400000)return cached.songs;
