@@ -1,76 +1,159 @@
+<div align="center">
+
 # Gutta Krutt Afterparty
 
-Open kjeldekode for ein Discord-musikkbot og ei nettside med synkroniserte konsertrom. Core 2.0.1 handterer lyd, kø, historikk og sanntidsklokke. Nettsida gir videorom og administrasjon av serverane dine.
+**Your Discord music bot. Your shared concert room. Your server.**
 
-## Funksjonar
+Play music in Discord, bring video into a shared room, and manage everything from one web interface.
 
-- Discord-musikk med `/play`, radio, favorittar, lagra køer og eitt fast spelarkort.
-- `/konsert` deler konsertvideo og avspelingsstatus med nettsida.
-- FFmpeg/Opus, volum, spoling, pause og crossfade.
-- Separate køer og databasar for kvar Discord-server.
-- Discord OAuth for administrasjon og tilgangskontroll per server.
-- SQLite med WAL, transaksjonar og gjenoppretting etter omstart.
+[![Core validation](https://github.com/lukasvri/gutta-krutt-afterparty/actions/workflows/core.yml/badge.svg)](https://github.com/lukasvri/gutta-krutt-afterparty/actions/workflows/core.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-24.17%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-## Arkitektur
+[Installation guide](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) · [Operations](services/core/PUBLIC_RELEASE.md) · [Report an issue](https://github.com/lukasvri/gutta-krutt-afterparty/issues)
 
-`services/core/` er den sjølvhosta Node-motoren. `app/`, `components/`, `hooks/` og `lib/` er React/Vinext-nettsida. Nettsida brukar Cloudflare Workers og D1, med Sites-integrasjon i `build/`. Ho er ikkje ein ferdig, plattformuavhengig Node-server. Bindinga heiter `DB`; `.openai/hosting.json` inneheld berre generiske bindingar og ingen eksisterande prosjektidentitet.
+</div>
 
-Core må vere tilgjengeleg på ei HTTPS-adresse som nettsidetenesta kan nå. Docker eksponerer berre `127.0.0.1:3990`. Konfigurer sjølv ein HTTPS-proxy eller tunnel, og hald bro-nøkkelen hemmeleg. Core har ikkje eit eige adminpanel: administrasjonen ligg på `/admin` på nettsida.
+---
 
-## Start Core
+## What you can do
 
-Krav: Docker Engine med Compose v2. Bygginga brukar Node 24, FFmpeg og yt-dlp.
+| In Discord | On the website |
+| --- | --- |
+| Play music with `/play` | Watch shared concert videos |
+| Use radio, favorites and saved queues | Open rooms with host controls |
+| Pause, seek, skip and crossfade tracks | Manage your Discord servers through `/admin` |
+| Keep one player message instead of chat spam | Follow the Core playback clock |
 
-```sh
-cd services/core
-cp .env.example .env
-# Fyll ut eigne verdiar i .env, inkludert botnøkkel og nettsideadresse.
-docker compose build
-docker compose up -d
-./core-control.sh status
+Each Discord server has its own queue, settings and SQLite database. Ordinary `/play` music stays out of the public concert feed. Use `/konsert` when you want to share a concert.
+
+## Before you install
+
+This project has **two services**: a Docker-based audio engine and a Cloudflare Workers/D1 website. The audio engine runs on your computer or server and must stay online. The website is built with React and Vinext, with Sites integration included.
+
+> **Hosting status:** Core has a ready-to-use Compose file. The website requires your own Workers/D1 or Sites deployment and an HTTPS connection to Core. There is no single-command production installer for the complete stack. Start with the guide below, which separates local preview from a full installation.
+
+| You need | Used for |
+| --- | --- |
+| Git and Docker with Compose v2 | Downloading and running Core |
+| Node.js 24.17+ and npm | Building and previewing the website |
+| Your own Discord application and test server | Bot token, server installation and admin sign-in |
+| A Workers/D1 or Sites hosting setup | The production website and room database |
+| HTTPS addresses for the website and Core | Admin sign-in and communication between services |
+
+Examples use Bash on Linux, macOS or Windows through WSL2.
+
+## Get started
+
+### 1. Download the project
+
+```bash
+git clone https://github.com/lukasvri/gutta-krutt-afterparty.git
+cd gutta-krutt-afterparty
 ```
 
-Opprett ei eiga Discord-applikasjon og bot. Legg boten til på serveren og set `DISCORD_GUILD_ID` til eigarserveren. OAuth krev `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` og ei registrert redirect-adresse på `https://DITT-DOMENE/api/auth/discord/callback`. Boten treng løyve til å sjå og sende meldingar, bruke lenker/embeds og kople til og snakke i talekanalar. Administrator er ikkje nødvendig.
+### 2. Create your configuration files
 
-`PUBLIC_SITE_ADMIN_KEY` i Core og `ADMIN_BRIDGE_KEY` på nettsida må vere same tilfeldig genererte hemmelegheit. `PUBLIC_SITE_URL` er nettsideadressa. `GUTTA_CORE_PUBLIC_URL` er HTTPS-adressa til Core. Det følgjer ikkje med nøklar eller ein ferdig produksjonskonto.
+```bash
+cp services/core/.env.example services/core/.env
+cp .dev.vars.example .dev.vars
+```
 
-## Nettside og lokal utvikling
+Fill them with **your own** credentials. The [installation guide](docs/INSTALLATION.md#2-create-and-install-your-discord-bot) shows where to find each value. The same bridge secret goes into Core's `PUBLIC_SITE_ADMIN_KEY` and the website's `ADMIN_BRIDGE_KEY`.
 
-Krav: Node 24.17 eller nyare og npm. Kopier `.dev.vars.example` til `.dev.vars` og fyll ut eigne verdiar. Bruk `npm ci`, deretter `npm run dev`. Opprett tabellane i di eiga D1-database med SQL-migrasjonen i `drizzle/` før første bruk. Etter `npm run build` kan du bruke kommandoane nedanfor for lokal utvikling. Produksjon krev di eiga Wrangler-konfigurasjon og database. Produksjon krev ei eiga D1-binding og Workers/Sites-konfigurasjon; bruk aldri ein annan installasjon sin prosjektidentitet.
+### 3. Build and start Core
 
-```sh
+After completing the Discord and URL setup in the guide:
+
+```bash
+cd services/core
+docker compose up -d --build
+curl --fail http://127.0.0.1:3990/health
+```
+
+Expected response:
+
+```json
+{"ready":true,"engine":"gutta-krutt-core"}
+```
+
+This confirms the bot is connected to Discord. It does not verify the website or audio playback yet.
+
+### 4. Set up the website and play your first track
+
+Follow [the website setup steps](docs/INSTALLATION.md#5-build-and-preview-the-website), then the [first-use checklist](docs/INSTALLATION.md#8-play-your-first-track). The guide covers database setup, HTTPS, Discord login and common errors.
+
+**[Open the complete step-by-step guide →](docs/INSTALLATION.md)**
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    User[Listener] --> Discord[Discord voice channel]
+    User --> Web[Afterparty website]
+    Web <-->|HTTPS: state and commands| Core[Core audio engine]
+    Core -->|Opus audio| Discord
+    Core --> SQLite[(SQLite per server)]
+    Web --> D1[(Cloudflare D1)]
+```
+
+Core owns audio playback and the shared timeline. The website displays state and sends authorized commands. FFmpeg handles decoding and Opus encoding; SQLite preserves queues, settings and recovery information.
+
+## Everyday commands
+
+Run these from `services/core/`:
+
+| Task | Command |
+| --- | --- |
+| Start an already-built bot | `docker compose up -d --no-build` |
+| See container status | `docker compose ps` |
+| Read recent logs | `docker compose logs --tail=100 core` |
+| Stop without deleting data | `docker compose stop` |
+
+Data is stored in the `core-data` Docker volume. Back up the entire volume, including `guilds/`. See [updates and backups](services/core/PUBLIC_RELEASE.md) before upgrading. `docker compose down -v` deletes the volume.
+
+## Development and checks
+
+From the repository root:
+
+```bash
 npm ci
-npm run dev
-# Kontroll av nettsidetypar, og Core-bygg med testar:
 npm run project -- check
 npm run test:fullscreen
+node --test scripts/audio-preferences.test.mjs
 ```
 
-Initialiser ei tom lokal database ved å køyre migrasjonane i rekkjefølgje, berre éin gong:
+The project check typechecks the website and builds Core's validation image. Core currently has **60 automated tests**, including real FFmpeg/Opus audio, server isolation, permissions, queue behavior and database rollback. The fullscreen and audio-preference suites contain **16 additional tests**. GitHub Actions runs Core validation on pushes and pull requests.
 
-```sh
-npm run build
-for migration in drizzle/*.sql; do
-  npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file "$migration"
-done
+<details>
+<summary><strong>Repository map</strong></summary>
+
+```text
+app/                 Website pages and API routes
+components/, hooks/  Player UI and browser behavior
+lib/                 Website state, authorization and Core transport
+db/, drizzle/        D1 schema and migrations
+services/core/       Discord bot, audio engine, Compose and tests
+build/               Sites and Cloudflare integration
+scripts/             Development commands and browser behavior tests
+docs/                Installation and configuration guides
 ```
 
-For isolerte Core-testar:
+</details>
 
-```sh
-docker build --target validation -t gutta-krutt-core:validation services/core
-```
+## Current limitations
 
-Docker-bygginga typekontrollerer og køyrer 60 testar, inkludert ekte FFmpeg/Opus, serverisolasjon, tilgang, kø, radio, databaseskriving og ytelsesmålingar. Testane brukar eigne data. `scripts/smoke.mjs` er ein integrasjonstest mot ei konfigurert testnettside, krev eigne nøklar og opprettar mellombelse rom.
+- Website deployment needs your own hosting configuration; local preview is not a deployed service.
+- Some application messages and slash commands are Norwegian. The installation documentation is in English.
+- Spotify links are matched to playable audio sources. SoundCloud plays as audio; YouTube video uses the official embedded player.
+- Chapter splitting and SponsorBlock are not implemented.
+- Separate clients have their own buffers and network delays; perfect synchronization is not guaranteed.
+- Concurrent load across multiple real Discord servers has not been established by a production load test.
 
-## Data og drift
+## Contributing and security
 
-Compose lagrar data i det namngjevne volumet `core-data`. Ta sikkerheitskopi av heile volumet, inkludert `guilds/`. Bruk SQLite-backup eller stopp Core kontrollert før filkopiering. Ikkje bruk `docker compose down -v` dersom data skal bevarast. Sjå [driftsnotata](services/core/PUBLIC_RELEASE.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. For credential exposure or vulnerabilities, follow [SECURITY.md](SECURITY.md). Never include tokens, `.env` files, private logs or databases in an issue.
 
-## Avgrensingar
+## License
 
-YouTube brukar sin offisielle innebygde spelar. Spotify-lenker blir matcha mot tilgjengelege lydkjelder. Kapitteldeling og SponsorBlock er ikkje implementerte. Null forseinking mellom menneskelege klientar er ikkje garantert. Samtidig last frå fleire ekte Discord-serverar er ikkje dokumentert.
-
-## Lisens og bidrag
-
-MIT, sjå [LICENSE](LICENSE). Tredjepartskode har eigne bevarte lisensar, sjå [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Sjå [CONTRIBUTING.md](CONTRIBUTING.md) og [SECURITY.md](SECURITY.md).
+Released under the [MIT license](LICENSE). Third-party code keeps its own notices; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The software license does not grant rights to music, video or third-party artwork.

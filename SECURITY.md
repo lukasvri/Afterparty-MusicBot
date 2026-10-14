@@ -1,7 +1,13 @@
-# Tryggleik
+# Security
 
-Ikkje legg nøklar, private loggar eller utnyttingsdetaljar i offentlege saker. Bruk GitHub si private rapportering under Security dersom ho er aktivert. Elles kan du opne ei sak som berre ber vedlikehaldaren om ein privat kontaktkanal.
+Do not publish credentials, private logs or exploit details in public issues. Use GitHub's private vulnerability reporting under **Security** if available. Otherwise, open an issue that only asks the maintainer for a private contact channel.
 
-Dersom ein nøkkel blir eksponert, trekk han tilbake og opprett ein ny hos leverandøren. Å fjerne fila frå Git er ikkje nok.
+## If a credential is exposed
 
-Bruk ein eigen tilfeldig bro-nøkkel, HTTPS mellom nettsida og Core, og bevar loopback-bindinga i Compose. Offentleg status skal ikkje innehalde Discord-medlemsopplysningar. Ta konsistent backup før oppgradering.
+Revoke it with the provider and generate a replacement. Update the affected service and recreate or redeploy it. Removing the file from the latest commit does not remove the credential from Git history.
+
+## Deployment basics
+
+Use a separate random bridge secret, HTTPS between the website and Core, and the loopback port binding provided in Compose. Public state must not expose Discord member information. Back up consistently before upgrades and keep backups and environment files outside Git.
+
+The [configuration reference](docs/CONFIGURATION.md) explains which values belong in each service.

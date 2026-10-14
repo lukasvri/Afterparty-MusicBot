@@ -1,17 +1,42 @@
-# Gutta Krutt Core 2.0.1
+# Gutta Krutt Core
 
-Sjølvhosta Discord-bot og sanntidsmotor. Sjå [hovudrettleiinga](../../README.md) for oppsett, nøklar, nettside og testar, og [driftsnotata](PUBLIC_RELEASE.md) for serverisolasjon og gjenoppretting.
+**The self-hosted audio engine behind Afterparty.** Core connects to Discord, manages per-server queues and exposes the playback state used by the website.
 
-```sh
+[Full installation guide](../../docs/INSTALLATION.md) · [Environment reference](../../docs/CONFIGURATION.md) · [Operations and backups](PUBLIC_RELEASE.md)
+
+## Start here
+
+From this directory, after creating your Discord application and configuring your website addresses:
+
+```bash
 cp .env.example .env
-# Fyll ut eigne verdiar.
-docker compose build
-docker compose up -d
-./core-control.sh status
+# Fill in your own values before continuing.
+docker compose up -d --build
+curl --fail http://127.0.0.1:3990/health
 ```
 
-Data ligg i Compose-volumet `core-data`, montert på `/data`. Nye Discord-serverar får databasar under `/data/guilds/`. Port 3990 er berre bunden til loopback. Administrasjon skjer på nettsida si `/admin`-rute.
+Do not overwrite an existing `.env`. A healthy response contains `"ready":true`.
 
-`./core-control.sh start|stop|status|logs|admin` brukar Docker-konteksten `default`. `start` byggjer ikkje ny kode; bygg eksplisitt ved oppgradering. Bevar førre Core-bilete og ta konsistent backup av heile datavolumet før eit byte.
+## Run and inspect
 
-Core brukar ikkje Muse som runtime. Referansekode med Muse-lisens er bevart under `reference/muse/`. Tilbakeføring frå denne motoren krev ein kompatibel Core-versjon, ikkje ein eldre Muse-installasjon.
+```bash
+docker compose ps
+docker compose logs --tail=100 core
+docker compose stop
+```
+
+The `core-control.sh` helper supports `start`, `stop`, `status`, `logs` and `admin`, using Docker context `default`. Its `start` action uses the existing image; it does not build new source. Administration lives at `/admin` on your configured website, not on a separate Core admin port.
+
+## Persistence and networking
+
+Compose mounts the named `core-data` volume at `/data`. Additional Discord servers use `/data/guilds/<server-id>/core.sqlite`. Back up the complete volume.
+
+The host port is `127.0.0.1:3990`. Use an HTTPS proxy or tunnel for website access while preserving this local binding.
+
+## Test without production data
+
+```bash
+docker build --target validation -t gutta-krutt-core:validation .
+```
+
+This typechecks Core and runs its tests, including real FFmpeg/Opus audio. Core uses its own runtime; the Muse files under `reference/` are retained reference material with their upstream license.

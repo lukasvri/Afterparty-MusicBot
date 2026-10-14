@@ -1,43 +1,74 @@
-# Offentleg drift, Core 2.0
+# Operations and recovery
 
-Administrasjon og botinvitasjon er samla på `/admin` på den konfigurerte nettsideadressa. «Public Bot» må vere slått på i Discord. Innlogging brukar `identify` og `guilds`, og krev servereigar, Administrator eller Manage Server. Botinvitasjonen krev ikkje Administrator.
+[README](../../README.md) · [Installation](../../docs/INSTALLATION.md) · [Configuration](../../docs/CONFIGURATION.md)
 
-## Serverar og tilgang
+## Normal operation
 
-Éin Discord-klient handterer fleire serverar. Kvar server har eigen motor, lydtilkopling, kø, innstillingar, favorittar, lagra køer og kommandologg. Eigaren sin gamle database og romkode `DISCORD1` blir bevarte. Nye serverar får stabile romkodar og databasar under `/data/guilds/<server-id>/core.sqlite`.
+Run these from `services/core/`:
 
-Discord-innlogging gir berre administrasjon av serverar brukaren faktisk administrerer. Rettane blir kontrollerte mot Discord ved private førespurnader. Økta varer høgst åtte timar. OAuth-tilstanden kan berre brukast éin gong. Nettlesaren får ei HttpOnly-økt, ikkje botnøkkelen eller Discord-tilgangstokenet.
+```bash
+docker compose ps
+curl --fail http://127.0.0.1:3990/health
+docker compose logs --tail=100 core
+```
 
-Det gamle passordet er ein reserve for eigarserveren. Det gir ikkje tilgang til andre serverar. Port 3847 og det separate adminpanelet er stengde. Berre loopback-port 3990 blir publisert frå containeren til den eksisterande Tailscale-transporten.
+`ready: true` confirms Discord readiness. Verify actual playback and website connectivity separately. The Core host, Docker and network must remain available for audio. A hosted website does not keep the bot running when its host is off.
 
-## Avspeling
+## Back up before updating
 
-`/play` spelar vanleg Discord-musikk med den faste spelarmeldinga. `/konsert` og tillegg frå nettsida blir viste i den aktuelle serveren sitt videorom. Pause, fortsett og neste i konsertrommet styrer same avspeling. Vanlege videorom bevarer vertskontrollen og vernar mot utdaterte og samtidige kommandoar.
+Back up the entire `/data` volume, including every `guilds/` database. Stop Core for a consistent file copy, or use SQLite's backup API separately for every live database. Protect backups because they contain server data.
 
-Administrasjonen har spelar, køredigering, spoling, volum, gjentaking, radio, lydkvalitet, kanalval, stopptimer og lagra køer. Videoskipping finst òg i fullskjerm, utan ei ekstra rad som reduserer videoflata.
+Example for a local backup using the existing container:
 
-Medieoppslag er mellomlagra og har høgst fire samtidige utpakkingsprosessar og seksten ventande oppslag. Lydstart får prioritet framfor søk. YouTube-søk har reserve ved brukt API-kvote. Maksimalt åtte samtidige taletilkoplingar er standardgrensa på denne maskina; dette er ei ressursgrense, ikkje dokumentasjon av lastkapasitet.
+```bash
+# Run from services/core/.
+umask 077
+mkdir -p backups
+backup_file="backups/core-$(date +%Y%m%d-%H%M%S).tar"
+docker compose stop core
+if docker cp gutta-krutt-core:/data/. - > "$backup_file"; then
+  tar -tf "$backup_file" >/dev/null
+else
+  echo "Backup failed. Do not upgrade. Inspect the partial archive locally."
+fi
+docker compose start core
+```
 
-## Drift og gjenoppretting
+Confirm the archive is nonempty and readable before an update. Keep a separate protected copy of your configuration and credentials. Do not commit either to Git. `docker compose down -v` removes the data volume and is not a normal stop command.
 
-Bruk `services/core/core-control.sh` som felles kontroll for start, stopp, status, logg og admin. Boten krev at PC-en, Docker, nettverket og Tailscale er tilgjengelege. Nettsida si feilmelding ved tapt sanntidstilkopling skal ikkje tolkast som ei ny avspelingskommando.
+## Update deliberately
 
-Ta sikkerheitskopi av heile datamappa, inkludert `guilds/`. Stopp boten før filkopiering av SQLite-filer, eller bruk SQLite si backup-funksjon for kvar database. Ei kopi av berre eigardatabasen bevarer ikkje nye serverar. Kopien `before-public-2.0.sqlite` er frå før oppgraderinga og gjeld berre eigarserveren.
+A bot restart interrupts voice playback. Choose a suitable time and take a verified backup first.
 
-Gjenoppretting etter at fleire serverar er installerte må bruke ein kompatibel 2.x-motor. Dei eldre motorane er ikkje trygge å starte mot denne fleirserverinstallasjonen. Bevar databasekopiar før vidare migrasjonar.
+1. Record the current commit with `git rev-parse HEAD`.
+2. Preserve the running image before building:
 
-## Kontroll og avgrensingar
+   ```bash
+   docker image tag "$(docker inspect --format '{{.Image}}' gutta-krutt-core)" gutta-krutt-core:before-update
+   ```
 
-Core har 60 automatiske testar, inkludert isolasjon mellom to simulerte serverar, OAuth-rettar, utløp og manipulering, kø, pause, konsertfiltrering, FFmpeg og lydkvalitet. Nettsidetesten kontrollerer rom, delte tilstandar, faktisk videoskipping, tilgang, versjonskonfliktar og opprydding. Éin ekte Discord-server er brukt under oppgraderinga; to ekte serverar med samtidige lyttarar er enno ikkje lasttesta.
+3. From the repository root, run `git pull --ff-only`. Resolve any local configuration conflicts before proceeding.
+4. From `services/core/`, run `docker compose build`. The image build must pass validation.
+5. Run `docker compose up -d --no-build`, then check health, recent logs, the player and website sign-in.
 
-YouTube styrer kvalitet og teksting i sin offisielle spelar. Spotify-lenker blir matcha mot YouTube-lyd. SoundCloud blir spela som lyd. Null forseinking mellom menneskelege klientar kan ikkje garanterast med separate nettverk, Discord-bufferar og YouTube-spelarar. Kapitteldeling og SponsorBlock er framleis kjende funksjonsavgrensingar frå overgangen til Core, sjå README.
+If the new image fails, select the preserved compatible Core image in Compose and recreate the service. Review any schema migrations before using an older image. Restore a backup only after stopping Core and verifying that it matches the selected version. Do not overwrite newer data casually. Muse rollback is not a supported recovery path for the multi-server Core databases.
 
-## Ytelsesforbetringar i Core 2.0.1
+## Server isolation and access
 
-Historikk og kommandologg har indeksar for tidsrekkjefølgje og usende resultat. Kø og gjeldande spor blir lagra atomisk i éin transaksjon; kvitteringar blir òg skrivne samla. SQLite brukar framleis WAL og synchronous=FULL, og gjenopprettingsposisjonen blir framleis lagra kvart sekund under avspeling.
+Each Discord server has its own queue, settings, favorites, saved queues and database. The owner server uses `/data/core.sqlite`; other servers use `/data/guilds/<server-id>/core.sqlite`.
 
-Klokkehendinga er eit signal utan full tilstand. Transporten hentar tilstand når han skal sende henne. Køhashen blir gjenbrukt når innhaldet som definerer køversjonen er uendra.
+Discord login requests `identify` and `guilds`, and administrative access requires ownership, Administrator or Manage Server permission for the selected server. Sessions last at most eight hours. The legacy owner-password fallback does not grant access to other servers.
 
-Svartid og event-loop-p95 gjeld eit rullerande vindauge på om lag 60 sekund, med sekundoppløysing. Event-loop-talet måler no ekstra forseinking utover eit 20 ms timerintervall, og kan ikkje samanliknast direkte med det gamle histogrammet som inkluderte intervallet. requestCount er framleis totalt sidan oppstart; windowRequestCount gjeld målevindauget.
+Only concert tracks are exposed in the public website feed. Normal Discord music and private requester information must stay out of public state.
 
-Isolert samanlikning med 50 000 syntetiske historikkrader og 50 000 kommandoar gav median 32,99 til 0,15 ms for historikk og 22,63 til 0,26 ms for kommandologg. Ein tomgangstick med 500 køelement gjekk frå 0,062 til 0,00069 ms. Dette er mikrotestar, ikkje dokumentasjon av kapasitet med fleire aktive Discord-serverar.
+## Resource limits and metrics
+
+Media extraction has a shared limit of four running processes and sixteen queued requests. Audio startup takes priority over searches. The default voice-session limit is eight. This is a resource guard, not evidence that every host can sustain eight simultaneous streams.
+
+Core 2.0.1 adds indexed history/job queries, atomic queue writes, batched acknowledgements and reduced work in the clock loop. SQLite retains WAL and `synchronous=FULL`; playback recovery is still checkpointed once per playback second.
+
+Admin metrics use an approximately 60-second rolling window with one-second buckets. `requestCount` is lifetime total; `windowRequestCount` covers the current window. Event-loop p95 measures delay beyond the expected 20 ms timer interval and is not directly comparable with the earlier interval-inclusive metric.
+
+## Verification limits
+
+Automated tests cover audio encoding, queue behavior, authorization, persistence and two simulated Discord servers. Multiple real Discord servers with simultaneous listeners have not been production load-tested. Media-provider availability and browser playback policies remain external dependencies.
