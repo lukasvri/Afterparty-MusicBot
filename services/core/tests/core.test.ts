@@ -44,6 +44,38 @@ test('radio queues early, deduplicates concurrent lookups and yields to manual s
   t.engine.setSettings({radio:false});assert.deepEqual(t.engine.queue.map(t=>t.id),['manual12345']);
  }finally{t.close();}
 });
+
+test('radio continues website concerts with public embeddable YouTube tracks',async()=>{
+ const t=setup();try{
+  t.engine.connected=true;t.engine.current={...track(),concert:true};t.providers.radio=async()=>track('radio123456');
+  await t.engine.ensureRadio();
+  assert.equal(t.engine.queue[0]?.concert,true);assert.equal(t.engine.queue[0]?.radio,true);
+  assert.equal(t.engine.websiteSnapshot().queue[0]?.id,'radio123456');
+ }finally{t.close();}
+});
+
+test('website enqueue continues into radio while ordinary admin music stays private',async()=>{
+ for(const scope of ['public','admin'] as const){
+  const t=setup();try{
+   t.engine.connected=true;t.providers.resolve=async()=>[track()];t.providers.radio=async()=>track('radio123456');
+   t.engine.startTrack=async selected=>{t.engine.generation++;t.engine.current=selected;};
+   await new Commands(t.engine).execute({action:'enqueue',videoId:'abcdefghijk'},scope);
+   assert.equal(t.engine.current?.concert,scope==='public');
+   await t.engine.ensureRadio();await t.engine.naturalNext();
+   assert.equal(t.engine.current?.id,'radio123456');assert.equal(t.engine.current?.concert,scope==='public');
+   assert.equal(t.engine.websiteSnapshot().current?.id,scope==='public'?'radio123456':undefined);
+  }finally{t.close();}
+ }
+});
+
+test('concert radio cannot introduce SoundCloud or unembeddable tracks',async()=>{
+ for(const candidate of [{...track('radio123456'),source:'soundcloud' as const},{...track('radio123456'),embeddable:false}]){
+  const t=setup();try{
+   t.engine.connected=true;t.engine.current={...track(),concert:true};t.providers.radio=async()=>candidate;
+   await t.engine.ensureRadio();assert.equal(t.engine.queue.length,0);assert(t.engine.radioError);
+  }finally{t.close();}
+ }
+});
 test('late radio result cannot survive stop, a manual selection or disabling radio',async()=>{
  for(const action of ['stop','manual','disable']){const t=setup();try{
   t.engine.connected=true;t.engine.current=track();let finish!:(track:Track)=>void;t.providers.radio=()=>new Promise(r=>finish=r);
@@ -55,6 +87,37 @@ test('late radio result cannot survive stop, a manual selection or disabling rad
 });
 test('radio lookup failure does not reject playback or retry every clock tick',async()=>{
  const t=setup();try{t.engine.connected=true;t.engine.current=track();let calls=0;t.providers.radio=async()=>{calls++;throw Error('quota');};await t.engine.ensureRadio();await t.engine.ensureRadio();assert.equal(calls,1);assert(t.engine.radioError);assert.equal(t.engine.current.id,'abcdefghijk');}finally{t.close();}
+});
+
+test('radio retries temporary failure after a cooldown and queues a recovered result',async context=>{
+ const t=setup();let now=1000;context.mock.method(Date,'now',()=>now);
+ try{
+  t.engine.connected=true;t.engine.current=track();let calls=0;
+  t.providers.radio=async()=>{if(++calls===1)throw Error('temporary failure');return track('radio123456');};
+  await t.engine.ensureRadio();await t.engine.ensureRadio();assert.equal(calls,1);
+  now+=15000;await t.engine.ensureRadio();
+  assert.equal(calls,2);assert.equal(t.engine.queue[0]?.id,'radio123456');assert.equal(t.engine.radioError,'');
+ }finally{t.close();}
+});
+
+test('empty radio results retry at most three times per song and report no matches',async context=>{
+ const t=setup();let now=1000;context.mock.method(Date,'now',()=>now);
+ try{
+  t.engine.connected=true;t.engine.current=track();let calls=0;t.providers.radio=async()=>{calls++;return null;};
+  for(let i=0;i<5;i++){await t.engine.ensureRadio();now+=15000;}
+  assert.equal(calls,3);assert(t.engine.radioError);assert.equal(t.engine.queue.length,0);
+ }finally{t.close();}
+});
+
+test('re-enabling radio discards the disabled lookup and starts a fresh selection',async()=>{
+ const t=setup(),pending=deferred<Track>();try{
+  t.engine.connected=true;t.engine.current=track();let calls=0;
+  t.providers.radio=async()=>++calls===1?pending.promise:track('newradio123');
+  const old=t.engine.ensureRadio();t.engine.setSettings({radio:false});t.engine.setSettings({radio:true});
+  pending.resolve(track('oldradio123'));await old;
+  assert.equal(t.engine.queue.length,0);await t.engine.ensureRadio();
+  assert.equal(calls,2);assert.equal(t.engine.queue[0]?.id,'newradio123');
+ }finally{t.close();}
 });
 
 test('requesting a radio suggestion explicitly promotes it to a manual choice',()=>{

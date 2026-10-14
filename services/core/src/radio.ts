@@ -1,19 +1,29 @@
 import type {PublicTrack,Track} from './types.ts';
 
 const normalize=(s:string)=>s.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
-export function radioArtist(track:PublicTrack){
-    const prefix=track.title.split(/\s[-\u2013\u2014]\s/)[0];
-    return (prefix!==track.title?prefix:track.artist).replace(/\s*(?:- Topic|VEVO|Official(?: Music)?)$/i,'').split(',')[0].trim();
+type RadioTrack=PublicTrack & Pick<Partial<Track>,'catalog'>;
+export function canPlayRadioTrack(seed:Track,track:Track){
+    return !track.live&&(!seed.concert||((track.source??'youtube')==='youtube'&&track.embeddable));
 }
-export function radioQuery(track:PublicTrack){
+export function radioArtist(track:RadioTrack){
+    const prefix=track.title.split(/\s[-\u2013\u2014]\s/)[0];
+    const artist=track.catalog?.artist||(/(?:- Topic|VEVO)$/i.test(track.artist)?track.artist:prefix!==track.title?prefix:track.artist);
+    return artist.replace(/\s*(?:- Topic|VEVO|Official(?: Music)?)$/i,'').split(',')[0].trim();
+}
+export function radioTitle(track:RadioTrack){
+    if(track.catalog?.title)return track.catalog.title;
     const parts=track.title.split(/\s[-\u2013\u2014]\s/);
-    const artist=parts.length>1?parts[0]:radioArtist(track);
-    const song=(parts.length>1?parts.slice(1).join(' - '):track.title).split('|')[0]
-        .replace(/\([^)]*\)|\[[^\]]*\]/g,'').replace(/\b(?:feat\.?|ft\.?)\s+.*/i,'').replace(/"/g,'').trim();
+    const artist=normalize(radioArtist(track)),prefix=normalize(parts[0]);
+    const hasArtistPrefix=Boolean(artist)&&(prefix===artist||prefix.startsWith(artist+' '));
+    return (parts.length>1&&hasArtistPrefix?parts.slice(1).join(' - '):track.title).split('|')[0]
+        .replace(/\([^)]*\)|\[[^\]]*\]/g,'').replace(/\b(?:feat\.?|ft\.?)\s+.*/i,'').trim();
+}
+export function radioQuery(track:RadioTrack){
+    const artist=radioArtist(track),song=radioTitle(track).replace(/"/g,'');
     return `${artist} audio${song?` -"${song}"`:''}`;
 }
-export function songIdentity(track:PublicTrack){
-    return normalize(track.title.split('|')[0].replace(/\([^)]*\)|\[[^\]]*\]/g,'').replace(/\b(?:feat\.?|ft\.?)\s+.*/i,'').replace(/\b(?:official|music|video|audio|lyrics?|visualizer|hd|hq|4k)\b/gi,''));
+export function songIdentity(track:RadioTrack){
+    return normalize(radioTitle(track).replace(/\([^)]*\)|\[[^\]]*\]/g,'').replace(/\b(?:feat\.?|ft\.?)\s+.*/i,'').replace(/\b(?:official|music|video|audio|lyrics?|visualizer|hd|hq|4k)\b/gi,''));
 }
 /** Conservative radio: prefer another real song by the seed artist to unrelated video guesses. */
 export function rankRadio(seed:Track,candidates:Track[],recent:PublicTrack[],excluded:string[]){

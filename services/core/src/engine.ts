@@ -2,13 +2,14 @@ import {EventEmitter} from 'node:events';
 import {randomUUID,createHash} from 'node:crypto';
 import {Store} from './store.ts';
 import {Providers} from './providers.ts';
+import {canPlayRadioTrack} from './radio.ts';
 import {Mixer,PcmDecoder,encodeOpus,audioBitrate,type Sink,type Prepared} from './audio.ts';
 import {publicTrack,UserError,type Track,type PublicState,type Settings} from './types.ts';
 export type Segment={track:Track;startFrame:number;offset:number};
 export function positionFromSegments(segments:Segment[],duration:number){const frame=Math.floor(duration/20);const active=segments.findLast(s=>s.startFrame<=frame)??segments[0];return active?{track:active.track,position:Math.max(0,active.offset+(frame-active.startFrame)/50)}:{track:null,position:0};}
 export class Engine extends EventEmitter{
  store:Store;providers:Providers;sink:Sink;settings:Settings;queue:Track[];current:Track|null=null;segments:Segment[]=[];volume:number;ducking=false;ready=false;connected=false;generation=0;queueGeneration=0;runId:string|null=null;mixer:Mixer|null=null;abort:AbortController|null=null;loading=false;paused=false;epoch=randomUUID();sequence=0;historyEntries:Track[]=[];loop=false;loopQueue=false;lastError='';timer:ReturnType<typeof setInterval>;lastEntry='';lastSecond=-1;bitrate=96000;channelBitrate=96000;mutationTail:Promise<unknown>=Promise.resolve();
- radioTask:Promise<void>|null=null;radioAttempt='';radioError='';
+ radioTask:Promise<void>|null=null;radioAttempt='';radioError='';radioAttempts=0;radioRetryAt=0;radioGeneration=0;
  constructor(store:Store,providers:Providers,sink:Sink){super();this.store=store;this.providers=providers;this.sink=sink;this.settings=store.settings();this.volume=this.settings.defaultVolume;this.queue=store.get<Track[]>('queue',[]);const recovery=store.get<{track:Track;position:number;paused:boolean}|null>('recovery',null);if(recovery?.track&&!this.queue.some(t=>t.entryId===recovery.track.entryId))this.queue.unshift({...recovery.track,offset:recovery.track.live?0:Math.min(recovery.position,Math.max(0,recovery.track.duration-1))});sink.onIdle=id=>{if(id===this.runId){this.runId=null;void this.naturalNext();}};sink.onError=(error,id)=>{if(id!==this.runId)return;this.lastError='Lydstrømmen stoppet.';console.warn(this.lastError);this.emit('audioError',error);void this.skip();};this.timer=setInterval(()=>this.tick(),100);}
  serialize<T>(fn:()=>Promise<T>|T):Promise<T>{const job=this.mutationTail.catch(()=>{}).then(fn);this.mutationTail=job;return job;}
  tick(){const {track,position}=positionFromSegments(this.segments,this.sink.duration());if(track&&track.entryId!==this.current?.entryId){this.current=track;this.queue=this.queue.filter(t=>t.entryId!==track.entryId);this.persist();this.changed();}if(track&&this.sink.advancing()&&this.sink.duration()>0&&track.entryId!==this.lastEntry){this.lastEntry=track.entryId;this.historyEntries.push(track);this.historyEntries=this.historyEntries.slice(-50);const video=publicTrack(track);if(video)this.store.record('core:'+track.entryId,video);this.changed();}const second=Math.floor(position);if(second!==this.lastSecond&&this.current){this.lastSecond=second;this.checkpoint();}if(this.current&&this.sink.advancing())void this.ensureRadio();this.emit('clock');}
@@ -20,23 +21,27 @@ export class Engine extends EventEmitter{
  checkpoint(){this.store.set('recovery',this.current?{track:this.current,position:positionFromSegments(this.segments,this.sink.duration()).position,paused:this.paused}:null);}
  persist(){this.store.setMany({queue:this.queue,current:this.current});}
  setConnection(connected:boolean){this.connected=connected;if(!connected){this.queueGeneration++;this.stop(false);}this.changed();}
- setSettings(change:Partial<Settings>){this.settings={...this.settings,...change};this.store.set('settings',this.settings);if(change.radio===false)this.queue=this.queue.filter(t=>!t.radio);this.persist();this.mixer?.invalidateNext();this.changed();}
+ setSettings(change:Partial<Settings>){if(change.radio!==undefined&&change.radio!==this.settings.radio){this.radioGeneration++;this.radioAttempt='';this.radioAttempts=0;this.radioRetryAt=0;this.radioError='';}this.settings={...this.settings,...change};this.store.set('settings',this.settings);if(change.radio===false)this.queue=this.queue.filter(t=>!t.radio);this.persist();this.mixer?.invalidateNext();this.changed();}
  enqueue(tracks:Track[],next=false,immediate=false){if(!tracks.length)throw new UserError('Fant ingen sanger.');const seen=new Set([this.current?.id,...this.queue.filter(t=>!t.radio).map(t=>t.id)]);const fresh=tracks.filter(t=>{if(seen.has(t.id))return false;seen.add(t.id);return true;});if(!fresh.length)throw new UserError('Sangen ligger allerede i køen.');if(this.queue.length+fresh.length>this.settings.playlistLimit)throw new UserError('Køen er full.');const manual=this.queue.filter(t=>!t.radio);this.queue=next?[...fresh,...manual]:[...manual,...fresh];this.mixer?.invalidateNext();this.persist();this.changed();if(immediate)void this.skip();else if(!this.current&&this.connected)void this.startNext();return fresh.length;}
  async prepare(track:Track,offset:number,signal:AbortSignal):Promise<Prepared>{const source=await this.providers.stream(track,signal);if(signal.aborted)throw new Error('Avbrutt avspilling.');return {track:{...track,duration:source.duration||track.duration},decoder:new PcmDecoder(source,offset,signal)};}
  /** Select one track early; decoding still starts near the end of the current song. */
  ensureRadio():Promise<void>{
   if(this.radioTask)return this.radioTask;
   const seed=this.current;
-  if(!seed||!this.connected||!this.settings.radio||this.loop||this.loopQueue||seed.concert||seed.live||this.queue.length||this.radioAttempt===seed.entryId)return Promise.resolve();
-  this.radioAttempt=seed.entryId;
-  const generation=this.generation;
+  if(!seed||!this.connected||!this.settings.radio||this.loop||this.loopQueue||seed.live||this.queue.length)return Promise.resolve();
+  if(this.radioAttempt!==seed.entryId){this.radioAttempt=seed.entryId;this.radioAttempts=0;this.radioRetryAt=0;this.radioError='';}
+  // Retry transient failures without issuing an unbounded lookup every clock tick.
+  if(this.radioAttempts>=3||Date.now()<this.radioRetryAt)return Promise.resolve();
+  this.radioAttempts++;
+  const generation=this.generation,radioGeneration=this.radioGeneration;
+  const valid=()=>generation===this.generation&&radioGeneration===this.radioGeneration&&this.current?.entryId===seed.entryId&&this.connected&&this.settings.radio&&!this.loop&&!this.loopQueue&&!this.queue.length;
   this.radioTask=(async()=>{
    try{
     const next=await this.providers.radio(seed,[seed.id]);
-    if(generation!==this.generation||this.current?.entryId!==seed.entryId||!this.connected||!this.settings.radio||this.loop||this.loopQueue||this.queue.length)return;
-    this.radioError='';
-    if(next){this.queue.push({...next,radio:true,concert:false});this.mixer?.invalidateNext();this.persist();this.changed();}
-   }catch{this.radioError='Radioen fant ikke neste sang. Prøv /play.';}
+    if(!valid())return;
+    if(next&&canPlayRadioTrack(seed,next)){this.radioError='';this.radioRetryAt=Infinity;this.queue.push({...next,radio:true,concert:seed.concert===true});this.mixer?.invalidateNext();this.persist();this.changed();}
+    else{this.radioError='Radioen fant ingen nye sanger. Prøv en annen låt.';this.radioRetryAt=Date.now()+15000;}
+   }catch{if(valid()){this.radioError='Radioen fant ikke neste sang. Prøv /play.';this.radioRetryAt=Date.now()+15000;}}
   })().finally(()=>{this.radioTask=null;});
   return this.radioTask;
  }

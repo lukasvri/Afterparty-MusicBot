@@ -1,5 +1,7 @@
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Radioen fant ingen nye sanger. Prøv en annen låt.":["Radioen fant ingen nye sanger. Prøv en annen låt.","Radio found no new songs. Try a different track."],
+ "Radioen fant ikke neste sang. Prøv /play.":["Radioen fant ikke neste sang. Prøv /play.","Radio could not find the next song. Try /play."],
  "Avspillingskontroller":["Avspillingskontroller","Playback controls"],
  "Lukk fullskjerm":["Lukk fullskjerm","Exit fullscreen"],
  "Bare verten kan endre synligheten.":["Bare verten kan endre synligheten.","Only the host can change room visibility."],

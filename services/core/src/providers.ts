@@ -5,7 +5,7 @@ import {resolveSoundcloud,soundcloudUrl} from './soundcloud.ts';
 import {Recommendations} from './recommendations.ts';
 import {normalized,scoreMatch,mapLimited,type CatalogSong} from './matching.ts';
 export {normalized,scoreMatch} from './matching.ts';
-import {radioArtist,radioQuery,rankRadio,songIdentity} from './radio.ts';
+import {radioArtist,radioQuery,rankRadio,songIdentity,canPlayRadioTrack} from './radio.ts';
 import {Store} from './store.ts';
 import {UserError,type Track} from './types.ts';
 function spawnJson(command:string,args:string[],signal?:AbortSignal):Promise<any>{return new Promise((resolve,reject)=>{const child=spawn(command,args,{stdio:['ignore','pipe','pipe'],signal});let out='',error='';const timer=setTimeout(()=>{child.kill('SIGKILL');reject(new UserError('Mediekilden svarte ikke innen fristen.',504));},30000);child.stdout.on('data',b=>{out+=String(b);if(out.length>8e6)child.kill('SIGKILL');});child.stderr.on('data',b=>{error=(error+String(b)).slice(-3000);});child.on('error',e=>{clearTimeout(timer);reject(e);});child.on('close',code=>{clearTimeout(timer);if(code!==0)return reject(new UserError('Mediekilden kunne ikke lastes. Prøv en annen lenke.',502));try{resolve(JSON.parse(out));}catch{reject(new UserError('Mediekilden ga et ugyldig svar.',502));}});});}
@@ -67,7 +67,7 @@ export class Providers{
   const track={...ranked[0].track,catalog:song,entryId:randomUUID()};this.store.set(key,{at:Date.now(),track});return track;
  }
  async radio(seed:Track,excluded:string[]){
-  if(seed.concert||seed.live)return null;
+  if(seed.live)return null;
   const recent=this.store.history(50).map(h=>h.video),skipped=this.store.get<Record<string,number>>('radio-skips',{});
   const banned=new Set([...excluded,...recent.map(t=>t.id),...Object.entries(skipped).filter(([,at])=>Date.now()-at<7*86400000).map(([id])=>id)]);
   if(this.recommendations.enabled){
@@ -75,16 +75,16 @@ export class Providers{
     const favorites=this.store.favorites().map(f=>normalized(f.name));
     songs.sort((a,b)=>Number(favorites.some(f=>f.includes(normalized(b.title))))-Number(favorites.some(f=>f.includes(normalized(a.title)))));
     const recentSongs=new Set([songIdentity(seed),...recent.map(songIdentity)]);
-    for(const song of songs.slice(0,4)){try{const next=await this.matchSong(song);if(next.id!==seed.id&&!banned.has(next.id)&&!recentSongs.has(songIdentity(next))){this.recommendationStatus='lastfm';return next;}}catch{}}
+    for(const song of songs.slice(0,4)){try{const next=await this.matchSong(song);if(canPlayRadioTrack(seed,next)&&next.id!==seed.id&&!banned.has(next.id)&&!recentSongs.has(songIdentity(next))){this.recommendationStatus='lastfm';return next;}}catch{}}
    }catch{this.recommendationStatus='fallback';}
   }
-  if(seed.source==='soundcloud'){
+  if(seed.source==='soundcloud'&&!seed.concert){
    const found=await resolveSoundcloud(`sc:${radioArtist(seed)}`,5,args=>runJson(process.env.YTDLP_PATH??'yt-dlp',args),5);
    this.recommendationStatus='soundcloud';return rankRadio(seed,found,recent,[...banned])[0]??null;
   }
   const artist=radioArtist(seed);if(!artist)return null;
   const found=await this.search(radioQuery(seed),20,true);this.recommendationStatus='artist';
-  return rankRadio(seed,found,recent,[...banned])[0]??null;
+  return rankRadio(seed,found,recent,[...banned]).find(track=>canPlayRadioTrack(seed,track))??null;
  }
  async spotify(kind:string,id:string):Promise<CatalogSong[]>{return this.spotifyCatalog.load(kind,id,this.store.settings().playlistLimit);}
 
