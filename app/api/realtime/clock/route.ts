@@ -1,0 +1,2 @@
+import {coreUrl,coreOrigin} from '@/lib/core-server';
+export async function GET(request:Request){const origin=coreUrl();if(!origin)return Response.json({error:'Frakoblet'},{status:503});try{const response=await fetch(origin+'/v1/clock',{headers:{Origin:coreOrigin(request)},redirect:'manual',signal:AbortSignal.timeout(5000)});if(!response.ok)return Response.json({error:'Frakoblet'},{status:502});return Response.json(await response.json(),{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({error:'Frakoblet'},{status:502});}}

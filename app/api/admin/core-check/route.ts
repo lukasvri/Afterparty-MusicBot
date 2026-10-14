@@ -1,0 +1,3 @@
+import {api,isAdmin,fail} from '@/lib/server';
+import {coreUrl} from '@/lib/core-server';
+export const GET=(request:Request)=>api(async()=>{if(!await isAdmin(request))fail(403,'Logg inn først.');const url=coreUrl();if(!url)return {configured:false};try{const response=await fetch(url+'/health',{redirect:'manual',signal:AbortSignal.timeout(5000)});return {configured:true,status:response.status,contentType:response.headers.get('content-type'),body:(await response.text()).slice(0,200)};}catch(error){return {configured:true,error:error instanceof Error?error.name+': '+error.message:'Network error'};}});

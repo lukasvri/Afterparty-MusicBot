@@ -1,0 +1,573 @@
+[
+  {
+    "name": "clear",
+    "description": "tømmer køen, men beholder sangen som spilles",
+    "default_member_permissions": null
+  },
+  {
+    "name": "config",
+    "description": "endre innstillingene til boten",
+    "options": [
+      {
+        "type": 1,
+        "name": "set-playlist-limit",
+        "description": "velg maks antall sanger fra en spilleliste",
+        "options": [
+          {
+            "type": 4,
+            "name": "limit",
+            "description": "maksimalt antall sanger",
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-wait-after-queue-empties",
+        "description": "velg ventetid før boten forlater en tom kø",
+        "options": [
+          {
+            "type": 4,
+            "name": "delay",
+            "description": "ventetid i sekunder, 0 betyr aldri koble fra",
+            "required": true,
+            "min_value": 0
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-leave-if-no-listeners",
+        "description": "velg om boten skal gå når alle andre går",
+        "options": [
+          {
+            "type": 5,
+            "name": "value",
+            "description": "om boten skal gå når alle andre går",
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-queue-add-response-hidden",
+        "description": "velg om køsvar bare vises til den som spør",
+        "options": [
+          {
+            "type": 5,
+            "name": "value",
+            "description": "om køsvar bare skal vises til den som spør",
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-reduce-vol-when-voice",
+        "description": "velg om volumet skal senkes når noen snakker",
+        "options": [
+          {
+            "type": 5,
+            "name": "value",
+            "description": "om volumet skal senkes når noen snakker",
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-reduce-vol-when-voice-target",
+        "description": "velg volumet når noen snakker",
+        "options": [
+          {
+            "type": 4,
+            "name": "volume",
+            "description": "volumprosent, 0 er lydløs og 100 er maks",
+            "required": true,
+            "min_value": 0,
+            "max_value": 100
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-auto-announce-next-song",
+        "description": "velg om neste sang skal annonseres automatisk",
+        "options": [
+          {
+            "type": 5,
+            "name": "value",
+            "description": "om neste sang skal annonseres automatisk",
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-default-volume",
+        "description": "velg standardvolum i talekanalen",
+        "options": [
+          {
+            "type": 4,
+            "name": "level",
+            "description": "volumprosent, 0 er lydløs og 100 er maks",
+            "required": true,
+            "min_value": 0,
+            "max_value": 100
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set-default-queue-page-size",
+        "description": "velg standard sidestørrelse for /queue",
+        "options": [
+          {
+            "type": 4,
+            "name": "page-size",
+            "description": "sidestørrelse for /queue",
+            "required": true,
+            "min_value": 1,
+            "max_value": 30
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "get",
+        "description": "vis alle innstillinger"
+      },
+      {
+        "type": 1,
+        "name": "set-audio-quality",
+        "description": "Lydkvalitet fra neste avspillingsstart, innenfor kanalgrensen",
+        "options": [
+          {
+            "type": 4,
+            "name": "kbps",
+            "description": "Ønsket bitrate, 64 til 384 kbit/s",
+            "required": true,
+            "min_value": 64,
+            "max_value": 384
+          }
+        ]
+      }
+    ],
+    "default_member_permissions": "32"
+  },
+  {
+    "name": "disconnect",
+    "description": "sett på pause og koble Muse fra",
+    "default_member_permissions": null
+  },
+  {
+    "name": "favorites",
+    "description": "legg til en sang i favoritter",
+    "options": [
+      {
+        "type": 1,
+        "name": "use",
+        "description": "spill en favoritt",
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "navn på favoritten",
+            "required": true,
+            "autocomplete": true
+          },
+          {
+            "type": 5,
+            "name": "immediate",
+            "description": "legg sangen fremst i køen"
+          },
+          {
+            "type": 5,
+            "name": "shuffle",
+            "description": "shuffle the input if you're adding multiple tracks"
+          },
+          {
+            "type": 5,
+            "name": "split",
+            "description": "del sangen hvis den har kapitler"
+          },
+          {
+            "type": 5,
+            "name": "skip",
+            "description": "hopp over sangen som spilles"
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "list",
+        "description": "vis alle favoritter"
+      },
+      {
+        "type": 1,
+        "name": "create",
+        "description": "opprett en ny favoritt",
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "you'll type this when using this favorite",
+            "required": true
+          },
+          {
+            "type": 3,
+            "name": "query",
+            "description": "any input you'd normally give to the play command",
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "remove",
+        "description": "fjern en favoritt",
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "navn på favoritten",
+            "required": true,
+            "autocomplete": true
+          }
+        ]
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "fseek",
+    "description": "spol fremover i sangen",
+    "options": [
+      {
+        "type": 3,
+        "name": "time",
+        "description": "tidsrom eller antall sekunder, for eksempel 1m, 30s eller 100",
+        "required": true
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "loop-queue",
+    "description": "slå gjentakelse av hele køen av eller på",
+    "default_member_permissions": null
+  },
+  {
+    "name": "loop",
+    "description": "slå gjentakelse av sangen av eller på",
+    "default_member_permissions": null
+  },
+  {
+    "name": "move",
+    "description": "flytt sanger i køen",
+    "options": [
+      {
+        "type": 4,
+        "name": "from",
+        "description": "plasseringen til sangen som skal flyttes",
+        "required": true
+      },
+      {
+        "type": 4,
+        "name": "to",
+        "description": "ny plassering for sangen",
+        "required": true
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "next",
+    "description": "hopp til neste sang",
+    "default_member_permissions": null
+  },
+  {
+    "name": "now-playing",
+    "description": "vis sangen som spilles",
+    "default_member_permissions": null
+  },
+  {
+    "name": "pause",
+    "description": "sett sangen på pause",
+    "default_member_permissions": null
+  },
+  {
+    "name": "play",
+    "description": "spill en sang",
+    "options": [
+      {
+        "type": 3,
+        "name": "query",
+        "description": "YouTube-lenke, Spotify-lenke eller søk",
+        "required": true,
+        "autocomplete": true
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "queue",
+    "description": "vis køen",
+    "options": [
+      {
+        "type": 4,
+        "name": "page",
+        "description": "køside som skal vises, standard 1",
+        "min_value": 1
+      },
+      {
+        "type": 4,
+        "name": "page-size",
+        "description": "antall sanger per side, standard 10 og maks 30",
+        "min_value": 1,
+        "max_value": 30
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "remove",
+    "description": "fjern sanger fra køen",
+    "options": [
+      {
+        "type": 4,
+        "name": "position",
+        "description": "plasseringen som skal fjernes, standard 1",
+        "min_value": 1
+      },
+      {
+        "type": 4,
+        "name": "range",
+        "description": "antall sanger som skal fjernes, standard 1",
+        "min_value": 1
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "replay",
+    "description": "start sangen på nytt",
+    "default_member_permissions": null
+  },
+  {
+    "name": "resume",
+    "description": "fortsett avspillingen",
+    "default_member_permissions": null
+  },
+  {
+    "name": "seek",
+    "description": "spol til et tidspunkt i sangen",
+    "options": [
+      {
+        "type": 3,
+        "name": "time",
+        "description": "tidsrom eller antall sekunder, for eksempel 1m, 30s eller 100",
+        "required": true
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "shuffle",
+    "description": "bland køen",
+    "default_member_permissions": null
+  },
+  {
+    "name": "skip",
+    "description": "hopp fremover i køen",
+    "options": [
+      {
+        "type": 4,
+        "name": "number",
+        "description": "antall sanger som skal hoppes over, standard 1"
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "stop",
+    "description": "stopp, koble fra og tøm køen",
+    "default_member_permissions": null
+  },
+  {
+    "name": "unskip",
+    "description": "gå én sang tilbake i køen",
+    "default_member_permissions": null
+  },
+  {
+    "name": "volume",
+    "description": "endre volumet nå",
+    "options": [
+      {
+        "type": 4,
+        "name": "level",
+        "description": "volumprosent, 0 er lydløs og 100 er maks",
+        "required": true,
+        "min_value": 0,
+        "max_value": 100
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "play-advanced",
+    "description": "spill med ekstra køvalg",
+    "options": [
+      {
+        "type": 3,
+        "name": "query",
+        "description": "YouTube-lenke, Spotify-lenke eller søk",
+        "required": true,
+        "autocomplete": true
+      },
+      {
+        "type": 5,
+        "name": "immediate",
+        "description": "legg sangen fremst i køen"
+      },
+      {
+        "type": 5,
+        "name": "shuffle",
+        "description": "bland sangene hvis du legger til flere"
+      },
+      {
+        "type": 5,
+        "name": "split",
+        "description": "del sangen hvis den har kapitler"
+      },
+      {
+        "type": 5,
+        "name": "skip",
+        "description": "hopp over sangen som spilles"
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "cleanup",
+    "description": "rydder unødvendige sanger fra køen",
+    "options": [
+      {
+        "type": 1,
+        "name": "duplicates",
+        "description": "fjerner duplikater fra resten av køen"
+      },
+      {
+        "type": 1,
+        "name": "absent-users",
+        "description": "fjerner ønsker fra brukere som har forlatt talekanalen"
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "grab",
+    "description": "gir deg en privat lenke til sangen som spilles",
+    "default_member_permissions": null
+  },
+  {
+    "name": "hjelp",
+    "description": "viser den korte guiden til musikkboten",
+    "default_member_permissions": null
+  },
+  {
+    "name": "history",
+    "description": "viser de siste sangene som ble spilt",
+    "options": [
+      {
+        "type": 4,
+        "name": "antall",
+        "description": "antall sanger, standard er 10",
+        "min_value": 1,
+        "max_value": 20
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "play-next",
+    "description": "legger en sang fremst i køen",
+    "options": [
+      {
+        "type": 3,
+        "name": "query",
+        "description": "sangnavn, YouTube-lenke eller Spotify-lenke",
+        "required": true,
+        "autocomplete": true
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "vote-skip",
+    "description": "lar lytterne stemme over å hoppe over sangen",
+    "options": [
+      {
+        "type": 1,
+        "name": "vote",
+        "description": "stem for å hoppe over sangen"
+      },
+      {
+        "type": 1,
+        "name": "undo",
+        "description": "trekk tilbake stemmen din"
+      },
+      {
+        "type": 1,
+        "name": "status",
+        "description": "vis status for avstemningen"
+      }
+    ],
+    "default_member_permissions": null
+  },
+  {
+    "name": "crossfade",
+    "description": "styr overgangen mellom sanger",
+    "options": [
+      {
+        "type": 1,
+        "name": "status",
+        "description": "vis gjeldende crossfade-innstilling"
+      },
+      {
+        "type": 1,
+        "name": "set",
+        "description": "velg lengden på crossfade",
+        "options": [
+          {
+            "type": 4,
+            "name": "seconds",
+            "description": "antall sekunder fra 1 til 12",
+            "required": true,
+            "min_value": 1,
+            "max_value": 12
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "off",
+        "description": "slå av crossfade"
+      }
+    ],
+    "default_member_permissions": "32"
+  },
+  {
+    "name": "konsert",
+    "description": "spill en YouTube-konsert i Discord og Afterparty",
+    "options": [
+      {
+        "type": 3,
+        "name": "lenke",
+        "description": "YouTube-lenke til konserten, eller utelat for å åpne Afterparty",
+        "max_length": 600
+      }
+    ],
+    "default_member_permissions": null
+  }
+]

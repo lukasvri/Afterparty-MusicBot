@@ -1,0 +1,3 @@
+import {api,body,limit,fail} from '@/lib/server';import {adminContext,adminState} from '@/lib/discord-auth';import {coreRequest} from '@/lib/core-server';
+export const GET=(request:Request)=>api(()=>adminState(request,new URL(request.url).searchParams.get('guildId')??undefined));
+export const POST=(request:Request)=>api(async()=>{const input=await body(request,64000);await limit(request,'admin-action',30,60000);const context=await adminContext(request,input.guildId);if(!['settings','channels','join','music-channel','command'].includes(String(input.operation)))fail(400,'Ukjent handling.');return coreRequest('/v1/admin','POST',{...input,...context});});

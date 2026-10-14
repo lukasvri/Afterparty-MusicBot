@@ -1,0 +1,12 @@
+name: Core validation
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Typecheck and test Core including FFmpeg
+        run: docker build --target validation -t core-validation services/core

@@ -1,0 +1,3 @@
+export type CommandReceipt={id:string;status?:string;ticket?:string;url?:string};
+export type CommandResult={command:{id:string;status:string;result?:string};state:unknown};
+export async function deliverCommand(receipt:CommandReceipt):Promise<CommandResult|null>{if(!receipt.ticket||!receipt.url)return null;try{const response=await fetch(receipt.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket:receipt.ticket}),signal:AbortSignal.timeout(28000),credentials:'omit'});if(!response.ok)return null;return await response.json() as CommandResult;}catch{return null;}}

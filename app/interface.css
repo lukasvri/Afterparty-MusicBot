@@ -1,0 +1,75 @@
+/* Shared control geometry and colour. Display type belongs to headings only. */
+:root{--accent:#ff263e;--red-button:#d71931;--font-body:Arial,Helvetica,sans-serif;--muted:#b6b6bd;--line:#343438}
+button,input,select,textarea{font-family:var(--font-body)}
+button>svg,a>svg,summary>svg{flex-shrink:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.stage-panel:focus{outline:none}
+.studio-shell .brand{flex-shrink:0;gap:10px;font-family:var(--font-body);font-size:21px;font-weight:800;letter-spacing:-.7px;line-height:1.1}
+.studio-shell .brand-mark{width:36px;height:36px;flex:0 0 36px;transform:none;background:var(--accent);border-radius:7px;display:grid;place-items:center}
+.brand-mark>svg{width:23px;height:23px;transform:none}
+.studio-shell .brand-sub{font-family:var(--font-body);font-size:8px;font-weight:500;letter-spacing:3.2px;margin-top:5px;line-height:1.2;color:#b6b6bd}
+.concert-shell .library-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px}
+.concert-shell .library-tabs button{width:100%;min-width:0;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;padding:10px 8px;font:600 14px/20px var(--font-body);white-space:nowrap;color:#b6b6bd}
+.concert-shell .library-tabs button>svg{width:20px;height:20px;flex:0 0 20px;stroke-width:1.8}
+.concert-shell .library-tabs button>.tab-label{display:inline;min-width:0;height:auto;background:none;border-radius:0;font:inherit;color:inherit}
+.concert-shell .library-tabs button>.tab-count{display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;background:#ffffff0d;color:inherit;font:500 11px/1 var(--font-body);font-variant-numeric:tabular-nums}
+.concert-shell .library-tabs button[aria-selected=true]{background:#ff263e17;color:#fff;box-shadow:inset 0 -2px var(--accent)}
+.concert-shell .library-panel{align-self:start}
+.concert-shell .stage-panel:not([data-immersive=true]){align-self:start;animation:none}
+.concert-shell .library-panel .queue-panel{min-height:320px}
+.concert-shell .library-panel .empty-queue{padding:32px 8px}
+.concert-shell .library-panel .empty-queue h3{font-size:20px;line-height:1.35;letter-spacing:-.4px}
+.concert-shell .library-panel .empty-queue p{font-size:13px;line-height:1.65}
+.concert-shell .music-list{max-height:440px;overscroll-behavior:contain}
+.concert-shell .track-details{min-width:0;flex:1}
+.concert-shell .transport{flex-shrink:0}
+.concert-shell .track-icon{flex-shrink:0}
+.concert-shell .mode-button.selected{background:#ff263e0d;border-color:#63313a}
+.concert-shell .primary{background:var(--red-button);border-color:var(--accent);color:#fff}
+.concert-shell .primary:hover:not(:disabled){background:#f0243c}
+.concert-shell .stage-intro .button{background:#d71931;border-color:#ff263e}
+.concert-shell .stage-panel:not([data-immersive=true]) .stage[data-current=true] .stage-intro{max-width:85%}
+.video-settings summary{gap:9px}
+.video-settings summary>.settings-label{margin:0;font:inherit;color:inherit}
+.video-settings summary>.settings-quality{margin-left:auto;color:#aaa;font-size:11px}
+/* One fullscreen toolbar. YouTube owns the timeline, volume, captions and quality. */
+.cinema-toolbar{display:none}
+.stage-panel[data-immersive=true] .cinema-toolbar{display:flex;position:absolute;left:50%;right:auto;bottom:max(88px,calc(env(safe-area-inset-bottom) + 72px));transform:translateX(-50%);align-items:center;gap:4px;z-index:10;width:max-content;max-width:calc(100% - 32px);padding:6px;border:1px solid #ffffff25;border-radius:12px;background:#111114ed;box-shadow:0 8px 32px #0005}
+.cinema-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:44px;height:44px;padding:0 13px;border:0;border-radius:7px;background:transparent;color:#f5f5f5;font:500 13px/1 var(--font-body);white-space:nowrap}
+.cinema-button:hover:not(:disabled){background:#ffffff12}.cinema-button:disabled{opacity:.35;cursor:default}
+.cinema-button svg{width:20px;height:20px;flex:0 0 20px}
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings,
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings[open],
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings:not([open]){position:static;inset:auto;width:auto;max-width:none;max-height:none;padding:0;border:0;background:transparent;overflow:visible;border-radius:7px;box-shadow:none}
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary{height:44px;min-height:44px;padding:0 13px;border-radius:7px;font:500 13px/1 var(--font-body);display:flex;align-items:center;gap:9px;color:#f5f5f5;list-style:none;overflow:visible}
+.cinema-toolbar .video-settings summary::-webkit-details-marker{display:none}
+.cinema-toolbar .video-settings summary::after{display:none}
+.cinema-toolbar .video-settings summary:hover,.cinema-toolbar .video-settings[open] summary{background:#ffffff12}
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary>.settings-label{display:inline;margin:0;font:inherit;color:inherit}
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings-body{position:absolute;bottom:calc(100% + 12px);right:0;width:360px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 180px);overflow:auto;overscroll-behavior:contain;padding:20px;border:1px solid #ffffff25;border-radius:12px;background:#151518;box-shadow:0 12px 36px #0008;display:grid;gap:16px}
+.cinema-toolbar .video-settings:not([open])>.video-settings-body{display:none!important}
+.stage-panel[data-immersive=true] .now-playing{display:none}
+.stage-panel[data-immersive=true] .buffer-notice{top:20px;left:20px;max-width:calc(100% - 40px)}
+.stage-panel[data-immersive=true] .stage-intro{max-width:80%;bottom:30%}
+@media(max-width:1100px){.studio-shell .sidebar{gap:24px}.studio-shell .topbar{position:static;min-height:64px;height:auto;padding-top:10px;padding-bottom:10px;border-bottom:1px solid #ffffff0d}.studio-shell .sidebar{justify-content:space-between}.concert-shell .music-list{max-height:400px}}
+@media(max-width:650px){.cinema-button{width:44px;padding:0}.cinema-button>span{display:none}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary{width:44px;padding:0;justify-content:center}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary>.settings-label{display:none}.stage-panel[data-immersive=true] .cinema-toolbar{bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px));gap:6px}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings-body{right:50%;transform:translateX(50%);width:min(360px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 164px);padding:16px}.studio-shell .brand{font-size:17px;gap:8px;letter-spacing:-.5px}.studio-shell .brand-mark{width:30px;height:30px;flex-basis:30px}.brand-mark>svg{width:20px;height:20px}.studio-shell .brand-sub{font-size:6px;letter-spacing:2.7px}.concert-shell .library-tabs button{font-size:14px;min-height:48px}.concert-shell .now-playing{flex-wrap:wrap}.concert-shell .track-details{flex-basis:50%}.concert-shell .studio-heading h1{overflow-wrap:anywhere}}
+@media(max-width:380px){.studio-shell .brand{font-size:15px;gap:7px}.studio-shell .brand-mark{width:27px;height:27px;flex-basis:27px}.studio-shell .brand-sub{font-size:5px;letter-spacing:2.5px}.studio-shell .sidebar{padding:0 12px;gap:8px}.studio-shell .nav-link{font-size:10px;padding:12px 5px}.concert-shell .library-tabs button{font-size:13px;gap:7px}}
+
+.stage-pixel-ribbon rect{animation:ribbon-pulse 2.8s ease-in-out infinite alternate}.deck-ring{animation:deck-light 3s linear infinite}.speaker-stacks{opacity:.9}@keyframes ribbon-pulse{from{opacity:.15}to{opacity:.9}}@keyframes deck-light{to{stroke-dashoffset:-84}}@media(prefers-reduced-motion:reduce){.stage-pixel-ribbon rect,.deck-ring{animation:none}}
+
+.led-orbit{transform-origin:0 0;animation:led-orbit 32s linear infinite}.led-orbit-inner{transform-origin:0 0;animation:led-orbit 24s linear infinite reverse}@keyframes led-orbit{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.led-orbit,.led-orbit-inner{animation:none}}
+
+.stage-panel[data-immersive=true] .stage[data-current=true] .stage-intro h2{font:600 clamp(20px,2.4vw,32px)/1.35 var(--font-body);letter-spacing:0;max-width:760px;-webkit-line-clamp:2;text-shadow:0 2px 16px #000}.stage-panel[data-immersive=true] .stage[data-current=true] .stage-intro{bottom:30%;left:7%;max-width:85%}.stage-panel[data-immersive=true] .stage[data-current=true] .stage-intro p{font-size:14px;max-width:560px;color:#ddd}
+
+/* Empty queue: a centred composition, independent of queue tab styles. */
+.concert-shell .library-panel .empty-queue{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:270px;padding:30px 18px 34px;text-align:center;box-sizing:border-box}
+.concert-shell .empty-queue-icon{display:grid;place-items:center;flex:0 0 52px;width:52px;height:52px;margin:0 0 18px;color:var(--accent);border:1px solid #ff263e30;border-radius:14px;background:#ff263e0a}
+.concert-shell .empty-queue-icon svg{display:block;width:36px;height:36px;transform:none}
+.concert-shell .library-panel .empty-queue h3{margin:0;max-width:100%;font-weight:700}
+.concert-shell .library-panel .empty-queue p{max-width:240px;margin:12px auto 18px;text-align:center}
+.concert-shell .empty-queue .text-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:40px;margin:0;padding:8px 12px}
+.performer-head{transform-origin:0 -42px;animation:performer-nod 4s ease-in-out infinite}
+.mixer-meter{animation:meter-level 1.2s ease-in-out infinite alternate}
+@keyframes performer-nod{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
+@keyframes meter-level{from{opacity:.25}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.performer-head,.mixer-meter{animation:none}}

@@ -1,0 +1,7 @@
+export type Video = {id: string; title: string; artist: string; image: string; duration: number; live: boolean; embeddable: boolean;concert?:boolean;source?:'youtube'|'soundcloud';url?:string};
+export type RoomState = {current: Video | null; queue: Video[]; playing: boolean; position: number;playbackKey?:string};
+export type OpenRoom = {code:string;name:string;viewers:number;expiresAt:number};
+export type Room = {isPublic?:boolean;code: string; name: string; current: Video | null; queue: Video[]; playing: boolean; position: number; version: number; serverTime: number; viewers: number; isHost: boolean; expiresAt: number;mode?:'discord';discordOnline?:boolean;playbackKey?:string;syncValidForMs?:number;syncSource?:'live'|'bridge';syncEpoch?:string;guildId?:string;startsAt?:number};
+export type DiscordState={guildId?:string;roomCode?:string;guildName?:string;ready:boolean;connected:boolean;playing:boolean;position:number;volume:number;current:Video|null;queue:Video[];queueRevision:string;lastSeen:number;online:boolean};
+export type HistoryVideo=Video&{plays:number;lastPlayed:number;source:string};
+export const time = (seconds: number) => {const s=Math.floor(Math.max(0,seconds));return s>=3600 ? `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}` : `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;};
