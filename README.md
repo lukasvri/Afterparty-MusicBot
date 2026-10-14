@@ -114,6 +114,10 @@ Data is stored in the `core-data` Docker volume. Back up the entire volume, incl
 
 ## Development and checks
 
+To update an existing bot privately from another computer, see
+[Remote deployment with deploy-core](docs/REMOTE_DEPLOY.md). Tests and backups
+run on the bot host; production credentials and data stay there.
+
 From the repository root:
 
 ```bash
@@ -121,7 +125,7 @@ npm run setup:cloud
 npm run check:all
 ```
 
-These commands need Node.js 24.17+ and FFmpeg. They install both locked dependency trees and run **60 Core tests**, **29 website behavior tests**, both typechecks and a website production build without production credentials or Docker. GitHub Actions validates Core's Docker image and the website on pushes and pull requests. See the [Codex Cloud workflow](docs/CODEX_CLOUD.md) for cloud setup and local production updates.
+These commands need Node.js 24.17+, Python 3.11+ and FFmpeg. They install both locked dependency trees and run **60 Core tests**, **29 website behavior tests**, deployment recovery tests, both typechecks and a website production build without production credentials or Docker. GitHub Actions validates Core's Docker image, the website and deployment recovery on pushes and pull requests. See the [Codex Cloud workflow](docs/CODEX_CLOUD.md) for cloud setup and local production updates.
 
 <details>
 <summary><strong>Repository map</strong></summary>

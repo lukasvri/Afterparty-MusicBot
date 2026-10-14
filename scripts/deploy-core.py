@@ -1,0 +1,400 @@
+#!/usr/bin/env python3
+"""Host-local Core deployment. Configuration and production data never enter tests."""
+import argparse
+import contextlib
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import signal
+import sqlite3
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+from datetime import datetime, timezone
+
+
+class DeployError(RuntimeError):
+    pass
+
+
+def atomic_write(path, text):
+    path = Path(path)
+    fd, temporary = tempfile.mkstemp(prefix='.' + path.name, dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def image_config(text, image):
+    if not re.fullmatch(r'[a-zA-Z0-9_./:@-]+', image):
+        raise DeployError('Invalid image reference.')
+    matches = list(re.finditer(r'(?m)^(\s+)image:[^\n]*$', text))
+    if len(matches) != 1:
+        raise DeployError('Private Compose must contain exactly one explicit image line.')
+    return re.sub(r'(?m)^(\s+)image:[^\n]*$', lambda m: m[1] + 'image: ' + image, text)
+
+
+def extract_archive(archive, destination):
+    # Python 3.11 in the audio image predates tarfile's extraction filters.
+    # Both source snapshots and backups accept only files and directories.
+    destination = Path(destination).resolve()
+    for member in archive:
+        relative = Path(member.name)
+        if relative.is_absolute() or '..' in relative.parts or not (member.isfile() or member.isdir()):
+            raise DeployError('Unsafe archive member.')
+        target = destination / relative
+        if not target.resolve().is_relative_to(destination):
+            raise DeployError('Archive member escapes its destination.')
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.extractfile(member) as source, target.open('wb') as output:
+                shutil.copyfileobj(source, output)
+            target.chmod(member.mode & 0o777)
+
+
+def check_databases(directory):
+    files = list(Path(directory).rglob('*.sqlite'))
+    if not files:
+        raise DeployError('No SQLite database found in production data.')
+    for path in files:
+        with contextlib.closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
+            if db.execute('PRAGMA quick_check').fetchall() != [('ok',)]:
+                raise DeployError('SQLite integrity check failed. Data remains local.')
+    return len(files)
+
+
+def backup_data(directory, archive):
+    directory, archive = Path(directory), Path(archive)
+    if any(p.is_symlink() for p in directory.rglob('*')):
+        raise DeployError('Production data contains symlinks; refusing an ambiguous backup.')
+    check_databases(directory)
+    with tarfile.open(archive, 'w:gz') as output:
+        output.add(directory, arcname='data')
+    # Read every member back, including data/guilds and any recovery files.
+    with tarfile.open(archive, 'r:gz') as saved:
+        members = [m for m in saved if m.isfile()]
+        if not members:
+            raise DeployError('Empty data backup.')
+        for member in members:
+            source = directory.parent / member.name if directory.name == 'data' else directory / Path(member.name).relative_to('data')
+            with saved.extractfile(member) as stream, source.open('rb') as original:
+                if hashlib.file_digest(stream, 'sha256').digest() != hashlib.file_digest(original, 'sha256').digest():
+                    raise DeployError('Backup verification failed.')
+    os.chmod(archive, 0o600)
+
+
+def restore_data(directory, archive):
+    directory = Path(directory)
+    with tempfile.TemporaryDirectory(prefix='.core-restore-', dir=directory.parent) as temporary:
+        with tarfile.open(archive, 'r:gz') as saved:
+            extract_archive(saved, temporary)
+        restored = Path(temporary) / 'data'
+        check_databases(restored)
+        quarantine = directory.with_name(directory.name + '.failed-' + str(time.time_ns()))
+        directory.rename(quarantine)
+        try:
+            restored.rename(directory)
+        except BaseException:
+            quarantine.rename(directory)
+            raise
+    return quarantine
+
+
+# Only reduced state leaves the container. The bridge key stays in its environment.
+PROBE = r"""
+import {readdirSync,existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+const root=process.env.DATA_DIR??'/data', hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
+const ids=[process.env.DISCORD_GUILD_ID,...(existsSync(root+'/guilds')?readdirSync(root+'/guilds').filter(x=>/^[0-9]{14,22}$/.test(x)):[])];
+const scopes=[];
+for(const id of [...new Set(ids)]){
+ const r=await fetch('http://127.0.0.1:3990/v1/state?all=1&guildId='+encodeURIComponent(id),{headers:{Authorization:'Bearer '+process.env.PUBLIC_SITE_ADMIN_KEY},signal:AbortSignal.timeout(5000)});
+ if(r.status===404)continue;
+ if(!r.ok)throw Error('State check failed: '+r.status);
+ const {state:s}=await r.json();
+ const tracks=[s.current,...s.queue].filter(Boolean), seen=new Set();
+ const entries=tracks.filter(t=>{const id=t.entryId??t.id;if(seen.has(id))return false;seen.add(id);return true}).map(t=>[t.entryId??t.id,t.id,!!t.concert]);
+ scopes.push({scope:hash(id),ready:s.ready,playing:s.playing,buffering:s.buffering,connected:s.connected,entries:hash(entries),count:entries.length});
+}
+console.log(JSON.stringify(scopes.sort((a,b)=>a.scope.localeCompare(b.scope))));
+"""
+HEALTH = "const r=await fetch('http://127.0.0.1:3990/health',{signal:AbortSignal.timeout(4000)});const d=await r.json();if(!r.ok||!d.ready)process.exit(1);"
+
+
+class Deployer:
+    def __init__(self, config):
+        self.config = config
+        self.repo = Path(config['repo']).resolve()
+        self.compose_file = Path(config['compose_file']).resolve()
+        self.data = Path(config['data_dir']).resolve()
+        self.state = Path(config['state_dir']).resolve()
+        self.backups = Path(config['backup_dir']).resolve()
+        self.container = config.get('container', 'gutta-krutt-core')
+        self.docker = ['docker', '--context', config.get('docker_context', 'default')]
+        self.compose = self.docker + ['compose', '--project-directory', str(self.repo / 'services/core'), '-f', str(self.compose_file)]
+        self.logfile = None
+        self.phase = 'preflight'
+        self.target = None
+
+    def command(self, args, *, capture=False, input=None, timeout=1800, cwd=None):
+        # Never echo command arguments, environment or private Compose output.
+        result = subprocess.run(args, cwd=cwd or self.repo, input=input, text=True,
+                                stdout=subprocess.PIPE if capture else self.logfile,
+                                stderr=self.logfile, timeout=timeout)
+        if result.returncode:
+            raise DeployError('A command failed during ' + self.phase + '. See the local deployment log.')
+        return result.stdout.strip() if capture else ''
+
+    def git(self, *args):
+        return self.command(['git', *args], capture=True)
+
+    def emit(self, phase):
+        self.phase = phase
+        message = datetime.now(timezone.utc).isoformat(timespec='seconds') + ' ' + phase
+        if self.logfile:
+            self.logfile.write(message + '\n')
+            self.logfile.flush()
+        atomic_write(self.state / 'last-run.json', json.dumps({'phase': phase, 'commit': self.target, 'time': time.time()}, indent=2) + '\n')
+        try:
+            print(message, flush=True)
+        except (BrokenPipeError, OSError):
+            pass
+
+    def inspect(self):
+        return json.loads(self.command(self.docker + ['inspect', self.container], capture=True))[0]
+
+    def probe(self):
+        return json.loads(self.command(self.docker + ['exec', '-i', self.container, 'node', '--input-type=module'], input=PROBE, capture=True, timeout=40))
+
+    def idle(self):
+        scopes = self.probe()
+        if not scopes or not all(s['ready'] for s in scopes):
+            raise DeployError('Core is not ready. Deployment was not started.')
+        if any(s['playing'] or s['buffering'] for s in scopes):
+            raise DeployError('Pause playback on every server and retry. Deployment was not started.')
+        return scopes
+
+    def preflight(self):
+        for path in [self.compose_file, self.data, self.state, self.backups]:
+            if path.is_relative_to(self.repo):
+                raise DeployError('Private configuration, data, state and backups must be outside the Git checkout.')
+        if self.backups.is_relative_to(self.data) or self.state.is_relative_to(self.data):
+            raise DeployError('Deployment state and backups must be outside production data.')
+        if self.data.stat().st_uid != os.getuid():
+            raise DeployError('The deployment user must own the production data directory.')
+        if self.git('branch', '--show-current') != 'main' or self.git('status', '--porcelain'):
+            raise DeployError('The checkout must be clean and on main. Existing work will not be overwritten.')
+        info = self.inspect()
+        if not info['State']['Running'] or info['State'].get('Health', {}).get('Status') != 'healthy':
+            raise DeployError('The existing Core container must be healthy before a normal update.')
+        mounts = [m for m in info['Mounts'] if m['Destination'] == '/data']
+        if len(mounts) != 1 or mounts[0]['Type'] != 'bind' or Path(mounts[0]['Source']).resolve() != self.data:
+            raise DeployError('Configured data directory does not match the running /data binding.')
+        model = json.loads(self.command(self.compose + ['config', '--no-env-resolution', '--format', 'json'], capture=True))
+        core = model['services']['core']
+        if core.get('container_name') != self.container or len(model['services']) != 1:
+            raise DeployError('Expected a private Compose file containing only the Core service.')
+        configured = [m for m in core.get('volumes', []) if m['target'] == '/data']
+        if len(configured) != 1 or configured[0]['type'] != 'bind' or Path(configured[0]['source']).resolve() != self.data:
+            raise DeployError('Private Compose would change the production data binding.')
+        for entry in core.get('env_file', []):
+            path = Path(entry['path'] if isinstance(entry, dict) else entry).resolve()
+            if not path.is_file() or path.is_relative_to(self.repo):
+                raise DeployError('Keep real environment files outside the checkout.')
+        self.model = model
+        self.old_image = info['Image']
+        self.old_config = self.compose_file.read_text()
+        image_config(self.old_config, self.old_image)
+        self.idle()
+        data_size = sum(p.stat().st_size for p in self.data.rglob('*') if p.is_file())
+        for path in [self.state, self.backups, self.data.parent]:
+            if shutil.disk_usage(path).free < max(512 * 1024 * 1024, 3 * data_size):
+                raise DeployError('Not enough free space for a verified backup and safe recovery.')
+
+    def snapshot(self, directory):
+        self.git('fetch', 'origin', 'main')
+        self.target = self.git('rev-parse', 'origin/main')
+        self.git('merge-base', '--is-ancestor', 'HEAD', self.target)
+        archive = directory / 'source.tar'
+        self.command(['git', 'archive', self.target, '-o', str(archive)])
+        source = directory / 'source'
+        source.mkdir()
+        with tarfile.open(archive) as contents:
+            extract_archive(contents, source)
+        # A tracked local file is not an acceptable candidate, even if Git contains it.
+        for p in source.rglob('*'):
+            if p.is_symlink():
+                raise DeployError('Candidate contains symlinks; review the source before deployment.')
+            if p.is_file() and (p.name in ['compose.local.yml', 'hosting.local.json'] or
+                ((p.name.startswith('.env') or p.name.startswith('.dev.vars')) and not p.name.endswith('.example')) or
+                re.search(r'\.(sqlite|db)(-|$)', p.name)):
+                raise DeployError('Candidate contains a private configuration or database file.')
+        return source
+
+    def validate(self, source):
+        self.emit('testing Core and website in isolated containers')
+        validation = 'gutta-krutt-core:validate-' + self.target[:12]
+        self.command(self.docker + ['build', '--target', 'validation', '-t', validation, str(source / 'services/core')])
+        self.command(self.docker + ['run', '--rm', '--network', 'none', '--cpus=2', '--memory=3g', '--entrypoint', 'sh', validation, '-c', 'npm run check && npm test'])
+        runner = self.docker + ['run', '--rm', '--cpus=2', '--memory=3g', '--user', str(os.getuid()) + ':' + str(os.getgid()), '-e', 'HOME=/tmp', '--mount', 'type=bind,src=' + str(source) + ',dst=/work', '-w', '/work', '--entrypoint', 'sh']
+        self.command(runner + [validation, '-c', 'npm ci --no-audit --no-fund'])
+        self.command(runner + ['--network', 'none', validation, '-c', 'python3 -m unittest discover -s tests -v && node node_modules/typescript/bin/tsc --noEmit --incremental false && node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.mjs scripts/playback-sync.test.mjs && npm run build'])
+        self.new_image = 'gutta-krutt-core:git-' + self.target[:12]
+        self.emit('building versioned production image')
+        self.command(self.docker + ['build', '--target', 'final', '--label', 'org.opencontainers.image.revision=' + self.target, '-t', self.new_image, str(source / 'services/core')])
+        self.new_image_id = self.command(self.docker + ['image', 'inspect', '--format', '{{.Id}}', self.new_image], capture=True)
+
+    def wait_ready(self):
+        deadline = time.monotonic() + self.config.get('health_timeout_seconds', 150)
+        consecutive = 0
+        while time.monotonic() < deadline:
+            try:
+                self.command(self.docker + ['exec', self.container, 'node', '-e', HEALTH], timeout=10)
+                info = self.inspect()
+                if not info['State']['Running'] or info.get('RestartCount', 0):
+                    raise DeployError('Core restarted during its health check.')
+                consecutive += 1
+                if consecutive >= 3 and info['State'].get('Health', {}).get('Status') == 'healthy':
+                    return
+            except (DeployError, subprocess.TimeoutExpired):
+                consecutive = 0
+            time.sleep(2)
+        raise DeployError('Core did not become healthy within the deployment timeout.')
+
+    def save_backup(self, backup):
+        atomic_write(backup / 'compose.previous.yml', self.old_config)
+        atomic_write(backup / 'image-id.txt', self.old_image + '\n')
+        for index, entry in enumerate(self.model['services']['core'].get('env_file', [])):
+            path = Path(entry['path'] if isinstance(entry, dict) else entry)
+            shutil.copyfile(path, backup / ('environment-' + str(index)))
+            os.chmod(backup / ('environment-' + str(index)), 0o600)
+        backup_data(self.data, backup / 'data.tar.gz')
+
+    def switch(self):
+        # Recheck after lengthy tests, before any interruption.
+        before = self.idle()
+        if self.git('status', '--porcelain'):
+            raise DeployError('Checkout changed during validation. Nothing was stopped.')
+        if self.compose_file.read_text() != self.old_config or self.inspect()['Image'] != self.old_image:
+            raise DeployError('Production configuration or image changed during validation. Nothing was stopped.')
+        self.git('merge', '--ff-only', self.target)
+        backup = self.backups / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + self.target[:12])
+        backup.mkdir(mode=0o700)
+        atomic_write(backup / 'state.before.json', json.dumps(before) + '\n')
+        self.command(self.docker + ['tag', self.old_image, 'gutta-krutt-core:rollback-' + backup.name.lower()])
+        stopped, complete_backup, candidate_started = False, False, False
+        try:
+            self.emit('stopping Core and backing up all production data')
+            stopped = True
+            self.command(self.compose + ['stop', 'core'], timeout=90)
+            if self.inspect()['State']['Running']:
+                raise DeployError('Core did not stop; refusing an inconsistent backup.')
+            self.save_backup(backup)
+            complete_backup = True
+            atomic_write(self.compose_file, image_config(self.old_config, self.new_image))
+            self.emit('starting the tested image')
+            candidate_started = True
+            self.command(self.compose + ['up', '-d', '--no-build', 'core'], timeout=120)
+            self.wait_ready()
+            after = self.probe()
+            if [(s['scope'], s['entries']) for s in before] != [(s['scope'], s['entries']) for s in after]:
+                raise DeployError('Recovered queue state differs from the state before deployment.')
+            if self.inspect()['Image'] != self.new_image_id:
+                raise DeployError('The running container is not the tested image.')
+            check_databases(self.data)
+            atomic_write(backup / 'state.after.json', json.dumps(after) + '\n')
+            atomic_write(self.state / 'current.json', json.dumps({'commit': self.target, 'image': self.new_image_id, 'backup': str(backup), 'time': time.time()}, indent=2) + '\n')
+            self.emit('deployment succeeded')
+        except BaseException:
+            if stopped:
+                self.emit('deployment failed; recovering the previous image')
+                if candidate_started:
+                    self.command(self.compose + ['stop', 'core'], timeout=90)
+                    if self.inspect()['State']['Running']:
+                        raise DeployError('Rollback stopped: candidate is still running. Keep the backup and inspect locally.')
+                    if complete_backup:
+                        quarantine = restore_data(self.data, backup / 'data.tar.gz')
+                        atomic_write(backup / 'quarantine.txt', str(quarantine) + '\n')
+                # Pin the exact previous image even if its old tag was changed.
+                atomic_write(self.compose_file, image_config(self.old_config, self.old_image))
+                self.command(self.compose + ['up', '-d', '--no-build', 'core'], timeout=120)
+                self.wait_ready()
+                self.emit('previous image restored; deployment failed')
+            raise
+
+    def run(self, check=False, redeploy=False):
+        self.preflight()
+        with tempfile.TemporaryDirectory(prefix='candidate-', dir=self.state) as temporary:
+            self.emit('fetching main and exporting source without local secrets')
+            source = self.snapshot(Path(temporary))
+            current_file = self.state / 'current.json'
+            if current_file.exists() and not check and not redeploy:
+                current = json.loads(current_file.read_text())
+                if current.get('commit') == self.target and current.get('image') == self.old_image:
+                    self.emit('already running this commit; no restart needed')
+                    return
+            self.validate(source)
+            if check:
+                self.emit('validation succeeded; production unchanged')
+            else:
+                self.switch()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config', required=True, type=Path)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--check', action='store_true', help='Fetch, export, test and build without updating production.')
+    mode.add_argument('--status', action='store_true', help='Show local deployment records without making changes.')
+    parser.add_argument('--redeploy', action='store_true', help='Also deploy if this commit is already recorded as running.')
+    args = parser.parse_args()
+    os.umask(0o077)
+    config = json.loads(args.config.read_text())
+    deploy = Deployer(config)
+    for path in [deploy.state, deploy.backups]:
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if args.status:
+        for name in ['current.json', 'last-run.json']:
+            path = deploy.state / name
+            print(name + ': ' + (path.read_text().strip() if path.exists() else 'not recorded'))
+        return 0
+    with (deploy.state / 'deploy.lock').open('a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print('Another deployment is already running.', file=sys.stderr)
+            return 1
+        # Keep recovery running if the SSH connection disappears. Child output is
+        # written locally, never to a pipe connected to the remote terminal.
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        def terminate(_signal, _frame):
+            raise DeployError('Deployment interrupted; recovering if needed.')
+        signal.signal(signal.SIGTERM, terminate)
+        log = deploy.state / ('deploy-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '.log')
+        with log.open('w', buffering=1) as deploy.logfile:
+            try:
+                deploy.run(check=args.check, redeploy=args.redeploy)
+            except Exception as error:
+                deploy.emit('failed: ' + str(error))
+                print('Details are in the local log: ' + str(log), file=sys.stderr)
+                return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

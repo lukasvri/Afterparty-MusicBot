@@ -1,0 +1,10 @@
+{
+  "repo": "/srv/gutta-krutt-afterparty",
+  "compose_file": "/srv/gutta-private/compose.yml",
+  "data_dir": "/srv/gutta-data/data",
+  "state_dir": "/srv/gutta-private/deployment",
+  "backup_dir": "/srv/gutta-backups",
+  "container": "gutta-krutt-core",
+  "docker_context": "default",
+  "health_timeout_seconds": 150
+}

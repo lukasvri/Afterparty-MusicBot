@@ -8,7 +8,7 @@ run on your deployment host, where its credentials and databases remain.
 1. In Codex, choose **Work in > Cloud > Select environment > Create environment**,
    or **Settings > Codex Cloud > Environments > Create environment**.
 2. Select `lukasvri/gutta-krutt-afterparty` and start environment setup.
-3. Ask Codex to install **Node.js 24.17+**, npm and **FFmpeg**, then run:
+3. Ask Codex to install **Node.js 24.17+**, npm, **Python 3.11+** and **FFmpeg**, then run:
 
    ```bash
    npm run setup:cloud
@@ -16,7 +16,7 @@ run on your deployment host, where its credentials and databases remain.
    ```
 
    On a Debian/Ubuntu environment, FFmpeg can be installed with
-   `sudo apt-get update && sudo apt-get install -y ffmpeg` if sudo is available.
+   `sudo apt-get update && sudo apt-get install -y ffmpeg python3` if sudo is available.
    The setup script fails clearly when Node or FFmpeg is missing.
 4. Set the installation command to `npm run setup:cloud`. Dependency installation
    needs access to npm's package registry. Keep environment access private.
@@ -55,6 +55,10 @@ ignored deployment output. Clean clones build with `.openai/hosting.json`.
 Keep `.dev.vars` local as well. Never upload a local deployment archive to a PR.
 
 ## Update the local bot after a cloud change
+
+For a tested host-side command that performs validation, backups and recovery,
+see [deploy-core](REMOTE_DEPLOY.md). It can be requested from another computer
+through private SSH over Tailscale after access is configured.
 
 1. Review the branch and successful tests, then merge the chosen change.
 2. In the deployment checkout, check `git status` and use `git pull --ff-only`.

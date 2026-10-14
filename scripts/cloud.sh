@@ -4,6 +4,7 @@ project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
 
 node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 24 || (major === 24 && minor < 17)) { console.error("Node.js 24.17+ is required."); process.exit(1); }'
+python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11+ is required.")'
 if ! command -v ffmpeg >/dev/null; then
   printf 'FFmpeg is required for the real audio tests. Install it before running this script.\n' >&2
   exit 1
@@ -15,6 +16,7 @@ case "${1:-check}" in
     npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
     ;;
   check)
+    python3 -m unittest discover -s tests -v
     node node_modules/typescript/bin/tsc --noEmit --incremental false
     node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.mjs scripts/playback-sync.test.mjs
     npm --prefix services/core run check

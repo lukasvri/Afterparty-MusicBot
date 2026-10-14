@@ -3,4 +3,5 @@ data
 work
 .git
 .env*
+compose.local.yml
 *.log

@@ -79,3 +79,6 @@ services/core/data/
 /services/core/compose.local.yml
 /.openai/hosting.local.json
 /.local/
+
+__pycache__/
+*.pyc
