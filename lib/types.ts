@@ -1,5 +1,7 @@
 import type { RoomPlayback } from "../services/core/src/room-state";
 export type Video = {
+  entryId?: string;
+  waitSeconds?: number | null;
   id: string;
   title: string;
   artist: string;
@@ -15,6 +17,7 @@ export type Video = {
   radio?: boolean;
 };
 export type RoomState = RoomPlayback & {
+  buffering?: boolean;
   cohostHashes?: string[];
   inviteHashes?: string[];
   transferHash?: string;
@@ -47,6 +50,7 @@ export type Room = {
   isHost: boolean;
   expiresAt: number;
   mode?: "discord";
+  buffering?: boolean;
   discordOnline?: boolean;
   playbackKey?: string;
   syncValidForMs?: number;

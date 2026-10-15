@@ -1,6 +1,8 @@
 "use client";
 import { loadYoutube, type Player } from "@/lib/youtube-player";
 import { headers, request } from "@/lib/browser-api";
+import { useConcertQueue } from "@/hooks/use-concert-queue";
+import { notePlayerEvent, playerDiagnostics } from "@/lib/player-diagnostics";
 import { NativeSeekTracker } from "@/lib/native-seek";
 import { StartEvening } from "@/components/party/start-evening";
 import { RoomDialog } from "@/components/party/room-dialog";
@@ -639,6 +641,10 @@ export default function Afterparty() {
     history.pushState(null, "", url.pathname + url.search);
   };
 
+  const concertQueue = useConcertQueue(room?.mode === "discord" ? room.guildId : undefined);
+  const queueRoom = room?.mode === "discord" && concertQueue.data ? {...room,...concertQueue.data.state,isHost:concertQueue.data.canManage} : room;
+  const queueAction = (name:string,extra?:Record<string,unknown>) => room?.mode === "discord"
+    ? void concertQueue.action(name,{playbackKey:room.playbackKey,...extra}) : void action(name,extra);
   const botCommand = async (
     action: "skip" | "enqueue" | "pause" | "resume",
     extras: Record<string, unknown> = {},
@@ -870,6 +876,7 @@ export default function Afterparty() {
         setPlayerError("YouTube-spilleren svarer ikke. Prøv videoen igjen.");
       }
     }, 15000);
+    Object.assign(window,{afterpartyPlaybackDiagnostics:playerDiagnostics});
     loadYoutube()
       .then(() => {
         if (disposed || !playerRoot.current) return;
@@ -961,9 +968,11 @@ export default function Afterparty() {
             onStateChange: (event: { data: number }) => {
               if (disposed) return;
               if (event.data === 3) {
+                if (bufferStarted.current === null) notePlayerEvent("buffer-start");
                 bufferStarted.current ??= performance.now();
                 setSyncStatus("Bufrer video");
               } else {
+                if (bufferStarted.current !== null) notePlayerEvent("buffer-end",performance.now()-bufferStarted.current);
                 if (event.data === 1 && bufferStarted.current !== null) {
                   settleUntil.current =
                     performance.now() + syncRecoveryMs(syncModeRef.current);
@@ -1089,6 +1098,9 @@ export default function Afterparty() {
     if (state !== 3) transportChangedRef.current = false;
     if (state === 1) recordPlayback();
     const currentTime = p.getCurrentTime();
+    // A short audio stall is not a shared pause. Keep the iframe intact and
+    // let the normal drift policy reconcile once the authoritative clock moves.
+    if (r.buffering && r.playing) { setSyncStatus("Bufrer lyd i Discord"); return; }
     if (r.isHost && r.mode !== "discord" && !r.current.live && !force && !nativeSeekPending.current) {
       const seek = nativeSeek.current.observe(currentTime, now, state);
       if (seek !== null) {
@@ -1137,6 +1149,7 @@ export default function Afterparty() {
       correctionCandidate.current = null;
       settleUntil.current = now + syncRecoveryMs(syncModeRef.current);
       nativeSeek.current.write(target.position);
+      notePlayerEvent("correction");
       p.seekTo(target.position, true);
       lastCorrection.current = now;
       setSyncStatus("Justerer synk");
@@ -1435,7 +1448,8 @@ export default function Afterparty() {
                 {tv ? t("Avslutt TV-modus") : t("TV-modus")}
               </button>
             </div>
-              {!discordMode && <QueueSettings room={room} busy={pending} onAction={(name, extra) => void action(name, extra)}/>}
+              {queueRoom && (!discordMode || concertQueue.data) && <QueueSettings room={queueRoom} busy={discordMode ? concertQueue.busy : pending} onAction={queueAction}/>}
+              {discordMode && !concertQueue.data?.canManage && <p>{t("Logg inn med Discord for å administrere denne serveren.")} <a href="/api/auth/discord">Discord</a></p>}
             </details>
           )}
           {(sharing || tv) && room && (
@@ -1888,7 +1902,7 @@ export default function Afterparty() {
                 >
                   <ListMusic size={20} aria-hidden="true" />
                   <span className="tab-label">{t("Kø")}</span>
-                  <span className="tab-count">{room?.queue.length ?? 0}</span>
+                  <span className="tab-count">{queueRoom?.queue.length ?? 0}</span>
                 </button>
                 <button
                   id="music-tab"
@@ -1938,24 +1952,9 @@ export default function Afterparty() {
                         <div><span>{t("Spelar no")}</span><strong>{room.current.title}</strong><small>{room.current.artist}</small></div>
                       </article>
                     )}
-                    {room && room.mode !== "discord" ? (
-                      <SocialQueue
-                        room={room}
-                        busy={pending}
-                        onAction={(name, extra) => void action(name, extra)}
-                      />
-                    ) : (
-                      room?.queue.map((v, i) => (
-                        <div className="queue-track" key={v.id + i}>
-                          <span>{i + 1}</span>
-                          <div>
-                            <strong>{v.title}</strong>
-                            <small>{v.artist}</small>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                    {!room?.queue.length && (
+                    {queueRoom && <SocialQueue room={queueRoom} busy={discordMode ? concertQueue.busy || !concertQueue.data : pending} onAction={queueAction}/>}
+                    {discordMode && concertQueue.error && <p role="alert">{t(concertQueue.error)}</p>}
+                    {!queueRoom?.queue.length && (
                       <div className="empty-queue">
                         <h3>{t("Køa er tom")}</h3>
                         <button
@@ -2229,7 +2228,7 @@ export default function Afterparty() {
               );
             }}
           >
-            Kø {room?.queue.length ?? 0}
+            Kø {queueRoom?.queue.length ?? 0}
           </button>
           <button
             onClick={() => {

@@ -113,7 +113,7 @@ try {
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
   }
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Queue consistency and faster queued skips" }).waitFor();
+  await page.getByRole("heading", { name: "Shared concert queue controls and resilient audio" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });

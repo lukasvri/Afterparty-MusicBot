@@ -4,6 +4,16 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.1.0: Shared concert queue controls and resilient audio
+
+2026-10-15
+
+- Discord concerts use the shared queue layout with artwork, waiting times, votes, moderation, removal, reordering, clear and undo. Management requires verified access to the selected Discord server. Ordinary private Discord tracks remain private and are preserved by concert queue edits.
+- Concert approval settings and pending website requests are stored by Core. Queue revisions reject stale edits, and undo expires after a track change.
+- Crossfades use a bounded decoded buffer. Slow or failed next sources cannot block a healthy current track. Unfinished audio streams trigger at most two retries of the same track from its consumed position instead of being treated as a normal song ending.
+- Audio buffering is separate from an explicit pause. Admin diagnostics include bounded, sanitized audio events, missing frame counts, longest interruptions and maximum event-loop delay. Browser video diagnostics remain local.
+- Regression coverage checks that YouTube quality changes retain the player and do not publish transport commands or reload the song. The reported real-player return to 1440p remains unverified; no quality lock is imposed.
+
 ## v2.0.4: Queue consistency and faster queued skips
 
 2026-10-15

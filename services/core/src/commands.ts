@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { ConcertQueue } from './concert-queue.ts';
 import { Engine } from './engine.ts';
 import { UserError, type Track, type Settings } from './types.ts';
 export class Commands {
     engine: Engine;
+    concertQueue: ConcertQueue;
     activity: {
         at: string;
         text: string;
@@ -12,9 +14,9 @@ export class Commands {
     enqueueTail: Promise<unknown> = Promise.resolve();
     disconnect: (() => void) | null = null;
     diagnostic: (() => Promise<string>) | null = null;
-    constructor(engine: Engine) { this.engine = engine; }
+    constructor(engine: Engine) { this.engine = engine; this.concertQueue = new ConcertQueue(engine); }
     note(text: string) { this.activity.unshift({ at: new Date().toISOString(), text }); this.activity = this.activity.slice(0, 20); }
-    async add(query:string, author='website', options:{next?:boolean;immediate?:boolean;shuffle?:boolean;concert?:boolean}={}) {
+    async add(query:string, author='website', options:{next?:boolean;immediate?:boolean;shuffle?:boolean;concert?:boolean;moderated?:boolean}={}) {
         const e=this.engine, epoch=e.queueGeneration;
         const found=e.providers.resolve(query).then(tracks=>({tracks}),error=>({error}));
         const result=this.enqueueTail.catch(()=>{}).then(async()=>{
@@ -24,7 +26,7 @@ export class Commands {
             if(options.concert&&(!tracks.length||tracks.some(t=>t.source!=='youtube'||!t.embeddable)))throw new UserError('Videoen kan ikke vises i Afterparty. Velg en annen YouTube-video.');
             if(epoch!==e.queueGeneration||!e.connected)throw new UserError('Avspillingen ble stoppet før søket var ferdig.');
             if(options.shuffle)for(let i=tracks.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tracks[i],tracks[j]]=[tracks[j],tracks[i]];}
-            const count=e.enqueue(tracks,options.next,options.immediate);
+            const count=options.moderated && this.concertQueue.request(tracks) ? tracks.length : e.enqueue(tracks,options.next,options.immediate);
             this.note(options.concert?'La til konsert i Discord og Afterparty':'La til musikk i Discord');
             return count;
         });
@@ -44,7 +46,7 @@ export class Commands {
             case 'enqueue': {
                 if (scope === 'public' && (typeof input.videoId !== 'string' || !/^[\w-]{11}$/.test(input.videoId)))
                     throw new UserError('Velg en YouTube-video.');
-                await this.add(String(input.query ?? input.videoId ?? ''), author, {next:Boolean(input.next),immediate:Boolean(input.immediate),shuffle:Boolean(input.shuffle),concert:scope==='public'||input.concert===true});
+                await this.add(String(input.query ?? input.videoId ?? ''), author, {next:Boolean(input.next),immediate:Boolean(input.immediate),shuffle:Boolean(input.shuffle),moderated:scope==='public',concert:scope==='public'||input.concert===true});
                 break;
             }
             case 'pause':

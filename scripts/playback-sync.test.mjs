@@ -33,3 +33,9 @@ test('subsecond iframe reporting jitter does not cause a hard seek',()=>{
  for(const jitter of [-.3,-.2,0,.2,.3]) assert.equal(shouldCorrect(50,50+jitter,9000,0),false);
  assert.equal(shouldCorrect(50,49,9000,0),true);
 });
+
+test('buffering freezes the authoritative position without turning it into a pause',()=>{
+ const room={code:'DISCORD1',mode:'discord',playing:true,buffering:true,position:20,serverTime:1000,current:{duration:200,live:false},syncValidForMs:7000};
+ const target=playbackTarget(room,1000,2000);assert.equal(target.position,20);assert.equal(target.playing,true);
+ assert.equal(playbackTarget({...room,playing:false},1000,2000).playing,false);
+});
