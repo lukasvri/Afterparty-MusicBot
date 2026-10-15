@@ -1,4 +1,4 @@
-# Gutta Krutt Core
+# Afterparty Core
 
 **The self-hosted audio engine behind Afterparty.** Core connects to Discord, manages per-server queues and exposes the playback state used by the website.
 

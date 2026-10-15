@@ -20,9 +20,9 @@ export const messages: Record<string, readonly [string, string]> = {
  "Lukk fullskjerm":["Lukk fullskjerm","Exit fullscreen"],
  "Bare verten kan endre synligheten.":["Bare verten kan endre synligheten.","Only the host can change room visibility."],
  "Velg offentlig eller privat rom.":["Velg offentlig eller privat rom.","Choose a public or private room."],
-  "Gutta Krutt Afterparty forsiden": [
-    "Gutta Krutt Afterparty forsiden",
-    "Gutta Krutt Afterparty home"
+  "Afterparty forsiden": [
+    "Afterparty forsiden",
+    "Afterparty home"
   ],
   "Hovedmeny": [
     "Hovedmeny",
@@ -824,9 +824,9 @@ export const messages: Record<string, readonly [string, string]> = {
     "Eierinnlogging",
     "Owner sign-in"
   ],
-  "Adminpassord for Gutta Krutt": [
-    "Adminpassord for Gutta Krutt",
-    "Gutta Krutt admin password"
+  "Adminpassord for Afterparty": [
+    "Adminpassord for Afterparty",
+    "Afterparty admin password"
   ],
   "Logg inn": [
     "Logg inn",
@@ -860,9 +860,9 @@ export const messages: Record<string, readonly [string, string]> = {
     "Du har ingen servere med administrasjonstilgang.",
     "You have no servers with administrative access."
   ],
-  "Legg til Gutta Krutt på": [
-    "Legg til Gutta Krutt på",
-    "Add Gutta Krutt to"
+  "Legg til Afterparty på": [
+    "Legg til Afterparty på",
+    "Add Afterparty to"
   ],
   "Oppdater serverlisten etter at boten er lagt til.": [
     "Oppdater serverlisten etter at boten er lagt til.",

@@ -2,7 +2,7 @@
 
 Effective: 15 October 2026
 
-These terms cover the hosted Gutta Krutt DJ Discord bot and Gutta Krutt Afterparty website, maintained by Discord user **lukasvri**. Independently hosted copies have their own operators. Using this service means agreeing to these terms.
+These terms cover the hosted Afterparty Discord bot and Afterparty website, maintained by Discord user **lukasvri**. Independently hosted copies have their own operators. Using this service means agreeing to these terms.
 
 
 ## Using the service

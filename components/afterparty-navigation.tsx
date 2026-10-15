@@ -7,13 +7,13 @@ export function Logo() {
     <a
       className="brand"
       href="/"
-      aria-label={t("Gutta Krutt Afterparty forsiden")}
+      aria-label={t("Afterparty forsiden")}
     >
       <span className="brand-mark">
         <AudioLines size={23} />
       </span>
       <span>
-        GUTTA KRUTT<span className="brand-sub">AFTERPARTY</span>
+        AFTERPARTY
       </span>
     </a>
   );

@@ -168,7 +168,7 @@ export class Commands {
             default: throw new UserError('Ukjent spillerhandling.');
         }
         this.note(action === 'pause' ? 'Avspillingen ble satt på pause' : action === 'resume' ? 'Avspillingen fortsatte' : action === 'skip' ? 'Hoppet til neste sang' : 'Utførte ' + action);
-        return 'Utført av Gutta Krutt-boten.';
+        return 'Utført av Afterparty-boten.';
     }
     updateSettings(input: Record<string, unknown>) { const bounds: Record<string, [
         number,
