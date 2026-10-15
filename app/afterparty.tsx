@@ -68,7 +68,7 @@ import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings } from "@/components/player-settings";
 
 export default function Afterparty() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [directoryOpen, setDirectoryOpen] = useState(false),
     [publicListing, setPublicListing] = useState(false);
   const navigate = (view: "music" | "rooms") => {
@@ -2171,6 +2171,10 @@ export default function Afterparty() {
               {!discordMode && room ? t(" · 48 timer") : ""}
             </span>
             <nav className="footer-links" aria-label={t("Snarveier")}>
+              <a href="/install">{language === 'en' ? 'Install bot' : 'Legg til bot'}</a>
+              <a href="/terms">{language === 'en' ? 'Terms' : 'Vilkår'}</a>
+              <a href="/privacy">{language === 'en' ? 'Privacy' : 'Personvern'}</a>
+              <a href="/support">Support</a>
               <a href="/patch-notes">{t("Patch notes")}</a>
               <a href="/admin" target="_top">
                 Admin <ArrowUpRight size={13} />
