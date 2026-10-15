@@ -25,7 +25,7 @@ export function AdminSeek({
   useEffect(() => {
     sample.current = { position, at: performance.now() };
     if (!editing.current) setValue(position);
-  }, [trackId, position]);
+  }, [trackId, position, playing]);
   useEffect(() => {
     editing.current = false;
   }, [trackId]);

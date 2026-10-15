@@ -1,7 +1,7 @@
 name: gutta-krutt-core
 services:
   core:
-    image: gutta-krutt-core:2.0.1
+    image: gutta-krutt-core:2.0.2
     build: .
     container_name: gutta-krutt-core
     restart: unless-stopped

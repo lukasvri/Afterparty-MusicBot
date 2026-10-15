@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.0.2",
+    "date": "2026-10-15",
+    "title": "Accurate seeking after pause and resume",
+    "items": [
+      "The host seek slider resets its playback sample when playback pauses or resumes, so time spent paused cannot advance the displayed position or the next shared seek. Active seek edits are preserved."
+    ]
+  },
+  {
     "version": "2.0.1",
     "date": "2026-10-15",
     "title": "Stable live playback and a quieter room",

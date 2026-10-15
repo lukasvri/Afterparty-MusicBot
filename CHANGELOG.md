@@ -4,6 +4,12 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.0.2: Accurate seeking after pause and resume
+
+2026-10-15
+
+- The host seek slider resets its playback sample when playback pauses or resumes, so time spent paused cannot advance the displayed position or the next shared seek. Active seek edits are preserved.
+
 ## v2.0.1: Stable live playback and a quieter room
 
 2026-10-15
