@@ -159,3 +159,10 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. For crede
 ## License
 
 Released under the [MIT license](LICENSE). Third-party code keeps its own notices; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The software license does not grant rights to music, video or third-party artwork.
+
+## Versions and release notes
+
+Website and Core share v1.0.0. See the [changelog](CHANGELOG.md) and
+[release policy](docs/RELEASING.md) for patch, minor and major increments.
+The website and GitHub release notes use the same source. Historical integer
+versions remain available; release entries do not prove production deployment.

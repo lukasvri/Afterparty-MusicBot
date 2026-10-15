@@ -1,0 +1,13 @@
+[
+  {
+    "version": "1.0.0",
+    "date": "2026-10-15",
+    "title": "Shared semantic versioning for Afterparty",
+    "items": [
+      "Website and Core share version 1.0.0. New releases use vMAJOR.MINOR.PATCH instead of integer version labels.",
+      "Bug fixes increment PATCH; larger updates increment MINOR and reset PATCH; massive updates increment MAJOR and reset MINOR and PATCH.",
+      "Website release notes, CHANGELOG.md and GitHub release notes are generated from the same release data. Historical V05 to V36 entries remain available with their original numbering and wording.",
+      "Afterparty owns its player navigation and Discord command definitions. Unused Muse reference code is removed while required license notices, saved browser preferences, existing player buttons and offline data imports are preserved."
+    ]
+  }
+]

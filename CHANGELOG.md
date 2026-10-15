@@ -1,0 +1,143 @@
+# Changelog
+
+Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by hand.
+Release entries describe source versions, not production deployment status.
+See [release policy](docs/RELEASING.md).
+
+## v1.0.0: Shared semantic versioning for Afterparty
+
+2026-10-15
+
+- Website and Core share version 1.0.0. New releases use vMAJOR.MINOR.PATCH instead of integer version labels.
+- Bug fixes increment PATCH; larger updates increment MINOR and reset PATCH; massive updates increment MAJOR and reset MINOR and PATCH.
+- Website release notes, CHANGELOG.md and GitHub release notes are generated from the same release data. Historical V05 to V36 entries remain available with their original numbering and wording.
+- Afterparty owns its player navigation and Discord command definitions. Unused Muse reference code is removed while required license notices, saved browser preferences, existing player buttons and offline data imports are preserved.
+
+## Historical integer versions
+
+Original dates, numbering and Norwegian wording are preserved.
+
+### V36: Sentrert kø og en ny DJ-figur
+
+14. oktober 2026
+
+- Tom kø har et sentrert lydikon, overskrift, forklaring og musikknapp.
+- DJ-en har fått caps, tydeligere hodetelefoner, en hånd ved øret og en hånd på mikseren. Nye detaljer på konsollen og roligere hodebevegelse.
+
+### V35: Ryddigere spiller og et mer detaljert DJ-sett
+
+14. oktober 2026
+
+- Køfanen har tydeligere tekst, sentrerte ikoner og jevne proporsjoner. Den klare rødfargen er tilbake.
+- Musikksøket strekker ikke lenger videopanelet. Merket i videohjørnet er fjernet.
+- Fullskjerm har én samlet kontrollrad og et eget innstillingspanel, med plass til YouTubes kontroller.
+- Scenen har detaljerte DJ-spillere, miksebord, høyttalerstakker og animerte LED-ringer.
+
+### V34: Åpne rom og mer liv på scenen
+
+14. oktober 2026
+
+- Åpne rom erstatter den doble Discord-lenken. Finn et offentlig rom og bli med uten konto. Verten velger om rommet skal vises.
+- Velg bokmål eller engelsk. Språket huskes på enheten.
+- Ny DJ, bevegelige lasere og scenelys med lyskilder og stråler som henger sammen. Mobilvisningen er tilpasset den nye scenen.
+
+### V33: Ei scene for Afterparty
+
+14. oktober 2026
+
+- Ny illustrert konsertscene med lysrigg, scenelys, djupn og publikumssilhuettar når ingen video er vald.
+- Samla fargar, typografi, knappar og avstandar, med tydelegare kø og musikksøk på mobil og stor skjerm.
+- Rørsle i scenelys og mjukare overgangar i kontrollane. Animasjonar kan slåast av og følgjer innstillinga for redusert rørsle.
+
+### V31: Utlogging av alle adminøkter
+
+14. oktober 2026
+
+- Logg ut avslutter Discord- og passordøkten, og logger også ut nettsidens eierkonto når den er aktiv.
+- Rettet at kontrollrommet åpnet seg igjen umiddelbart etter utlogging.
+
+### V30: Flere Discord-servere, ett kontrollrom
+
+14. oktober 2026
+
+- Boten har egen kø, innstillinger, favoritter og videorom for hver Discord-server.
+- Discord-innlogging gir administrasjon av serverne du har rettigheter til. Legg til boten direkte fra nettsiden.
+- Spiller, kø, radio, lydkvalitet, kanaler, lagrede køer og stopptimer er samlet under Admin. Det separate adminpanelet er stengt.
+- Neste video er tilgjengelig også i fullskjerm. /play er fortsatt Discord-musikk, mens /konsert vises på nettsiden.
+- Medieoppslag er mellomlagret og begrenset, med prioritert lydstart og reserve ved brukt YouTube-kvote.
+
+### V19: Romvideo og én felles motor
+
+14. oktober 2026
+
+- Nettsiden, boten og rommotoren er samlet i ett prosjekt med en felles klokke og protokoll.
+- Vanlige videorom får løpende status uten å vente på rompolling. Start og spoling avtales på et felles tidspunkt.
+- Videospilleren starter med riktig video og viser innlasting eller retry ved feil. Spill for alle er synlig under videoen.
+- Fullskjerm har ingen vignett eller skygge over bildet. Små kontroller ligger i hjørnene.
+- Tett synk korrigerer mindre avvik. Nettverk, YouTube og autoplay kan fortsatt gi lokale avvik.
+
+### V11: Egen motor og direkte synk
+
+14. oktober 2026
+
+- Gutta Krutt har fått egen avspillingsmotor for Discord, med kø, favoritter, crossfade og faktisk lydklokke.
+- Discord-rommet får løpende status via WebSocket eller en kontinuerlig HTTP-strøm. Kontaktens rundtur vises nederst på siden.
+- Pause, fortsett og neste sang sendes direkte til den nye motoren. Kortlevde, signerte kommandoer brukes som reserve. Felles avspilling gjelder alle.
+- Når kontakten brytes, prøves tilkoblingen på nytt og broen brukes som reserve. Videoen stopper hvis statusen blir for gammel.
+- Videospilleren beholder én tidslinje, én volumkontroll og kvalitet og teksting fra YouTube.
+
+### V10: Tett synk som standard
+
+14. oktober 2026
+
+- Tett synk er standard når du ikke har valgt en annen synkmodus på enheten.
+- Romstatus hentes hvert sekund mens siden er synlig, tidligere hvert andre sekund. Skjulte faner henter hvert fjerde sekund.
+- Tett synk venter 1,5 sekunder etter bufring før nye korrigeringer tillates, tidligere fire sekunder. Det gjøres fortsatt ingen synkhopp mens videoen bufrer.
+- Svar på botkommandoer sjekkes hvert halve sekund, tidligere hvert 1,5 sekund. Dette reduserer ventingen etter at boten har svart.
+
+### V09: Enklere videokontroller og roligere synk
+
+14. oktober 2026
+
+- Én tidslinje og én volumkontroll i videoen, og én utgang fra fullskjerm. Øvrige valg er samlet under Videoinnstillinger.
+- Velg kvalitet med tannhjulet og slå teksting av eller på med CC når videoen har teksting. Velg 1440p eller lavere manuelt; YouTube Auto kan ikke begrenses av nettsiden.
+- Stabil avspilling er standard: færre automatiske tidshopp og en hvileperiode etter bufring. Tettere synk kan velges og lagres lokalt.
+- Ny bufremelding og lokal omlasting av videoen, uten å bytte sang i rommet eller Discord.
+- Pause, fortsett og neste sang i Discord gjelder både musikken og videoene for alle. Vertens play/pause i egne rom styrer felles avspilling. Volum og mute fra videoen lagres på enheten.
+- Snarveier: F for fullskjerm og M for mute.
+
+### V08: Bunnlinje i sideinnholdet
+
+14. oktober 2026
+
+- Bunnlinjen ligger nederst i sideinnholdet og følger siden når du scroller.
+- Patch notes og Admin er fortsatt tilgjengelige der.
+
+### V07: Fast bunnlinje og patch notes
+
+14. oktober 2026
+
+- Botstatus, romkode og Admin ligger fast nederst på skjermen.
+- Ny knapp til denne endringsloggen.
+- Bunnlinjen tilpasser seg mobil og gir innholdet plass over seg.
+
+### V06: Synk, felles kø og nytt grensesnitt
+
+14. oktober 2026
+
+- Botens tidsmåling følger avspilte lydpakker, også ved pause og bufring.
+- Videoavvik korrigeres automatisk. Finjustering lagres på enheten din.
+- Legg til sanger og hopp over nåværende sang i Discord fra nettsiden.
+- Kø og musikksøk er samlet ved siden av videoen i et nytt svart og rødt grensesnitt.
+- Rettet oppstart fra tom Discord-kø, dobbeltklikk, rombytte og søkestatus.
+- Adminsøket fungerer uten å blokkere avspillingskontrollene.
+
+### V05: Nettsiden og boten samlet
+
+13. oktober 2026
+
+- Gutta Krutt Afterparty fikk bokmål, svart og rød profil og et samlet adminpanel.
+- Forslagene hentes fra faktiske avspillinger, med nylig og mest spilt.
+- Discord-video, kø og posisjon speiles på nettsiden.
+- Fullskjerm skjuler kontrollene når de ikke er i bruk. Volum og mute lagres separat.
+- Passordbeskyttet admin styrer boten og videorommene.
