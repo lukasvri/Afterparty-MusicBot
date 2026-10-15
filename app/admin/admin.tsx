@@ -314,7 +314,7 @@ export default function Admin() {
             </p>
           ) : !authenticated ? (
             <section className="admin-login">
-              <span className="party-kicker">GUTTA KRUTT / ADMIN</span>
+              <span className="party-kicker">AFTERPARTY / ADMIN</span>
               <h1>{t("Din server. Din musikk.")}</h1>
               <p>
                 {t(
@@ -343,7 +343,7 @@ export default function Admin() {
                   }}
                 >
                   <label htmlFor="admin-password">
-                    {t("Adminpassord for Gutta Krutt")}
+                    {t("Adminpassord for Afterparty")}
                   </label>
                   <input
                     id="admin-password"
@@ -367,7 +367,7 @@ export default function Admin() {
             <>
               <section className="scene-heading admin-heading">
                 <div>
-                  <span className="party-kicker">GUTTA KRUTT / AFTERPARTY</span>
+                  <span className="party-kicker">AFTERPARTY</span>
                   <h1>{t("Kontrollrom.")}</h1>
                   <p>{t("Spiller, kø og innstillinger for din server.")}</p>
                 </div>
@@ -402,7 +402,7 @@ export default function Admin() {
               ) : !selected?.installed ? (
                 <section className="admin-card">
                   <h2>
-                    {t("Legg til Gutta Krutt på")} {selected?.name}
+                    {t("Legg til Afterparty på")} {selected?.name}
                   </h2>
                   <a
                     className="button primary"
@@ -1009,7 +1009,7 @@ export default function Admin() {
             </>
           )}
           <footer className="page-footer">
-            <span>GUTTA KRUTT AFTERPARTY</span>
+            <span>AFTERPARTY</span>
             <a href="/">
               {t("Til musikken")} <ArrowUpRight size={13} />
             </a>

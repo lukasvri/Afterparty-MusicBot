@@ -346,7 +346,7 @@ const renderPerformance = () => {
   document.querySelector('#metric-memory').textContent = formatBytes(metric.rssBytes);
   document.querySelector('#metric-heap').textContent = `Heap ${formatBytes(metric.heapUsedBytes)}`;
   document.querySelector('#metric-uptime').textContent = formatRuntime(metric.uptimeSeconds);
-  document.querySelector('#metric-status').textContent = state.bot.ready ? 'Gutta Krutt kjører normalt' : 'Discord er ikke klar';
+  document.querySelector('#metric-status').textContent = state.bot.ready ? 'Afterparty kjører normalt' : 'Discord er ikke klar';
   document.querySelector('#metric-event-loop').textContent = `${metric.eventLoopP95Ms.toFixed(1)} ms`;
   document.querySelector('#metric-response').textContent = `${metric.averageResponseMs.toFixed(1)} ms`;
   document.querySelector('#metric-requests').textContent = metric.requestCount.toLocaleString('nb-NO');

@@ -1,6 +1,6 @@
 <div align="center">
 
-# Gutta Krutt Afterparty
+# Afterparty
 
 **Your Discord music bot. Your shared concert room. Your server.**
 

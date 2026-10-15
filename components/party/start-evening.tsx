@@ -13,7 +13,7 @@ export function StartEvening({ offline, onBrowser, onDiscord, onJoin }: {
     <a className="welcome-release" href="/patch-notes"><span>V{releases[0].version}</span> {en ? "What’s new" : "Siste oppdatering"}<span className="release-link">Patch notes <ArrowUpRight size={15}/></span></a>
     <div className="welcome-hero">
       <div className="welcome-copy">
-        <span className="party-kicker">GUTTA KRUTT AFTERPARTY</span>
+        <span className="party-kicker">AFTERPARTY</span>
         <h1 id="start-evening-title">Afterparty</h1>
         <p>{en ? "Play music and video together in a shared room." : "Spel musikk og video saman i eit felles rom."}</p>
         <button className="button primary welcome-start" onClick={onBrowser}><Play size={18} fill="currentColor"/>{t("Spel i nettlesaren")}<ArrowRight size={18}/></button>

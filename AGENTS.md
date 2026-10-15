@@ -1,4 +1,4 @@
-# Working on Gutta Krutt Afterparty
+# Working on Afterparty
 
 This repository is the source of truth for the website and Core. Write public
 documentation in English. Do not use em dashes.

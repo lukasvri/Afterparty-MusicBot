@@ -2,7 +2,7 @@
 
 Effective: 15 October 2026
 
-This policy describes the hosted Gutta Krutt DJ Discord bot and Gutta Krutt Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://muse-afterhours.lukasvri.chatgpt.site/support). Independently hosted copies are operated separately.
+This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://muse-afterhours.lukasvri.chatgpt.site/support). Independently hosted copies are operated separately.
 
 
 ## Information processed and why
