@@ -64,6 +64,11 @@ private queue contents. Exit codes are `0` for healthy, `1` for a warning and `2
 for an error. During a deployment the probe respects the deployment lock. An
 intentionally stopped container is reported without starting it.
 
+Voice usage counts connected sessions, including paused or idle connections.
+Connection attempts in progress are not exposed by this metric, so the admission
+guard remains authoritative. The probe checks the archive's size and SHA-256
+against `latest.json` on every run before reporting a recent verified backup.
+
 Schedule the probe with a bounded systemd oneshot service. Give background jobs
 lower CPU/I/O priority and keep their memory budgets finite. User timers need
 `loginctl enable-linger USER` if they must continue after logout. Keep Docker and

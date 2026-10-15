@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -16,7 +17,7 @@ const headers={Authorization:'Bearer '+process.env.PUBLIC_SITE_ADMIN_KEY};
 const api=async path=>{const r=await fetch('http://127.0.0.1:3990'+path,{headers,signal:AbortSignal.timeout(5000)});if(!r.ok)throw Error('Core health request failed');return r.json();};
 const app=await api('/v1/application'),admin=await api('/v1/admin');
 let active=0;
-for(const g of app.guilds??[]){const {state}=await api('/v1/state?all=1&guildId='+encodeURIComponent(g.id));if(state.playing)active++;}
+for(const g of app.guilds??[]){const {state}=await api('/v1/state?all=1&guildId='+encodeURIComponent(g.id));if(state.connected)active++;}
 console.log(JSON.stringify({ready:admin.bot?.ready===true,guilds:app.guilds?.length??0,active_voice_sessions:active,
 cpu_percent:admin.performance?.cpuPercent,rss_bytes:admin.performance?.rssBytes,event_loop_p95_ms:admin.performance?.eventLoopP95Ms,
 voice_limit:Number(process.env.MAX_ACTIVE_VOICE_SESSIONS??8)}));
@@ -93,10 +94,13 @@ def collect(config, backup_dir):
     try:
         latest = json.loads((backup_dir / 'latest.json').read_text())
         archive = backup_dir / Path(latest['archive']).name
-        result['backup_present'] = archive.is_file() and archive.stat().st_size == latest['size_bytes']
+        result['backup_present'] = False
+        if archive.is_file() and archive.stat().st_size == latest['size_bytes']:
+            with archive.open('rb') as stream:
+                result['backup_present'] = hashlib.file_digest(stream, 'sha256').hexdigest() == latest['sha256']
         result['backup_age_hours'] = round((time.time() - datetime.fromisoformat(latest['created_at']).timestamp()) / 3600, 2)
         result['backup_databases'] = latest['databases']
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError, TypeError):
         result['backup_present'] = False
     return result
 
