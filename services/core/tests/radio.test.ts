@@ -67,3 +67,9 @@ test('genre words inside a song name are not treated as metadata',()=>{
  assert.equal(radioGenre(track('seed','Artist - Country Roads','Uploader')),null);
  assert.equal(radioGenre(track('seed','Artist - Song [Progressive House]','Uploader')),'progressive house');
 });
+
+test('genre metadata supports unlabelled titles without trusting the upload channel',()=>{
+ const original={...track('seed','Janji - Heroes Tonight'),genres:['progressive house']};
+ const candidate={...track('next','Other Artist - Another Song'),genres:['progressive house']};
+ assert.equal(rankRadio(original,[candidate],[],[])[0]?.id,'next');
+});

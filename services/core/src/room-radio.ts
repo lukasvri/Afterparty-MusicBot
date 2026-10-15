@@ -15,7 +15,7 @@ export async function roomRecommendation(state: RoomRadioState, search: (query: 
       const tagged = metadata.find(candidate => radioGenre(candidate) &&
         radioArtist(candidate).toLocaleLowerCase() === artist.toLocaleLowerCase() &&
         songIdentity(candidate) === songIdentity(seed!));
-      if (tagged) { genre = radioGenre(tagged); seed = { ...seed, title: tagged.title }; }
+      if (tagged) { genre = radioGenre(tagged); seed = { ...seed, title: tagged.title, genres: tagged.genres }; }
     } catch { /* retain conservative matching when metadata lookup is unavailable */ }
   }
   if (!artist && !genre) return null;
@@ -30,7 +30,7 @@ export async function roomRecommendation(state: RoomRadioState, search: (query: 
       const candidates = await search(query);
       succeeded = true;
       const next = rankRadio(track(seed), candidates.filter(video => video.embeddable).map(track), [...(state.radioHistory ?? []), ...(state.history ?? [])], state.radioExcluded ?? [])[0];
-      if (next) return { id: next.id, title: next.title, artist: next.artist, image: next.image, duration: next.duration, live: next.live, embeddable: next.embeddable };
+      if (next) return { id: next.id, title: next.title, artist: next.artist, genres: next.genres, image: next.image, duration: next.duration, live: next.live, embeddable: next.embeddable };
     } catch (error) { failure = error; }
   }
   if (!succeeded && failure) throw failure;

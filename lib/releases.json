@@ -1,5 +1,16 @@
 [
   {
+    "version": "2.0.2",
+    "date": "2026-10-15",
+    "title": "Native YouTube seeking and reliable early skips",
+    "items": [
+      "YouTube is the only seek bar in video rooms. Confirmed native seeks update the shared room, while buffering and delayed automatic corrections are not published as user seeks.",
+      "Early skips share an in-flight radio lookup with prefetch. A failed lookup keeps the current song playing; a safe single retry handles queue revisions arriving during a skip.",
+      "Radio begins preparing the next song as playback starts. Genre matching now also uses explicit tags and genre labels in provider metadata, not just the video title.",
+      "Queue controls are located under room settings. The welcome page expands across large displays, including 2560 by 1440."
+    ]
+  },
+  {
     "version": "2.0.1",
     "date": "2026-10-15",
     "title": "Stable live playback and a quieter room",

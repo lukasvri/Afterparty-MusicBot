@@ -571,3 +571,13 @@ button:disabled {
 .video-settings .admin-seek { display:grid; gap:12px; width:100%; padding:12px 0; }
 .video-settings .admin-seek input { width:100%; }
 [data-tv="true"] .room-options { display:none; }
+
+/* A welcome screen, not a narrow document column, on large displays. */
+.concert-shell[data-welcome="true"] .content { width:calc(100% - clamp(32px,5vw,128px)); min-height:calc(100svh - 88px); display:flex; flex-direction:column; }
+.concert-shell[data-welcome="true"] .start-evening { flex:1; display:flex; flex-direction:column; margin-bottom:0; }
+.concert-shell[data-welcome="true"] .welcome-hero { flex:1; grid-template-columns:minmax(300px,.8fr) minmax(0,1.4fr); gap:clamp(24px,5vw,100px); }
+.concert-shell[data-welcome="true"] .welcome-copy h1 { font-size:clamp(54px,5.8vw,148px); }
+.concert-shell[data-welcome="true"] .welcome-art { width:100%; }
+.concert-shell[data-welcome="true"] .studio-foot { margin-top:28px; }
+.room-options .queue-options { border-top:1px solid #ffffff20; padding:8px 16px; }
+@media(max-width:650px) { .concert-shell[data-welcome="true"] .content { min-height:calc(100svh - 140px); } .concert-shell[data-welcome="true"] .welcome-copy h1 { font-size:clamp(44px,12vw,70px); } }

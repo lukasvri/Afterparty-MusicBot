@@ -92,8 +92,8 @@ try {
   });
   const page = await context.newPage();
   await page.goto(base);
-  for (const width of [390, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
+  for (const width of [390, 1440, 2560]) {
+    await page.setViewportSize({ width, height: width === 2560 ? 1440 : 900 });
     await page.getByRole("heading", { name: "Afterparty", exact:true }).waitFor();
     const geometry = await page.locator(".welcome-art").evaluate(el => {
       const frame = el.getBoundingClientRect();
@@ -104,10 +104,15 @@ try {
     });
     assert(geometry.contained, "DJ head and lighting rig must remain inside the welcome scene");
     assert(!geometry.overflow, "Welcome page must fit the viewport");
+    if(width===2560){
+      const content=await page.locator('.content').boundingBox();
+      assert(content.width>2300,'1440p welcome should use the available screen width');
+      assert(content.height>1200,'1440p welcome should occupy the viewport height');
+    }
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
   }
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Stable live playback and a quieter room" }).waitFor();
+  await page.getByRole("heading", { name: "Native YouTube seeking and reliable early skips" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -138,7 +143,8 @@ try {
     .getByRole("button", { name: /Legg.*Synthetic evening song/ })
     .click();
   await page.getByRole("tab", { name: "Kø" }).click();
-  await page.locator(".queue-options summary").click();
+  await page.locator(".room-options > summary").click();
+  await page.locator(".room-options .queue-options summary").click();
   await page
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
     .click();
@@ -163,7 +169,6 @@ try {
       })
       .getAttribute("aria-pressed")) === "true",
   );
-  await page.locator(".room-options summary").click();
   await page.getByRole("button", { name: "TV-modus", exact: true }).click();
   assert(new URL(page.url()).searchParams.get("tv") === "1");
   await page.getByAltText("QR-kode for å bli med i rommet").waitFor();

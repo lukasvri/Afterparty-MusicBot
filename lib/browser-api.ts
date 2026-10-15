@@ -21,6 +21,6 @@ export async function request<T>(
     throw new Error("Tjenesten svarer ikke. Prøv igjen.");
   }
   if (!response.ok)
-    throw new Error(data.error ?? "Tjenesten svarer ikke. Prøv igjen.");
+    throw Object.assign(new Error(data.error ?? "Tjenesten svarer ikke. Prøv igjen."), { status: response.status });
   return data;
 }

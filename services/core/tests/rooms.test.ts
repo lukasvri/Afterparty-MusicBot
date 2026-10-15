@@ -464,7 +464,8 @@ test("radio falls back to a second artist search and can restart after the last 
   const { store, rooms, input } = setup();
   try {
     rooms.search = async () => [];
-    const ended = await rooms.control("TESTROOM", input);
+    await assert.rejects(rooms.control("TESTROOM", input), /Radioen fann ikkje/);
+    const ended = rooms.mutate("TESTROOM", input);
     assert.equal(ended.current, null);
     const queries: string[] = [];
     rooms.search = async query => { queries.push(query); return queries.length === 1 ? [] : [next]; };
@@ -483,7 +484,7 @@ test("radio queues the next song before the end, preserves the clock, and yields
   rooms.import({code:"TESTROOM",name:"Preview radio",owner_hash:"a".repeat(64),state:{current:seed,queue:[],position:169,playing:true},version:1,updated_at:now,expires_at:100000});
   rooms.search=async()=>{searches++;return [next];};
   try {
-    await rooms.tick(); assert.equal(searches,0);
+    await rooms.tick(); assert.equal(searches,1);
     now+=1000;
     await rooms.tick();
     const prepared=rooms.snapshot("TESTROOM");
@@ -532,4 +533,26 @@ test("untagged radio seeds can learn genre from the same recording and cross art
  });
  assert.equal(result?.id,next.id);
  assert(queries[1].startsWith('future house'));
+});
+
+test('skip shares an in-flight radio lookup and takes priority over prefetch',async()=>{
+ const {rooms,store,input}=setup();const gate=deferred<RoomVideo[]>();let calls=0;
+ rooms.search=async()=>{calls++;return gate.promise;};
+ try {
+  const preload=rooms.control('TESTROOM',{...input,action:'radio-prefetch'});
+  const skip=rooms.control('TESTROOM',input);
+  gate.resolve([next]);
+  await preload;const result=await skip;
+  assert.equal(result.current?.id,next.id);assert.equal(result.queue.length,0);assert.equal(calls,1);
+ }finally{store.close();}
+});
+test('an unsuccessful early skip keeps the current song and allows retry',async()=>{
+ const {rooms,store,input}=setup();
+ try {
+  rooms.search=async()=>[];
+  await assert.rejects(rooms.control('TESTROOM',input),/Radioen fann ikkje/);
+  assert.equal(rooms.snapshot('TESTROOM').current?.id,seed.id);
+  assert.equal(rooms.snapshot('TESTROOM').playing,true);
+  rooms.search=async()=>[next];assert.equal((await rooms.control('TESTROOM',input)).current?.id,next.id);
+ }finally{store.close();}
 });

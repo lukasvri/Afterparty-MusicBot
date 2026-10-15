@@ -50,8 +50,8 @@ It exercises private setup, first-song search, focus and scrolling, adding track
 Tight synchronization remains the default. The player tolerates up to 0.5 seconds
 of iframe reporting jitter and requires sustained drift before an automatic seek.
 Room transport changes apply promptly; buffering never publishes a host seek.
-Use the shared seek slider under Video settings to seek the whole room. Native
-YouTube time observations are not treated as room commands.
+YouTube is the only seek bar in browser rooms. A confirmed discontinuity updates
+the shared room for hosts. Buffering and pending programmatic seeks are excluded.
 
 Radio searches explicit genre labels across artists, favouring artists not heard
 recently. It retries empty or failed searches. If the title has no reliable genre
@@ -60,8 +60,16 @@ do not establish similarity.
 If no eligible track is available, the room retains its listening history and
 shows Retry radio. It does not fill the queue with unrelated search results.
 
-Radio prepares one visible suggestion during the final 30 seconds of a track.
+Radio prepares one visible suggestion as soon as a track begins playing.
 Manual queue additions replace that suggestion, and turning radio off removes it.
 Live performances, remakes, recreations and covers are excluded by title as well
 as provider flags. Search latency can still delay a suggestion when providers
 are unavailable.
+
+## Early skip handling (2.0.2)
+
+Prefetch and skip share a provider lookup. Skip takes priority over inserting a
+suggestion. Failed lookups preserve a song that has not finished yet. The browser
+retries a stale skip once only if the track, playback instance and play state are
+unchanged. Genre labels can come from explicit provider tags or genre fields in
+descriptions; no audio classifier is implied.

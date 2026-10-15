@@ -76,7 +76,44 @@ export function SocialQueue({
           Stem for neste låt · {room.skipVotes ?? 0}/3
         </button>
       )}
-      <details className="queue-options"><summary>{t("Køinnstillingar")}</summary>
+      {!!room.requests?.length && (
+        <div>
+          <h3>{t("Ventande låtønske")}</h3>
+          {room.requests.map((v) => (
+            <article className="social-track" key={v.id}>
+              <div>
+                <strong>{v.title}</strong>
+                <small>Frå {v.requestedBy ?? t("Gjest")}</small>
+              </div>
+              {room.isHost ? (
+                <>
+                  <button
+                    disabled={busy}
+                    onClick={() => onAction("approve", { videoId: v.id })}
+                  >
+                    {t("Godkjenn")}
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => onAction("reject", { videoId: v.id })}
+                  >
+                    {t("Avvis")}
+                  </button>
+                </>
+              ) : (
+                <span>{t("Ventar på verten")}</span>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function QueueSettings({room,busy,onAction}:{room:Room;busy:boolean;onAction:(action:string,extra?:Record<string,unknown>)=>void}) {
+ const {t}=useLanguage();
+ return (      <details className="queue-options"><summary>{t("Køinnstillingar")}</summary>
       <div className="queue-summary">
 
         {room.isHost && (
@@ -117,37 +154,5 @@ export function SocialQueue({
         </label>
       )}
       </details>
-      {!!room.requests?.length && (
-        <div>
-          <h3>{t("Ventande låtønske")}</h3>
-          {room.requests.map((v) => (
-            <article className="social-track" key={v.id}>
-              <div>
-                <strong>{v.title}</strong>
-                <small>Frå {v.requestedBy ?? t("Gjest")}</small>
-              </div>
-              {room.isHost ? (
-                <>
-                  <button
-                    disabled={busy}
-                    onClick={() => onAction("approve", { videoId: v.id })}
-                  >
-                    {t("Godkjenn")}
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => onAction("reject", { videoId: v.id })}
-                  >
-                    {t("Avvis")}
-                  </button>
-                </>
-              ) : (
-                <span>{t("Ventar på verten")}</span>
-              )}
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
+);
 }
