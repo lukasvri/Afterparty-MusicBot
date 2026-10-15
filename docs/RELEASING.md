@@ -48,3 +48,7 @@ do not move it. A maintainer may then publish the release and create its new tag
 Production deployment is a separate local operation following
 [operations and recovery](../services/core/PUBLIC_RELEASE.md). A GitHub Release
 alone is not deployment evidence. Cloud tasks do not merge, publish or deploy.
+
+## Reading release history
+
+Website and Core use semantic versioning. Historical release entries retain their original numbering. Patch notes describe the source build; a build is not proof of a production deployment. Published release artifacts are listed in [GitHub Releases](https://github.com/lukasvri/gutta-krutt-afterparty/releases).

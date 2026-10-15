@@ -92,6 +92,25 @@ try {
   });
   const page = await context.newPage();
   await page.goto(base);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByRole("heading", { name: /Gode vener/ }).waitFor();
+    const geometry = await page.locator(".welcome-art").evaluate(el => {
+      const frame = el.getBoundingClientRect();
+      const head = el.querySelector(".performer-head").getBoundingClientRect();
+      const rig = el.querySelector(".stage-truss").getBoundingClientRect();
+      return { contained: head.top >= frame.top && head.bottom <= frame.bottom && head.left >= frame.left && head.right <= frame.right && rig.top >= frame.top,
+        overflow: document.documentElement.scrollWidth > innerWidth };
+    });
+    assert(geometry.contained, "DJ head and lighting rig must remain inside the welcome scene");
+    assert(!geometry.overflow, "Welcome page must fit the viewport");
+    if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
+  }
+  await page.locator(".welcome-release").click();
+  await page.getByRole("heading", { name: "Your people, your music: Afterparty v2" }).waitFor();
+  assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
+  await page.goto(base);
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Spel i nettlesaren" }).click();
   const dialog = page.getByRole("dialog", { name: "Start kvelden" });
   await dialog.waitFor();
