@@ -61,6 +61,7 @@ def extract_archive(archive, destination):
             raise DeployError('Archive member escapes its destination.')
         if member.isdir():
             target.mkdir(parents=True, exist_ok=True)
+            target.chmod(member.mode & 0o777)
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             with archive.extractfile(member) as source, target.open('wb') as output:
