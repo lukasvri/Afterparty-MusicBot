@@ -1378,6 +1378,20 @@ export default function Afterparty() {
                 </span>
                 <span className={`status-dot ${botOnline ? "live" : ""}`} />
               </span>
+              {room?.isHost && !discordMode && (
+                <button
+                  className="button subtle"
+                  aria-pressed={room.radio !== false}
+                  disabled={pending}
+                  onClick={() =>
+                    void action("radio", { enabled: room.radio === false })
+                  }
+                >
+                  <Radio size={16} />
+                  {room.radio === false ? t("Radio av") : t("Radio på")}
+                </button>
+              )}
+
               <button
                 className="button subtle share-button"
                 disabled={!room}
@@ -1391,20 +1405,7 @@ export default function Afterparty() {
             </div>
           </section>
           {!directoryOpen && room && (
-            <details className="room-options"><summary>{t("Rominnstillingar")}</summary><div className="party-tools">              {room?.isHost && !discordMode && (
-                <button
-                  className="button subtle"
-                  aria-pressed={room.radio !== false}
-                  disabled={pending}
-                  onClick={() =>
-                    void action("radio", { enabled: room.radio === false })
-                  }
-                >
-                  <Radio size={16} />
-                  {room.radio === false ? t("Radio av") : t("Radio på")}
-                </button>
-              )}
-              {room?.isOwner && !discordMode && (
+            <details className="room-options"><summary>{t("Rominnstillingar")}</summary><div className="party-tools">              {room?.isOwner && !discordMode && (
                 <label className="room-visibility">
                   <input
                     type="checkbox"
@@ -1931,6 +1932,12 @@ export default function Afterparty() {
                     </small>
                   </div>
                   <div className="queue-content">
+                    {room?.current && (
+                      <article className="queue-current">
+                        <img src={room.current.image || `https://i.ytimg.com/vi/${room.current.id}/mqdefault.jpg`} alt="" />
+                        <div><span>{t("Spelar no")}</span><strong>{room.current.title}</strong><small>{room.current.artist}</small></div>
+                      </article>
+                    )}
                     {room && room.mode !== "discord" ? (
                       <SocialQueue
                         room={room}

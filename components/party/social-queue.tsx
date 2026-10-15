@@ -33,8 +33,10 @@ export function SocialQueue({
         return (
           <article className="social-track" key={v.id}>
             <span className="queue-number">{i + 1}</span>
+            <img className="queue-art" src={v.image || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" />
             <div>
               <strong>{v.title}</strong>
+              <small>{v.artist}</small>
               <small>
                 {v.radio ? "Radio" : v.requestedBy ?? t("Gjest")} · {eta}
               </small>

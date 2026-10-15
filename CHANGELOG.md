@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.0.3: Visible room controls and radio retry cooldown
+
+2026-10-15
+
+- When an early skip shares an empty radio search with automatic prefetch, the current song keeps playing and a persisted 15 second cooldown prevents repeated provider searches on every room tick.
+- Radio on/off is visible beside the room controls. The queue restores the current song card, artwork and artist information.
+
 ## v2.0.2: Native YouTube seeking and reliable early skips
 
 2026-10-15
