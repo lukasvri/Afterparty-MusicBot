@@ -19,8 +19,8 @@ npm --version
 Docker must be running, and your user must be able to run Docker commands. The host does not need FFmpeg or Python: the Core Docker image installs them.
 
 ```bash
-git clone https://github.com/lukasvri/gutta-krutt-afterparty.git
-cd gutta-krutt-afterparty
+git clone https://github.com/lukasvri/Afterparty-MusicBot.git
+cd Afterparty-MusicBot
 cp services/core/.env.example services/core/.env
 cp .dev.vars.example .dev.vars
 ```
@@ -215,6 +215,28 @@ Some bot messages remain Norwegian. `konsert` means concert; `hjelp` means help.
 | `EADDRINUSE` or container-name conflict | Another Core instance already uses port 3990 or `gutta-krutt-core`. Use a separate host for an independent installation. |
 | UI loads but search fails | Configure the website's YouTube API key and check its quota. |
 
-If you need help, open an [issue](https://github.com/lukasvri/gutta-krutt-afterparty/issues) with your OS, Docker and Node versions, the failed step and redacted logs. Never post tokens, full environment files or private database contents.
+If you need help, open an [issue](https://github.com/lukasvri/Afterparty-MusicBot/issues) with your OS, Docker and Node versions, the failed step and redacted logs. Never post tokens, full environment files or private database contents.
 
 **Next:** [Backups and updates](../services/core/PUBLIC_RELEASE.md) · [Configuration reference](CONFIGURATION.md)
+
+## Existing installations after the repository rename
+
+The canonical repository is `https://github.com/lukasvri/Afterparty-MusicBot`.
+From your existing checkout, update its remote without moving the working directory:
+
+```bash
+git remote set-url origin https://github.com/lukasvri/Afterparty-MusicBot.git
+git remote -v
+```
+
+Keep existing deployment configuration paths, data volumes and backups unchanged.
+The example `/srv/Afterparty-MusicBot` path is for new installations only.
+
+The hosted website is now `https://afterparty.lukasvri.chatgpt.site`.
+For that installation, update Core's `PUBLIC_SITE_URL` and the website's
+`GUTTA_CORE_SITE_ORIGIN` to this origin. Register
+`https://afterparty.lukasvri.chatgpt.site/api/auth/discord/callback` under
+Discord Developer Portal's OAuth2 redirects. Keep existing redirects until the
+new login flow is verified. Self-hosted copies should continue using their own
+origins. These source changes do not update production environment settings or
+Discord Developer Portal automatically.
