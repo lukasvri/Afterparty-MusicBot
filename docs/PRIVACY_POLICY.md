@@ -2,7 +2,7 @@
 
 Effective: 15 October 2026
 
-This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://muse-afterhours.lukasvri.chatgpt.site/support). Independently hosted copies are operated separately.
+This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://afterparty.lukasvri.chatgpt.site/support). Independently hosted copies are operated separately.
 
 
 ## Information processed and why
@@ -38,7 +38,7 @@ The website bridge removes concert history older than 90 days and command record
 
 You can remove your favorites and room content using the available controls, sign out of admin, clear site data in your browser, and revoke Discord authorization in Discord’s Authorized Apps settings. Server administrators can uninstall the bot. These steps do not by themselves erase every stored record.
 
-To request access, correction, export or deletion of information associated with you or your server, contact **lukasvri** through [Support](https://muse-afterhours.lukasvri.chatgpt.site/support). Specify the affected feature and provide identifiers privately only when needed to locate the records. We may ask you to demonstrate control of the relevant account or server before disclosing or deleting data. Do not send passwords, bot tokens or identity documents. We will respond as required by applicable data protection law. Depending on your location, you may also have rights to object, restrict processing and complain to a data protection authority.
+To request access, correction, export or deletion of information associated with you or your server, contact **lukasvri** through [Support](https://afterparty.lukasvri.chatgpt.site/support). Specify the affected feature and provide identifiers privately only when needed to locate the records. We may ask you to demonstrate control of the relevant account or server before disclosing or deleting data. Do not send passwords, bot tokens or identity documents. We will respond as required by applicable data protection law. Depending on your location, you may also have rights to object, restrict processing and complain to a data protection authority.
 
 We process information needed to provide features you request and use operational information to protect and maintain the service. Where applicable, these purposes rely on performance of the service agreement and legitimate interests in security and reliability. Where a third-party feature requires consent, its provider handles that choice. You can contact us with questions or objections.
 

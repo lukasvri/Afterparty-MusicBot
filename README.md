@@ -6,11 +6,11 @@
 
 Play music in Discord, bring video into a shared room, and manage everything from one web interface.
 
-[![Core validation](https://github.com/lukasvri/gutta-krutt-afterparty/actions/workflows/core.yml/badge.svg)](https://github.com/lukasvri/gutta-krutt-afterparty/actions/workflows/core.yml)
+[![Core validation](https://github.com/lukasvri/Afterparty-MusicBot/actions/workflows/core.yml/badge.svg)](https://github.com/lukasvri/Afterparty-MusicBot/actions/workflows/core.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24.17%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-[Installation guide](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) · [Operations](services/core/PUBLIC_RELEASE.md) · [Codex Cloud](docs/CODEX_CLOUD.md) · [Report an issue](https://github.com/lukasvri/gutta-krutt-afterparty/issues)
+[Website](https://afterparty.lukasvri.chatgpt.site) · [Installation guide](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) · [Operations](services/core/PUBLIC_RELEASE.md) · [Codex Cloud](docs/CODEX_CLOUD.md) · [Report an issue](https://github.com/lukasvri/Afterparty-MusicBot/issues)
 
 </div>
 
@@ -48,8 +48,8 @@ Examples use Bash on Linux, macOS or Windows through WSL2.
 ### 1. Download the project
 
 ```bash
-git clone https://github.com/lukasvri/gutta-krutt-afterparty.git
-cd gutta-krutt-afterparty
+git clone https://github.com/lukasvri/Afterparty-MusicBot.git
+cd Afterparty-MusicBot
 ```
 
 ### 2. Create your configuration files

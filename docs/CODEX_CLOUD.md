@@ -7,7 +7,7 @@ run on your deployment host, where its credentials and databases remain.
 
 1. In Codex, choose **Work in > Cloud > Select environment > Create environment**,
    or **Settings > Codex Cloud > Environments > Create environment**.
-2. Select `lukasvri/gutta-krutt-afterparty` and start environment setup.
+2. Select `lukasvri/Afterparty-MusicBot` and start environment setup.
 3. Ask Codex to install **Node.js 24.17+**, npm, **Python 3.11+** and **FFmpeg**, then run:
 
    ```bash

@@ -28,7 +28,7 @@ To the extent permitted by applicable law, the service is provided as available 
 
 ## Leaving, privacy and support
 
-You can stop using the website or remove the bot through Discord’s server settings. Removing the bot does not automatically erase its stored server data. See the [Privacy Policy](https://muse-afterhours.lukasvri.chatgpt.site/privacy) for data handling and deletion requests, and [Support](https://muse-afterhours.lukasvri.chatgpt.site/support) to contact the maintainer.
+You can stop using the website or remove the bot through Discord’s server settings. Removing the bot does not automatically erase its stored server data. See the [Privacy Policy](https://afterparty.lukasvri.chatgpt.site/privacy) for data handling and deletion requests, and [Support](https://afterparty.lukasvri.chatgpt.site/support) to contact the maintainer.
 
 
 ## Updates to these terms

@@ -1,5 +1,5 @@
 {
-  "repo": "/srv/gutta-krutt-afterparty",
+  "repo": "/srv/Afterparty-MusicBot",
   "compose_file": "/srv/gutta-private/compose.yml",
   "data_dir": "/srv/gutta-data/data",
   "state_dir": "/srv/gutta-private/deployment",
