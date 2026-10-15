@@ -20,7 +20,7 @@ export function releaseNotes(release){
 export function changelog(){
  return '# Changelog\n\nGenerated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by hand.\nRelease entries describe source versions, not production deployment status.\nSee [release policy](docs/RELEASING.md).\n\n'+releases.map(releaseNotes).join('\n')+'\n## Historical integer versions\n\nOriginal dates, numbering and Norwegian wording are preserved.\n\n'+legacyUpdates.map(entry=>`### V${entry.version}: ${entry.title}\n\n${entry.date}\n\n${entry.items.map(item=>`- ${item}`).join('\n')}\n`).join('\n');
 }
-export function validate(){
+export function validateReleaseHistory(releases){
  if(!releases.length)throw new Error('At least one release is required');
  const versions=new Set();
  for(const release of releases){
@@ -30,6 +30,16 @@ export function validate(){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(release.date)||new Date(release.date).toISOString().slice(0,10)!==release.date)throw new Error('Invalid release date');
   if(!release.title||!release.items.length||release.items.some(item=>typeof item!=='string'||!item.trim()))throw new Error('Empty release notes');
  }
+ for(let index=1;index<releases.length;index++){
+  const older=releases[index].version;
+  const newer=releases[index-1].version;
+  if(!['patch','minor','major'].some(kind=>nextVersion(older,kind)===newer)){
+   throw new Error(`Invalid release transition: ${older} -> ${newer}; releases must be newest first with one patch, minor or major increment`);
+  }
+ }
+}
+export function validate(){
+ validateReleaseHistory(releases);
  for(const path of ['package.json','package-lock.json','services/core/package.json','services/core/package-lock.json']){
   const manifest=JSON.parse(read(path));
   if(manifest.version!==releases[0].version||manifest.packages&&manifest.packages[''].version!==releases[0].version)throw new Error(`Version mismatch: ${path}`);
