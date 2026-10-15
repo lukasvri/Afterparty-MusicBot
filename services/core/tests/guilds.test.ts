@@ -21,6 +21,12 @@ test('guilds isolate state, queue, settings, favorites, commands and streams whi
   const invoke=()=>fetch(base+'/v1/command',{method:'POST',headers:header,body:JSON.stringify(input)});await invoke();await invoke();assert(two.engine.paused);assert(!one.engine.paused);assert.equal(two.store.jobs().length,1);assert.equal(one.store.jobs().length,0);
   const stream=await fetch(base+'/events?guildId='+B,{headers:{Origin:'https://site.example'}}),reader=stream.body!.getReader();const frame=Buffer.from((await reader.read()).value!).toString();assert(frame.includes(B));assert(!frame.includes('Song '+A));await reader.cancel();
   const settings=await fetch(base+'/v1/admin',{method:'POST',headers:header,body:JSON.stringify({guildId:A,tokenCipher:grant,operation:'settings',settings:{defaultVolume:50}})});assert.equal(settings.status,200);assert.equal(one.engine.settings.defaultVolume,50);assert.equal(two.engine.settings.defaultVolume,100);
+  const queueCall=(input:Record<string,unknown>,authorized=true)=>fetch(base+'/v1/concert-queue',{method:'POST',headers:authorized?header:{'Content-Type':'application/json'},body:JSON.stringify(input)});
+  assert.equal((await queueCall({guildId:A,action:'read'},false)).status,403);
+  assert.equal((await queueCall({guildId:B,action:'clear',admin:true,tokenCipher:grant,revision:two.commands.concertQueue.revision()})).status,403);
+  assert.equal((await queueCall({guildId:B,action:'clear',admin:true,revision:two.commands.concertQueue.revision()})).status,403);
+  assert.equal((await queueCall({guildId:A,action:'clear',isHost:true,revision:one.commands.concertQueue.revision()})).status,403);
+  const allowed=await queueCall({guildId:A,action:'approval',admin:true,tokenCipher:grant,enabled:true,revision:one.commands.concertQueue.revision()});assert.equal(allowed.status,200);assert(one.commands.concertQueue.read().approvalRequired);assert(!two.commands.concertQueue.read().approvalRequired);
   assert.throws(()=>guilds.get('999953157932843050'),/ikke lagt til/);assert.notEqual(guilds.roomCode(A),guilds.roomCode(B));
  }finally{await server.close();for(const r of resources){r.commands.close();r.engine.close();r.store.close();}rmSync(dir,{recursive:true,force:true});}
 });

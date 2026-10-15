@@ -25,13 +25,13 @@ export function SocialQueue({
         <button disabled={busy} onClick={() => onAction("radio", { enabled: true })}>{t("Prøv radio igjen")}</button>
       </div>}
       {room.queue.map((v, i) => {
-        const eta = unknown
+        const eta = (v.waitSeconds === null || (v.waitSeconds === undefined && unknown))
           ? t("Etter direktesendinga")
-          : `${room.playing ? t("Om lag") : t("Når avspelinga startar: ca.")} ${time(wait)}`;
+          : `${room.playing ? t("Om lag") : t("Når avspelinga startar: ca.")} ${time(v.waitSeconds ?? wait)}`;
         wait += v.duration;
         unknown ||= v.live;
         return (
-          <article className="social-track" key={v.id}>
+          <article className="social-track" key={v.entryId ?? v.id}>
             <span className="queue-number">{i + 1}</span>
             <img className="queue-art" src={v.image || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" />
             <div>
@@ -43,24 +43,24 @@ export function SocialQueue({
             </div>
             <button
               disabled={busy}
-              onClick={() => onAction("vote", { videoId: v.id })}
+              onClick={() => onAction("vote", { videoId: v.entryId ?? v.id })}
               aria-label={t("Stem på ") + v.title}
             >
-              ♡ {room.voteCounts?.[v.id] ?? 0}
+              ♡ {room.voteCounts?.[v.entryId ?? v.id] ?? 0}
             </button>
             {room.isHost && (
               <>
                 <button
                   disabled={busy || i === 0}
                   aria-label={t("Flytt opp ") + v.title}
-                  onClick={() => onAction("move", { videoId: v.id, to: i - 1 })}
+                  onClick={() => onAction("move", { videoId: v.entryId ?? v.id, to: i - 1 })}
                 >
                   ↑
                 </button>
                 <button
                   disabled={busy}
                   aria-label={t("Fjern ") + v.title}
-                  onClick={() => onAction("remove", { videoId: v.id })}
+                  onClick={() => onAction("remove", { videoId: v.entryId ?? v.id })}
                 >
                   ×
                 </button>
@@ -75,14 +75,14 @@ export function SocialQueue({
           disabled={busy}
           onClick={() => onAction("skip-vote")}
         >
-          Stem for neste låt · {room.skipVotes ?? 0}/3
+          {t("Stem for neste låt")} · {room.skipVotes ?? 0}/3
         </button>
       )}
       {!!room.requests?.length && (
         <div>
           <h3>{t("Ventande låtønske")}</h3>
           {room.requests.map((v) => (
-            <article className="social-track" key={v.id}>
+            <article className="social-track" key={v.entryId ?? v.id}>
               <div>
                 <strong>{v.title}</strong>
                 <small>Frå {v.requestedBy ?? t("Gjest")}</small>
@@ -91,13 +91,13 @@ export function SocialQueue({
                 <>
                   <button
                     disabled={busy}
-                    onClick={() => onAction("approve", { videoId: v.id })}
+                    onClick={() => onAction("approve", { videoId: v.entryId ?? v.id })}
                   >
                     {t("Godkjenn")}
                   </button>
                   <button
                     disabled={busy}
-                    onClick={() => onAction("reject", { videoId: v.id })}
+                    onClick={() => onAction("reject", { videoId: v.entryId ?? v.id })}
                   >
                     {t("Avvis")}
                   </button>

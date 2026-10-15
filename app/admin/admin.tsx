@@ -26,6 +26,8 @@ type Job = {
   payload: { action: string };
 };
 type Detail = {
+  audio?: {missedFrames?:number;maxConsecutiveMissedFrames?:number;interruptions:number;maxInterruptionMs:number;buffering:boolean;events:{at:number;reason:string;durationMs:number}[]};
+  performance?: {eventLoopP95Ms:number;eventLoopMaxMs:number};
   guildId: string;
   roomCode: string;
   state: DiscordState;
@@ -709,6 +711,12 @@ export default function Admin() {
                           </button>
                         </div>
                       </section>
+                      {detail.audio && <section className="admin-card"><h2>{t("Lydstatus")}</h2>
+                        <p>{t("Avbrot")}: {detail.audio.interruptions} · {t("Lengste avbrot")}: {detail.audio.maxInterruptionMs} ms</p>
+                        <p>{t("Manglande lydrammer")}: {detail.audio.missedFrames ?? 0} · max: {detail.audio.maxConsecutiveMissedFrames ?? 0}</p>
+                        <p>Event loop p95: {detail.performance?.eventLoopP95Ms?.toFixed(2) ?? "?"} ms · max: {detail.performance?.eventLoopMaxMs?.toFixed(2) ?? "?"} ms</p>
+                        <details><summary>{t("Siste lydhendingar")}</summary><ul>{detail.audio.events.map((event,i)=><li key={i}>{new Date(event.at).toLocaleTimeString()} · {event.reason} · {event.durationMs} ms</li>)}</ul></details>
+                      </section>}
                     </>
                   ) : tab === "settings" ? (
                     <form

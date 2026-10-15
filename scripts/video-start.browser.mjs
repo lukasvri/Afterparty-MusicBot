@@ -463,3 +463,13 @@ for(const staleNext of ['same-track','new-track']) test(`skip safely handles a s
   assert.equal(commands.filter(c=>c.action==='next').length,staleNext==='same-track'?2:1);
  }finally{await browser.close();}
 });
+
+test('quality changes preserve the iframe and never reload the song or publish transport',async()=>{
+ const {browser,page,commands}=await fixture({playing:true});
+ try{await page.locator('.stage-intro button').click();await page.waitForFunction(()=>window.__fakePlayer?.state===1);await page.waitForTimeout(2500);
+ const before=await page.evaluate(()=>({loads:window.__videoCalls.length,seeks:window.__transportCalls.filter(c=>c==='seek').length}));const sent=commands.length;
+ await page.evaluate(()=>{window.__originalPlayer=window.__fakePlayer;window.__fakePlayer.options.events.onPlaybackQualityChange({data:'hd1440'});window.__fakePlayer.emit(3);});await page.waitForTimeout(200);
+ await page.evaluate(()=>{window.__fakePlayer.options.events.onPlaybackQualityChange({data:'hd720'});window.__fakePlayer.emit(1);});await page.waitForTimeout(4000);
+ assert(await page.evaluate(()=>window.__fakePlayer===window.__originalPlayer));assert.equal(await page.evaluate(()=>window.__videoCalls.length),before.loads);assert.equal(await page.evaluate(()=>window.__transportCalls.filter(c=>c==='seek').length),before.seeks);assert.equal(commands.slice(sent).filter(c=>['seek','play','pause','next'].includes(c.action)).length,0);assert.equal(await page.locator('.settings-quality').first().innerText(),'720p');
+ }finally{await browser.close();}
+});
