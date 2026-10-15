@@ -66,3 +66,23 @@ test('D1 starts the recommended video clock after its metadata lookup completes'
   const {room}=await mutate(f.request,'TESTROOM',{action:'next',version:1});assert.equal(room.current.id,next.id);assert.equal(room.position,0);
  }finally{Date.now=now;f.close();}
 });
+
+test('D1 direct playback starts at zero after slow metadata, including replay of the same video',async()=>{
+ const f=fixture(),now=Date.now;let time=now();Date.now=()=>time;try{
+  await f.save();const fetchMetadata=globalThis.fetch;
+  globalThis.fetch=async target=>{time+=2500;return fetchMetadata(target);};
+  const {room}=await mutate(f.request,'TESTROOM',{action:'play-video',videoId:next.id,version:1});
+  assert.equal(room.current.id,next.id);assert.equal(room.position,0);assert.equal(room.playing,true);
+  time+=5000;
+  const replay=await mutate(f.request,'TESTROOM',{action:'play-video',videoId:next.id,version:2});
+  assert.equal(replay.room.position,0);assert.notEqual(replay.room.playbackKey,room.playbackKey);
+ }finally{Date.now=now;f.close();}
+});
+test('D1 a slow queue addition preserves the clock of the video already playing',async()=>{
+ const f=fixture(),now=Date.now;let time=now();Date.now=()=>time;try{
+  await f.save('TESTROOM',{current:seed,queue:[],playing:true,position:20});
+  const fetchMetadata=globalThis.fetch;globalThis.fetch=async target=>{time+=2500;return fetchMetadata(target);};
+  const {room}=await mutate(f.request,'TESTROOM',{action:'add',videoId:next.id,version:1});
+  assert.equal(room.current.id,seed.id);assert.equal(room.position,22.5);assert.equal(room.queue[0].id,next.id);
+ }finally{Date.now=now;f.close();}
+});

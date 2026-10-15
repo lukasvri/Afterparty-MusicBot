@@ -121,7 +121,7 @@ export async function mutate(request:Request,code:string,input:Record<string,unk
   else if(action==='remove'){if(!Number.isInteger(input.index)||Number(input.index)<0||Number(input.index)>=state.queue.length)fail(400,'Køplassen finnes ikke.');state.queue.splice(Number(input.index),1);}
   else if(action==='clear'){state.queue=[];}else fail(400,'Ukjent handling.');
   if(state.current&&(!state.playbackKey||action==='next'||action==='play-video'))state.playbackKey=`room:${code}:${value.version+1}`;
-  const updatedAt=action==='next'?Date.now():now;
+  const updatedAt=action==='next'||action==='play-video'?Date.now():now;
   const result=await db().prepare('UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?').bind(JSON.stringify(state),updatedAt,code,value.version).run();if(!result.meta.changes)fail(409,'En annen endring kom først. Prøv igjen.');
   return {room:await publicRoom(request,await row(code))};
 }
