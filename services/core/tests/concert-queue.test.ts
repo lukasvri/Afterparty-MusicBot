@@ -171,3 +171,54 @@ test('three distinct skip votes apply only to the current public playback key',a
  a.e.current={...a.e.current!,concert:false};await assert.rejects(a.q.apply({action:'skip-vote',revision:a.q.revision(),playbackKey:'core:current',participantHash:'d'.repeat(64)},false),/endret/);assert.equal(skips,1);
  }finally{a.close();}
 });
+
+for (const location of ['current', 'queue'] as const) {
+  for (const route of ['request', 'direct', 'approve'] as const) {
+    test(`${route} accepts concert music matching private ${location}`, async () => {
+      const a = setup();
+      try {
+        const privateTrack = track('shared', false);
+        if (location === 'current') a.e.current = privateTrack;
+        else a.e.queue.push(privateTrack);
+        const requested = { ...track('public-copy'), id: privateTrack.id };
+        if (route !== 'direct') await a.q.apply({ action: 'approval', enabled: true, revision: a.q.revision() }, true);
+        if (route === 'request') {
+          assert.equal(a.q.request([requested]), true);
+          assert.throws(() => a.q.request([{ ...requested, entryId: 'duplicate' }]), /allerede/);
+        } else if (route === 'direct') {
+          a.e.providers.resolve = async () => [requested];
+          await a.c.execute({ action: 'enqueue', videoId: requested.id }, 'public');
+          await assert.rejects(a.c.execute({ action: 'enqueue', videoId: requested.id }, 'public'), /allerede/);
+        } else {
+          // Seed an already pending request to exercise approval independently.
+          a.q.save({ ...a.q.read(), requests: [requested] });
+          await assert.rejects(a.q.apply({ action: 'approve', videoId: requested.entryId, revision: a.q.revision() }, false), /administratortilgang/);
+          await a.q.apply({ action: 'approve', videoId: requested.entryId, revision: a.q.revision() }, true);
+          assert.equal(a.q.read().requests.length, 0);
+        }
+        assert.equal(a.e.current?.entryId, location === 'current' ? 'shared' : 'current');
+        assert.equal(a.e.queue.some(t => t.entryId === 'shared'), location === 'queue');
+        assert.equal(a.e.queue.filter(t => t.entryId === requested.entryId).length, route === 'request' ? 0 : 1);
+      } finally { a.close(); }
+    });
+  }
+}
+
+test('duplicate protection stays within visibility scopes, including batches and current concerts', async () => {
+  const a = setup();
+  try {
+    await a.q.apply({ action: 'approval', enabled: true, revision: a.q.revision() }, true);
+    for (const existing of [a.e.current!, a.e.queue[0]]) {
+      assert.throws(() => a.q.request([{ ...existing, entryId: 'copy' }]), /allerede/);
+      assert.throws(() => a.e.enqueue([{ ...existing, entryId: 'copy' }]), /allerede/);
+    }
+    const publicCopy = { ...track('batch'), id: 'batch000000' };
+    const privateCopy = { ...publicCopy, concert: false, entryId: 'private-batch' };
+    assert.equal(a.e.enqueue([publicCopy, { ...publicCopy, entryId: 'duplicate' }, privateCopy]), 2);
+    assert.throws(() => a.e.enqueue([{ ...privateCopy, concert: undefined, entryId: 'legacy-private' }]), /allerede/);
+    assert.throws(() => a.e.enqueue([{ ...track('private', false), entryId: 'duplicate-private' }]), /allerede/);
+    const request = track('pending');
+    assert(a.q.request([request, { ...request, entryId: 'duplicate-pending' }]));
+    assert.equal(a.q.read().requests.length, 1);
+  } finally { a.close(); }
+});

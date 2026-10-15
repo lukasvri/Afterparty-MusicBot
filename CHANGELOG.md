@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.1.1: Private queue isolation and accurate crossfade recovery
+
+2026-10-15
+
+- Public concert requests, direct additions and approvals no longer reject songs solely because they are playing or queued privately in Discord. Duplicate protection remains within each visibility scope and pending concert requests.
+- Audio recovery selects the track and position from the same consumed segment, removes that entry from the queue, and preserves later tracks. Exhausting the two retries advances past the recovered track instead of replaying it.
+
 ## v2.1.0: Shared concert queue controls and resilient audio
 
 2026-10-15

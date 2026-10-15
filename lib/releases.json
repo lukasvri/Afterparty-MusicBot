@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.1.1",
+    "date": "2026-10-15",
+    "title": "Private queue isolation and accurate crossfade recovery",
+    "items": [
+      "Public concert requests, direct additions and approvals no longer reject songs solely because they are playing or queued privately in Discord. Duplicate protection remains within each visibility scope and pending concert requests.",
+      "Audio recovery selects the track and position from the same consumed segment, removes that entry from the queue, and preserves later tracks. Exhausting the two retries advances past the recovered track instead of replaying it."
+    ]
+  },
+  {
     "version": "2.1.0",
     "date": "2026-10-15",
     "title": "Shared concert queue controls and resilient audio",
