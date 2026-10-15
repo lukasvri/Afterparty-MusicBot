@@ -168,11 +168,16 @@ export class Rooms extends EventEmitter {
     try { recommended = await lookup; }
     catch (error) { this.skipping.delete(lookupKey); throw error; }
     finally { this.radioLookups.delete(lookupKey); }
+    if (this.stopped) throw new UserError("Romtjenesten starter på nytt.", 503);
     if (input.action === "radio-prefetch" && this.skipping.has(lookupKey)) return this.snapshot(code);
     this.skipping.delete(lookupKey);
-    if (input.action === "next" && room.state.radio !== false && room.state.current && !room.state.queue.length && !recommended && !finished(room.state, room.updatedAt, this.now()))
+    if (input.action === "next" && room.state.radio !== false && room.state.current && !room.state.queue.length && !recommended && !finished(room.state, room.updatedAt, this.now())) {
+      // The joined prefetch yields to next. Persist its normal cooldown before
+      // rejecting the skip, or tick() would immediately repeat the empty lookup.
+      // mutate keeps revision protection if another command won during lookup.
+      this.mutate(code, { ...input, action: "radio-prefetch" });
       throw new UserError("Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.", 422);
-    if (this.stopped) throw new UserError("Romtjenesten starter på nytt.", 503);
+    }
     return this.mutate(code, input, recommended);
   }
   mutate(

@@ -1391,7 +1391,8 @@ export default function Afterparty() {
             </div>
           </section>
           {!directoryOpen && room && (
-            <details className="room-options"><summary>{t("Rominnstillingar")}</summary><div className="party-tools">              {room?.isHost && !discordMode && (
+            <details className="room-options"><summary>{t("Rominnstillingar")}</summary><div className="party-tools">
+              {room?.isHost && !discordMode && (
                 <button
                   className="button subtle"
                   aria-pressed={room.radio !== false}
@@ -1931,6 +1932,12 @@ export default function Afterparty() {
                     </small>
                   </div>
                   <div className="queue-content">
+                    {room?.current && (
+                      <article className="queue-current">
+                        <img src={room.current.image || `https://i.ytimg.com/vi/${room.current.id}/mqdefault.jpg`} alt="" />
+                        <div><span>{t("Spelar no")}</span><strong>{room.current.title}</strong><small>{room.current.artist}</small></div>
+                      </article>
+                    )}
                     {room && room.mode !== "discord" ? (
                       <SocialQueue
                         room={room}

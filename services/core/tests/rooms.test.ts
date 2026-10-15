@@ -465,7 +465,7 @@ test("radio falls back to a second artist search and can restart after the last 
   try {
     rooms.search = async () => [];
     await assert.rejects(rooms.control("TESTROOM", input), /Radioen fann ikkje/);
-    const ended = rooms.mutate("TESTROOM", input);
+    const ended = rooms.mutate("TESTROOM", { ...input, version: rooms.snapshot("TESTROOM").version });
     assert.equal(ended.current, null);
     const queries: string[] = [];
     rooms.search = async query => { queries.push(query); return queries.length === 1 ? [] : [next]; };
@@ -553,6 +553,35 @@ test('an unsuccessful early skip keeps the current song and allows retry',async(
   await assert.rejects(rooms.control('TESTROOM',input),/Radioen fann ikkje/);
   assert.equal(rooms.snapshot('TESTROOM').current?.id,seed.id);
   assert.equal(rooms.snapshot('TESTROOM').playing,true);
-  rooms.search=async()=>[next];assert.equal((await rooms.control('TESTROOM',input)).current?.id,next.id);
+  rooms.search=async()=>[next];assert.equal((await rooms.control('TESTROOM',{...input,version:rooms.snapshot('TESTROOM').version})).current?.id,next.id);
  }finally{store.close();}
+});
+
+for (const skipFirst of [false, true]) test(`empty shared radio lookup persists backoff (skip first: ${skipFirst})`, async () => {
+  const store = new Store(":memory:");
+  let now = 10000, calls = 0;
+  const rooms = new Rooms(store, () => now);
+  rooms.import({ code: "TESTROOM", name: "Cooldown", owner_hash: "a".repeat(64), state: { current: seed, queue: [], position: 10, playing: true }, version: 1, updated_at: now, expires_at: 100000 });
+  const gate = deferred<RoomVideo[]>();
+  rooms.search = async () => { calls++; return gate.promise; };
+  const input = { action: "next", version: 1, actorHash: "a".repeat(64) };
+  try {
+    let tick, skip;
+    if (skipFirst) { skip = rooms.control("TESTROOM", input); tick = rooms.tick(); }
+    else { tick = rooms.tick(); skip = rooms.control("TESTROOM", input); }
+    const rejection = assert.rejects(skip, error => error instanceof Error && 'status' in error && error.status === 422);
+    gate.resolve([]);
+    await Promise.all([tick, rejection]);
+    assert.equal(calls, 2, "one shared lookup with its two search queries");
+    assert.equal(rooms.snapshot("TESTROOM").current?.id, seed.id);
+    assert.equal(rooms.snapshot("TESTROOM").playing, true);
+    const recovered = new Rooms(store, () => now);
+    recovered.search = rooms.search;
+    for (let i = 0; i < 29; i++) { now += 500; await recovered.tick(); }
+    assert.equal(calls, 2, "persisted cooldown survives reload and repeated 500ms ticks");
+    now += 500;
+    await recovered.tick();
+    assert.equal(calls, 4, "radio retries when the 15 second cooldown expires");
+    recovered.dispose();
+  } finally { rooms.dispose(); store.close(); }
 });

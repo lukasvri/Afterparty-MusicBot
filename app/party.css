@@ -581,3 +581,11 @@ button:disabled {
 .concert-shell[data-welcome="true"] .studio-foot { margin-top:28px; }
 .room-options .queue-options { border-top:1px solid #ffffff20; padding:8px 16px; }
 @media(max-width:650px) { .concert-shell[data-welcome="true"] .content { min-height:calc(100svh - 140px); } .concert-shell[data-welcome="true"] .welcome-copy h1 { font-size:clamp(44px,12vw,70px); } }
+
+/* Queue artwork and actions stay readable inside the narrow side panel. */
+.social-track { display:grid; grid-template-columns:18px 54px minmax(0,1fr); }
+.social-track .queue-art { width:54px; height:54px; object-fit:cover; border-radius:5px; }
+.social-track > button { grid-row:2; }
+.social-track > button:first-of-type { grid-column:2; }
+.social-track > button:nth-of-type(2) { grid-column:3; justify-self:start; }
+.social-track > button:nth-of-type(3) { grid-column:3; justify-self:end; }

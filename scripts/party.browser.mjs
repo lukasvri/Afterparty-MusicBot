@@ -70,8 +70,9 @@ try {
         commands.push(input);
         assert(!input.actorHash);
         if (input.action === "add") {
-          room = { ...room, current: track, version: room.version + 1 };
+          room = room.current ? { ...room, queue: [...room.queue, {...track, id: "next1234567", title: "Second queued song"}], version: room.version + 1 } : { ...room, current: track, version: room.version + 1 };
         }
+        if (input.action === "radio") room = {...room, radio:input.enabled, version:room.version+1};
         if (input.action === "approval")
           room = {
             ...room,
@@ -112,7 +113,7 @@ try {
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
   }
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Native YouTube seeking and reliable early skips" }).waitFor();
+  await page.getByRole("heading", { name: "Queue artwork and radio retry cooldown" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -142,8 +143,32 @@ try {
   await page
     .getByRole("button", { name: /Legg.*Synthetic evening song/ })
     .click();
+  await page.getByRole("button", { name: /Legg.*Synthetic evening song/ }).click();
   await page.getByRole("tab", { name: "Kø" }).click();
+  await page.getByText("Second queued song", {exact:true}).waitFor();
+  const queued = page.locator(".social-track").filter({hasText:"Second queued song"});
+  assert(await queued.isVisible(), "Manually queued track must be visible");
+  assert.equal(await page.locator("#queue-tab .tab-count").innerText(), "1");
+
   await page.locator(".room-options > summary").click();
+  const radio = page.getByRole("button", {name:"Radio på",exact:true});
+  assert(await radio.isVisible(), "Radio must be available in room settings");
+  await radio.click();
+  await page.getByRole("button", {name:"Radio av",exact:true}).waitFor();
+  assert(commands.some(c => c.action === "radio" && c.enabled === false));
+  assert(await page.locator(".queue-current").isVisible());
+  assert.equal(await page.locator(".queue-current img").count(),1);
+  assert.equal(await queued.locator("img").count(),1);
+  for (const width of [390,1794,2560]) {
+    await page.setViewportSize({width,height:1440});
+    assert(await queued.isVisible());
+    const visible = await queued.evaluate(el => {
+      const r=el.getBoundingClientRect(), p=el.closest(".queue-content").getBoundingClientRect();
+      return r.width>0 && r.height>0 && r.top>=p.top && r.bottom<=p.bottom;
+    });
+    assert(visible,"Queued track must be inside the visible queue area");
+  }
+  await page.setViewportSize({width:390,height:844});
   await page.locator(".room-options .queue-options summary").click();
   await page
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
@@ -182,7 +207,7 @@ try {
   assert.equal(page.url(), previous);
   await page.getByRole("tab", { name: "Kveldar", exact: true }).click();
   assert(
-    await page.getByText("Kvelden vår · 1 låtar", { exact: true }).count(),
+    await page.getByText("Kvelden vår · 2 låtar", { exact: true }).count(),
   );
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth),
