@@ -62,6 +62,10 @@ export function needsRecommendation(
   state: RoomPlayback,
   input: Record<string, unknown>,
 ) {
+  // A queued track already wins over radio. Avoid allocating a shared lookup
+  // and yielding the revision to concurrent commands when no search is needed.
+  const enabling = input.action === "radio" && input.enabled === true;
+  if (state.queue.length || (state.radio === false && !enabling)) return false;
   const actor = String(input.participantHash ?? "");
   return (
     input.action === "next" || input.action === "radio-prefetch" ||
@@ -138,6 +142,12 @@ export function changeRoom(
     if (action === "play-video") {
       if (state.current)
         state.history = [...(state.history ?? []), state.current].slice(-100);
+      // A direct selection consumes that entry and invalidates suggestions
+      // prepared for the old seed, while retaining other manual requests.
+      state.queue = state.queue.filter(item => item.id !== track.id && !item.radio);
+      state.requests = state.requests?.filter(item => item.id !== track.id);
+      delete state.undoQueue;
+      delete state.radioRetryAt;
       state.current = track;
       state.position = 0;
       state.playing = true;
@@ -226,7 +236,7 @@ export function changeRoom(
     }
   } else if (action === "undo") {
     if (!state.undoQueue) throw new UserError("Ingen køendring å angre.");
-    const restored = state.undoQueue.filter((v) => v.id !== state.current?.id);
+    const restored = state.undoQueue.filter((v) => v.id !== state.current?.id && (state.radio !== false || !v.radio));
     const additions = state.queue.filter(
       (v) => !restored.some((saved) => saved.id === v.id),
     );

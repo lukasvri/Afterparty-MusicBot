@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.0.4: Queue consistency and faster queued skips
+
+2026-10-15
+
+- Playing a queued song directly consumes its queue entry, removes radio suggestions prepared for the previous song, and resets obsolete undo and radio retry state. Other manually queued tracks remain in order.
+- Undo cannot restore radio suggestions after radio has been switched off. The fallback room service now persists deleted state fields correctly while retaining room permissions.
+- Skipping to an already queued song, or skipping with radio disabled, bypasses unnecessary radio lookup coordination.
+
 ## v2.0.3: Queue artwork and radio retry cooldown
 
 2026-10-15
