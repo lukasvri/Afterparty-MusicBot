@@ -21,11 +21,16 @@ export function radioTitle(track:RadioTrack){
 }
 /** Use explicit genre labels, not the uploader's identity, as similarity evidence. */
 export function radioGenre(track:RadioTrack){
- const labels=[...track.title.split("|").slice(1),...(track.title.match(/\[[^\]]+\]|\([^)]*\)/g)??[])];
+ const labels=[...(track.genres??[]),...track.title.split("|").slice(1),...(track.title.match(/\[[^\]]+\]|\([^)]*\)/g)??[])];
  const text=normalize(labels.join(" "));
  const genres=['progressive house','melodic house','deep house','future house','bass house','electro house','tropical house','tech house','drum and bass','drum bass','liquid dnb','electronic pop','dance pop','synth pop','indie pop','future bass','melodic dubstep','dubstep','hardstyle','phonk','hip hop','lo fi','lofi','techno','trance','reggaeton','reggae','metal','country','jazz','soul','funk','house','pop','rock','ambient','disco','punk','rnb'];
  const found=genres.find(genre=>` ${text} `.includes(` ${genre} `));
  return found==='drum bass'?'drum and bass':found==='lofi'?'lo fi':found??null;
+}
+export function metadataGenres(description:unknown,tags:unknown):string[]{
+ const labels=[...(Array.isArray(tags)?tags.filter((t):t is string=>typeof t==='string'):[]),
+  ...(typeof description==='string'?(description.match(/(?:genre|style)\s*:\s*[^\n]+/gi)??[]):[])];
+ return [...new Set(labels.map(label=>radioGenre({title:`| ${label}`,artist:'',id:'',duration:0,image:'',live:false,embeddable:true})).filter((genre):genre is string=>Boolean(genre)))].slice(0,8);
 }
 export function radioQuery(track:RadioTrack){
     const artist=radioArtist(track),song=radioTitle(track).replace(/"/g,'');

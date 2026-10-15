@@ -56,7 +56,7 @@ export function finished(state: RoomPlayback, updatedAt: number, now: number) {
 }
 export function prefetchDue(state:RoomPlayback,updatedAt:number,now:number){
  const remaining=(state.current?.duration??0)-state.position-Math.max(0,now-Math.max(updatedAt,state.startsAt??updatedAt))/1000;
- return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && !state.queue.length && remaining>0 && remaining<=30 && now>=(state.radioRetryAt??0));
+ return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && !state.queue.length && remaining>0 && now>=(state.radioRetryAt??0));
 }
 export function needsRecommendation(
   state: RoomPlayback,

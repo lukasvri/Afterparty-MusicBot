@@ -7,6 +7,7 @@ export type RoomVideo = {
   duration: number;
   live: boolean;
   embeddable: boolean;
+  genres?: string[];
   requestedBy?: string;
   radio?: boolean;
 };

@@ -1,3 +1,4 @@
+import { metadataGenres } from "../services/core/src/radio.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { env as cloudEnv } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
@@ -290,6 +291,7 @@ export async function videos(
     });
     return data.items.map((v: any) => ({
       id: v.id,
+      genres: metadataGenres(v.snippet.description, v.snippet.tags),
       title: decode(v.snippet.title),
       artist: decode(v.snippet.channelTitle),
       image: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
@@ -359,6 +361,7 @@ export async function publicRoom(
   request: Request,
   value: Row,
   heartbeat = true,
+  allowRadioPrefetch = true,
 ): Promise<Room> {
   const state = JSON.parse(value.state) as RoomState;
   const actor = visitorIdentity(request.headers);
@@ -399,7 +402,7 @@ export async function publicRoom(
       fail(503, "Rommet venter på sanntidstjenesten. Prøv igjen.");
     }
   }
-  if (!discord && (finished(state, value.updated_at, now) || prefetchDue(state, value.updated_at, now))) {
+  if (!discord && (finished(state, value.updated_at, now) || (allowRadioPrefetch && prefetchDue(state, value.updated_at, now)))) {
     const action = finished(state, value.updated_at, now) ? "next" : "radio-prefetch";
     let recommended: Video | null = null;
     try {
@@ -603,7 +606,7 @@ export async function mutate(
       .prepare("UPDATE rooms SET is_public=? WHERE code=?")
       .bind(input.isPublic ? 1 : 0, code)
       .run();
-    return { room: await publicRoom(request, await row(code)) };
+    return { room: await publicRoom(request, await row(code), true, false) };
   }
   if (!host && !guestActions.has(action))
     fail(403, "Bare verten eller medverten kan styre avspillingen.");
@@ -678,6 +681,8 @@ export async function mutate(
       { ...state, ...(command.action === "radio" ? { radio: command.enabled === true } : {}) },
       async (query) => (await search(request, query)).videos,
     );
+  if (action === "next" && state.current && state.radio !== false && !state.queue.length && !recommended && !finished(state,value.updated_at,Date.now()))
+    fail(422,"Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.");
   const now = Date.now(),
     position =
       state.position +
@@ -697,7 +702,7 @@ export async function mutate(
     .run();
   if (!result.meta.changes)
     fail(409, "En annen endring kom først. Prøv igjen.");
-  return { room: await publicRoom(request, await row(code)) };
+  return { room: await publicRoom(request, await row(code), true, false) };
 }
 export async function adminRooms(request: Request) {
   if (!(await isAdmin(request)))

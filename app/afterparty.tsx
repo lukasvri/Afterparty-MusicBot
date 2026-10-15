@@ -1,11 +1,11 @@
 "use client";
 import { loadYoutube, type Player } from "@/lib/youtube-player";
 import { headers, request } from "@/lib/browser-api";
-import { AdminSeek } from "@/components/party/admin-seek";
+import { NativeSeekTracker } from "@/lib/native-seek";
 import { StartEvening } from "@/components/party/start-evening";
 import { RoomDialog } from "@/components/party/room-dialog";
 import { RoomSharing } from "@/components/party/room-sharing";
-import { SocialQueue } from "@/components/party/social-queue";
+import { SocialQueue, QueueSettings } from "@/components/party/social-queue";
 import { EveningLibrary } from "@/components/party/evening-library";
 import { browserStorage as storage } from "@/lib/browser-storage";
 import { Sidebar } from "@/components/afterparty-navigation";
@@ -154,6 +154,8 @@ export default function Afterparty() {
     settleUntil = useRef(0),
     locallyPaused = useRef(false),
     audioWriteUntil = useRef(0),
+    nativeSeek = useRef(new NativeSeekTracker()),
+    nativeSeekPending = useRef(false),
     transportChangedRef = useRef(false),
     correctionCandidate = useRef<number | null>(null);
   useEffect(() => {
@@ -402,21 +404,31 @@ export default function Afterparty() {
       setPending(true);
       setError("");
       try {
-        const data = await request<{ room: Room }>(
+        const send = (snapshot: Room) => request<{ room: Room }>(
           `/api/rooms/${current.code}`,
           {
             method: "POST",
             headers: headers(current.code),
-            ...(name === "next" ? { signal: AbortSignal.timeout(35000) } : {}),
+            ...(["next", "radio"].includes(name) ? { signal: AbortSignal.timeout(35000) } : {}),
             body: JSON.stringify({
               action: name,
               guildId: roomRef.current?.guildId,
-              version: current.version,
+              version: snapshot.version,
               displayName: storage.get("afterparty-display-name") ?? t("Gjest"),
               ...extras,
             }),
           },
         );
+        let data: { room: Room };
+        try { data = await send(current); }
+        catch (error) {
+          if (name !== "next" || (error as Error & {status?:number}).status !== 409) throw error;
+          await refresh(current.code);
+          const latest = roomRef.current;
+          if (!latest || generation !== pollGeneration.current || latest.code !== current.code ||
+            latest.current?.id !== current.current?.id || latest.playbackKey !== current.playbackKey || latest.playing !== current.playing) throw error;
+          data = await send(latest);
+        }
         if (
           generation === pollGeneration.current &&
           activeCode.current === current.code
@@ -1038,6 +1050,7 @@ export default function Afterparty() {
     }
     if (loadedId.current !== key) {
       loadedId.current = key;
+      nativeSeek.current.write(target.position);
       transportChangedRef.current = false;
       correctionCandidate.current = null;
       locallyPaused.current = false;
@@ -1076,6 +1089,19 @@ export default function Afterparty() {
     if (state !== 3) transportChangedRef.current = false;
     if (state === 1) recordPlayback();
     const currentTime = p.getCurrentTime();
+    if (r.isHost && r.mode !== "discord" && !r.current.live && !force && !nativeSeekPending.current) {
+      const seek = nativeSeek.current.observe(currentTime, now, state);
+      if (seek !== null) {
+        nativeSeekPending.current = true;
+        void actionRef.current("seek", { position: seek }).finally(() => {
+          nativeSeekPending.current = false;
+          nativeSeek.current.reset();
+        });
+        return;
+      }
+      if (nativeSeek.current.pending) return;
+    }
+    if (nativeSeekPending.current) return;
     setSyncDrift(
       r.current.live
         ? null
@@ -1102,7 +1128,7 @@ export default function Afterparty() {
         currentTime,
         now,
         lastCorrection.current,
-        force || !target.playing,
+        force,
         syncModeRef.current,
       ) &&
       !r.current.live
@@ -1110,6 +1136,7 @@ export default function Afterparty() {
 
       correctionCandidate.current = null;
       settleUntil.current = now + syncRecoveryMs(syncModeRef.current);
+      nativeSeek.current.write(target.position);
       p.seekTo(target.position, true);
       lastCorrection.current = now;
       setSyncStatus("Justerer synk");
@@ -1230,11 +1257,6 @@ export default function Afterparty() {
       onRetry={reloadPlayer}
       onSync={() => syncRef.current(true)}
     >
-      {room?.isHost && !discordMode && !current.live && <AdminSeek
-        trackId={room.playbackKey ?? current.id} position={room.position}
-        duration={current.duration} playing={room.playing} disabled={pending}
-        onSeek={(position) => void action("seek", { position })}
-      />}
       {discordMode && (
         <div className="sync-offset-tools">
           <label htmlFor="sync-offset">
@@ -1276,6 +1298,7 @@ export default function Afterparty() {
     <div
       className="app-shell studio-shell concert-shell"
       data-motion={motion ? "on" : "off"}
+      data-welcome={!room && !directoryOpen ? "true" : "false"}
       data-playing={Boolean(room?.playing)}
       data-tv={tv}
       data-empty={!current}
@@ -1410,7 +1433,9 @@ export default function Afterparty() {
               <button className="button subtle" onClick={toggleTV}>
                 {tv ? t("Avslutt TV-modus") : t("TV-modus")}
               </button>
-            </div></details>
+            </div>
+              {!discordMode && <QueueSettings room={room} busy={pending} onAction={(name, extra) => void action(name, extra)}/>}
+            </details>
           )}
           {(sharing || tv) && room && (
             <RoomSharing

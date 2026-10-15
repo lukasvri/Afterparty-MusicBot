@@ -10,6 +10,7 @@ export type Video = {
   concert?: boolean;
   source?: "youtube" | "soundcloud";
   url?: string;
+  genres?: string[];
   requestedBy?: string;
   radio?: boolean;
 };

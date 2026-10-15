@@ -126,3 +126,12 @@ test('empty cached searches are refreshed so a radio retry can recover',async()=
   await p.search(query,20,true);assert.equal(calls,1);
  }finally{t.close();}
 });
+
+test('video metadata retains explicit genre tags for unlabelled song titles',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{});
+  p.youtube=async()=>({items:[{id:'abcdefghijk',snippet:{title:'Artist - Song',channelTitle:'Publisher',tags:['future house'],description:'Genre: Future House\nNew release'},contentDetails:{duration:'PT3M20S'},status:{embeddable:true}}]});
+  const [video]=await p.video(['abcdefghijk']);
+  assert.deepEqual(video.genres,['future house']);
+ }finally{t.close();}
+});

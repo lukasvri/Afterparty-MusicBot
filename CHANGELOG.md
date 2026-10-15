@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.0.2: Native YouTube seeking and reliable early skips
+
+2026-10-15
+
+- YouTube is the only seek bar in video rooms. Confirmed native seeks update the shared room, while buffering and delayed automatic corrections are not published as user seeks.
+- Early skips share an in-flight radio lookup with prefetch. A failed lookup keeps the current song playing; a safe single retry handles queue revisions arriving during a skip.
+- Radio begins preparing the next song as playback starts. Genre matching now also uses explicit tags and genre labels in provider metadata, not just the video title.
+- Queue controls are located under room settings. The welcome page expands across large displays, including 2560 by 1440.
+
 ## v2.0.1: Stable live playback and a quieter room
 
 2026-10-15

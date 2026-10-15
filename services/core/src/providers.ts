@@ -1,3 +1,4 @@
+import {metadataGenres} from "./radio.ts";
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {SpotifyCatalog,spotifyRef,expandSpotifyLink} from './spotify.ts';
@@ -30,16 +31,16 @@ export class Providers{
  async video(ids:string[],skipUnavailable=false):Promise<Track[]>{
   if(!ids.length)return [];if(ids.some(id=>!/^[\w-]{11}$/.test(id)))throw new UserError('Ugyldig video-ID.');
   const found=new Map<string,Track>(),missing:string[]=[];
-  for(const id of ids){const cached=this.store.get<{at:number;track:Track}|null>('metadata:'+id,null);if(cached&&Date.now()-cached.at<86400000)found.set(id,cached.track);else if(!missing.includes(id))missing.push(id);}
-  const remember=(track:Track)=>{found.set(track.id,track);this.store.set('metadata:'+track.id,{at:Date.now(),track});};
+  for(const id of ids){const cached=this.store.get<{at:number;track:Track}|null>('metadata:v2:'+id,null);if(cached&&Date.now()-cached.at<86400000)found.set(id,cached.track);else if(!missing.includes(id))missing.push(id);}
+  const remember=(track:Track)=>{found.set(track.id,track);this.store.set('metadata:v2:'+track.id,{at:Date.now(),track});};
   for(let index=0;index<missing.length;index+=50){const batch=missing.slice(index,index+50);
-   try{const data=await this.youtube('videos',{id:batch.join(','),part:'snippet,contentDetails,status'});for(const v of data.items??[]){const parts=String(v.contentDetails.duration).match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);remember({id:v.id,title:decode(v.snippet.title),artist:decode(v.snippet.channelTitle),image:`https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,duration:parts?Number(parts[1]??0)*3600+Number(parts[2]??0)*60+Number(parts[3]??0):0,live:v.snippet.liveBroadcastContent==='live',embeddable:v.status.embeddable!==false,entryId:randomUUID(),source:'youtube'});}}
-   catch{await mapLimited(batch,3,async id=>{try{const v=await this.extract(['--no-playlist','--dump-single-json','--skip-download','--js-runtimes','node','https://www.youtube.com/watch?v='+id]);remember({id,title:v.title,artist:v.artist??v.uploader??'YouTube',image:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,duration:Number(v.duration)||0,live:v.is_live===true,embeddable:v.playable_in_embed===true,source:'youtube',entryId:randomUUID()});}catch(error){if(!skipUnavailable)throw error;}});}
+   try{const data=await this.youtube('videos',{id:batch.join(','),part:'snippet,contentDetails,status'});for(const v of data.items??[]){const parts=String(v.contentDetails.duration).match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);remember({id:v.id,genres:metadataGenres(v.snippet.description,v.snippet.tags),title:decode(v.snippet.title),artist:decode(v.snippet.channelTitle),image:`https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,duration:parts?Number(parts[1]??0)*3600+Number(parts[2]??0)*60+Number(parts[3]??0):0,live:v.snippet.liveBroadcastContent==='live',embeddable:v.status.embeddable!==false,entryId:randomUUID(),source:'youtube'});}}
+   catch{await mapLimited(batch,3,async id=>{try{const v=await this.extract(['--no-playlist','--dump-single-json','--skip-download','--js-runtimes','node','https://www.youtube.com/watch?v='+id]);remember({id,genres:metadataGenres(v.description,v.tags),title:v.title,artist:v.artist??v.uploader??'YouTube',image:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,duration:Number(v.duration)||0,live:v.is_live===true,embeddable:v.playable_in_embed===true,source:'youtube',entryId:randomUUID()});}catch(error){if(!skipUnavailable)throw error;}});}
   }
   return ids.map(id=>found.get(id)).filter((t):t is Track=>Boolean(t)).map(t=>({...t,entryId:randomUUID()}));
  }
  async search(query:string,count=8,musicOnly=false):Promise<Track[]>{
-  const key='search:v2:'+JSON.stringify([query.trim().normalize('NFKC').toLowerCase(),count,musicOnly]),cached=this.store.get<{at:number;tracks:Track[]}|null>(key,null);
+  const key='search:v3:'+JSON.stringify([query.trim().normalize('NFKC').toLowerCase(),count,musicOnly]),cached=this.store.get<{at:number;tracks:Track[]}|null>(key,null);
   if(cached?.tracks.length&&Date.now()-cached.at<3600000)return cached.tracks.map(t=>({...t,entryId:randomUUID()}));
   let ids:string[];
   try{const data=await this.youtube('search',{q:query,type:'video',maxResults:String(count),videoEmbeddable:'true',part:'snippet',safeSearch:'moderate',...(musicOnly?{videoCategoryId:'10'}:{})});ids=data.items.map((i:any)=>i.id.videoId);}

@@ -35,6 +35,8 @@ export class Rooms extends EventEmitter {
   readonly epoch = randomUUID();
   search: ((query: string) => Promise<RoomVideo[]>) | null = null;
   private advancing = new Set<string>();
+  private radioLookups = new Map<string, Promise<RoomVideo | null>>();
+  private skipping = new Set<string>();
   private stopped = false;
   readonly store: Store;
   readonly now: () => number;
@@ -155,7 +157,21 @@ export class Rooms extends EventEmitter {
       throw new UserError("Bare verten kan styre avspillingen.", 403);
     if (input.version !== room.version)
       throw new UserError("Rommet er endret. Prøv igjen.", 409);
-    const recommended = await roomRecommendation({ ...room.state, ...(input.action === "radio" ? { radio: input.enabled === true } : {}) }, this.search);
+    const lookupKey = `${code}:${room.version}`;
+    if (input.action === "next") this.skipping.add(lookupKey);
+    let lookup = this.radioLookups.get(lookupKey);
+    if (!lookup) {
+      lookup = roomRecommendation({ ...room.state, ...(input.action === "radio" ? { radio: input.enabled === true } : {}) }, this.search);
+      this.radioLookups.set(lookupKey, lookup);
+    }
+    let recommended: RoomVideo | null;
+    try { recommended = await lookup; }
+    catch (error) { this.skipping.delete(lookupKey); throw error; }
+    finally { this.radioLookups.delete(lookupKey); }
+    if (input.action === "radio-prefetch" && this.skipping.has(lookupKey)) return this.snapshot(code);
+    this.skipping.delete(lookupKey);
+    if (input.action === "next" && room.state.radio !== false && room.state.current && !room.state.queue.length && !recommended && !finished(room.state, room.updatedAt, this.now()))
+      throw new UserError("Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.", 422);
     if (this.stopped) throw new UserError("Romtjenesten starter på nytt.", 503);
     return this.mutate(code, input, recommended);
   }

@@ -18,7 +18,7 @@ case "${1:-check}" in
   check)
     python3 -m unittest discover -s tests -v
     node node_modules/typescript/bin/tsc --noEmit --incremental false
-    node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.mjs scripts/playback-sync.test.mjs scripts/rooms.test.mjs scripts/afterparty-compatibility.test.mjs scripts/releases.test.mjs
+    node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.mjs scripts/playback-sync.test.mjs scripts/native-seek.test.mjs scripts/rooms.test.mjs scripts/afterparty-compatibility.test.mjs scripts/releases.test.mjs
     npm --prefix services/core run check
     npm --prefix services/core test
     npm run build

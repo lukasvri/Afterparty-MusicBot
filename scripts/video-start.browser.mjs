@@ -18,6 +18,7 @@ async function fixture({
   nextFails = false,
   previousStorage = true,
   jitter = false,
+  staleNext = "",
 } = {}) {
   const browser = await chromium.launch({
     headless: true,
@@ -161,6 +162,11 @@ async function fixture({
       if (route.request().method() === "POST") {
         const command = route.request().postDataJSON();
         commands.push(command);
+        if (command.action === "next" && staleNext) {
+          if(staleNext === "new-track") current=video("newtrack123");
+          staleNext="";version++;
+          return route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({error:"Synthetic stale revision"})});
+        }
         if (command.action === "played") result = { ok: true };
         else {
           assert.equal(command.version, version);
@@ -316,7 +322,7 @@ test("server-owned room progression loads the next track without a browser next 
       commands.filter((command) => command.action === "next").length,
       0,
     );
-    await page.locator(".room-options summary").click();
+    await page.locator(".room-options > summary").click();
     await page.getByRole("button", { name: "Radio on", exact: true }).click();
     await page
       .getByRole("button", { name: "Radio off", exact: true })
@@ -436,12 +442,24 @@ test("one host stays live without repeated seeks or publishing buffering as a ro
   assert.equal(seeks,1,'recover once, then continue without seeking loops');
   const measured = await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
   assert(Math.abs(expectedPosition()-measured)<.6,'recovery must return within 600ms of the shared live clock');
-  await page.locator('.video-settings summary').click();
-  const scrub=page.getByRole('slider',{name:'Seek in track'});
-  await scrub.focus();
-  await scrub.press('ArrowRight');
-  await page.waitForFunction(()=>window.__fakePlayer.state===1);
-  await page.waitForTimeout(1500);
-  assert.equal(commands.filter(c=>c.action==='seek').length,1,'only explicit room scrubbing publishes a seek');
+  assert.equal(await page.locator('.video-settings .admin-seek').count(),0);
+  await page.evaluate(()=>{
+    const p=window.__fakePlayer;
+    p.emit(3); p.position=80; p.at=performance.now(); p.emit(1);
+  });
+  await page.waitForTimeout(2000);
+  assert.equal(commands.filter(c=>c.action==='seek').length,1,'native YouTube scrubbing publishes exactly one seek');
+  assert(Math.abs(commands.find(c=>c.action==='seek').position-80)<2);
  } finally { await browser.close(); }
+});
+
+for(const staleNext of ['same-track','new-track']) test(`skip safely handles a stale revision: ${staleNext}`,async()=>{
+ const {browser,page,commands}=await fixture({playing:true,staleNext});
+ try{
+  await page.locator('.stage-intro button').click();
+  await page.waitForFunction(()=>window.__fakePlayer?.state===1);
+  await page.getByRole('button',{name:'Next video for everyone',exact:true}).click();
+  await page.waitForFunction(id=>window.__videoCalls.includes(id),staleNext==='same-track'?'next1234567':'newtrack123');
+  assert.equal(commands.filter(c=>c.action==='next').length,staleNext==='same-track'?2:1);
+ }finally{await browser.close();}
 });
