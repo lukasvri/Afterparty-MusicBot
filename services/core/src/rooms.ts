@@ -45,13 +45,16 @@ export class Rooms extends EventEmitter {
     this.store = store;
     this.now = now;
     store.db.exec(
-      "CREATE TABLE IF NOT EXISTS video_rooms(code TEXT PRIMARY KEY,data TEXT NOT NULL)",
+      `CREATE TABLE IF NOT EXISTS video_rooms(code TEXT PRIMARY KEY,data TEXT NOT NULL);
+       CREATE INDEX IF NOT EXISTS video_rooms_playing_expiry
+       ON video_rooms(json_extract(data,'$.expiresAt'))
+       WHERE json_extract(data,'$.state.playing')=1`,
     );
   }
   load(code: string): Saved {
     if (!/^[A-Z0-9]{8}$/.test(code) || code === "DISCORD1")
       throw new UserError("Rommet finnes ikke.", 404);
-    const value = this.store.db
+    const value = this.store
       .prepare("SELECT data FROM video_rooms WHERE code=?")
       .get(code);
     if (!value) throw new UserError("Rommet finnes ikke.", 404);
@@ -61,7 +64,7 @@ export class Rooms extends EventEmitter {
     return room;
   }
   save(room: Saved) {
-    this.store.db
+    this.store
       .prepare(
         "INSERT INTO video_rooms VALUES(?,?) ON CONFLICT(code) DO UPDATE SET data=excluded.data",
       )
@@ -153,7 +156,10 @@ export class Rooms extends EventEmitter {
     const room = this.load(code);
     if (!needsRecommendation(room.state, input) || !this.search)
       return this.mutate(code, input);
-    if (!guestActions.has(String(input.action)) && input.actorHash !== room.ownerHash)
+    if (
+      !guestActions.has(String(input.action)) &&
+      input.actorHash !== room.ownerHash
+    )
       throw new UserError("Bare verten kan styre avspillingen.", 403);
     if (input.version !== room.version)
       throw new UserError("Rommet er endret. Prøv igjen.", 409);
@@ -161,22 +167,46 @@ export class Rooms extends EventEmitter {
     if (input.action === "next") this.skipping.add(lookupKey);
     let lookup = this.radioLookups.get(lookupKey);
     if (!lookup) {
-      lookup = roomRecommendation({ ...room.state, ...(input.action === "radio" ? { radio: input.enabled === true } : {}) }, this.search);
+      lookup = roomRecommendation(
+        {
+          ...room.state,
+          ...(input.action === "radio"
+            ? { radio: input.enabled === true }
+            : {}),
+        },
+        this.search,
+      );
       this.radioLookups.set(lookupKey, lookup);
     }
     let recommended: RoomVideo | null;
-    try { recommended = await lookup; }
-    catch (error) { this.skipping.delete(lookupKey); throw error; }
-    finally { this.radioLookups.delete(lookupKey); }
+    try {
+      recommended = await lookup;
+    } catch (error) {
+      this.skipping.delete(lookupKey);
+      throw error;
+    } finally {
+      this.radioLookups.delete(lookupKey);
+    }
     if (this.stopped) throw new UserError("Romtjenesten starter på nytt.", 503);
-    if (input.action === "radio-prefetch" && this.skipping.has(lookupKey)) return this.snapshot(code);
+    if (input.action === "radio-prefetch" && this.skipping.has(lookupKey))
+      return this.snapshot(code);
     this.skipping.delete(lookupKey);
-    if (input.action === "next" && room.state.radio !== false && room.state.current && !room.state.queue.length && !recommended && !finished(room.state, room.updatedAt, this.now())) {
+    if (
+      input.action === "next" &&
+      room.state.radio !== false &&
+      room.state.current &&
+      !room.state.queue.length &&
+      !recommended &&
+      !finished(room.state, room.updatedAt, this.now())
+    ) {
       // The joined prefetch yields to next. Persist its normal cooldown before
       // rejecting the skip, or tick() would immediately repeat the empty lookup.
       // mutate keeps revision protection if another command won during lookup.
       this.mutate(code, { ...input, action: "radio-prefetch" });
-      throw new UserError("Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.", 422);
+      throw new UserError(
+        "Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.",
+        422,
+      );
     }
     return this.mutate(code, input, recommended);
   }
@@ -213,7 +243,7 @@ export class Rooms extends EventEmitter {
   }
   async tick() {
     if (this.stopped) return;
-    const rows = this.store.db
+    const rows = this.store
       .prepare(
         "SELECT data FROM video_rooms WHERE json_extract(data,'$.expiresAt')>? AND json_extract(data,'$.state.playing')=1",
       )
@@ -223,12 +253,17 @@ export class Rooms extends EventEmitter {
         const room = JSON.parse(String(value.data)) as Saved;
         if (
           this.advancing.has(room.code) ||
-          !(finished(room.state, room.updatedAt, this.now()) || prefetchDue(room.state, room.updatedAt, this.now()))
+          !(
+            finished(room.state, room.updatedAt, this.now()) ||
+            prefetchDue(room.state, room.updatedAt, this.now())
+          )
         )
           return;
         this.advancing.add(room.code);
         const input = {
-          action: finished(room.state, room.updatedAt, this.now()) ? "next" : "radio-prefetch",
+          action: finished(room.state, room.updatedAt, this.now())
+            ? "next"
+            : "radio-prefetch",
           actorHash: room.ownerHash,
           version: room.version,
         };
@@ -254,7 +289,7 @@ export class Rooms extends EventEmitter {
   }
   close(code: string) {
     this.load(code);
-    this.store.db.prepare("DELETE FROM video_rooms WHERE code=?").run(code);
+    this.store.prepare("DELETE FROM video_rooms WHERE code=?").run(code);
     this.emit("change", code);
   }
 }

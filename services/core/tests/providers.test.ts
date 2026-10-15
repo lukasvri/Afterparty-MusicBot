@@ -5,9 +5,35 @@ import {Store} from '../src/store.ts';import {Providers} from '../src/providers.
 import {scoreMatch,mapLimited} from '../src/matching.ts';import {spotifyRef,SpotifyCatalog,expandSpotifyLink} from '../src/spotify.ts';
 import {soundcloudUrl,resolveSoundcloud} from '../src/soundcloud.ts';import {Recommendations} from '../src/recommendations.ts';
 import {audioBitrate} from '../src/audio.ts';import type {Track} from '../src/types.ts';
+import {deferred} from './deferred.ts';
 const source={id:'4uLU6hMCjMI75M1A2tKUQC',isrc:'GBARL9300135',title:'Example Song',artist:'Artist',duration:200};
 const track=(title='Artist - Example Song',id='abcdefghijk'):Track=>({id,title,artist:'Artist - Topic',duration:200,entryId:id,image:'',live:false,embeddable:true,source:'youtube'});
 const setup=()=>{const dir=mkdtempSync(join(tmpdir(),'gutta-provider-'));const store=new Store(join(dir,'db.sqlite'));return {store,close:()=>{store.close();rmSync(dir,{recursive:true,force:true});}};};
+
+test('concurrent identical searches share one lookup and return independent queue entry identities',async()=>{
+ const t=setup(),gate=deferred<void>();try{
+  const p=new Providers(t.store,{});let calls=0;
+  p.youtube=async()=>{calls++;await gate.promise;return {items:[{id:{videoId:'abcdefghijk'}}]};};
+  p.video=async()=>[track()];
+  const pending=Array.from({length:20},()=>p.search('Artist audio',8,true));
+  gate.resolve();const results=await Promise.all(pending);
+  assert.equal(calls,1);assert(results.every(tracks=>tracks[0].id==='abcdefghijk'));
+  assert.equal(new Set(results.map(tracks=>tracks[0].entryId)).size,20);
+  await p.search('Artist audio',8,true);assert.equal(calls,1);
+ }finally{gate.resolve();t.close();}
+});
+
+test('a failed shared search is released so the next request can recover',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{});let calls=0;
+  p.youtube=async()=>{calls++;throw Error('synthetic unavailable API');};
+  p.extract=async()=>{throw Error('synthetic unavailable extractor');};
+  const failed=await Promise.allSettled([p.search('Artist audio'),p.search('Artist audio')]);
+  assert(failed.every(result=>result.status==='rejected'));assert.equal(calls,1);
+  p.youtube=async()=>{calls++;return {items:[{id:{videoId:'abcdefghijk'}}]};};p.video=async()=>[track()];
+  assert.equal((await p.search('Artist audio'))[0].id,'abcdefghijk');assert.equal(calls,2);
+ }finally{t.close();}
+});
 test('matching rejects different versions, substrings, wrong durations and supports ISRC metadata',()=>{
  assert(scoreMatch(source,track())>.9);
  for(const suffix of ['Live','Remix','Acoustic','Karaoke','Cover','Slowed','Sped Up','Instrumental'])assert.equal(scoreMatch(source,track('Artist - Example Song '+suffix)),0);

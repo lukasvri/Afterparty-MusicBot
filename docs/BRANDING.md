@@ -4,8 +4,9 @@ The website and Discord music bot share the display name **Afterparty**.
 This source change updates navigation, accessible labels, page metadata,
 admin and invite text, translations, scenery, bot help and idle activity,
 fallback display names, operational messages and public documentation.
-There is no web app manifest in this repository. The existing waveform favicon
-contains no old name and remains suitable.
+There is no web app manifest in this repository. The favicon and stage monogram use a lowercase white `ap` with a red dot.
+The wordmark uses Inter 900, with a self-hosted Latin variable font and its
+SIL Open Font License preserved in `public/fonts/Inter.LICENSE`.
 
 ## Compatibility
 

@@ -14,6 +14,19 @@ const video = {
   live: false,
   embeddable: true,
 };
+
+test("room scheduling uses the playing-room expiry index without rewriting durable rooms", () => {
+  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  try {
+    const insert = store.prepare("INSERT INTO video_rooms(code,data) VALUES(?,?)");
+    for (let i = 0; i < 100; i++) insert.run(`R${String(i).padStart(7,"0")}`, JSON.stringify({ expiresAt: i % 3 ? 20000 : 9000, state: { playing: i % 2 === 0 } }));
+    const query = "SELECT data FROM video_rooms WHERE json_extract(data,'$.expiresAt')>? AND json_extract(data,'$.state.playing')=1";
+    const plan = JSON.stringify(store.prepare("EXPLAIN QUERY PLAN " + query).all(10000));
+    assert.match(plan, /video_rooms_playing_expiry/);
+    assert.equal(store.prepare(query).all(10000).length, 33);
+    assert.equal(store.prepare("SELECT count(*) AS n FROM video_rooms").get()!.n, 100);
+  } finally { rooms.dispose(); store.close(); }
+});
 test("one persisted room clock, shared start deadline, host protection and queue races", () => {
   const store = new Store(":memory:");
   let now = 10000;

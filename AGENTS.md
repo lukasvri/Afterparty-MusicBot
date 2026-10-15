@@ -3,6 +3,17 @@
 This repository is the source of truth for the website and Core. Write public
 documentation in English. Do not use em dashes.
 
+## Source freshness
+
+- Before every new requested code change, fetch the canonical GitHub repository
+  and verify that the working branch includes its latest `main`. Do this before
+  reviewing or editing code. A cached checkout or existing `origin/main` is not
+  evidence that the source is current.
+- Preserve local work when updating the base. Do not reset or discard changes.
+  Integrate the latest source, resolve conflicts and validate the combined result.
+- Recheck upstream before submitting a pull request. If `main` moved during the
+  task, incorporate it and rerun checks affected by the new changes.
+
 ## Development and validation
 
 - Use Node.js 24.17+, Python 3.11+ and FFmpeg. Run `npm run setup:cloud` to install both locked

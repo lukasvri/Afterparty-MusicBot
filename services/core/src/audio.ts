@@ -40,7 +40,7 @@ export class PcmDecoder {
   ended = false;
   error: Error | null = null;
   disposed = false;
-  pending = Buffer.alloc(0);
+  pending: Buffer = Buffer.alloc(0);
   iterator: AsyncIterator<Buffer>;
   closed: Promise<void>;
   constructor(
@@ -124,7 +124,10 @@ export class PcmDecoder {
           }),
         ]);
         if (next.done) this.ended = true;
-        else this.pending = Buffer.concat([this.pending, next.value]);
+        else
+          this.pending = this.pending.length
+            ? Buffer.concat([this.pending, next.value])
+            : next.value;
       } catch (error) {
         this.stop();
         throw error;
@@ -148,15 +151,18 @@ function pad(data: Buffer) {
   data.copy(b, 0, 0, FRAME_BYTES);
   return b;
 }
+/** Frames are immutable downstream. Unity gain needs neither a copy nor a sample loop. */
 export function mixPcm(
   a: Buffer,
   b: Buffer | null,
   progress: number,
   volume: number,
 ) {
-  const out = Buffer.allocUnsafe(FRAME_BYTES),
-    gain = Math.max(0, Math.min(1, volume / 100)),
+  const gain = Math.max(0, Math.min(1, volume / 100)),
     fade = Math.max(0, Math.min(1, progress));
+  if (!b && gain === 1) return a;
+  if (gain === 0) return Buffer.alloc(FRAME_BYTES);
+  const out = Buffer.allocUnsafe(FRAME_BYTES);
   for (let i = 0; i < FRAME_BYTES; i += 2) {
     const sample =
       (a.readInt16LE(i) * (b ? 1 - fade : 1) +

@@ -1,7 +1,6 @@
 "use client";
 import { useLanguage } from "@/components/language";
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import { browserStorage } from "@/lib/browser-storage";
 import type { Room } from "@/lib/types";
 export function RoomSharing({
@@ -30,17 +29,21 @@ export function RoomSharing({
   useEffect(() => {
     let stopped = false;
     if (url)
-      void QRCode.toDataURL(url, {
-        width: 180,
-        margin: 2,
-        color: { dark: "#111111", light: "#ffffff" },
-      })
+      void import("qrcode")
+        .then(({ default: QRCode }) =>
+          QRCode.toDataURL(url, {
+            width: 180,
+            margin: 2,
+            color: { dark: "#111111", light: "#ffffff" },
+          }),
+        )
         .then((value) => {
           if (!stopped) setQr(value);
         })
-        .catch(() =>
-          setMessage(t("QR-koden kunne ikkje lagast. Bruk lenkja.")),
-        );
+        .catch(() => {
+          if (!stopped)
+            setMessage(t("QR-koden kunne ikkje lagast. Bruk lenkja."));
+        });
     return () => {
       stopped = true;
     };

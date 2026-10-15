@@ -4,13 +4,15 @@ import { useLanguage } from "./language";
 export function Logo() {
   const { t } = useLanguage();
   return (
-    <a
-      className="brand"
-      href="/"
-      aria-label={t("Afterparty forsiden")}
-    >
+    <a className="brand" href="/" aria-label={t("Afterparty forsiden")}>
+      <span className="brand-mark" aria-hidden="true">
+        <img src="/afterparty-mark.svg" width="48" height="48" alt="" />
+      </span>
       <span>
-        AFTERPARTY
+        afterparty
+        <span className="brand-dot" aria-hidden="true">
+          .
+        </span>
       </span>
     </a>
   );

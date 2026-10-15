@@ -1,5 +1,6 @@
 import { metadataGenres } from "./radio.ts";
-import { spawn } from "node:child_process";
+import { runJson } from "./extractor.ts";
+export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
@@ -20,95 +21,6 @@ import {
 } from "./radio.ts";
 import { Store } from "./store.ts";
 import { UserError, type Track } from "./types.ts";
-function spawnJson(
-  command: string,
-  args: string[],
-  signal?: AbortSignal,
-): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      signal,
-    });
-    let out = "",
-      error = "";
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new UserError("Mediekilden svarte ikke innen fristen.", 504));
-    }, 30000);
-    child.stdout.on("data", (b) => {
-      out += String(b);
-      if (out.length > 8e6) child.kill("SIGKILL");
-    });
-    child.stderr.on("data", (b) => {
-      error = (error + String(b)).slice(-3000);
-    });
-    child.on("error", (e) => {
-      clearTimeout(timer);
-      reject(e);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      if (code !== 0)
-        return reject(
-          new UserError(
-            "Mediekilden kunne ikke lastes. Prøv en annen lenke.",
-            502,
-          ),
-        );
-      try {
-        resolve(JSON.parse(out));
-      } catch {
-        reject(new UserError("Mediekilden ga et ugyldig svar.", 502));
-      }
-    });
-  });
-}
-let activeExtractors = 0;
-const waiting: Array<() => void> = [];
-async function extractorSlot(signal?: AbortSignal, priority = false) {
-  if (signal?.aborted) throw new UserError("Forespørselen ble avbrutt.");
-  if (activeExtractors < 4) {
-    activeExtractors++;
-    return;
-  }
-  if (waiting.length >= 16)
-    throw new UserError("Musikkilden er opptatt. Prøv igjen om litt.", 503);
-  await new Promise<void>((resolve, reject) => {
-    const cancel = () => {
-      const index = waiting.indexOf(enter);
-      if (index < 0) return;
-      waiting.splice(index, 1);
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", cancel);
-      reject(new UserError("Musikkilden er opptatt. Prøv igjen om litt.", 503));
-    };
-    const enter = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", cancel);
-      activeExtractors++;
-      resolve();
-    };
-    const timer = setTimeout(cancel, 15000);
-    signal?.addEventListener("abort", cancel, { once: true });
-    if (priority) waiting.unshift(enter);
-    else waiting.push(enter);
-  });
-}
-export async function runJson(
-  command: string,
-  args: string[],
-  signal?: AbortSignal,
-  priority = false,
-) {
-  await extractorSlot(signal, priority);
-  try {
-    return await spawnJson(command, args, signal);
-  } finally {
-    activeExtractors--;
-    waiting.shift()?.();
-  }
-}
 export function youtubeId(query: string) {
   if (/^[\w-]{11}$/.test(query)) return query;
   try {
@@ -139,6 +51,7 @@ export class Providers {
   spotifyCatalog: SpotifyCatalog;
   recommendations: Recommendations;
   recommendationStatus = "artist";
+  private searches = new Map<string, Promise<Track[]>>();
   constructor(store: Store, env: NodeJS.ProcessEnv = process.env) {
     this.store = store;
     this.key = env.YOUTUBE_API_KEY ?? "";
@@ -260,6 +173,29 @@ export class Providers {
       );
     if (cached?.tracks.length && Date.now() - cached.at < 3600000)
       return cached.tracks.map((t) => ({ ...t, entryId: randomUUID() }));
+    let lookup = this.searches.get(key);
+    if (!lookup) {
+      lookup = this.searchUncached(query, count, musicOnly).then((tracks) => {
+        if (tracks.length) this.store.set(key, { at: Date.now(), tracks });
+        return tracks;
+      });
+      // Coalesce bursts without retaining an unlimited set of distinct queries.
+      if (this.searches.size < 64) this.searches.set(key, lookup);
+    }
+    try {
+      return (await lookup).map((track) => ({
+        ...track,
+        entryId: randomUUID(),
+      }));
+    } finally {
+      if (this.searches.get(key) === lookup) this.searches.delete(key);
+    }
+  }
+  private async searchUncached(
+    query: string,
+    count: number,
+    musicOnly: boolean,
+  ): Promise<Track[]> {
     let ids: string[];
     try {
       const data = await this.youtube("search", {
@@ -283,9 +219,7 @@ export class Providers {
         .map((t: any) => t.id)
         .filter((id: string) => /^[\w-]{11}$/.test(id));
     }
-    const tracks = await this.video(ids, true);
-    if (tracks.length) this.store.set(key, { at: Date.now(), tracks });
-    return tracks;
+    return this.video(ids, true);
   }
   async resolve(query: string): Promise<Track[]> {
     query = query.trim();

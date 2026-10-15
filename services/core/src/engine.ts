@@ -125,16 +125,20 @@ export class Engine extends EventEmitter {
     return job;
   }
   tick() {
+    // Keep the audible segment and any prepared future segment, even during pause.
+    // A single crossfading mixer can otherwise retain every track for days.
+    const duration = this.sink.duration(),
+      active = this.segments.findLastIndex(
+        (s) => s.startFrame <= Math.floor(duration / 20),
+      );
+    if (active > 0) this.segments.splice(0, active);
     this.diagnostics.buffer(
       this.connected &&
         !this.paused &&
         Boolean(this.current) &&
         (this.loading || this.sink.buffering()),
     );
-    const { track, position } = positionFromSegments(
-      this.segments,
-      this.sink.duration(),
-    );
+    const { track, position } = positionFromSegments(this.segments, duration);
     if (track) this.adoptTrack(track);
     if (
       track &&

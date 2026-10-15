@@ -13,6 +13,34 @@ import type {Track} from '../src/types.ts';
 import {parseTime} from '../src/discord.ts';
 const track=(id='abcdefghijk',entryId=id):Track=>({id,entryId,title:'Example song',artist:'Artist',duration:200,image:'',live:false,embeddable:true,source:'youtube'});
 class FakeSink implements Sink{ms=0;playing=true;onIdle:((id:string)=>void)|null=null;onError:((e:Error,id:string)=>void)|null=null;play(){this.ms=0;this.playing=true;}pause(){this.playing=false;}resume(){this.playing=true;}stop(){this.ms=0;this.playing=false;}duration(){return this.ms;}advancing(){return this.playing;}buffering(){return false;}}
+
+test('a long-running mix releases consumed segments while retaining the audible and future clocks',()=>{
+ const t=setup();try{
+  t.engine.settings.radio=false;t.engine.connected=true;
+  const segments=Array.from({length:1002},(_,i)=>({track:track('abcdefghijk','entry:'+i),startFrame:i*500,offset:i%7}));
+  t.engine.segments=[...segments];t.sink.ms=(1000*500+100)*20;
+  const expected=positionFromSegments(segments,t.sink.ms);
+  t.engine.tick();
+  assert.equal(t.engine.segments.length,2);
+  assert.deepEqual(positionFromSegments(t.engine.segments,t.sink.ms),expected);
+  assert.equal(t.engine.current?.entryId,'entry:1000');
+  t.sink.ms=1001*500*20;t.engine.tick();
+  assert.equal(t.engine.segments.length,1);
+  assert.equal(t.engine.current?.entryId,'entry:1001');
+  assert.deepEqual(positionFromSegments(t.engine.segments,t.sink.ms),positionFromSegments(segments,t.sink.ms));
+ }finally{t.close();}
+});
+
+test('PCM fast paths preserve samples and never change the input during gain or fades',()=>{
+ const input=Buffer.alloc(FRAME_BYTES);
+ for(let i=0;i<FRAME_BYTES;i+=2)input.writeInt16LE((i*37)%65536-32768,i);
+ const original=Buffer.from(input),other=Buffer.alloc(FRAME_BYTES);
+ for(const volume of [0,25,50,100])for(const next of [null,other]){
+  const out=mixPcm(input,next,.5,volume);
+  for(let i=0;i<FRAME_BYTES;i+=2)assert.equal(out.readInt16LE(i),Math.round(input.readInt16LE(i)*(next?.5:1)*volume/100)||0);
+  assert.deepEqual(input,original);
+ }
+});
 function setup(){const dir=mkdtempSync(join(tmpdir(),'gutta-core-')),store=new Store(join(dir,'db.sqlite')),providers=new Providers(store,{}),sink=new FakeSink(),engine=new Engine(store,providers,sink);return {store,providers,sink,engine,close:()=>{engine.close();store.close();rmSync(dir,{recursive:true,force:true});}};}
 test('media clock uses consumed audio, including incoming crossfade offset',()=>{const segments=[{track:track(),startFrame:0,offset:10},{track:track('bcdefghijkl'),startFrame:500,offset:0}];assert.equal(positionFromSegments(segments,9000).position,19);assert.equal(positionFromSegments(segments,10000).track?.id,'bcdefghijkl');assert.equal(positionFromSegments(segments,13000).position,3);});
 test('public state excludes requester identity and private fields',()=>{const t=setup();try{t.engine.current={...track(),requestedBy:'private-member-id'};t.engine.queue=[{...track('bcdefghijkl'),requestedBy:'private-member-id'}];const text=JSON.stringify(t.engine.snapshot());assert(!text.includes('private-member-id'));assert(!text.includes('requestedBy'));}finally{t.close();}});
