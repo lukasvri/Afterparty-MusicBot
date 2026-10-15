@@ -6,28 +6,33 @@ images, logs and backups stay on the bot host.
 
 ## What the command does
 
-1. Acquires a deployment lock and requires a healthy bot, a clean `main` checkout
-   and matching private data bindings. Playback must be paused on every server.
+1. Acquires a deployment lock and requires a healthy bot and matching private
+   data bindings. Music continues during validation and builds.
 2. Fetches `origin/main` and exports tracked source into a temporary directory.
-   Ignored local configuration and credentials are not exported or mounted in tests.
+   Local edits, staged files, untracked files and ignored configuration are not
+   exported or mounted in tests. The working branch and local files stay unchanged.
+   If a production commit is recorded, the fetched commit must descend from it.
 3. Builds Core's validation image, reruns its tests with networking disabled,
    then runs deployer tests, website typechecks, behavior tests and a production
    website build. Only dependency installation has network access after the
    validation image is built. Tests use synthetic data.
-4. Builds a production image tagged with the Git commit. Checks playback again,
-   fast-forwards the checkout, then stops Core and backs up the entire data tree,
+4. Builds a production image tagged with the Git commit. Automatically pauses
+   active playback on each server immediately before the switch, then stops
+   Core and backs up the entire data tree,
    including `guilds/`, private Compose configuration and referenced environment files.
 5. Verifies the backup, selects the new image in the private Compose file and
    starts it. Checks Discord readiness, Docker health, queue recovery, the actual
    running image and SQLite integrity.
+   Resumes only the tracks this deployment paused; manually paused servers stay paused.
 6. If startup or post-start checks fail, stops the candidate, restores the
    pre-update data and exact previous image, and checks recovery. Candidate data
    is retained locally in a `data.failed-*` directory for investigation.
+   Restores automatically paused playback after successful recovery as well.
 
 Backups, failed data and old images are retained until you deliberately remove
 ones you no longer need. Check disk space before a large update. No cleanup
-command deletes production volumes automatically. A failed update can leave the
-source checkout at the fetched commit; `--status` records the running version.
+command deletes production volumes automatically. The source checkout is never
+fast-forwarded or reset; `--status` records the running version.
 
 The deployment only handles Core. Website builds are validation, not publication.
 Automated tests and readiness checks do not replace listening in a real voice channel.
@@ -83,7 +88,21 @@ or need a copy of the bot's credentials on the main computer.
 `--check` runs tests and builds without stopping or updating production.
 A normal deployment skips the restart if its recorded commit and actual running
 image already match. `--redeploy` explicitly repeats deployment of the same commit.
-If music is playing or buffering, pause it on all servers and retry.
+An already current deployment and `--check` do not pause music. Actual updates
+and `--redeploy` pause active playback only after validation and building finish,
+then resume it after the new bot is healthy or the previous bot is recovered.
+If someone changes the track, disconnects, or sends a newer transport command
+through the website during this interval, automatic resume leaves that server
+unchanged. The final idle check still aborts safely if playback restarts before
+Core can be stopped.
+
+A private `playback-resume.json` journal in the deployment state directory records
+opaque server and track hashes plus idempotent command IDs before pausing. It
+contains no credentials or Discord IDs. Partial failures retain only unresolved
+servers; the next normal run retries recovery before starting another update.
+`--check` refuses pending recovery without changing playback. Keep the journal
+if the bot cannot become healthy; resume recovery requires a healthy Core.
+Playback recovery failure reports an error even if the image update succeeded.
 
 Progress is printed to the SSH session; full logs and deployment records remain
 in the configured private state directory. The deployer ignores SSH hangup signals

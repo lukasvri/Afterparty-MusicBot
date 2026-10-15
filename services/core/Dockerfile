@@ -8,6 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=peer --ignore-scripts --no-audit --no-fund
 
 FROM dependencies AS validation
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY tsconfig.json ./
 COPY src src
 COPY public public
