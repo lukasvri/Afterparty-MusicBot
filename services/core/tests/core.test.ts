@@ -179,3 +179,10 @@ test('closing an engine rejects delayed adds and cannot restart playback',async(
   assert.deepEqual(t.store.get('queue',[]),[]);
  }finally{t.close();}
 });
+
+test('audio buffering is distinct from pause and recovery retries the same consumed position twice',async()=>{
+ const t=setup();try{const e=t.engine;e.connected=true;e.current=track();e.segments=[{track:e.current,startFrame:0,offset:20}];t.sink.ms=2000;t.sink.advancing=()=>false;t.sink.buffering=()=>true;
+ assert.equal(e.snapshot().playing,true);assert.equal(e.snapshot().buffering,true);e.pause();assert.equal(e.snapshot().playing,false);e.paused=false;
+ const attempts:number[]=[];e.startTrack=async(_track,offset)=>{attempts.push(offset??0);};let skipped=0;e.skip=async()=>{skipped++;};await e.recoverAudio();await e.recoverAudio();await e.recoverAudio();assert.deepEqual(attempts,[22,22]);assert.equal(skipped,1);assert.equal(e.diagnostics.snapshot().events.at(-1)?.reason,'recovery-exhausted');
+ }finally{t.close();}
+});

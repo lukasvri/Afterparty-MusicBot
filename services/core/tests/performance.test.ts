@@ -64,3 +64,5 @@ test('delay buckets are bounded and recent stalls are reflected in p95',()=>{
   now=241000;m.recordDelay(1);assert(m.snapshot(0).eventLoopP95Ms<2);
  }finally{m.close();}
 });
+
+test('maximum loop delay retains rare spikes that p95 hides',()=>{const m=new Metrics(()=>1000);try{for(let i=0;i<100;i++)m.recordDelay(1);m.recordDelay(1200);const s=m.snapshot(0);assert(s.eventLoopP95Ms<2);assert(s.eventLoopMaxMs>=1200);}finally{m.close();}});

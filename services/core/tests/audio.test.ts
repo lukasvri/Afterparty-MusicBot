@@ -5,6 +5,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {once} from 'node:events';
+import {Readable} from 'node:stream';
+import {DiscordSink,DECODER_TIMEOUT_MS,FRAME_MS} from '../src/audio.ts';
 import {PcmDecoder,Mixer,encodeOpus,FRAME_BYTES} from '../src/audio.ts';
 import {deferred} from './deferred.ts';
 const ffmpeg=process.env.FFMPEG_PATH??'ffmpeg';
@@ -15,6 +17,7 @@ for(const bitrate of [96000,192000])test(`real FFmpeg sources crossfade into val
   const make=(name:string)=>({track:{id:name.repeat(11),entryId:name,title:name,artist:'Test',image:'',duration:4,live:false,embeddable:true},decoder:new PcmDecoder({url:join(dir,name+'.wav'),headers:''},0,abort.signal,ffmpeg)});
   const first=make('a'),second=make('b'),segments:{entry:string;frame:number}[]=[];let supplied=false;
   mixer=new Mixer({first,offset:0,volume:()=>100,crossfade:()=>1,bitrate,next:async()=>{if(supplied)return null;supplied=true;return second;},onSegment:(t,frame)=>segments.push({entry:t.entryId,frame})});
+  mixer.prepare();await mixer.preparing;await mixer.nextRead;
   const encoded=encodeOpus(mixer,bitrate),ogg:Buffer[]=[];encoded.process.stdout.on('data',chunk=>ogg.push(Buffer.from(chunk)));let packets=0;for await(const packet of encoded.stream){assert(packet.length>0);packets++;}assert(packets>=350&&packets<=351);const decoded=spawnSync(ffmpeg,['-hide_banner','-loglevel','error','-i','pipe:0','-f','s16le','-ar','48000','-ac','2','pipe:1'],{input:Buffer.concat(ogg),maxBuffer:4e6});assert.equal(decoded.status,0,String(decoded.stderr));assert.equal(decoded.stdout.length,350*FRAME_BYTES);assert(decoded.stdout.some(byte=>byte!==0));assert.deepEqual(segments,[{entry:'a',frame:0},{entry:'b',frame:150}]);
  }finally{mixer?.destroy();abort.abort();rmSync(dir,{recursive:true,force:true});}
 });
@@ -64,4 +67,29 @@ test('an encoder crash is an output error and disposes its input',async()=>{
  const closed=new Promise<void>(resolve=>encoded.process.once('close',()=>resolve()));
  try{await assert.rejects(async()=>{for await(const _ of encoded.stream){}},/Lydkodingen stoppet/);await closed;assert.equal(mixer.destroyed,true);}
  finally{encoded.stream.destroy();encoded.process.kill('SIGKILL');mixer.destroy();await closed;}
+});
+
+for (const failure of ['slow','eof','error']) test(`crossfade keeps main frames flowing when the next source is ${failure}`,async()=>{
+ const gate=deferred<Buffer|null>();const packet=Buffer.alloc(FRAME_BYTES,1);let reads=0;
+ const make=(id:string,frame:()=>Promise<Buffer|null>)=>({track:{id:id.repeat(11),entryId:id,title:id,artist:'Test',image:'',duration:20,live:false,embeddable:true},decoder:{frame,stop(){}} as unknown as PcmDecoder});
+ const main=make('a',async()=>{reads++;return packet;});const next=make('b',async()=>failure==='slow'?gate.promise:failure==='eof'?null:Promise.reject(new Error('synthetic')));
+ const mixer=new Mixer({first:main,offset:15,volume:()=>100,crossfade:()=>6,bitrate:96000,next:async()=>next,onSegment(){}});
+ try{mixer.prepare();await mixer.preparing;await Promise.resolve();const out=await Promise.race([mixer.produce(),new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('main stalled')),150))]);assert(out);assert.equal(reads,1);assert.equal(mixer.fadeFrame,0);}finally{mixer.destroy();gate.resolve(null);}
+});
+
+
+test('sink classifies an unfinished idle as a stall and gives the decoder time to fail first',async()=>{
+ const sink=new DiscordSink(),stream=new Readable({read(){}});let idle=0,errors=0;
+ sink.onIdle=()=>idle++;sink.onError=()=>errors++;
+ (sink.player as unknown as {behaviors:{noSubscriber:string}}).behaviors.noSubscriber='play';
+ try{sink.play(stream,'synthetic');stream.push(Buffer.from([0xf8,0xff,0xfe]));await new Promise(r=>setImmediate(r));
+ const player=sink.player as unknown as {behaviors:{maxMissedFrames:number;noSubscriber:string};_stepPrepare:()=>void;stop:(force:boolean)=>void};
+ assert(player.behaviors.maxMissedFrames*FRAME_MS>DECODER_TIMEOUT_MS);player.behaviors.noSubscriber='play';player._stepPrepare();for(let i=0;i<200;i++)player._stepPrepare();assert.equal(errors,0,'four seconds of missing frames are not EOF');for(let i=200;i<player.behaviors.maxMissedFrames;i++)player._stepPrepare();assert.equal(idle,0);assert.equal(errors,1);assert.equal(sink.diagnostics().missedFrames,350);
+ sink.play(new Readable({read(){}}),'stopped');sink.stop();assert.equal(errors,1,'intentional stop is not a stall');
+ }finally{sink.stop();stream.destroy();}
+});
+
+test('a completed Opus source remains a natural end',{timeout:2000},async()=>{
+ const sink=new DiscordSink();let idle=0,errors=0;sink.onIdle=()=>idle++;sink.onError=()=>errors++;
+ const stream=Readable.from([Buffer.from([0xf8,0xff,0xfe])]);try{sink.play(stream,'complete');for(let i=0;i<10&&!stream.readableEnded;i++){stream.read();await new Promise(r=>setImmediate(r));}assert(stream.readableEnded);sink.player.stop(true);assert.equal(errors,0);assert.equal(idle,1);}finally{sink.stop();}
 });

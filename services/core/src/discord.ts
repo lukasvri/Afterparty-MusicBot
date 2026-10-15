@@ -132,7 +132,7 @@ export class DiscordBot {
         this.connection.destroy();
         this.connection = null;
         throw new UserError('Kunne ikke koble til talekanalen. Prøv igjen.');
-    } this.engine.store.set('voice-channel', channel.id); this.connection.subscribe(this.sink.player); this.engine.channelBitrate = channel.bitrate; this.engine.setConnection(true); this.connection.on(VoiceConnectionStatus.Disconnected, () => { const connection = this.connection; if (!connection)
+    } this.engine.store.set('voice-channel', channel.id); this.connection.subscribe(this.sink.player); this.engine.channelBitrate = channel.bitrate; this.engine.setConnection(true); let disconnectedAt:number|null=null;this.connection.on(VoiceConnectionStatus.Ready,()=>{if(disconnectedAt!==null){this.engine.diagnostics.note("voice-reconnected",performance.now()-disconnectedAt);disconnectedAt=null;}});this.connection.on(VoiceConnectionStatus.Disconnected, () => { disconnectedAt=performance.now();this.engine.diagnostics.note("voice-disconnected"); const connection = this.connection; if (!connection)
         return; void Promise.race([entersState(connection, VoiceConnectionStatus.Signalling, 5000), entersState(connection, VoiceConnectionStatus.Connecting, 5000)]).catch(() => { if (this.connection === connection)
         this.disconnect(); }); }); this.connection.receiver.speaking.on('start', id => { if (id === this.client.user?.id)
         return; this.talking.add(id); this.engine.ducking = this.engine.settings.turnDownVolumeWhenPeopleSpeak && this.talking.size > 0; }); this.connection.receiver.speaking.on('end', id => { this.talking.delete(id); this.engine.ducking = this.engine.settings.turnDownVolumeWhenPeopleSpeak && this.talking.size > 0; }); }

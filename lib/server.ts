@@ -431,7 +431,7 @@ export async function publicRoom(
   }
   const position =
     state.position +
-    (state.playing
+    (state.playing && !state.buffering
       ? (discord
           ? Math.min(12000, now - value.updated_at)
           : now - value.updated_at) / 1000
@@ -457,6 +457,7 @@ export async function publicRoom(
           mode: "discord" as const,
           guildId: value.guild_id,
           discordOnline,
+          buffering:state.buffering,
           syncValidForMs: Math.max(0, 12000 - (now - value.updated_at)),
         }
       : {}),
