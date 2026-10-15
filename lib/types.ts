@@ -11,6 +11,7 @@ export type Video = {
   source?: "youtube" | "soundcloud";
   url?: string;
   requestedBy?: string;
+  radio?: boolean;
 };
 export type RoomState = RoomPlayback & {
   cohostHashes?: string[];

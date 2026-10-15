@@ -17,6 +17,7 @@ async function fixture({
   nextGate = null,
   nextFails = false,
   previousStorage = true,
+  jitter = false,
 } = {}) {
   const browser = await chromium.launch({
     headless: true,
@@ -41,6 +42,7 @@ async function fixture({
   let current = video("seed1234567"),
     version = 1,
     radio = true;
+  let anchor = Date.now(), position = 20;
   const room = () => ({
     code: "TESTROOM",
     name: "Synthetic own room",
@@ -48,7 +50,7 @@ async function fixture({
     queue: [],
     playing,
     radio,
-    position: 20,
+    position: position + (playing ? (Date.now() - anchor)/1000 : 0),
     version,
     serverTime: Date.now(),
     viewers: 1,
@@ -56,7 +58,7 @@ async function fixture({
     expiresAt: Date.now() + 60000,
   });
   await page.addInitScript(
-    ({ blocked, previousStorage }) => {
+    ({ blocked, previousStorage, jitter }) => {
       localStorage.setItem("gutta-language", "en");
       const prefix = previousStorage ? "muse-" : "afterparty-";
       localStorage.setItem(
@@ -66,6 +68,7 @@ async function fixture({
       localStorage.setItem(prefix + "host:TESTROOM", "synthetic-host-token");
       localStorage.setItem(prefix + "visitor", "synthetic-visitor");
       window.__blockAudio = blocked;
+      window.__jitter = jitter;
       window.__videoCalls = [];
       window.__transportCalls = [];
       window.YT = {
@@ -108,10 +111,8 @@ async function fixture({
             if (this.state !== 2) this.emit(2);
           }
           getCurrentTime() {
-            return (
-              this.position +
-              (this.state === 1 ? (performance.now() - this.at) / 1000 : 0)
-            );
+            const value = this.position + (this.state === 1 ? (performance.now() - this.at) / 1000 : 0);
+            return window.__jitter ? Math.floor(value * 4) / 4 : value;
           }
           getPlayerState() {
             return this.state;
@@ -141,7 +142,7 @@ async function fixture({
         },
       };
     },
-    { blocked, previousStorage },
+    { blocked, previousStorage, jitter },
   );
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
@@ -163,6 +164,9 @@ async function fixture({
         if (command.action === "played") result = { ok: true };
         else {
           assert.equal(command.version, version);
+          position = room().position;
+          anchor = Date.now();
+          if (command.action === "seek") position = command.position;
           if (command.action === "play") playing = true;
           if (command.action === "pause") playing = false;
           if (command.action === "radio") radio = command.enabled;
@@ -203,6 +207,7 @@ async function fixture({
     browser,
     page,
     commands,
+    expectedPosition: () => room().position,
     advance: async () => {
       if (nextGate) await nextGate;
       current = nextFails ? null : video("next1234567");
@@ -311,6 +316,7 @@ test("server-owned room progression loads the next track without a browser next 
       commands.filter((command) => command.action === "next").length,
       0,
     );
+    await page.locator(".room-options summary").click();
     await page.getByRole("button", { name: "Radio on", exact: true }).click();
     await page
       .getByRole("button", { name: "Radio off", exact: true })
@@ -410,4 +416,32 @@ test("fresh Afterparty storage works without any old browser keys", async () => 
   } finally {
     await f.browser.close();
   }
+});
+
+
+test("one host stays live without repeated seeks or publishing buffering as a room seek", async () => {
+ const {browser,page,commands,expectedPosition}=await fixture({playing:true,jitter:true});
+ try {
+  await page.locator('.stage-intro button').click();
+  await page.waitForFunction(()=>window.__fakePlayer?.state===1);
+  await page.waitForTimeout(12000);
+  if(process.env.SCREENSHOT_DIR) await page.screenshot({path:process.env.SCREENSHOT_DIR+'/clean-room.png',fullPage:true});
+  assert.equal(await page.evaluate(()=>window.__transportCalls.filter(c=>c==='seek').length),0);
+  await page.evaluate(()=>window.__fakePlayer.emit(3));
+  await page.waitForTimeout(3500);
+  await page.evaluate(()=>window.__fakePlayer.emit(1));
+  await page.waitForTimeout(8000);
+  assert.equal(commands.filter(c=>c.action==='seek').length,0,'buffer recovery must never publish a host seek');
+  const seeks=await page.evaluate(()=>window.__transportCalls.filter(c=>c==='seek').length);
+  assert.equal(seeks,1,'recover once, then continue without seeking loops');
+  const measured = await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+  assert(Math.abs(expectedPosition()-measured)<.6,'recovery must return within 600ms of the shared live clock');
+  await page.locator('.video-settings summary').click();
+  const scrub=page.getByRole('slider',{name:'Seek in track'});
+  await scrub.focus();
+  await scrub.press('ArrowRight');
+  await page.waitForFunction(()=>window.__fakePlayer.state===1);
+  await page.waitForTimeout(1500);
+  assert.equal(commands.filter(c=>c.action==='seek').length,1,'only explicit room scrubbing publishes a seek');
+ } finally { await browser.close(); }
 });

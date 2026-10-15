@@ -83,7 +83,7 @@ const seed = {
 const next = {
   ...video,
   id: "next1234567",
-  title: "Syn Cole - Synthetic Next",
+  title: "Other Artist - Synthetic Next | Future House",
   artist: "NCS",
   duration: 200,
 };
@@ -110,7 +110,7 @@ test("own-room radio continues an empty queue and retains its shared clock", asy
   const { store, rooms, input } = setup();
   try {
     rooms.search = async (query) => {
-      assert.equal(query, 'Syn Cole audio -"Feel Good"');
+      assert.equal(query, 'future house audio -"Feel Good"');
       return [next];
     };
     const state = await rooms.control("TESTROOM", input);
@@ -458,4 +458,78 @@ test("undo preserves guest tracks added after the host cleared the queue", () =>
   } finally {
     store.close();
   }
+});
+
+test("radio falls back to a second artist search and can restart after the last track ended", async () => {
+  const { store, rooms, input } = setup();
+  try {
+    rooms.search = async () => [];
+    const ended = await rooms.control("TESTROOM", input);
+    assert.equal(ended.current, null);
+    const queries: string[] = [];
+    rooms.search = async query => { queries.push(query); return queries.length === 1 ? [] : [next]; };
+    const resumed = await rooms.control("TESTROOM", { ...input, action: "radio", enabled: true, version: ended.version });
+    assert.equal(resumed.current?.id, next.id);
+    assert.equal(resumed.playing, true);
+    assert.equal(queries.length, 2);
+    assert(queries.every(query => query.includes("future house")));
+  } finally { store.close(); }
+});
+
+test("radio queues the next song before the end, preserves the clock, and yields to manual choices", async () => {
+  const store = new Store(":memory:");
+  let now=10000, searches=0;
+  const rooms=new Rooms(store,()=>now);
+  rooms.import({code:"TESTROOM",name:"Preview radio",owner_hash:"a".repeat(64),state:{current:seed,queue:[],position:169,playing:true},version:1,updated_at:now,expires_at:100000});
+  rooms.search=async()=>{searches++;return [next];};
+  try {
+    await rooms.tick(); assert.equal(searches,0);
+    now+=1000;
+    await rooms.tick();
+    const prepared=rooms.snapshot("TESTROOM");
+    assert.equal(prepared.current?.id,seed.id);
+    assert.equal(prepared.position,170);
+    assert.equal(prepared.queue[0]?.id,next.id);
+    assert.equal(prepared.queue[0]?.radio,true);
+    await rooms.tick(); assert.equal(searches,1);
+    now+=30000;
+    await rooms.tick();
+    assert.equal(rooms.snapshot("TESTROOM").current?.id,next.id);
+    assert.equal(searches,1,'the next track is already resolved before transition');
+  } finally { rooms.dispose();store.close(); }
+});
+
+test("turning radio off removes its prepared track and a manual request takes priority", async()=>{
+ for(const action of ['radio','add']) {
+  const {rooms,store}=setup();
+  try {
+   const prepared=rooms.mutate('TESTROOM',{action:'radio-prefetch',version:1,actorHash:'a'.repeat(64)},next);
+   assert.equal(prepared.queue.length,1);
+   const manual={...video,id:'manual12345'};
+   const result=rooms.mutate('TESTROOM',{action,enabled:false,video:manual,version:prepared.version,actorHash:'a'.repeat(64)});
+   assert.deepEqual(result.queue.map(v=>v.id),action==='add'?[manual.id]:[]);
+  }finally{store.close();}
+ }
+});
+
+test("a removed radio suggestion is not immediately recommended again",async()=>{
+ const {rooms,store}=setup();
+ try {
+  const prepared=rooms.mutate('TESTROOM',{action:'radio-prefetch',version:1,actorHash:'a'.repeat(64)},next);
+  const removed=rooms.mutate('TESTROOM',{action:'remove',videoId:next.id,version:prepared.version,actorHash:'a'.repeat(64)});
+  rooms.search=async()=>[next];
+  const retried=await rooms.control('TESTROOM',{action:'radio-prefetch',version:removed.version,actorHash:'a'.repeat(64)});
+  assert.equal(retried.queue.length,0);
+ }finally{store.close();}
+});
+
+test("untagged radio seeds can learn genre from the same recording and cross artists",async()=>{
+ const plain={...seed,title:'Syn Cole - Feel Good'};
+ const queries:string[]=[];
+ const result=await roomRecommendation({current:plain,queue:[]},async query=>{
+  queries.push(query);
+  return queries.length===1?[seed]:[next];
+ });
+ assert.equal(result?.id,next.id);
+ assert(queries[1].startsWith('future house'));
 });

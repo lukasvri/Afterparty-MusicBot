@@ -16,19 +16,25 @@ export function playbackTarget(room:Room,receivedAt:number,now:number,offset=0){
 }
 export type SyncMode='stable'|'precise';
 export function readSyncMode(saved:string|null):SyncMode{return saved==='stable'?'stable':'precise';}
-export function syncRecoveryMs(mode:SyncMode){return mode==='precise'?1500:4000;}
+export function syncRecoveryMs(mode:SyncMode){return mode==='precise'?2000:4000;}
 export function roomPollMs(hidden:boolean){return hidden?4000:1000;}
 export function shouldCorrect(position:number,current:number,now:number,lastCorrection:number,force=false,mode:SyncMode='precise'){
- const interval=mode==='precise'?1400:6000;
- const tolerance=mode==='precise'?.18:1.5;
+ const interval=mode==='precise'?3000:6000;
+ const tolerance=mode==='precise'?.5:1.5;
  return Number.isFinite(current)&&(force||now-lastCorrection>=interval)&&Math.abs(position-current)>(force ? .15 : tolerance);
 }
 export function canCorrectPlayback(state:number,playing:boolean,now:number,settleUntil:number,force=false){
  // Seeking during buffering or immediately after recovery discards useful buffered data.
  return state!==3&&(force||!playing||now>=settleUntil);
 }
-export function isLocalSeek(previous:{position:number;at:number;playing:boolean}|null,position:number,now:number){
- if(!previous||!Number.isFinite(position)||now<previous.at)return false;
- const expected=previous.position+(previous.playing?(now-previous.at)/1000:0);
- return Math.abs(position-expected)>2;
+/** Reject delayed polls/commands after a newer snapshot of the same timeline. */
+export function isOlderSnapshot(previous:Room|null, next:Room){
+ return Boolean(previous && previous.code===next.code && previous.syncSource===next.syncSource && previous.syncEpoch===next.syncEpoch &&
+  (previous.version>next.version || (previous.version===next.version && previous.serverTime>next.serverTime)));
+}
+
+export function transportChanged(previous:Room|null,next:Room){
+ if(!previous || previous.code!==next.code || previous.current?.id!==next.current?.id || next.version<=previous.version)return false;
+ const predicted=previous.position+(previous.playing?elapsedPlayingMs(previous.serverTime,previous.startsAt,Math.max(0,next.serverTime-previous.serverTime))/1000:0);
+ return previous.playing!==next.playing || Math.abs(next.position-predicted)>.5;
 }

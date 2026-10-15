@@ -8,6 +8,7 @@ export type RoomVideo = {
   live: boolean;
   embeddable: boolean;
   requestedBy?: string;
+  radio?: boolean;
 };
 export type RoomTimeline = {
   code: string;

@@ -44,3 +44,24 @@ node scripts/party.browser.mjs
 ```
 
 It exercises private setup, first-song search, focus and scrolling, adding tracks, moderation, saved evenings, favorites, QR generation, TV mode, browser back navigation and mobile overflow. Automated audio and browser tests do not establish what people hear on a production Discord voice connection.
+
+## Playback recovery and radio (2.0.1)
+
+Tight synchronization remains the default. The player tolerates up to 0.5 seconds
+of iframe reporting jitter and requires sustained drift before an automatic seek.
+Room transport changes apply promptly; buffering never publishes a host seek.
+Use the shared seek slider under Video settings to seek the whole room. Native
+YouTube time observations are not treated as room commands.
+
+Radio searches explicit genre labels across artists, favouring artists not heard
+recently. It retries empty or failed searches. If the title has no reliable genre
+label, artist matching remains a conservative fallback. Publisher channels alone
+do not establish similarity.
+If no eligible track is available, the room retains its listening history and
+shows Retry radio. It does not fill the queue with unrelated search results.
+
+Radio prepares one visible suggestion during the final 30 seconds of a track.
+Manual queue additions replace that suggestion, and turning radio off removes it.
+Live performances, remakes, recreations and covers are excluded by title as well
+as provider flags. Search latency can still delay a suggestion when providers
+are unavailable.

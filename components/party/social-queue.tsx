@@ -20,27 +20,10 @@ export function SocialQueue({
   let unknown = Boolean(room.current?.live);
   return (
     <section className="social-queue" aria-label={t("Felles spelekø")}>
-      <div className="queue-summary">
-        <span>{room.queue.length} låtar i kø</span>
-        {room.isHost && (
-          <>
-            <button
-              disabled={busy || !room.queue.length}
-              onClick={() => {
-                if (
-                  confirm(t("Tømme køen? Du kan angre den siste køendringa."))
-                )
-                  onAction("clear");
-              }}
-            >
-              {t("Tøm")}
-            </button>
-            <button disabled={busy} onClick={() => onAction("undo")}>
-              {t("Angre køendring")}
-            </button>
-          </>
-        )}
-      </div>
+      {!room.current && room.radio !== false && !!room.history?.length && room.isHost && <div className="radio-retry">
+        <p>{t("Radioen fann ikkje neste låt.")}</p>
+        <button disabled={busy} onClick={() => onAction("radio", { enabled: true })}>{t("Prøv radio igjen")}</button>
+      </div>}
       {room.queue.map((v, i) => {
         const eta = unknown
           ? t("Etter direktesendinga")
@@ -53,7 +36,7 @@ export function SocialQueue({
             <div>
               <strong>{v.title}</strong>
               <small>
-                {v.requestedBy ?? t("Gjest")} · {eta}
+                {v.radio ? "Radio" : v.requestedBy ?? t("Gjest")} · {eta}
               </small>
             </div>
             <button
@@ -93,6 +76,28 @@ export function SocialQueue({
           Stem for neste låt · {room.skipVotes ?? 0}/3
         </button>
       )}
+      <details className="queue-options"><summary>{t("Køinnstillingar")}</summary>
+      <div className="queue-summary">
+
+        {room.isHost && (
+          <>
+            <button
+              disabled={busy || !room.queue.length}
+              onClick={() => {
+                if (
+                  confirm(t("Tømme køen? Du kan angre den siste køendringa."))
+                )
+                  onAction("clear");
+              }}
+            >
+              {t("Tøm")}
+            </button>
+            <button disabled={busy} onClick={() => onAction("undo")}>
+              {t("Angre køendring")}
+            </button>
+          </>
+        )}
+      </div>
       <p className="queue-help">
         {t(
           "Stemmer viser kva gjestene ønskjer. Verten bestemmer rekkjefølgja. Tre stemmer hoppar over låta. Éi stemme per nettlesar.",
@@ -111,6 +116,7 @@ export function SocialQueue({
           {t("Godkjenn gjestene sine låtønske")}
         </label>
       )}
+      </details>
       {!!room.requests?.length && (
         <div>
           <h3>{t("Ventande låtønske")}</h3>

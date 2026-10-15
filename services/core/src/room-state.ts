@@ -17,6 +17,8 @@ export type RoomPlayback = {
   votes?: Record<string, string[]>;
   skipVoters?: string[];
   undoQueue?: RoomVideo[];
+  radioRetryAt?: number;
+  radioExcluded?: string[];
 };
 export const guestActions = new Set(["add", "vote", "skip-vote"]);
 export function publicPlayback(state: RoomPlayback) {
@@ -52,13 +54,18 @@ export function finished(state: RoomPlayback, updatedAt: number, now: number) {
       state.current.duration,
   );
 }
+export function prefetchDue(state:RoomPlayback,updatedAt:number,now:number){
+ const remaining=(state.current?.duration??0)-state.position-Math.max(0,now-Math.max(updatedAt,state.startsAt??updatedAt))/1000;
+ return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && !state.queue.length && remaining>0 && remaining<=30 && now>=(state.radioRetryAt??0));
+}
 export function needsRecommendation(
   state: RoomPlayback,
   input: Record<string, unknown>,
 ) {
   const actor = String(input.participantHash ?? "");
   return (
-    input.action === "next" ||
+    input.action === "next" || input.action === "radio-prefetch" ||
+    (input.action === "radio" && input.enabled === true && !state.current) ||
     Boolean(
       input.action === "skip-vote" &&
       state.current &&
@@ -114,6 +121,7 @@ export function changeRoom(
     state.playbackKey = crypto.randomUUID();
     state.skipVoters = [];
     delete state.undoQueue;
+    delete state.radioRetryAt;
     if (state.current && state.votes) delete state.votes[state.current.id];
   };
   if (action === "add" || action === "play-video") {
@@ -121,6 +129,7 @@ export function changeRoom(
       throw new UserError("Videoen kan ikke spilles her. Velg en annen.", 422);
     const track = {
       ...video,
+      radio: false,
       requestedBy:
         String(input.displayName ?? "Gjest")
           .trim()
@@ -150,7 +159,10 @@ export function changeRoom(
         state.position = 0;
         state.playing = false;
         state.playbackKey = crypto.randomUUID();
-      } else state.queue.push(track);
+      } else {
+        state.queue = state.queue.filter(item => !item.radio);
+        state.queue.push(track);
+      }
     }
   } else if (action === "play" || action === "pause") {
     if (!state.current) throw new UserError("Legg til en låt først.");
@@ -167,11 +179,18 @@ export function changeRoom(
       0,
       Math.min(Math.max(0, state.current.duration - 1), input.position),
     );
+  } else if (action === "radio-prefetch") {
+    if (!state.queue.length && state.radio !== false && recommended) state.queue.push({ ...recommended, radio: true });
+    state.radioRetryAt = Number(input.now ?? 0) + 15000;
   } else if (action === "next") advance();
   else if (action === "radio" || action === "approval") {
     if (typeof input.enabled !== "boolean")
       throw new UserError("Velg på eller av.");
-    if (action === "radio") state.radio = input.enabled;
+    if (action === "radio") {
+      state.radio = input.enabled;
+      if (!input.enabled) state.queue = state.queue.filter(track => !track.radio);
+      if (input.enabled && !state.current && recommended) advance();
+    }
     else state.approvalRequired = input.enabled;
   } else if (action === "approve" || action === "reject") {
     const items = state.requests ?? [];
@@ -184,12 +203,20 @@ export function changeRoom(
         state.position = 0;
         state.playing = false;
         state.playbackKey = crypto.randomUUID();
-      } else state.queue.push(track);
+      } else {
+        state.queue = state.queue.filter(item => !item.radio);
+        state.queue.push(track);
+      }
     }
   } else if (action === "remove" || action === "clear" || action === "move") {
     state.undoQueue = [...state.queue];
-    if (action === "clear") state.queue = [];
-    else if (action === "remove") state.queue.splice(index(state.queue), 1);
+    if (action === "clear") {
+      state.radioExcluded = [...(state.radioExcluded ?? []), ...state.queue.filter(track => track.radio).map(track => track.id)].slice(-50);
+      state.queue = [];
+    } else if (action === "remove") {
+      const [removed] = state.queue.splice(index(state.queue), 1);
+      if (removed.radio) state.radioExcluded = [...(state.radioExcluded ?? []), removed.id].slice(-50);
+    }
     else {
       const from = index(state.queue),
         to = Number(input.to);
@@ -209,6 +236,7 @@ export function changeRoom(
       );
     state.queue = [...restored, ...additions];
     delete state.undoQueue;
+    delete state.radioRetryAt;
   } else if (action === "vote" || action === "skip-vote") {
     const actor = String(input.participantHash ?? "");
     if (!/^[a-f0-9]{64}$/.test(actor))

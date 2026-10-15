@@ -553,3 +553,21 @@ button:disabled {
 
 /* Author display rules must not override inactive surfaces. */
 .concert-shell [hidden] { display: none !important; }
+
+/* Keep secondary controls out of the listening surface. */
+.room-options { margin: 0 0 16px; }
+.room-options > summary, .queue-options > summary { cursor:pointer; color:#bfb5bd; font-size:12px; padding:10px 0; min-height:40px; }
+.room-options .party-tools { padding:16px; border:1px solid #ffffff20; border-radius:8px; align-items:center; }
+.queue-options { margin:12px 0; }
+.queue-options .queue-help { margin:12px 0; }
+.queue-summary { justify-content:flex-end; }
+.social-track > div, .track-details, .queue-current > div { min-width:0; }
+.social-track strong { display:block; overflow-wrap:anywhere; }
+.concert-shell .studio-heading { align-items:center; gap:20px; }
+.concert-shell .studio-heading h1 { line-height:1.15; }
+.concert-subtitle:empty { display:none; }
+.concert-shell .library-panel .empty-queue { padding:26px 16px; min-height:0; }
+.concert-shell .library-panel .empty-queue h3 { font-size:18px; margin-bottom:12px; }
+.video-settings .admin-seek { display:grid; gap:12px; width:100%; padding:12px 0; }
+.video-settings .admin-seek input { width:100%; }
+[data-tv="true"] .room-options { display:none; }

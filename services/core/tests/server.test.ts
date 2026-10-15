@@ -44,7 +44,7 @@ test('the authenticated own-room bridge advances radio without a Discord connect
  const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
  const providers=new Providers(store,{}),engine=new Engine(store,providers,sink),commands=new Commands(engine);
  const seed={id:'seed1234567',title:'Syn Cole - Feel Good | Future House | NCS - Copyright Free',artist:'NCS',image:'',duration:200,live:false,embeddable:true};
- let lookups=0;providers.search=async(query,count,musicOnly)=>{lookups++;assert.equal(query,'Syn Cole audio -"Feel Good"');assert.equal(count,20);assert.equal(musicOnly,true);return [{...seed,id:'next1234567',title:'Syn Cole - Synthetic next',entryId:'synthetic'}];};
+ let lookups=0;providers.search=async(query,count,musicOnly)=>{lookups++;assert.equal(query,'future house audio -"Feel Good"');assert.equal(count,20);assert.equal(musicOnly,true);return [{...seed,id:'next1234567',title:'Other Artist - Synthetic next | Future House',entryId:'synthetic'}];};
  const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',passwordHash:'',hosts:['127.0.0.1'],publicPort:0,adminPort:false,host:'127.0.0.1',privateState:()=>({})});
  const base=`http://127.0.0.1:${(servers.publicServer.address() as {port:number}).port}`;
  const request=(input:unknown)=>fetch(base+'/v1/rooms',{method:'POST',headers:{Authorization:'Bearer synthetic-key','Content-Type':'application/json'},body:JSON.stringify(input)});

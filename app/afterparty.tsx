@@ -1,6 +1,7 @@
 "use client";
 import { loadYoutube, type Player } from "@/lib/youtube-player";
 import { headers, request } from "@/lib/browser-api";
+import { AdminSeek } from "@/components/party/admin-seek";
 import { StartEvening } from "@/components/party/start-evening";
 import { RoomDialog } from "@/components/party/room-dialog";
 import { RoomSharing } from "@/components/party/room-sharing";
@@ -45,7 +46,8 @@ import { useImmersiveControls } from "@/hooks/use-immersive-controls";
 import { applyAudioPreferences } from "@/lib/audio-preferences";
 import {
   canCorrectPlayback,
-  isLocalSeek,
+  isOlderSnapshot,
+  transportChanged,
   compensateDelivery,
   playbackTarget,
   shouldCorrect,
@@ -152,14 +154,8 @@ export default function Afterparty() {
     settleUntil = useRef(0),
     locallyPaused = useRef(false),
     audioWriteUntil = useRef(0),
-    nativeTransportPending = useRef(false),
-    playerWriteUntil = useRef(0),
-    playerTransportWrite = useRef(false),
-    localPosition = useRef<{
-      position: number;
-      at: number;
-      playing: boolean;
-    } | null>(null);
+    transportChangedRef = useRef(false),
+    correctionCandidate = useRef<number | null>(null);
   useEffect(() => {
     const mode = readSyncMode(storage.get("afterparty-sync-mode-v1"));
     syncModeRef.current = mode;
@@ -177,7 +173,7 @@ export default function Afterparty() {
     bufferStarted.current = null;
     settleUntil.current = 0;
     locallyPaused.current = false;
-    localPosition.current = null;
+
     setQuality("");
     setConsent(true);
     setPlayerEpoch((epoch) => epoch + 1);
@@ -211,13 +207,8 @@ export default function Afterparty() {
         isPublic: next.isPublic ?? previous.isPublic,
         isOwner: next.isOwner ?? previous.isOwner,
       };
-    if (
-      previous?.code === next.code &&
-      previous.syncSource === next.syncSource &&
-      previous.syncEpoch === next.syncEpoch &&
-      previous.version > next.version
-    )
-      return;
+    if (isOlderSnapshot(previous, next)) return;
+    if (transportChanged(previous, next)) transportChangedRef.current = true;
     if (
       previous?.code === next.code &&
       next.version > previous.version &&
@@ -280,7 +271,7 @@ export default function Afterparty() {
     (next) => {
       const previous = roomRef.current;
       if (activeCode.current === next.code)
-        accept({ ...next, isHost: previous?.isHost ?? false });
+        accept({ ...next, viewers: previous?.viewers ?? next.viewers, isHost: previous?.isHost ?? false });
     },
   );
   const liveFresh = realtime.fresh;
@@ -430,7 +421,7 @@ export default function Afterparty() {
           generation === pollGeneration.current &&
           activeCode.current === current.code
         ) {
-          accept(data.room);
+          accept({ ...data.room, viewers: roomRef.current?.viewers ?? data.room.viewers });
           if (name === "add")
             announce(
               data.room.approvalRequired && !data.room.isHost
@@ -541,7 +532,7 @@ export default function Afterparty() {
                   storage.get("afterparty-display-name") ?? t("Gjest"),
               }),
             });
-            accept(data.room);
+            accept({ ...data.room, viewers: roomRef.current?.viewers ?? data.room.viewers });
           }
         } catch (e) {
           setError("Settet er delvis lagt til. " + (e as Error).message);
@@ -776,8 +767,7 @@ export default function Afterparty() {
       else void action("play");
     }
     if (playerReady.current && player.current && r.playing) {
-      playerTransportWrite.current = true;
-      playerWriteUntil.current = performance.now() + 1000;
+
       applyAudioPreferences(player.current, audio.current.current);
       syncRef.current(true);
       player.current.playVideo();
@@ -836,7 +826,7 @@ export default function Afterparty() {
       if (!document.hidden) {
         clearTimeout(timer);
         void poll();
-        syncRef.current(true);
+        syncRef.current();
       }
     };
     document.addEventListener("visibilitychange", focus);
@@ -958,19 +948,6 @@ export default function Afterparty() {
             },
             onStateChange: (event: { data: number }) => {
               if (disposed) return;
-              const written = playerTransportWrite.current,
-                r0 = roomRef.current,
-                expected = r0
-                  ? playbackTarget(r0, received.current, performance.now())
-                      .playing
-                  : false;
-              if (
-                written &&
-                ((event.data === 1 && expected) ||
-                  ([2, 5].includes(event.data) && !expected))
-              )
-                playerTransportWrite.current = false;
-              observeLocalPosition();
               if (event.data === 3) {
                 bufferStarted.current ??= performance.now();
                 setSyncStatus("Bufrer video");
@@ -1015,30 +992,6 @@ export default function Afterparty() {
       bufferStarted.current = null;
     };
   }, [consent, playerEpoch]);
-  function observeLocalPosition() {
-    const p = player.current,
-      r = roomRef.current;
-    if (!p || !playerReady.current) return;
-    const now = performance.now(),
-      position = p.getCurrentTime(),
-      state = p.getPlayerState();
-    if (
-      r?.isHost &&
-      r.current &&
-      !r.current.live &&
-      !playerTransportWrite.current &&
-      now >= playerWriteUntil.current &&
-      isLocalSeek(localPosition.current, position, now)
-    ) {
-      lastCorrection.current = now;
-      nativeTransportPending.current = true;
-      void actionRef.current("seek", { position }).finally(() => {
-        nativeTransportPending.current = false;
-        syncRef.current();
-      });
-    }
-    localPosition.current = { position, at: now, playing: state === 1 };
-  }
   function recordPlayback() {
     const r = roomRef.current;
     if (r?.isHost && r.playing && r.current) {
@@ -1076,6 +1029,7 @@ export default function Afterparty() {
       return;
     }
     if (playerError) return;
+    force ||= transportChangedRef.current;
     const key = `${r.code}:${r.playbackKey ?? r.current.id}`;
     if (lastEnded.current === key) {
       if (p.getPlayerState() === 1) p.pauseVideo();
@@ -1084,10 +1038,10 @@ export default function Afterparty() {
     }
     if (loadedId.current !== key) {
       loadedId.current = key;
+      transportChangedRef.current = false;
+      correctionCandidate.current = null;
       locallyPaused.current = false;
-      localPosition.current = null;
-      playerTransportWrite.current = true;
-      playerWriteUntil.current = now + 2000;
+
       lastCorrection.current = now;
       settleUntil.current = now + syncRecoveryMs(syncModeRef.current);
       bufferStarted.current = null;
@@ -1112,7 +1066,6 @@ export default function Afterparty() {
       setSyncStatus("Laster video");
       return;
     }
-    observeLocalPosition();
     if (temporaryMute.current && !p.isMuted()) {
       temporaryMute.current = false;
       setAutoplayMuted(false);
@@ -1120,6 +1073,7 @@ export default function Afterparty() {
     if (now >= audioWriteUntil.current && !temporaryMute.current)
       audio.fromPlayer(p.getVolume(), p.isMuted());
     const state = p.getPlayerState();
+    if (state !== 3) transportChangedRef.current = false;
     if (state === 1) recordPlayback();
     const currentTime = p.getCurrentTime();
     setSyncDrift(
@@ -1127,7 +1081,14 @@ export default function Afterparty() {
         ? null
         : Math.round((currentTime - target.position) * 10) / 10,
     );
+    // Require persistent drift; a single delayed iframe sample is not a seek.
+    const drift = Math.abs(currentTime - target.position);
+    if (state !== 1 || drift < (syncModeRef.current === "stable" ? 1.5 : .5))
+      correctionCandidate.current = null;
+    else correctionCandidate.current ??= now;
+    const persistent = correctionCandidate.current !== null && now - correctionCandidate.current >= 1000;
     if (
+      (force || !target.playing || persistent) &&
       (!locallyPaused.current || force) &&
       canCorrectPlayback(
         state,
@@ -1146,8 +1107,9 @@ export default function Afterparty() {
       ) &&
       !r.current.live
     ) {
-      playerTransportWrite.current = true;
-      playerWriteUntil.current = now + 2000;
+
+      correctionCandidate.current = null;
+      settleUntil.current = now + syncRecoveryMs(syncModeRef.current);
       p.seekTo(target.position, true);
       lastCorrection.current = now;
       setSyncStatus("Justerer synk");
@@ -1173,13 +1135,11 @@ export default function Afterparty() {
       !locallyPaused.current &&
       ![1, 3].includes(state)
     ) {
-      playerTransportWrite.current = true;
-      playerWriteUntil.current = now + 1000;
+
       p.playVideo();
     }
     if (!target.playing && state === 1) {
-      playerTransportWrite.current = true;
-      playerWriteUntil.current = now + 1000;
+
       p.pauseVideo();
     }
   }
@@ -1270,7 +1230,12 @@ export default function Afterparty() {
       onRetry={reloadPlayer}
       onSync={() => syncRef.current(true)}
     >
-      {
+      {room?.isHost && !discordMode && !current.live && <AdminSeek
+        trackId={room.playbackKey ?? current.id} position={room.position}
+        duration={current.duration} playing={room.playing} disabled={pending}
+        onSeek={(position) => void action("seek", { position })}
+      />}
+      {discordMode && (
         <div className="sync-offset-tools">
           <label htmlFor="sync-offset">
             {t("Finjuster video")}{" "}
@@ -1304,7 +1269,7 @@ export default function Afterparty() {
             {t("Video foran lyden? Flytt til venstre.")}
           </small>
         </div>
-      }
+      )}
     </PlayerSettings>
   );
   return (
@@ -1379,7 +1344,7 @@ export default function Afterparty() {
                     )
                   : discordMode || !room
                     ? t("Musikken i Discord. Videoen her. Same augeblikk.")
-                    : t("Eitt rom. Ei kø. Musikk de deler.")}
+                    : null}
               </p>
             </div>
             <div className="room-switch" hidden={directoryOpen}>
@@ -1390,12 +1355,20 @@ export default function Afterparty() {
                 </span>
                 <span className={`status-dot ${botOnline ? "live" : ""}`} />
               </span>
-              {room && !discordMode && (
-                <span className="room-label">
-                  {room.isHost ? t("Ditt rom") : t("Felles rom")}
-                </span>
-              )}
-              {room?.isHost && !discordMode && (
+              <button
+                className="button subtle share-button"
+                disabled={!room}
+                aria-label={t("Del rommet")}
+                title={t("Del rommet")}
+                onClick={share}
+              >
+                <Copy size={17} />
+                {t("Inviter")}
+              </button>
+            </div>
+          </section>
+          {!directoryOpen && room && (
+            <details className="room-options"><summary>{t("Rominnstillingar")}</summary><div className="party-tools">              {room?.isHost && !discordMode && (
                 <button
                   className="button subtle"
                   aria-pressed={room.radio !== false}
@@ -1421,20 +1394,7 @@ export default function Afterparty() {
                   {t("Vis i Åpne rom")}
                 </label>
               )}
-              <button
-                className="button subtle share-button"
-                disabled={!room}
-                aria-label={t("Del rommet")}
-                title={t("Del rommet")}
-                onClick={share}
-              >
-                <Copy size={17} />
-                {t("Inviter")}
-              </button>
-            </div>
-          </section>
-          {!directoryOpen && room && (
-            <div className="party-tools">
+
               <label>
                 {t("Kallenamnet ditt")}
                 <input
@@ -1447,27 +1407,10 @@ export default function Afterparty() {
                   }}
                 />
               </label>
-              <button
-                className="button subtle"
-                onClick={() => setPanel("library")}
-              >
-                {t("Kveldane våre")}
-              </button>
               <button className="button subtle" onClick={toggleTV}>
                 {tv ? t("Avslutt TV-modus") : t("TV-modus")}
               </button>
-              <span>
-                {discordMode
-                  ? t("Lyden kjem frå Discord")
-                  : t("Lyd og video i nettlesaren")}{" "}
-                ·{" "}
-                {room.isOwner
-                  ? t("Eigar")
-                  : room.isHost
-                    ? t("Medvert")
-                    : t("Gjest")}
-              </span>
-            </div>
+            </div></details>
           )}
           {(sharing || tv) && room && (
             <RoomSharing
@@ -1963,19 +1906,6 @@ export default function Afterparty() {
                     </small>
                   </div>
                   <div className="queue-content">
-                    {current && (
-                      <div className="queue-current">
-                        <img src={current.image} alt="" />
-                        <div>
-                          <span>
-                            <AudioLines size={13} />{" "}
-                            {room?.playing ? t("Spelar no") : t("På pause")}
-                          </span>
-                          <strong>{current.title}</strong>
-                          <small>{current.artist}</small>
-                        </div>
-                      </div>
-                    )}
                     {room && room.mode !== "discord" ? (
                       <SocialQueue
                         room={room}
@@ -1995,19 +1925,7 @@ export default function Afterparty() {
                     )}
                     {!room?.queue.length && (
                       <div className="empty-queue">
-                        <div className="empty-queue-icon" aria-hidden="true">
-                          <AudioLines size={36} strokeWidth={1.7} />
-                        </div>
-                        <h3>
-                          {current
-                            ? t("Kva skal spele etterpå?")
-                            : t("Bygg kveldens sett")}
-                        </h3>
-                        <p>
-                          {t(
-                            "Finn ei låt. Legg henne i køen. Gjer kvelden til dykkar.",
-                          )}
-                        </p>
+                        <h3>{t("Køa er tom")}</h3>
                         <button
                           className="text-button"
                           onClick={() => setPanel("music")}

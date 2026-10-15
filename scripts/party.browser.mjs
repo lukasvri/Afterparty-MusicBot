@@ -94,7 +94,7 @@ try {
   await page.goto(base);
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.getByRole("heading", { name: /Gode vener/ }).waitFor();
+    await page.getByRole("heading", { name: "Afterparty", exact:true }).waitFor();
     const geometry = await page.locator(".welcome-art").evaluate(el => {
       const frame = el.getBoundingClientRect();
       const head = el.querySelector(".performer-head").getBoundingClientRect();
@@ -107,7 +107,7 @@ try {
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
   }
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Your people, your music: Afterparty v2" }).waitFor();
+  await page.getByRole("heading", { name: "Stable live playback and a quieter room" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -138,6 +138,7 @@ try {
     .getByRole("button", { name: /Legg.*Synthetic evening song/ })
     .click();
   await page.getByRole("tab", { name: "Kø" }).click();
+  await page.locator(".queue-options summary").click();
   await page
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
     .click();
@@ -162,6 +163,7 @@ try {
       })
       .getAttribute("aria-pressed")) === "true",
   );
+  await page.locator(".room-options summary").click();
   await page.getByRole("button", { name: "TV-modus", exact: true }).click();
   assert(new URL(page.url()).searchParams.get("tv") === "1");
   await page.getByAltText("QR-kode for å bli med i rommet").waitFor();

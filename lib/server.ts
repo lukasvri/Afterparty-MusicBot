@@ -9,6 +9,7 @@ import {
   changeRoom,
   needsRecommendation,
   finished,
+  prefetchDue,
   publicPlayback,
   guestActions,
 } from "../services/core/src/room-state.ts";
@@ -398,7 +399,8 @@ export async function publicRoom(
       fail(503, "Rommet venter på sanntidstjenesten. Prøv igjen.");
     }
   }
-  if (!discord && finished(state, value.updated_at, now)) {
+  if (!discord && (finished(state, value.updated_at, now) || prefetchDue(state, value.updated_at, now))) {
+    const action = finished(state, value.updated_at, now) ? "next" : "radio-prefetch";
     let recommended: Video | null = null;
     try {
       recommended = await roomRecommendation(
@@ -410,9 +412,9 @@ export async function publicRoom(
     }
     const next = changeRoom(
       state,
-      { action: "next" },
+      { action, now: Date.now() },
       true,
-      state.current?.duration ?? 0,
+      state.position + (state.playing ? Math.max(0, Date.now() - Math.max(value.updated_at, state.startsAt ?? value.updated_at)) / 1000 : 0),
       recommended,
     );
     const saved = { ...state, ...next };
@@ -673,7 +675,7 @@ export async function mutate(
   let recommended: Video | null = null;
   if (needsRecommendation(state, command))
     recommended = await roomRecommendation(
-      state,
+      { ...state, ...(command.action === "radio" ? { radio: command.enabled === true } : {}) },
       async (query) => (await search(request, query)).videos,
     );
   const now = Date.now(),
