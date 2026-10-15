@@ -61,6 +61,7 @@ def extract_archive(archive, destination):
             raise DeployError('Archive member escapes its destination.')
         if member.isdir():
             target.mkdir(parents=True, exist_ok=True)
+            target.chmod(member.mode & 0o777)
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             with archive.extractfile(member) as source, target.open('wb') as output:
@@ -396,7 +397,20 @@ class Deployer:
         self.new_image = 'gutta-krutt-core:git-' + self.target[:12]
         self.emit('building versioned production image')
         self.command(self.docker + ['build', '--target', 'final', '--label', 'org.opencontainers.image.revision=' + self.target, '-t', self.new_image, str(source / 'services/core')])
+        self.validate_runtime_image()
         self.new_image_id = self.command(self.docker + ['image', 'inspect', '--format', '{{.Id}}', self.new_image], capture=True)
+
+    def validate_runtime_image(self):
+        # Build-stage tests run as root. The final image must also work as its
+        # unprivileged runtime user, including when local source modes differ.
+        script = """import {readdirSync,readFileSync} from 'node:fs';
+if(process.getuid()===0)throw Error('Core must run without root.');
+function check(dir){for(const item of readdirSync(dir,{withFileTypes:true})){const path=dir+'/'+item.name;if(item.isDirectory())check(path);else if(item.isFile())readFileSync(path);}}
+check('/app/src');await import('/app/src/data-import.ts');
+console.log('Unprivileged runtime source and imports verified.');"""
+        self.command(self.docker + ['run', '--rm', '--network', 'none', '--read-only',
+                     '--cpus=1', '--memory=256m', '--pids-limit=64', '--entrypoint',
+                     'node', self.new_image, '--input-type=module', '-e', script], timeout=30)
 
     def wait_ready(self):
         deadline = time.monotonic() + self.config.get('health_timeout_seconds', 150)

@@ -29,6 +29,27 @@ def value(path):
 
 
 class Files(unittest.TestCase):
+    def test_archive_directory_modes_survive_private_process_umask(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            payload = io.BytesIO()
+            with tarfile.open(fileobj=payload, mode='w') as saved:
+                directory = tarfile.TarInfo('src'); directory.type = tarfile.DIRTYPE; directory.mode = 0o755
+                saved.addfile(directory)
+                source = tarfile.TarInfo('src/example.ts'); source.mode = 0o644; source.size = 1
+                saved.addfile(source, io.BytesIO(b'x'))
+                private = tarfile.TarInfo('private'); private.type = tarfile.DIRTYPE; private.mode = 0o700
+                saved.addfile(private)
+            payload.seek(0)
+            previous = os.umask(0o077)
+            try:
+                with tarfile.open(fileobj=payload) as saved:
+                    deploy.extract_archive(saved, Path(temporary))
+            finally:
+                os.umask(previous)
+            self.assertEqual((Path(temporary) / 'src').stat().st_mode & 0o777, 0o755)
+            self.assertEqual((Path(temporary) / 'src/example.ts').stat().st_mode & 0o777, 0o644)
+            self.assertEqual((Path(temporary) / 'private').stat().st_mode & 0o777, 0o700)
+
     def test_image_change_preserves_private_configuration(self):
         original = 'services:\n  core:\n    image: old:1\n    env_file: /private/.env\n    volumes:\n      - /private/data:/data\n'
         changed = deploy.image_config(original, 'core:git-123')
