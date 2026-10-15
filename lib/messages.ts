@@ -1,5 +1,9 @@
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Slå på lyd":["Slå på lyd","Enable sound"],
+ "Radio på":["Radio på","Radio on"],
+ "Radio av":["Radio av","Radio off"],
+ "Velg radio på eller av.":["Velg radio på eller av.","Choose radio on or off."],
  "Radioen fant ingen nye sanger. Prøv en annen låt.":["Radioen fant ingen nye sanger. Prøv en annen låt.","Radio found no new songs. Try a different track."],
  "Radioen fant ikke neste sang. Prøv /play.":["Radioen fant ikke neste sang. Prøv /play.","Radio could not find the next song. Try /play."],
  "Avspillingskontroller":["Avspillingskontroller","Playback controls"],
