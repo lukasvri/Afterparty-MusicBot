@@ -15,7 +15,7 @@ versions. Never rename or renumber those entries or move existing tags.
 
 For a release containing several changes, use the largest applicable increment.
 Start with `1.0.0`; do not reinterpret historical V36 as `36.0.0`.
-The tested `nextVersion` helper in `scripts/releases.mjs` encodes these rules.
+The tested `nextVersion` helper in `scripts/releases.ts` encodes these rules.
 
 ## Prepare a release in a pull request
 
@@ -33,7 +33,7 @@ The tested `nextVersion` helper in `scripts/releases.mjs` encodes these rules.
    state that dependency and retain its changes. Do not publish a release as
    though the branch were deployed.
 6. Generate the exact GitHub body with
-   `node scripts/releases.mjs --notes > /tmp/afterparty-release-notes.md`.
+   `node scripts/releases.ts --notes > /tmp/afterparty-release-notes.md`.
    Do not use `npm run` output redirected to a file: npm adds script headers.
 7. Create a **draft** GitHub Release using the new `vX.Y.Z` tag name, the exact
    tested branch commit as its target and the generated notes as its body.

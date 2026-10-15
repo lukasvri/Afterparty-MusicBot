@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import path from "node:path";
-import { projectRoot } from "./sites-env.mjs";
-import { readExecutionProfile } from "./execution-profile.mjs";
+import { projectRoot } from "./sites-env.ts";
+import { readExecutionProfile } from "./execution-profile.ts";
 import { runNpmInstall } from "./npm-install.mjs";
 
 if (!process.env.npm_execpath) {

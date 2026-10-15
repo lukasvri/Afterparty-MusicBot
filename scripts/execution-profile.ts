@@ -6,7 +6,7 @@ export function readExecutionProfile() {
     settings = JSON.parse(readFileSync(new URL("../.sites-runtime/execution-profile.json", import.meta.url), "utf8"));
   } catch (error) {
     // Clean clones and remote builds have no checkout-local selection.
-    if (error.code === "ENOENT") return "portable";
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return "portable";
     throw error;
   }
   if (!["managed-linux", "portable"].includes(settings?.executionProfile)) {

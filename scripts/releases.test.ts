@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {releases,nextVersion,releaseNotes,changelog,validate,validateReleaseHistory} from './releases.mjs';
+import {releases,nextVersion,releaseNotes,changelog,validate,validateReleaseHistory} from './releases.ts';
 import {legacyUpdates} from '../lib/legacy-updates.ts';
 
 test('version increments reset only the subordinate components',()=>{
@@ -37,7 +37,7 @@ test('validation rejects version drift and duplicate releases',()=>{
  validate();
 });
 
-const history=versions=>versions.map(version=>({version,date:'2026-10-15',title:'Test release',items:['Synthetic release notes']}));
+const history=(versions: string[])=>versions.map(version=>({version,date:'2026-10-15',title:'Test release',items:['Synthetic release notes']}));
 test('release history accepts single entries and consecutive semantic increments',()=>{
  for(const versions of [
   ['1.0.0'],

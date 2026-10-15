@@ -3,22 +3,22 @@
   "version": "2.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=24.17.0"
   },
   "scripts": {
     "install:ci": "node scripts/install-ci.mjs",
-    "dev": "node scripts/run-framework.mjs dev",
-    "build": "node scripts/run-framework.mjs build",
-    "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
+    "dev": "node scripts/run-framework.ts dev",
+    "build": "node scripts/run-framework.ts build",
+    "start": "node --import ./scripts/sites-env.ts ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "test:fullscreen": "node --experimental-strip-types scripts/fullscreen.test.mjs",
     "setup:cloud": "bash scripts/cloud.sh setup",
     "check:all": "bash scripts/cloud.sh check",
-    "project": "node scripts/project.mjs",
-    "release:check": "node scripts/releases.mjs --check",
-    "release:notes": "node scripts/releases.mjs --notes",
-    "release:changelog": "node scripts/releases.mjs --write",
+    "project": "node scripts/project.ts",
+    "release:check": "node scripts/releases.ts --check",
+    "release:notes": "node scripts/releases.ts --notes",
+    "release:changelog": "node scripts/releases.ts --write",
     "test:party": "node scripts/party.browser.mjs"
   },
   "dependencies": {
