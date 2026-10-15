@@ -75,8 +75,8 @@ export class ConcertQueue {
       s = this.read();
     if (!s.approvalRequired) return false;
     const known = new Set([
-      e.current?.id,
-      ...e.queue.map((t) => t.id),
+      e.current?.concert ? e.current.id : undefined,
+      ...e.queue.filter((t) => t.concert).map((t) => t.id),
       ...s.requests.map((t) => t.id),
     ]);
     const fresh = tracks.filter((t) => {

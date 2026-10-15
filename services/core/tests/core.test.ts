@@ -186,3 +186,39 @@ test('audio buffering is distinct from pause and recovery retries the same consu
  const attempts:number[]=[];e.startTrack=async(_track,offset)=>{attempts.push(offset??0);};let skipped=0;e.skip=async()=>{skipped++;};await e.recoverAudio();await e.recoverAudio();await e.recoverAudio();assert.deepEqual(attempts,[22,22]);assert.equal(skipped,1);assert.equal(e.diagnostics.snapshot().events.at(-1)?.reason,'recovery-exhausted');
  }finally{t.close();}
 });
+
+for (const consumed of [9980, 10000, 12000]) {
+ test(`crossfade recovery pairs track and offset at consumed ${consumed} ms and consumes only the active entry`,async()=>{
+  const t=setup();try{
+   const e=t.engine,outgoing=track('outgoing000'),incoming={...track('incoming000'),offset:7},later=track('later000000');
+   e.connected=true;e.paused=true;e.current=outgoing;e.queue=[incoming,later];
+   e.segments=[{track:outgoing,startFrame:0,offset:30},{track:incoming,startFrame:500,offset:7}];t.sink.ms=consumed;
+   const expected=consumed<10000?outgoing:incoming;
+   const pending=deferred<Prepared>();e.prepare=(song,offset)=>{
+    assert.equal(song.entryId,expected.entryId);
+    assert(Math.abs(offset-(consumed<10000?39.98:7+(consumed-10000)/1000))<1e-9);
+    return pending.promise;
+   };
+   const recovering=e.recoverAudio();
+   // Real startTrack has run up to prepare, before any clock tick.
+   assert.equal(e.current?.entryId,expected.entryId);
+   assert.deepEqual(e.queue.map(v=>v.entryId),consumed<10000?[incoming.entryId,later.entryId]:[later.entryId]);
+   assert.deepEqual(t.store.get<Track[]>('queue',[]).map(v=>v.entryId),e.queue.map(v=>v.entryId));
+   assert.equal(e.recoveryEntry,expected.entryId);assert.equal(e.recoveryAttempts,1);
+   pending.resolve({track:expected,decoder:{frame:async()=>null,stop(){}} as PcmDecoder});await recovering;
+   e.tick();assert.equal(e.paused,true);
+   assert(!e.queue.some(v=>v.entryId===e.current?.entryId));
+  }finally{t.close();}
+ });
+}
+
+test('exhausted crossfade recovery skips the consumed incoming entry, not back into it',async()=>{
+ const t=setup();try{
+  const e=t.engine,outgoing=track('outgoing000'),incoming=track('incoming000'),later=track('later000000');
+  e.connected=true;e.current=outgoing;e.queue=[incoming,later];e.segments=[{track:outgoing,startFrame:0,offset:30},{track:incoming,startFrame:500,offset:7}];t.sink.ms=12000;
+  e.recoveryEntry=incoming.entryId;e.recoveryAttempts=2;
+  const starts:Track[]=[];e.startTrack=async song=>{starts.push(song);};
+  await e.recoverAudio();assert.deepEqual(starts.map(v=>v.entryId),[later.entryId]);assert.equal(e.queue.length,0);
+  assert.equal(e.diagnostics.snapshot().events.at(-1)?.reason,'recovery-exhausted');
+ }finally{t.close();}
+});
