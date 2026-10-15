@@ -50,10 +50,10 @@ export function AdminSeek({
   };
   return (
     <label className="admin-seek">
-      Spoling · {time(value)} / {time(duration)}
+      {t("Spoling")} · {time(value)} / {time(duration)}
       <input
         type="range"
-        aria-label="Spol musikken"
+        aria-label={t("Spol musikken")}
         min={0}
         max={Math.max(0, duration - 1)}
         value={value}

@@ -4,6 +4,17 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.0.1: Stable live playback and a quieter room
+
+2026-10-15
+
+- Video buffering and iframe time updates no longer publish accidental host seek commands. Explicit shared seeking is available in video settings.
+- Tight sync remains the default. Small reporting jitter is ignored, sustained drift is corrected, and intentional room seeks are applied promptly. Older snapshots cannot rewind the same room revision.
+- Live playback events preserve the website participant count instead of replacing it with the Core placeholder.
+- Room and queue options are collapsed by default. Duplicate track cards, extra toolbars and promotional copy have been removed.
+- Radio uses explicit genre labels to find similar tracks across artists and favours artist variety. Empty or failed searches get a second attempt, and radio can restart from listening history. Without genre metadata it falls back to artist matching, never an arbitrary result from the same upload channel.
+- Radio prepares a visible next track during the final 30 seconds, rejects live remakes and covers, and gives manually queued songs priority. Turning radio off removes its prepared suggestion.
+
 ## v2.0.0: Your people, your music: Afterparty v2
 
 2026-10-15

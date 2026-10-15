@@ -32,8 +32,7 @@ test('all historical entries retain their labels, dates and content in the chang
  }
 });
 test('validation rejects version drift and duplicate releases',()=>{
- const original=releases[0].version;
- try{releases[0].version='1.0.1';assert.throws(validate,/Version mismatch/);}finally{releases[0].version=original;}
+ try{releases.unshift({...releases[0],version:nextVersion(releases[0].version,'patch')});assert.throws(validate,/Version mismatch/);}finally{releases.shift();}
  try{releases.push(releases[0]);assert.throws(validate,/Duplicate/);}finally{releases.pop();}
  validate();
 });

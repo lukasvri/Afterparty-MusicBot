@@ -69,7 +69,7 @@ const seed = {
   live: false,
   embeddable: true,
 };
-const next = { ...seed, id: "next1234567", title: "Syn Cole - Synthetic next" };
+const next = { ...seed, id: "next1234567", title: "Other Artist - Synthetic next | Future House" };
 function fixture() {
   const sqlite = new DatabaseSync(":memory:");
   for (const file of readdirSync(new URL("../drizzle/", import.meta.url))

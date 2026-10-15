@@ -1,5 +1,14 @@
 /** English copy for the party workflows; Norwegian source keys remain stable. */
 export const partyMessages: Record<string, string> = {
+  "Radioen fann ikkje neste låt.": "Radio could not find the next track.",
+  "Prøv radio igjen": "Retry radio",
+  "Spoling": "Seek",
+  "Spol musikken": "Seek track",
+  "Rominnstillingar": "Room settings",
+  "Køinnstillingar": "Queue settings",
+  "Køa er tom": "Queue is empty",
+  "Tett synk": "Tighter sync",
+  "Stabil avspilling (standard)": "Stable playback (default)",
   "Lagre kveldshistorikken": "Save evening history",
   "Kveldane våre": "Our evenings",
   Kveldar: "Evenings",

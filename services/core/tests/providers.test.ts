@@ -109,7 +109,7 @@ test('radio search survives an unavailable candidate in the no-key extractor fal
    if(args.some(arg=>arg.startsWith('ytsearch')))return {entries:[{id:'next1234567'},{id:'other123456'},{id:'blocked1234'}]};
    const id=new URL(args.at(-1)!).searchParams.get('v');
    if(id==='blocked1234')throw Error('Video unavailable');
-   return {title:'Syn Cole - Synthetic '+id,artist:'Syn Cole',duration:200,playable_in_embed:true};
+   return {title:'Other Artist - Synthetic '+id+' | Future House',artist:'Syn Cole',duration:200,playable_in_embed:true};
   };
   const next=await p.radio(seed,[]);assert.equal(next?.id,'next1234567');assert.equal(next?.embeddable,true);
   await assert.rejects(p.video(['blocked1234']),/Video unavailable/);

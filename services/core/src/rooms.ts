@@ -12,8 +12,10 @@ import {
 import { roomRecommendation } from "./room-radio.ts";
 import {
   changeRoom,
+  guestActions,
   needsRecommendation,
   finished,
+  prefetchDue,
   publicPlayback,
   type RoomPlayback,
 } from "./room-state.ts";
@@ -149,11 +151,11 @@ export class Rooms extends EventEmitter {
     const room = this.load(code);
     if (!needsRecommendation(room.state, input) || !this.search)
       return this.mutate(code, input);
-    if (input.action === "next" && input.actorHash !== room.ownerHash)
+    if (!guestActions.has(String(input.action)) && input.actorHash !== room.ownerHash)
       throw new UserError("Bare verten kan styre avspillingen.", 403);
     if (input.version !== room.version)
       throw new UserError("Rommet er endret. Prøv igjen.", 409);
-    const recommended = await roomRecommendation(room.state, this.search);
+    const recommended = await roomRecommendation({ ...room.state, ...(input.action === "radio" ? { radio: input.enabled === true } : {}) }, this.search);
     if (this.stopped) throw new UserError("Romtjenesten starter på nytt.", 503);
     return this.mutate(code, input, recommended);
   }
@@ -169,7 +171,7 @@ export class Rooms extends EventEmitter {
       previousKey = room.state.playbackKey;
     const state = changeRoom(
       room.state,
-      input,
+      { ...input, now },
       input.actorHash === room.ownerHash,
       this.position(room, now),
       recommended,
@@ -200,12 +202,12 @@ export class Rooms extends EventEmitter {
         const room = JSON.parse(String(value.data)) as Saved;
         if (
           this.advancing.has(room.code) ||
-          !finished(room.state, room.updatedAt, this.now())
+          !(finished(room.state, room.updatedAt, this.now()) || prefetchDue(room.state, room.updatedAt, this.now()))
         )
           return;
         this.advancing.add(room.code);
         const input = {
-          action: "next",
+          action: finished(room.state, room.updatedAt, this.now()) ? "next" : "radio-prefetch",
           actorHash: room.ownerHash,
           version: room.version,
         };
