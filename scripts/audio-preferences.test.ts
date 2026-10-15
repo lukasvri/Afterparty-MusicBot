@@ -27,7 +27,7 @@ test('malformed or invalid preferences use a safe valid fallback',()=>{
  assert.equal(changeAudioLevel(defaultAudio,101).level,100);
 });
 test('player receives both remembered volume and mute state',()=>{
- const calls=[];const player={setVolume:n=>calls.push(['volume',n]),mute:()=>calls.push(['mute']),unMute:()=>calls.push(['unmute'])};
+ const calls: Array<[string, number?]>=[];const player={setVolume:(n: number)=>calls.push(['volume',n]),mute:()=>calls.push(['mute']),unMute:()=>calls.push(['unmute'])};
  const muted=toggleAudioMute(changeAudioLevel(defaultAudio,19));applyAudioPreferences(player,muted);applyAudioPreferences(player,toggleAudioMute(muted));
  assert.deepEqual(calls,[['volume',19],['mute'],['volume',19],['unmute']]);
 });

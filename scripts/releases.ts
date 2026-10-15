@@ -4,9 +4,10 @@ import {resolve} from 'node:path';
 import {legacyUpdates} from '../lib/legacy-updates.ts';
 
 const root=new URL('../',import.meta.url);
-const read=path=>readFileSync(new URL(path,root),'utf8');
-export const releases=JSON.parse(read('lib/releases.json'));
-export function nextVersion(version,kind){
+type Release = {version: string; title: string; date: string; items: string[]};
+const read=(path: string)=>readFileSync(new URL(path,root),'utf8');
+export const releases: Release[]=JSON.parse(read('lib/releases.json'));
+export function nextVersion(version: string,kind: string){
  if(!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))throw new Error('Expected MAJOR.MINOR.PATCH');
  const [major,minor,patch]=version.split('.').map(Number);
  if(kind==='patch')return `${major}.${minor}.${patch+1}`;
@@ -14,13 +15,13 @@ export function nextVersion(version,kind){
  if(kind==='major')return `${major+1}.0.0`;
  throw new Error('Expected patch, minor or major');
 }
-export function releaseNotes(release){
+export function releaseNotes(release: Release){
  return `## v${release.version}: ${release.title}\n\n${release.date}\n\n${release.items.map(item=>`- ${item}`).join('\n')}\n`;
 }
 export function changelog(){
  return '# Changelog\n\nGenerated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by hand.\nRelease entries describe source versions, not production deployment status.\nSee [release policy](docs/RELEASING.md).\n\n'+releases.map(releaseNotes).join('\n')+'\n## Historical integer versions\n\nOriginal dates, numbering and Norwegian wording are preserved.\n\n'+legacyUpdates.map(entry=>`### V${entry.version}: ${entry.title}\n\n${entry.date}\n\n${entry.items.map(item=>`- ${item}`).join('\n')}\n`).join('\n');
 }
-export function validateReleaseHistory(releases){
+export function validateReleaseHistory(releases: Release[]){
  if(!releases.length)throw new Error('At least one release is required');
  const versions=new Set();
  for(const release of releases){
@@ -51,5 +52,5 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  if(mode==='--write')writeFileSync(new URL('CHANGELOG.md',root),changelog());
  else if(mode==='--check')validate();
  else if(mode==='--notes'){validate();process.stdout.write(releaseNotes(releases[0]));}
- else throw new Error('Usage: node scripts/releases.mjs --write|--check|--notes');
+ else throw new Error('Usage: node scripts/releases.ts --write|--check|--notes');
 }
