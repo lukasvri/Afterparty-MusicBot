@@ -1,57 +1,1013 @@
-'use client';
-import {useEffect,useRef,useState} from 'react';
-import {ArrowUpRight,ShieldCheck,LoaderCircle,LogOut,Play,Pause,SkipForward,Square,Shuffle,Plus,Trash2,RefreshCw} from 'lucide-react';
-import {useLanguage,LanguageSwitch} from '@/components/language';
-import {Sidebar} from '@/components/afterparty-navigation';
-import type {DiscordState,Room} from '@/lib/types';
-type Guild={id:string;name:string;roomCode:string;installed:boolean};
-type Job={id:string;status:string;result?:string;payload:{action:string}};
-type Detail={guildId:string;roomCode:string;state:DiscordState;settings:Record<string,number|boolean>;player:{loopCurrentSong:boolean;loopCurrentQueue:boolean;bitrate:number;radioProvider:string;radioError?:string;lastfmConfigured:boolean};snapshots:Array<{id:string;name:string;songCount:number}>;commands:Job[];sleepTimerEndsAt:number|null};
-async function api<T>(url:string,method='GET',input?:unknown):Promise<T>{const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},...(input!==undefined?{body:JSON.stringify(input)}:{}),signal:AbortSignal.timeout(35000)});const d=await r.json() as any;if(!r.ok)throw Error(d.error??'Tjenesten svarer ikke.');return d;}
-const labels:Record<string,string>={playlistLimit:'Maks sanger fra spilleliste',defaultQueuePageSize:'Sanger per køside',defaultVolume:'Standardvolum, prosent',audioBitrateKbps:'Lydkvalitet, kbit/s',crossfade:'Kryssfade, sekunder',secondsToWaitAfterQueueEmpties:'Vent etter tom kø, sekunder',leaveIfNoListeners:'Forlat tom talekanal',queueAddResponseEphemeral:'Privat købekreftelse',autoAnnounceNextSong:'Meld neste sang',turnDownVolumeWhenPeopleSpeak:'Demp når noen snakker',turnDownVolumeWhenPeopleSpeakTarget:'Volum under tale, prosent',radio:'Radio når køen er tom'};
-const bounds:Record<string,[number,number]>={playlistLimit:[1,1000],defaultQueuePageSize:[1,30],defaultVolume:[0,100],audioBitrateKbps:[64,384],crossfade:[0,12],secondsToWaitAfterQueueEmpties:[0,86400],turnDownVolumeWhenPeopleSpeakTarget:[0,100]};
-export default function Admin(){
- const {t,language}=useLanguage();
- const [authenticated,setAuthenticated]=useState(false),[checking,setChecking]=useState(true),[guilds,setGuilds]=useState<Guild[]>([]),[guildId,setGuildId]=useState(''),[invite,setInvite]=useState(''),[password,setPassword]=useState(''),[detail,setDetail]=useState<Detail|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[tab,setTab]=useState('player'),[query,setQuery]=useState(''),[volume,setVolume]=useState(60),[settings,setSettings]=useState<Record<string,number|boolean>>({}),[snapshotName,setSnapshotName]=useState(''),[minutes,setMinutes]=useState(30),[channels,setChannels]=useState<Array<{id:string;name:string;voice:boolean}>>([]),[channelId,setChannelId]=useState('');
- const [globalAdmin,setGlobalAdmin]=useState(false),[rooms,setRooms]=useState<Room[]>([]);
- const generation=useRef(0),refreshing=useRef(false),alive=useRef(true),actionBusy=useRef(false);const selected=guilds.find(g=>g.id===guildId);
- async function loadGuilds(){try{const r=await api<{authenticated:boolean;globalAdmin:boolean;guilds:Guild[];invite:string}>('/api/admin/guilds');if(!alive.current)return;setAuthenticated(r.authenticated);setGlobalAdmin(r.globalAdmin);setGuilds(r.guilds);setInvite(r.invite);setGuildId(previous=>r.guilds.some(g=>g.id===previous)?previous:r.guilds.find(g=>g.installed)?.id??r.guilds[0]?.id??'');}catch(e){setError((e as Error).message);}finally{setChecking(false);}}
- async function refresh(id=guildId){if(!id||refreshing.current)return;const version=generation.current;refreshing.current=true;try{const r=await api<Detail>('/api/admin/control?guildId='+id);if(alive.current&&version===generation.current){setDetail(r);if(document.activeElement?.id!=='bot-volume')setVolume(r.state.volume);setError('');}}catch(e){if(version===generation.current)setError((e as Error).message);}finally{refreshing.current=false;}}
- useEffect(()=>{alive.current=true;void loadGuilds();if(new URLSearchParams(location.search).has('login'))setError('Discord-innloggingen kunne ikke fullføres. Kontroller appoppsettet og prøv igjen.');return()=>{alive.current=false;generation.current++;};},[]);
- useEffect(()=>{generation.current++;setDetail(null);if(!authenticated||!selected?.installed)return;void refresh();const t=setInterval(()=>{if(!document.hidden&&!actionBusy.current)void refresh();},5000);return()=>clearInterval(t);},[authenticated,guildId,selected?.installed]);
- useEffect(()=>{if(tab==='settings'&&detail?.guildId===guildId)setSettings(detail.settings);},[tab,detail?.guildId,guildId]);
- async function control(operation:string,extra:Record<string,unknown>={}){if(actionBusy.current)return;actionBusy.current=true;setBusy(true);setError('');const id=guildId,version=generation.current;try{const result=await api<any>('/api/admin/control','POST',{guildId:id,operation,...extra});if(operation==='command'){const until=performance.now()+35000;let status=result.status;while(status==='processing'&&performance.now()<until){await new Promise(r=>setTimeout(r,500));const read=await api<Detail>('/api/admin/control?guildId='+id);const job=read.commands.find(j=>j.id===result.id);status=job?.status??'processing';if(job&&['failed','unknown'].includes(job.status))throw Error(job.result??'Handlingen mislyktes.');}if(status!=='done')throw Error('Boten har ikke bekreftet handlingen. Sjekk køen før du prøver igjen.');}if(version===generation.current){setNotice(operation==='command'?'Utført.':'Lagret.');await refresh(id);}return result;}catch(e){if(version===generation.current)setError((e as Error).message);}finally{actionBusy.current=false;setBusy(false);}}
- const command=(action:string,extra:Record<string,unknown>={})=>control('command',{commandId:crypto.randomUUID(),command:{action,queueRevision:detail?.state.queueRevision,...extra}});
- async function loadRooms(){try{const r=await api<{rooms:Room[]}>('/api/admin/rooms');setRooms(r.rooms);}catch(e){setError((e as Error).message);}}
- useEffect(()=>{if(tab==='rooms'&&globalAdmin)void loadRooms();},[tab,globalAdmin]);
- async function closeRoom(code:string){if(!confirm(t('Avslutte dette videorommet for alle?')))return;try{await api('/api/admin/rooms','DELETE',{code});await loadRooms();}catch(e){setError((e as Error).message);}}
- async function login(){setBusy(true);try{await api('/api/admin/session','POST',{password});setPassword('');await loadGuilds();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
- async function logout(){try{const result=await api<{redirect:string}>('/api/admin/session','DELETE',{});location.assign(result.redirect);}catch(e){setError((e as Error).message);}}
- async function readChannels(){try{const result=await control('channels');if(result)setChannels(result.channels);}catch(e){setError((e as Error).message);}}
- const state=detail?.state,online=Boolean(state?.ready),current=state?.current;
- return <div className="app-shell admin-shell"><Sidebar admin/><main className="main"><header className="topbar"><LanguageSwitch/><span className="breadcrumb"><ShieldCheck size={16}/> {t("Kontrollrom")}</span>{authenticated&&<button className="button subtle" onClick={()=>void logout()}><LogOut size={16}/> {t("Logg ut")}</button>}</header><div className="content">
- {error&&<div className="notice error" role="alert">{t(error)}</div>}
- {checking?<p><LoaderCircle className="spin"/> {t("Sjekker innlogging …")}</p>:!authenticated?<section className="admin-login"><span className="party-kicker">GUTTA KRUTT / ADMIN</span><h1>{t("Din server. Din musikk.")}</h1><p>{t("Logg inn med Discord for å styre serverne du administrerer.")}</p><a className="button primary" href="/api/auth/discord">{t("Logg inn med Discord")} <ArrowUpRight size={16}/></a>{invite&&<a className="button subtle" href={invite} target="_blank" rel="noreferrer">{t("Legg til boten")}</a>}<details><summary>{t("Eierinnlogging")}</summary><form onSubmit={e=>{e.preventDefault();void login();}}><label htmlFor="admin-password">{t("Adminpassord for Gutta Krutt")}</label><input id="admin-password" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required maxLength={200}/><button className="button subtle" disabled={busy}>{t("Logg inn")}</button></form><a href="/signin-with-chatgpt?return_to=%2Fadmin">{t("Eierkonto")}</a></details></section>:<>
- <section className="scene-heading admin-heading"><div><span className="party-kicker">GUTTA KRUTT / AFTERPARTY</span><h1>{t("Kontrollrom.")}</h1><p>{t("Spiller, kø og innstillinger for din server.")}</p></div><button className="button subtle" disabled={busy} onClick={()=>void loadGuilds()}><RefreshCw size={16}/> {t("Oppdater servere")}</button></section>
- <label className="guild-select">{t("Discord-server")}<select value={guildId} disabled={busy} onChange={e=>setGuildId(e.target.value)}>{guilds.map(g=><option key={g.id} value={g.id}>{g.name}{g.installed?'':t(" · legg til boten")}</option>)}</select></label>
- {!guilds.length?<p>{t("Du har ingen servere med administrasjonstilgang.")} <a href={invite}>{t("Legg til boten")}</a></p>:!selected?.installed?<section className="admin-card"><h2>{t("Legg til Gutta Krutt på")} {selected?.name}</h2><a className="button primary" href={invite+'&guild_id='+guildId+'&disable_guild_select=true'} target="_blank" rel="noreferrer">{t("Legg til boten")} <ArrowUpRight size={16}/></a><p>{t("Oppdater serverlisten etter at boten er lagt til.")}</p></section>:<>
- <nav className="admin-tabs" aria-label={t("Kontrollrom")}><button aria-pressed={tab==='player'} onClick={()=>setTab('player')}>{t("Spiller og kø")}</button><button aria-pressed={tab==='settings'} onClick={()=>setTab('settings')}>{t("Innstillinger")}</button><button aria-pressed={tab==='tools'} onClick={()=>setTab('tools')}>{t("Verktøy")}</button>{globalAdmin&&<button aria-pressed={tab==='rooms'} onClick={()=>setTab('rooms')}>{t("Videorom")}</button>}<a href={'/?room='+selected.roomCode}>{t("Se video")} <ArrowUpRight size={14}/></a></nav>
- {!detail?<p>{t("Henter serveren …")}</p>:tab==='player'?<>
- <section className="bot-control"><div className="bot-control-heading"><strong>{online?(state?.connected?t("I talekanal"):t("Klar i Discord")):t("Discord er frakoblet")}</strong><span>{detail.player.bitrate/1000} {t("kbit/s · radio:")} {{lastfm:'Last.fm',artist:t("Artistradio"),soundcloud:'SoundCloud',fallback:t("Reserve")}[detail.player.radioProvider as 'lastfm']??t("Klar")}</span></div><div className="bot-deck">{current?<img src={current.image} alt=""/>:<div className="bot-empty-art">GK</div>}<div><span className="party-kicker">{state?.playing?t("SPILLER"):current?t("PÅ PAUSE"):t("KLAR")}</span><h2>{current?.title??t("Klar for musikk")}</h2><p>{current?.artist??t("Start med /play i Discord, eller velg en talekanal under Verktøy.")}</p><div className="bot-buttons"><button className="button primary" disabled={busy||!current} onClick={()=>void command(state?.playing?'pause':'resume')}>{state?.playing?<Pause size={16}/>:<Play size={16}/>} {state?.playing?t("Pause"):t("Fortsett")}</button><button className="button subtle" disabled={busy||!current} onClick={()=>void command('skip')}><SkipForward size={16}/> {t("Neste")}</button><button className="button subtle" disabled={busy} onClick={()=>void command('shuffle')}><Shuffle size={16}/> {t("Bland")}</button><button className="button danger-button" disabled={busy} onClick={()=>{if(confirm(t("Stoppe musikken og tømme køen på denne serveren?")))void command('stop');}}><Square size={16}/> {t("Stopp")}</button></div></div></div>
- {current&&!current.live&&<label className="admin-seek">{t("Spoling")}<input type="range" aria-label={t("Spol musikken")} min={0} max={Math.max(0,current.duration-1)} defaultValue={state?.position??0} key={current.id} disabled={busy} onKeyUp={e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key))void command('seek',{seconds:Number(e.currentTarget.value)});}} onPointerUp={e=>void command('seek',{seconds:Number(e.currentTarget.value)})}/></label>}
- {Boolean(detail.settings.radio)&&detail.player.radioError&&<p className="admin-notice" role="status">{t(detail.player.radioError)}</p>}
- <div className="admin-volume"><label htmlFor="bot-volume">{t("Discord-volum")} {volume}%</label><input id="bot-volume" type="range" min={0} max={100} value={volume} onChange={e=>setVolume(Number(e.target.value))}/><button className="button subtle" disabled={busy} onClick={()=>void command('volume',{value:volume})}>{t("Bruk volum")}</button></div>
- <form className="search-form" onSubmit={e=>{e.preventDefault();void command('enqueue',{query,concert:false});}}><input value={query} onChange={e=>setQuery(e.target.value)} aria-label={t("Sang eller lenke")} placeholder={t("Søk, Spotify- eller SoundCloud-lenke. sc: for SoundCloud")} required maxLength={2000}/><button className="button primary" disabled={busy||!state?.connected}><Plus size={16}/> {t("Legg til")}</button></form>
- <div className="admin-bot-queue">{state?.queue.map((track,i)=><div key={`${track.id}-${i}`}><span>{i+1}</span><strong>{track.title}</strong><button className="icon-button" aria-label={t("Flytt ")+track.title+t(" opp")} disabled={busy||i===0} onClick={()=>void command('move',{from:i+1,to:i})}>↑</button><button className="icon-button" aria-label={t("Spill ")+track.title+t(" nå")} disabled={busy} onClick={()=>void command('jump',{position:i+1})}><Play size={15}/></button><button className="icon-button" aria-label={t("Fjern ")+track.title} disabled={busy} onClick={()=>void command('remove',{index:i})}><Trash2 size={15}/></button></div>)}</div>
- <div className="bot-buttons"><button className="button subtle" disabled={busy} onClick={()=>void command('loop-sang',{value:!detail.player.loopCurrentSong})}>{t("🔁 Gjenta sang")} {detail.player.loopCurrentSong?t("på"):t("av")}</button><button className="button subtle" disabled={busy} onClick={()=>void command('loop-queue',{value:!detail.player.loopCurrentQueue})}>{t("🔁 Gjenta kø")} {detail.player.loopCurrentQueue?t("på"):t("av")}</button><button className="button subtle" disabled={busy} onClick={()=>void command('replay')}>{t("↩️ Start på nytt")}</button><button className="button subtle" disabled={busy} onClick={()=>void command('unskip')}>{t("⏮️ Forrige sang")}</button><button className="button subtle" disabled={busy} onClick={()=>void command('clear')}>{t("Tøm kø")}</button></div></section>
- </>:tab==='settings'?<form className="admin-card settings-grid" onSubmit={e=>{e.preventDefault();void control('settings',{settings});}}><h2>{t("Serverinnstillinger")}</h2>{Object.entries(labels).map(([key,label])=><label key={key}>{t(label)}{typeof detail.settings[key]==='boolean'?<input type="checkbox" checked={Boolean(settings[key]??detail.settings[key])} onChange={e=>setSettings(s=>({...s,[key]:e.target.checked}))}/>:<input type="number" min={bounds[key]?.[0]} max={bounds[key]?.[1]} required value={Number(settings[key]??detail.settings[key])} onChange={e=>setSettings(s=>({...s,[key]:Number(e.target.value)}))}/>}</label>)}<p>{t("Lydkvaliteten begrenses av talekanalen. Endringer gjelder fra neste avspillingsstart.")}</p><button className="button primary" disabled={busy}>{t("Lagre innstillinger")}</button></form>:tab==='rooms'?<section className="admin-card"><h2>{t("Videorom")}</h2><button className="button subtle" onClick={()=>void loadRooms()}>{t("Oppdater rom")}</button>{rooms.map(r=><article className="admin-room" key={r.code}><div><h3>{r.name}</h3><p>{r.current?.title??t("Ingen video")} · {r.viewers} {t("i rommet")}</p></div><a className="button subtle" href={'/?room='+r.code}>{t("Se video")}</a>{r.mode!=='discord'&&<button className="button danger-button" onClick={()=>void closeRoom(r.code)}>{t("Avslutt")}</button>}</article>)}</section>:<div className="admin-columns">
- <section className="admin-card"><h2>{t("Talekanal og spillermelding")}</h2><button className="button subtle" disabled={busy} onClick={()=>void readChannels()}>{t("Hent kanaler")}</button><select aria-label={t("Velg kanal")} value={channelId} onChange={e=>setChannelId(e.target.value)}><option value="">{t("Velg kanal")}</option>{channels.map(c=><option key={c.id} value={c.id}>{c.voice?'🔊':'#'} {c.name}</option>)}</select><button className="button subtle" disabled={busy||!channels.find(c=>c.id===channelId)?.voice} onClick={()=>void control('join',{channelId})}>{t("Bli med")}</button><button className="button subtle" disabled={busy||channels.find(c=>c.id===channelId)?.voice||!channelId} onClick={()=>void control('music-channel',{channelId})}>{t("Bruk som musikk-kanal")}</button><button className="button subtle" disabled={busy} onClick={()=>void command('disconnect')}>{t("Koble fra")}</button></section>
- <section className="admin-card"><h2>{t("Stopptimer")}</h2><input aria-label={t("Minutter til stopp")} type="number" min={1} max={1440} value={minutes} onChange={e=>setMinutes(Number(e.target.value))}/><button className="button subtle" disabled={busy} onClick={()=>void command('sleep-timer',{minutes})}>{t("Start timer")}</button><button className="button subtle" disabled={busy} onClick={()=>void command('cancel-sleep-timer')}>{t("Avbryt timer")}</button>{detail.sleepTimerEndsAt&&<p>{t("Stopper")} {new Date(detail.sleepTimerEndsAt).toLocaleTimeString(language==='en'?'en-GB':'nb-NO')}</p>}</section>
- <section className="admin-card"><h2>{t("Lagrede køer")}</h2><form onSubmit={e=>{e.preventDefault();void command('snapshot-save',{name:snapshotName});}}><input aria-label={t("Navn på lagret kø")} value={snapshotName} onChange={e=>setSnapshotName(e.target.value)} required maxLength={80}/><button className="button subtle" disabled={busy}>{t("Lagre køen")}</button></form>{detail.snapshots.map(s=><article className="saved-queue" key={s.id}><strong>{s.name} · {s.songCount} {t("sanger")}</strong><button className="button subtle" disabled={busy} onClick={()=>void command('snapshot-restore',{id:s.id,replace:false})}>{t("Legg til")}</button><button className="button subtle" disabled={busy} onClick={()=>{if(confirm(t("Erstatte køen?")))void command('snapshot-restore',{id:s.id,replace:true});}}>{t("Erstatt kø")}</button><button className="icon-button" aria-label={t("Slett ")+s.name} disabled={busy} onClick={()=>{if(confirm(t("Slette denne lagrede køen?")))void command('snapshot-delete',{id:s.id});}}><Trash2 size={15}/></button></article>)}</section>
- <section className="admin-card"><h2>{t("Vedlikehold")}</h2><button className="button subtle" disabled={busy} onClick={()=>void command('cleanup-duplicates')}>{t("Fjern duplikater i køen")}</button><button className="button subtle" disabled={busy||Boolean(current)||Boolean(state?.connected)} onClick={()=>void command('diagnostic')}>{t("Test lydtilkoblingen")}</button><p>{t("Testen krever en tom bot og en tom talekanal.")}</p></section></div>}
- {notice&&<p role="status" className="admin-notice">{t(notice)}</p>}
- {detail&&<details className="admin-card"><summary>{t("Siste handlinger")}</summary>{detail.commands.slice(0,10).map(j=><p key={j.id}>{j.payload.action}: {j.status}{j.result?' · '+j.result:''}</p>)}</details>}
- </>}
- </>}
- <footer className="page-footer"><span>GUTTA KRUTT AFTERPARTY</span><a href="/">{t("Til musikken")} <ArrowUpRight size={13}/></a></footer></div></main></div>;
+"use client";
+import { AdminSeek } from "@/components/party/admin-seek";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowUpRight,
+  ShieldCheck,
+  LoaderCircle,
+  LogOut,
+  Play,
+  Pause,
+  SkipForward,
+  Square,
+  Shuffle,
+  Plus,
+  Trash2,
+  RefreshCw,
+} from "lucide-react";
+import { useLanguage, LanguageSwitch } from "@/components/language";
+import { Sidebar } from "@/components/afterparty-navigation";
+import type { DiscordState, Room } from "@/lib/types";
+type Guild = { id: string; name: string; roomCode: string; installed: boolean };
+type Job = {
+  id: string;
+  status: string;
+  result?: string;
+  payload: { action: string };
+};
+type Detail = {
+  guildId: string;
+  roomCode: string;
+  state: DiscordState;
+  settings: Record<string, number | boolean>;
+  player: {
+    loopCurrentSong: boolean;
+    loopCurrentQueue: boolean;
+    bitrate: number;
+    radioProvider: string;
+    radioError?: string;
+    lastfmConfigured: boolean;
+  };
+  snapshots: Array<{ id: string; name: string; songCount: number }>;
+  commands: Job[];
+  sleepTimerEndsAt: number | null;
+};
+async function api<T>(
+  url: string,
+  method = "GET",
+  input?: unknown,
+): Promise<T> {
+  const r = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    ...(input !== undefined ? { body: JSON.stringify(input) } : {}),
+    signal: AbortSignal.timeout(35000),
+  });
+  const d = (await r.json()) as any;
+  if (!r.ok) throw Error(d.error ?? "Tjenesten svarer ikke.");
+  return d;
+}
+const labels: Record<string, string> = {
+  playlistLimit: "Maks sanger fra spilleliste",
+  defaultQueuePageSize: "Sanger per køside",
+  defaultVolume: "Standardvolum, prosent",
+  audioBitrateKbps: "Lydkvalitet, kbit/s",
+  crossfade: "Kryssfade, sekunder",
+  secondsToWaitAfterQueueEmpties: "Vent etter tom kø, sekunder",
+  leaveIfNoListeners: "Forlat tom talekanal",
+  queueAddResponseEphemeral: "Privat købekreftelse",
+  autoAnnounceNextSong: "Meld neste sang",
+  turnDownVolumeWhenPeopleSpeak: "Demp når noen snakker",
+  turnDownVolumeWhenPeopleSpeakTarget: "Volum under tale, prosent",
+  radio: "Radio når køen er tom",
+};
+const bounds: Record<string, [number, number]> = {
+  playlistLimit: [1, 1000],
+  defaultQueuePageSize: [1, 30],
+  defaultVolume: [0, 100],
+  audioBitrateKbps: [64, 384],
+  crossfade: [0, 12],
+  secondsToWaitAfterQueueEmpties: [0, 86400],
+  turnDownVolumeWhenPeopleSpeakTarget: [0, 100],
+};
+export default function Admin() {
+  const { t, language } = useLanguage();
+  const [authenticated, setAuthenticated] = useState(false),
+    [checking, setChecking] = useState(true),
+    [guilds, setGuilds] = useState<Guild[]>([]),
+    [guildId, setGuildId] = useState(""),
+    [invite, setInvite] = useState(""),
+    [password, setPassword] = useState(""),
+    [detail, setDetail] = useState<Detail | null>(null),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false),
+    [tab, setTab] = useState("player"),
+    [query, setQuery] = useState(""),
+    [volume, setVolume] = useState(60),
+    [settings, setSettings] = useState<Record<string, number | boolean>>({}),
+    [snapshotName, setSnapshotName] = useState(""),
+    [minutes, setMinutes] = useState(30),
+    [channels, setChannels] = useState<
+      Array<{ id: string; name: string; voice: boolean }>
+    >([]),
+    [channelId, setChannelId] = useState("");
+  const [globalAdmin, setGlobalAdmin] = useState(false),
+    [rooms, setRooms] = useState<Room[]>([]);
+  const volumeDirty = useRef(false);
+  const generation = useRef(0),
+    refreshing = useRef(false),
+    alive = useRef(true),
+    actionBusy = useRef(false);
+  const selected = guilds.find((g) => g.id === guildId);
+  async function loadGuilds() {
+    try {
+      const r = await api<{
+        authenticated: boolean;
+        globalAdmin: boolean;
+        guilds: Guild[];
+        invite: string;
+      }>("/api/admin/guilds");
+      if (!alive.current) return;
+      setAuthenticated(r.authenticated);
+      setGlobalAdmin(r.globalAdmin);
+      setGuilds(r.guilds);
+      setInvite(r.invite);
+      setGuildId((previous) =>
+        r.guilds.some((g) => g.id === previous)
+          ? previous
+          : (r.guilds.find((g) => g.installed)?.id ?? r.guilds[0]?.id ?? ""),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setChecking(false);
+    }
+  }
+  async function refresh(id = guildId) {
+    if (!id || refreshing.current) return;
+    const version = generation.current;
+    refreshing.current = true;
+    try {
+      const r = await api<Detail>("/api/admin/control?guildId=" + id);
+      if (alive.current && version === generation.current) {
+        setDetail(r);
+        if (!volumeDirty.current) setVolume(r.state.volume);
+        setError("");
+      }
+    } catch (e) {
+      if (version === generation.current) setError((e as Error).message);
+    } finally {
+      refreshing.current = false;
+    }
+  }
+  useEffect(() => {
+    alive.current = true;
+    void loadGuilds();
+    if (new URLSearchParams(location.search).has("login"))
+      setError(
+        "Discord-innloggingen kunne ikke fullføres. Kontroller appoppsettet og prøv igjen.",
+      );
+    return () => {
+      alive.current = false;
+      generation.current++;
+    };
+  }, []);
+  useEffect(() => {
+    generation.current++;
+    setDetail(null);
+    setChannels([]);
+    setChannelId("");
+    setSettings({});
+    volumeDirty.current = false;
+    if (!authenticated || !selected?.installed) return;
+    void refresh();
+    const t = setInterval(() => {
+      if (!document.hidden && !actionBusy.current) void refresh();
+    }, 5000);
+    return () => clearInterval(t);
+  }, [authenticated, guildId, selected?.installed]);
+  useEffect(() => {
+    if (tab === "settings" && detail?.guildId === guildId)
+      setSettings(detail.settings);
+  }, [tab, detail?.guildId, guildId]);
+  async function control(
+    operation: string,
+    extra: Record<string, unknown> = {},
+  ) {
+    if (actionBusy.current) return;
+    actionBusy.current = true;
+    setBusy(true);
+    setError("");
+    const id = guildId,
+      version = generation.current;
+    try {
+      const result = await api<any>("/api/admin/control", "POST", {
+        guildId: id,
+        operation,
+        ...extra,
+      });
+      if (operation === "command") {
+        const until = performance.now() + 35000;
+        let status = result.status;
+        while (status === "processing" && performance.now() < until) {
+          await new Promise((r) => setTimeout(r, 500));
+          const read = await api<Detail>("/api/admin/control?guildId=" + id);
+          const job = read.commands.find((j) => j.id === result.id);
+          status = job?.status ?? "processing";
+          if (job && ["failed", "unknown"].includes(job.status))
+            throw Error(job.result ?? "Handlingen mislyktes.");
+        }
+        if (status !== "done")
+          throw Error(
+            "Boten har ikke bekreftet handlingen. Sjekk køen før du prøver igjen.",
+          );
+      }
+      if (version === generation.current) {
+        setNotice(operation === "command" ? "Utført." : "Lagret.");
+        await refresh(id);
+      }
+      return result;
+    } catch (e) {
+      if (version === generation.current) setError((e as Error).message);
+    } finally {
+      actionBusy.current = false;
+      setBusy(false);
+    }
+  }
+  const command = (action: string, extra: Record<string, unknown> = {}) =>
+    control("command", {
+      commandId: crypto.randomUUID(),
+      command: { action, queueRevision: detail?.state.queueRevision, ...extra },
+    });
+  async function loadRooms() {
+    try {
+      const r = await api<{ rooms: Room[] }>("/api/admin/rooms");
+      setRooms(r.rooms);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  useEffect(() => {
+    if (tab === "rooms" && globalAdmin) void loadRooms();
+  }, [tab, globalAdmin]);
+  async function closeRoom(code: string) {
+    if (!confirm(t("Avslutte dette videorommet for alle?"))) return;
+    try {
+      await api("/api/admin/rooms", "DELETE", { code });
+      await loadRooms();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function login() {
+    setBusy(true);
+    try {
+      await api("/api/admin/session", "POST", { password });
+      setPassword("");
+      await loadGuilds();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function logout() {
+    try {
+      const result = await api<{ redirect: string }>(
+        "/api/admin/session",
+        "DELETE",
+        {},
+      );
+      location.assign(result.redirect);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function readChannels() {
+    try {
+      const result = await control("channels");
+      if (result) setChannels(result.channels);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  const state = detail?.state,
+    online = Boolean(state?.ready),
+    current = state?.current;
+  return (
+    <div className="app-shell admin-shell">
+      <Sidebar admin />
+      <main className="main">
+        <header className="topbar">
+          <LanguageSwitch />
+          <span className="breadcrumb">
+            <ShieldCheck size={16} /> {t("Kontrollrom")}
+          </span>
+          {authenticated && (
+            <button className="button subtle" onClick={() => void logout()}>
+              <LogOut size={16} /> {t("Logg ut")}
+            </button>
+          )}
+        </header>
+        <div className="content">
+          {error && (
+            <div className="notice error" role="alert">
+              {t(error)}
+            </div>
+          )}
+          {checking ? (
+            <p>
+              <LoaderCircle className="spin" /> {t("Sjekker innlogging …")}
+            </p>
+          ) : !authenticated ? (
+            <section className="admin-login">
+              <span className="party-kicker">GUTTA KRUTT / ADMIN</span>
+              <h1>{t("Din server. Din musikk.")}</h1>
+              <p>
+                {t(
+                  "Logg inn med Discord for å styre serverne du administrerer.",
+                )}
+              </p>
+              <a className="button primary" href="/api/auth/discord">
+                {t("Logg inn med Discord")} <ArrowUpRight size={16} />
+              </a>
+              {invite && (
+                <a
+                  className="button subtle"
+                  href={invite}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("Legg til boten")}
+                </a>
+              )}
+              <details>
+                <summary>{t("Eierinnlogging")}</summary>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void login();
+                  }}
+                >
+                  <label htmlFor="admin-password">
+                    {t("Adminpassord for Gutta Krutt")}
+                  </label>
+                  <input
+                    id="admin-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    maxLength={200}
+                  />
+                  <button className="button subtle" disabled={busy}>
+                    {t("Logg inn")}
+                  </button>
+                </form>
+                <a href="/signin-with-chatgpt?return_to=%2Fadmin">
+                  {t("Eierkonto")}
+                </a>
+              </details>
+            </section>
+          ) : (
+            <>
+              <section className="scene-heading admin-heading">
+                <div>
+                  <span className="party-kicker">GUTTA KRUTT / AFTERPARTY</span>
+                  <h1>{t("Kontrollrom.")}</h1>
+                  <p>{t("Spiller, kø og innstillinger for din server.")}</p>
+                </div>
+                <button
+                  className="button subtle"
+                  disabled={busy}
+                  onClick={() => void loadGuilds()}
+                >
+                  <RefreshCw size={16} /> {t("Oppdater servere")}
+                </button>
+              </section>
+              <label className="guild-select">
+                {t("Discord-server")}
+                <select
+                  value={guildId}
+                  disabled={busy}
+                  onChange={(e) => setGuildId(e.target.value)}
+                >
+                  {guilds.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                      {g.installed ? "" : t(" · legg til boten")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!guilds.length ? (
+                <p>
+                  {t("Du har ingen servere med administrasjonstilgang.")}{" "}
+                  <a href={invite}>{t("Legg til boten")}</a>
+                </p>
+              ) : !selected?.installed ? (
+                <section className="admin-card">
+                  <h2>
+                    {t("Legg til Gutta Krutt på")} {selected?.name}
+                  </h2>
+                  <a
+                    className="button primary"
+                    href={
+                      invite +
+                      "&guild_id=" +
+                      guildId +
+                      "&disable_guild_select=true"
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("Legg til boten")} <ArrowUpRight size={16} />
+                  </a>
+                  <p>
+                    {t("Oppdater serverlisten etter at boten er lagt til.")}
+                  </p>
+                </section>
+              ) : (
+                <>
+                  <nav className="admin-tabs" aria-label={t("Kontrollrom")}>
+                    <button
+                      aria-pressed={tab === "player"}
+                      onClick={() => setTab("player")}
+                    >
+                      {t("Spiller og kø")}
+                    </button>
+                    <button
+                      aria-pressed={tab === "settings"}
+                      onClick={() => setTab("settings")}
+                    >
+                      {t("Innstillinger")}
+                    </button>
+                    <button
+                      aria-pressed={tab === "tools"}
+                      onClick={() => setTab("tools")}
+                    >
+                      {t("Verktøy")}
+                    </button>
+                    {globalAdmin && (
+                      <button
+                        aria-pressed={tab === "rooms"}
+                        onClick={() => setTab("rooms")}
+                      >
+                        {t("Videorom")}
+                      </button>
+                    )}
+                    <a href={"/?room=" + selected.roomCode}>
+                      {t("Se video")} <ArrowUpRight size={14} />
+                    </a>
+                  </nav>
+                  {!detail ? (
+                    <p>{t("Henter serveren …")}</p>
+                  ) : tab === "player" ? (
+                    <>
+                      <section className="bot-control">
+                        <div className="bot-control-heading">
+                          <strong>
+                            {online
+                              ? state?.connected
+                                ? t("I talekanal")
+                                : t("Klar i Discord")
+                              : t("Discord er frakoblet")}
+                          </strong>
+                          <span>
+                            {detail.player.bitrate / 1000}{" "}
+                            {t("kbit/s · radio:")}{" "}
+                            {{
+                              lastfm: "Last.fm",
+                              artist: t("Artistradio"),
+                              soundcloud: "SoundCloud",
+                              fallback: t("Reserve"),
+                            }[detail.player.radioProvider as "lastfm"] ??
+                              t("Klar")}
+                          </span>
+                        </div>
+                        <div className="bot-deck">
+                          {current ? (
+                            <img src={current.image} alt="" />
+                          ) : (
+                            <div className="bot-empty-art">GK</div>
+                          )}
+                          <div>
+                            <span className="party-kicker">
+                              {state?.playing
+                                ? t("SPILLER")
+                                : current
+                                  ? t("PÅ PAUSE")
+                                  : t("KLAR")}
+                            </span>
+                            <h2>{current?.title ?? t("Klar for musikk")}</h2>
+                            <p>
+                              {current?.artist ??
+                                t(
+                                  "Start med /play i Discord, eller velg en talekanal under Verktøy.",
+                                )}
+                            </p>
+                            <div className="bot-buttons">
+                              <button
+                                className="button primary"
+                                disabled={busy || !current}
+                                onClick={() =>
+                                  void command(
+                                    state?.playing ? "pause" : "resume",
+                                  )
+                                }
+                              >
+                                {state?.playing ? (
+                                  <Pause size={16} />
+                                ) : (
+                                  <Play size={16} />
+                                )}{" "}
+                                {state?.playing ? t("Pause") : t("Fortsett")}
+                              </button>
+                              <button
+                                className="button subtle"
+                                disabled={busy || !current}
+                                onClick={() => void command("skip")}
+                              >
+                                <SkipForward size={16} /> {t("Neste")}
+                              </button>
+                              <button
+                                className="button subtle"
+                                disabled={busy}
+                                onClick={() => void command("shuffle")}
+                              >
+                                <Shuffle size={16} /> {t("Bland")}
+                              </button>
+                              <button
+                                className="button danger-button"
+                                disabled={busy}
+                                onClick={() => {
+                                  if (
+                                    confirm(
+                                      t(
+                                        "Stoppe musikken og tømme køen på denne serveren?",
+                                      ),
+                                    )
+                                  )
+                                    void command("stop");
+                                }}
+                              >
+                                <Square size={16} /> {t("Stopp")}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        {current && !current.live && (
+                          <AdminSeek
+                            trackId={current.id}
+                            position={state?.position ?? 0}
+                            duration={current.duration}
+                            playing={Boolean(state?.playing)}
+                            disabled={busy}
+                            onSeek={(seconds) =>
+                              void command("seek", { seconds })
+                            }
+                          />
+                        )}
+                        {Boolean(detail.settings.radio) &&
+                          detail.player.radioError && (
+                            <p className="admin-notice" role="status">
+                              {t(detail.player.radioError)}
+                            </p>
+                          )}
+                        <div className="admin-volume">
+                          <label htmlFor="bot-volume">
+                            {t("Discord-volum")} {volume}%
+                          </label>
+                          <input
+                            id="bot-volume"
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={volume}
+                            onChange={(e) => {
+                              volumeDirty.current = true;
+                              setVolume(Number(e.target.value));
+                            }}
+                          />
+                          <button
+                            className="button subtle"
+                            disabled={busy}
+                            onClick={() => {
+                              void command("volume", { value: volume }).then(
+                                (result) => {
+                                  if (result) volumeDirty.current = false;
+                                },
+                              );
+                            }}
+                          >
+                            {t("Bruk volum")}
+                          </button>
+                        </div>
+                        <form
+                          className="search-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void command("enqueue", { query, concert: false });
+                          }}
+                        >
+                          <input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            aria-label={t("Sang eller lenke")}
+                            placeholder={t(
+                              "Søk, Spotify- eller SoundCloud-lenke. sc: for SoundCloud",
+                            )}
+                            required
+                            maxLength={2000}
+                          />
+                          <button
+                            className="button primary"
+                            disabled={busy || !state?.connected}
+                          >
+                            <Plus size={16} /> {t("Legg til")}
+                          </button>
+                        </form>
+                        <div className="admin-bot-queue">
+                          {state?.queue.map((track, i) => (
+                            <div key={`${track.id}-${i}`}>
+                              <span>{i + 1}</span>
+                              <strong>{track.title}</strong>
+                              <button
+                                className="icon-button"
+                                aria-label={
+                                  t("Flytt ") + track.title + t(" opp")
+                                }
+                                disabled={busy || i === 0}
+                                onClick={() =>
+                                  void command("move", { from: i + 1, to: i })
+                                }
+                              >
+                                ↑
+                              </button>
+                              <button
+                                className="icon-button"
+                                aria-label={
+                                  t("Spill ") + track.title + t(" nå")
+                                }
+                                disabled={busy}
+                                onClick={() =>
+                                  void command("jump", { position: i + 1 })
+                                }
+                              >
+                                <Play size={15} />
+                              </button>
+                              <button
+                                className="icon-button"
+                                aria-label={t("Fjern ") + track.title}
+                                disabled={busy}
+                                onClick={() =>
+                                  void command("remove", { index: i })
+                                }
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="bot-buttons">
+                          <button
+                            className="button subtle"
+                            disabled={busy}
+                            onClick={() =>
+                              void command("loop-sang", {
+                                value: !detail.player.loopCurrentSong,
+                              })
+                            }
+                          >
+                            {t("🔁 Gjenta sang")}{" "}
+                            {detail.player.loopCurrentSong ? t("på") : t("av")}
+                          </button>
+                          <button
+                            className="button subtle"
+                            disabled={busy}
+                            onClick={() =>
+                              void command("loop-queue", {
+                                value: !detail.player.loopCurrentQueue,
+                              })
+                            }
+                          >
+                            {t("🔁 Gjenta kø")}{" "}
+                            {detail.player.loopCurrentQueue ? t("på") : t("av")}
+                          </button>
+                          <button
+                            className="button subtle"
+                            disabled={busy}
+                            onClick={() => void command("replay")}
+                          >
+                            {t("↩️ Start på nytt")}
+                          </button>
+                          <button
+                            className="button subtle"
+                            disabled={busy}
+                            onClick={() => void command("unskip")}
+                          >
+                            {t("⏮️ Forrige sang")}
+                          </button>
+                          <button
+                            className="button subtle"
+                            disabled={busy}
+                            onClick={() => void command("clear")}
+                          >
+                            {t("Tøm kø")}
+                          </button>
+                        </div>
+                      </section>
+                    </>
+                  ) : tab === "settings" ? (
+                    <form
+                      className="admin-card settings-grid"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void control("settings", { settings });
+                      }}
+                    >
+                      <h2>{t("Serverinnstillinger")}</h2>
+                      {Object.entries(labels).map(([key, label]) => (
+                        <label key={key}>
+                          {t(label)}
+                          {typeof detail.settings[key] === "boolean" ? (
+                            <input
+                              type="checkbox"
+                              checked={Boolean(
+                                settings[key] ?? detail.settings[key],
+                              )}
+                              onChange={(e) =>
+                                setSettings((s) => ({
+                                  ...s,
+                                  [key]: e.target.checked,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <input
+                              type="number"
+                              min={bounds[key]?.[0]}
+                              max={bounds[key]?.[1]}
+                              required
+                              value={Number(
+                                settings[key] ?? detail.settings[key],
+                              )}
+                              onChange={(e) =>
+                                setSettings((s) => ({
+                                  ...s,
+                                  [key]: Number(e.target.value),
+                                }))
+                              }
+                            />
+                          )}
+                        </label>
+                      ))}
+                      <p>
+                        {t(
+                          "Lydkvaliteten begrenses av talekanalen. Endringer gjelder fra neste avspillingsstart.",
+                        )}
+                      </p>
+                      <button className="button primary" disabled={busy}>
+                        {t("Lagre innstillinger")}
+                      </button>
+                    </form>
+                  ) : tab === "rooms" ? (
+                    <section className="admin-card">
+                      <h2>{t("Videorom")}</h2>
+                      <button
+                        className="button subtle"
+                        onClick={() => void loadRooms()}
+                      >
+                        {t("Oppdater rom")}
+                      </button>
+                      {rooms.map((r) => (
+                        <article className="admin-room" key={r.code}>
+                          <div>
+                            <h3>{r.name}</h3>
+                            <p>
+                              {r.current?.title ?? t("Ingen video")} ·{" "}
+                              {r.viewers} {t("i rommet")}
+                            </p>
+                          </div>
+                          <a
+                            className="button subtle"
+                            href={"/?room=" + r.code}
+                          >
+                            {t("Se video")}
+                          </a>
+                          {r.mode !== "discord" && (
+                            <button
+                              className="button danger-button"
+                              onClick={() => void closeRoom(r.code)}
+                            >
+                              {t("Avslutt")}
+                            </button>
+                          )}
+                        </article>
+                      ))}
+                    </section>
+                  ) : (
+                    <div className="admin-columns">
+                      <section className="admin-card">
+                        <h2>{t("Talekanal og spillermelding")}</h2>
+                        <button
+                          className="button subtle"
+                          disabled={busy}
+                          onClick={() => void readChannels()}
+                        >
+                          {t("Hent kanaler")}
+                        </button>
+                        <select
+                          aria-label={t("Velg kanal")}
+                          value={channelId}
+                          onChange={(e) => setChannelId(e.target.value)}
+                        >
+                          <option value="">{t("Velg kanal")}</option>
+                          {channels.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.voice ? "🔊" : "#"} {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="button subtle"
+                          disabled={
+                            busy ||
+                            !channels.find((c) => c.id === channelId)?.voice
+                          }
+                          onClick={() => void control("join", { channelId })}
+                        >
+                          {t("Bli med")}
+                        </button>
+                        <button
+                          className="button subtle"
+                          disabled={
+                            busy ||
+                            channels.find((c) => c.id === channelId)?.voice ||
+                            !channelId
+                          }
+                          onClick={() =>
+                            void control("music-channel", { channelId })
+                          }
+                        >
+                          {t("Bruk som musikk-kanal")}
+                        </button>
+                        <button
+                          className="button subtle"
+                          disabled={busy}
+                          onClick={() => void command("disconnect")}
+                        >
+                          {t("Koble fra")}
+                        </button>
+                      </section>
+                      <section className="admin-card">
+                        <h2>{t("Stopptimer")}</h2>
+                        <input
+                          aria-label={t("Minutter til stopp")}
+                          type="number"
+                          min={1}
+                          max={1440}
+                          value={minutes}
+                          onChange={(e) => setMinutes(Number(e.target.value))}
+                        />
+                        <button
+                          className="button subtle"
+                          disabled={busy}
+                          onClick={() =>
+                            void command("sleep-timer", { minutes })
+                          }
+                        >
+                          {t("Start timer")}
+                        </button>
+                        <button
+                          className="button subtle"
+                          disabled={busy}
+                          onClick={() => void command("cancel-sleep-timer")}
+                        >
+                          {t("Avbryt timer")}
+                        </button>
+                        {detail.sleepTimerEndsAt && (
+                          <p>
+                            {t("Stopper")}{" "}
+                            {new Date(
+                              detail.sleepTimerEndsAt,
+                            ).toLocaleTimeString(
+                              language === "en" ? "en-GB" : "nb-NO",
+                            )}
+                          </p>
+                        )}
+                      </section>
+                      <section className="admin-card">
+                        <h2>{t("Lagrede køer")}</h2>
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void command("snapshot-save", {
+                              name: snapshotName,
+                            });
+                          }}
+                        >
+                          <input
+                            aria-label={t("Navn på lagret kø")}
+                            value={snapshotName}
+                            onChange={(e) => setSnapshotName(e.target.value)}
+                            required
+                            maxLength={80}
+                          />
+                          <button className="button subtle" disabled={busy}>
+                            {t("Lagre køen")}
+                          </button>
+                        </form>
+                        {detail.snapshots.map((s) => (
+                          <article className="saved-queue" key={s.id}>
+                            <strong>
+                              {s.name} · {s.songCount} {t("sanger")}
+                            </strong>
+                            <button
+                              className="button subtle"
+                              disabled={busy}
+                              onClick={() =>
+                                void command("snapshot-restore", {
+                                  id: s.id,
+                                  replace: false,
+                                })
+                              }
+                            >
+                              {t("Legg til")}
+                            </button>
+                            <button
+                              className="button subtle"
+                              disabled={busy}
+                              onClick={() => {
+                                if (confirm(t("Erstatte køen?")))
+                                  void command("snapshot-restore", {
+                                    id: s.id,
+                                    replace: true,
+                                  });
+                              }}
+                            >
+                              {t("Erstatt kø")}
+                            </button>
+                            <button
+                              className="icon-button"
+                              aria-label={t("Slett ") + s.name}
+                              disabled={busy}
+                              onClick={() => {
+                                if (confirm(t("Slette denne lagrede køen?")))
+                                  void command("snapshot-delete", { id: s.id });
+                              }}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </article>
+                        ))}
+                      </section>
+                      <section className="admin-card">
+                        <h2>{t("Vedlikehold")}</h2>
+                        <button
+                          className="button subtle"
+                          disabled={busy}
+                          onClick={() => void command("cleanup-duplicates")}
+                        >
+                          {t("Fjern duplikater i køen")}
+                        </button>
+                        <button
+                          className="button subtle"
+                          disabled={
+                            busy ||
+                            Boolean(current) ||
+                            Boolean(state?.connected)
+                          }
+                          onClick={() => void command("diagnostic")}
+                        >
+                          {t("Test lydtilkoblingen")}
+                        </button>
+                        <p>
+                          {t("Testen krever en tom bot og en tom talekanal.")}
+                        </p>
+                      </section>
+                    </div>
+                  )}
+                  {notice && (
+                    <p role="status" className="admin-notice">
+                      {t(notice)}
+                    </p>
+                  )}
+                  {detail && (
+                    <details className="admin-card">
+                      <summary>{t("Siste handlinger")}</summary>
+                      {detail.commands.slice(0, 10).map((j) => (
+                        <p key={j.id}>
+                          {j.payload.action}: {j.status}
+                          {j.result ? " · " + j.result : ""}
+                        </p>
+                      ))}
+                    </details>
+                  )}
+                </>
+              )}
+            </>
+          )}
+          <footer className="page-footer">
+            <span>GUTTA KRUTT AFTERPARTY</span>
+            <a href="/">
+              {t("Til musikken")} <ArrowUpRight size={13} />
+            </a>
+          </footer>
+        </div>
+      </main>
+    </div>
+  );
 }
