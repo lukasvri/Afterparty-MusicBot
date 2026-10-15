@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ?? "playwright"
 );
-const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:5173";
+const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:8787";
 assert(
   ["127.0.0.1", "localhost"].includes(new URL(base).hostname),
   "Synthetic browser checks require a local preview",
@@ -43,7 +43,8 @@ async function fixture({
   let current = video("seed1234567"),
     version = 1,
     radio = true;
-  let anchor = Date.now(), position = 20;
+  let anchor = Date.now(),
+    position = 20;
   const room = () => ({
     code: "TESTROOM",
     name: "Synthetic own room",
@@ -51,7 +52,7 @@ async function fixture({
     queue: [],
     playing,
     radio,
-    position: position + (playing ? (Date.now() - anchor)/1000 : 0),
+    position: position + (playing ? (Date.now() - anchor) / 1000 : 0),
     version,
     serverTime: Date.now(),
     viewers: 1,
@@ -112,7 +113,9 @@ async function fixture({
             if (this.state !== 2) this.emit(2);
           }
           getCurrentTime() {
-            const value = this.position + (this.state === 1 ? (performance.now() - this.at) / 1000 : 0);
+            const value =
+              this.position +
+              (this.state === 1 ? (performance.now() - this.at) / 1000 : 0);
             return window.__jitter ? Math.floor(value * 4) / 4 : value;
           }
           getPlayerState() {
@@ -163,9 +166,14 @@ async function fixture({
         const command = route.request().postDataJSON();
         commands.push(command);
         if (command.action === "next" && staleNext) {
-          if(staleNext === "new-track") current=video("newtrack123");
-          staleNext="";version++;
-          return route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({error:"Synthetic stale revision"})});
+          if (staleNext === "new-track") current = video("newtrack123");
+          staleNext = "";
+          version++;
+          return route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "Synthetic stale revision" }),
+          });
         }
         if (command.action === "played") result = { ok: true };
         else {
@@ -207,8 +215,13 @@ async function fixture({
       body: JSON.stringify(result),
     });
   });
-  await page.goto(base + "/?room=TESTROOM", { waitUntil: "networkidle" });
-  await page.locator(".stage-intro button").waitFor();
+  try {
+    await page.goto(base + "/?room=TESTROOM", { waitUntil: "networkidle" });
+    await page.locator(".stage-intro button").waitFor();
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
   return {
     browser,
     page,
@@ -424,52 +437,146 @@ test("fresh Afterparty storage works without any old browser keys", async () => 
   }
 });
 
-
 test("one host stays live without repeated seeks or publishing buffering as a room seek", async () => {
- const {browser,page,commands,expectedPosition}=await fixture({playing:true,jitter:true});
- try {
-  await page.locator('.stage-intro button').click();
-  await page.waitForFunction(()=>window.__fakePlayer?.state===1);
-  await page.waitForTimeout(12000);
-  if(process.env.SCREENSHOT_DIR) await page.screenshot({path:process.env.SCREENSHOT_DIR+'/clean-room.png',fullPage:true});
-  assert.equal(await page.evaluate(()=>window.__transportCalls.filter(c=>c==='seek').length),0);
-  await page.evaluate(()=>window.__fakePlayer.emit(3));
-  await page.waitForTimeout(3500);
-  await page.evaluate(()=>window.__fakePlayer.emit(1));
-  await page.waitForTimeout(8000);
-  assert.equal(commands.filter(c=>c.action==='seek').length,0,'buffer recovery must never publish a host seek');
-  const seeks=await page.evaluate(()=>window.__transportCalls.filter(c=>c==='seek').length);
-  assert.equal(seeks,1,'recover once, then continue without seeking loops');
-  const measured = await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
-  assert(Math.abs(expectedPosition()-measured)<.6,'recovery must return within 600ms of the shared live clock');
-  assert.equal(await page.locator('.video-settings .admin-seek').count(),0);
-  await page.evaluate(()=>{
-    const p=window.__fakePlayer;
-    p.emit(3); p.position=80; p.at=performance.now(); p.emit(1);
+  const { browser, page, commands, expectedPosition } = await fixture({
+    playing: true,
+    jitter: true,
   });
-  await page.waitForTimeout(2000);
-  assert.equal(commands.filter(c=>c.action==='seek').length,1,'native YouTube scrubbing publishes exactly one seek');
-  assert(Math.abs(commands.find(c=>c.action==='seek').position-80)<2);
- } finally { await browser.close(); }
+  try {
+    await page.locator(".stage-intro button").click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.waitForTimeout(12000);
+    if (process.env.SCREENSHOT_DIR)
+      await page.screenshot({
+        path: process.env.SCREENSHOT_DIR + "/clean-room.png",
+        fullPage: true,
+      });
+    assert.equal(
+      await page.evaluate(
+        () => window.__transportCalls.filter((c) => c === "seek").length,
+      ),
+      0,
+    );
+    await page.evaluate(() => window.__fakePlayer.emit(3));
+    await page.waitForTimeout(3500);
+    await page.evaluate(() => window.__fakePlayer.emit(1));
+    await page.waitForTimeout(8000);
+    assert.equal(
+      commands.filter((c) => c.action === "seek").length,
+      0,
+      "buffer recovery must never publish a host seek",
+    );
+    const seeks = await page.evaluate(
+      () => window.__transportCalls.filter((c) => c === "seek").length,
+    );
+    assert.equal(seeks, 1, "recover once, then continue without seeking loops");
+    const measured = await page.evaluate(() =>
+      window.__fakePlayer.getCurrentTime(),
+    );
+    assert(
+      Math.abs(expectedPosition() - measured) < 0.6,
+      "recovery must return within 600ms of the shared live clock",
+    );
+    assert.equal(await page.locator(".video-settings .admin-seek").count(), 0);
+    await page.evaluate(() => {
+      const p = window.__fakePlayer;
+      p.emit(3);
+      p.position = 80;
+      p.at = performance.now();
+      p.emit(1);
+    });
+    await page.waitForTimeout(2000);
+    assert.equal(
+      commands.filter((c) => c.action === "seek").length,
+      1,
+      "native YouTube scrubbing publishes exactly one seek",
+    );
+    assert(
+      Math.abs(commands.find((c) => c.action === "seek").position - 80) < 2,
+    );
+  } finally {
+    await browser.close();
+  }
 });
 
-for(const staleNext of ['same-track','new-track']) test(`skip safely handles a stale revision: ${staleNext}`,async()=>{
- const {browser,page,commands}=await fixture({playing:true,staleNext});
- try{
-  await page.locator('.stage-intro button').click();
-  await page.waitForFunction(()=>window.__fakePlayer?.state===1);
-  await page.getByRole('button',{name:'Next video for everyone',exact:true}).click();
-  await page.waitForFunction(id=>window.__videoCalls.includes(id),staleNext==='same-track'?'next1234567':'newtrack123');
-  assert.equal(commands.filter(c=>c.action==='next').length,staleNext==='same-track'?2:1);
- }finally{await browser.close();}
-});
+for (const staleNext of ["same-track", "new-track"])
+  test(`skip safely handles a stale revision: ${staleNext}`, async () => {
+    const { browser, page, commands } = await fixture({
+      playing: true,
+      staleNext,
+    });
+    try {
+      await page.locator(".stage-intro button").click();
+      await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+      await page
+        .getByRole("button", { name: "Next video for everyone", exact: true })
+        .click();
+      await page.waitForFunction(
+        (id) => window.__videoCalls.includes(id),
+        staleNext === "same-track" ? "next1234567" : "newtrack123",
+      );
+      assert.equal(
+        commands.filter((c) => c.action === "next").length,
+        staleNext === "same-track" ? 2 : 1,
+      );
+    } finally {
+      await browser.close();
+    }
+  });
 
-test('quality changes preserve the iframe and never reload the song or publish transport',async()=>{
- const {browser,page,commands}=await fixture({playing:true});
- try{await page.locator('.stage-intro button').click();await page.waitForFunction(()=>window.__fakePlayer?.state===1);await page.waitForTimeout(2500);
- const before=await page.evaluate(()=>({loads:window.__videoCalls.length,seeks:window.__transportCalls.filter(c=>c==='seek').length}));const sent=commands.length;
- await page.evaluate(()=>{window.__originalPlayer=window.__fakePlayer;window.__fakePlayer.options.events.onPlaybackQualityChange({data:'hd1440'});window.__fakePlayer.emit(3);});await page.waitForTimeout(200);
- await page.evaluate(()=>{window.__fakePlayer.options.events.onPlaybackQualityChange({data:'hd720'});window.__fakePlayer.emit(1);});await page.waitForTimeout(4000);
- assert(await page.evaluate(()=>window.__fakePlayer===window.__originalPlayer));assert.equal(await page.evaluate(()=>window.__videoCalls.length),before.loads);assert.equal(await page.evaluate(()=>window.__transportCalls.filter(c=>c==='seek').length),before.seeks);assert.equal(commands.slice(sent).filter(c=>['seek','play','pause','next'].includes(c.action)).length,0);assert.equal(await page.locator('.settings-quality').first().innerText(),'720p');
- }finally{await browser.close();}
+test("quality changes preserve the iframe and never reload the song or publish transport", async () => {
+  const { browser, page, commands } = await fixture({ playing: true });
+  try {
+    await page.locator(".stage-intro button").click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.waitForTimeout(2500);
+    const before = await page.evaluate(() => ({
+      loads: window.__videoCalls.length,
+      seeks: window.__transportCalls.filter((c) => c === "seek").length,
+    }));
+    const sent = commands.length;
+    await page.evaluate(() => {
+      window.__originalPlayer = window.__fakePlayer;
+      window.__fakePlayer.options.events.onPlaybackQualityChange({
+        data: "hd1440",
+      });
+      window.__fakePlayer.emit(3);
+    });
+    await page.waitForTimeout(200);
+    await page.evaluate(() => {
+      window.__fakePlayer.options.events.onPlaybackQualityChange({
+        data: "hd720",
+      });
+      window.__fakePlayer.emit(1);
+    });
+    await page.waitForTimeout(4000);
+    assert(
+      await page.evaluate(
+        () => window.__fakePlayer === window.__originalPlayer,
+      ),
+    );
+    assert.equal(
+      await page.evaluate(() => window.__videoCalls.length),
+      before.loads,
+    );
+    assert.equal(
+      await page.evaluate(
+        () => window.__transportCalls.filter((c) => c === "seek").length,
+      ),
+      before.seeks,
+    );
+    assert.equal(
+      commands
+        .slice(sent)
+        .filter((c) => ["seek", "play", "pause", "next"].includes(c.action))
+        .length,
+      0,
+    );
+    assert.equal(
+      await page.locator(".settings-quality").first().innerText(),
+      "720p",
+    );
+  } finally {
+    await browser.close();
+  }
 });

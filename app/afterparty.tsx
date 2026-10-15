@@ -4,6 +4,7 @@ import { headers, request } from "@/lib/browser-api";
 import { useConcertQueue } from "@/hooks/use-concert-queue";
 import { notePlayerEvent, playerDiagnostics } from "@/lib/player-diagnostics";
 import { NativeSeekTracker } from "@/lib/native-seek";
+import { MusicDiscovery } from "@/components/party/music-discovery";
 import { StartEvening } from "@/components/party/start-evening";
 import { RoomDialog } from "@/components/party/room-dialog";
 import { RoomSharing } from "@/components/party/room-sharing";
@@ -16,7 +17,6 @@ import {
   ArrowUpRight,
   AudioLines,
   Check,
-  ChevronRight,
   Copy,
   Link2,
   ListMusic,
@@ -35,13 +35,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import {
-  Room,
-  Video,
-  time,
-  type DiscordState,
-  type HistoryVideo,
-} from "@/lib/types";
+import { Room, Video, type DiscordState, type HistoryVideo } from "@/lib/types";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useAudioPreferences } from "@/hooks/use-audio-preferences";
 import { useImmersiveControls } from "@/hooks/use-immersive-controls";
@@ -203,54 +197,57 @@ export default function Afterparty() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 4500);
   }, []);
-  const accept = useCallback((next: Room) => {
-    const previous = roomRef.current;
-    if (previous?.code === next.code)
-      next = {
-        ...next,
-        isPublic: next.isPublic ?? previous.isPublic,
-        isOwner: next.isOwner ?? previous.isOwner,
-      };
-    if (isOlderSnapshot(previous, next)) return;
-    if (transportChanged(previous, next)) transportChangedRef.current = true;
-    if (
-      previous?.code === next.code &&
-      next.version > previous.version &&
-      (next.position < previous.position - 1 ||
-        (!previous.playing && next.playing))
-    )
-      lastEnded.current = "";
-    roomRef.current = next;
-    received.current = performance.now();
-    if (
-      next.syncSource !== "live" ||
-      JSON.stringify([
-        previous?.syncEpoch,
-        previous?.version,
-        previous?.playing,
-        previous?.discordOnline,
-        previous?.viewers,
-        previous?.isPublic,
-      ]) !==
-        JSON.stringify([
-          next.syncEpoch,
-          next.version,
-          next.playing,
-          next.discordOnline,
-          next.viewers,
-          next.isPublic,
-        ])
-    )
-      setRoom(next);
-    if (
-      loadedId.current &&
-      !loadedId.current.startsWith(
-        `${next.code}:${next.playbackKey ?? next.current?.id}`,
+  const accept = useCallback(
+    (next: Room) => {
+      const previous = roomRef.current;
+      if (previous?.code === next.code)
+        next = {
+          ...next,
+          isPublic: next.isPublic ?? previous.isPublic,
+          isOwner: next.isOwner ?? previous.isOwner,
+        };
+      if (isOlderSnapshot(previous, next)) return;
+      if (transportChanged(previous, next)) transportChangedRef.current = true;
+      if (
+        previous?.code === next.code &&
+        next.version > previous.version &&
+        (next.position < previous.position - 1 ||
+          (!previous.playing && next.playing))
       )
-    )
-      setPlayerError("");
-    setOnline(true);
-  }, []);
+        lastEnded.current = "";
+      roomRef.current = next;
+      received.current = performance.now();
+      if (
+        next.syncSource !== "live" ||
+        JSON.stringify([
+          previous?.syncEpoch,
+          previous?.version,
+          previous?.playing,
+          previous?.discordOnline,
+          previous?.viewers,
+          previous?.isPublic,
+        ]) !==
+          JSON.stringify([
+            next.syncEpoch,
+            next.version,
+            next.playing,
+            next.discordOnline,
+            next.viewers,
+            next.isPublic,
+          ])
+      )
+        setRoom(next);
+      if (
+        loadedId.current &&
+        !loadedId.current.startsWith(
+          `${next.code}:${next.playbackKey ?? next.current?.id}`,
+        )
+      )
+        setPlayerError("");
+      setOnline(true);
+    },
+    [setRoom, setPlayerError, setOnline],
+  );
   const liveKey = useRef("");
   const realtime = useLiveDiscord(
     (state, age) => {
@@ -269,13 +266,18 @@ export default function Afterparty() {
       );
     },
     room?.guildId,
+    !room || room.mode === "discord",
   );
   const roomLive = useLiveRoom(
     room?.mode === "discord" ? undefined : room?.code,
     (next) => {
       const previous = roomRef.current;
       if (activeCode.current === next.code)
-        accept({ ...next, viewers: previous?.viewers ?? next.viewers, isHost: previous?.isHost ?? false });
+        accept({
+          ...next,
+          viewers: previous?.viewers ?? next.viewers,
+          isHost: previous?.isHost ?? false,
+        });
     },
   );
   const liveFresh = realtime.fresh;
@@ -348,7 +350,7 @@ export default function Afterparty() {
         if (generation === joinGeneration.current) setLoadingRoom(false);
       }
     },
-    [accept],
+    [accept, setError, setLoadingRoom, setModal, setPlayerError],
   );
   const create = async () => {
     const generation = ++joinGeneration.current;
@@ -406,12 +408,13 @@ export default function Afterparty() {
       setPending(true);
       setError("");
       try {
-        const send = (snapshot: Room) => request<{ room: Room }>(
-          `/api/rooms/${current.code}`,
-          {
+        const send = (snapshot: Room) =>
+          request<{ room: Room }>(`/api/rooms/${current.code}`, {
             method: "POST",
             headers: headers(current.code),
-            ...(["next", "radio"].includes(name) ? { signal: AbortSignal.timeout(35000) } : {}),
+            ...(["next", "radio"].includes(name)
+              ? { signal: AbortSignal.timeout(35000) }
+              : {}),
             body: JSON.stringify({
               action: name,
               guildId: roomRef.current?.guildId,
@@ -419,23 +422,37 @@ export default function Afterparty() {
               displayName: storage.get("afterparty-display-name") ?? t("Gjest"),
               ...extras,
             }),
-          },
-        );
+          });
         let data: { room: Room };
-        try { data = await send(current); }
-        catch (error) {
-          if (name !== "next" || (error as Error & {status?:number}).status !== 409) throw error;
+        try {
+          data = await send(current);
+        } catch (error) {
+          if (
+            name !== "next" ||
+            (error as Error & { status?: number }).status !== 409
+          )
+            throw error;
           await refresh(current.code);
           const latest = roomRef.current;
-          if (!latest || generation !== pollGeneration.current || latest.code !== current.code ||
-            latest.current?.id !== current.current?.id || latest.playbackKey !== current.playbackKey || latest.playing !== current.playing) throw error;
+          if (
+            !latest ||
+            generation !== pollGeneration.current ||
+            latest.code !== current.code ||
+            latest.current?.id !== current.current?.id ||
+            latest.playbackKey !== current.playbackKey ||
+            latest.playing !== current.playing
+          )
+            throw error;
           data = await send(latest);
         }
         if (
           generation === pollGeneration.current &&
           activeCode.current === current.code
         ) {
-          accept({ ...data.room, viewers: roomRef.current?.viewers ?? data.room.viewers });
+          accept({
+            ...data.room,
+            viewers: roomRef.current?.viewers ?? data.room.viewers,
+          });
           if (name === "add")
             announce(
               data.room.approvalRequired && !data.room.isHost
@@ -546,7 +563,10 @@ export default function Afterparty() {
                   storage.get("afterparty-display-name") ?? t("Gjest"),
               }),
             });
-            accept({ ...data.room, viewers: roomRef.current?.viewers ?? data.room.viewers });
+            accept({
+              ...data.room,
+              viewers: roomRef.current?.viewers ?? data.room.viewers,
+            });
           }
         } catch (e) {
           setError("Settet er delvis lagt til. " + (e as Error).message);
@@ -641,10 +661,24 @@ export default function Afterparty() {
     history.pushState(null, "", url.pathname + url.search);
   };
 
-  const concertQueue = useConcertQueue(room?.mode === "discord" ? room.guildId : undefined);
-  const queueRoom = room?.mode === "discord" && concertQueue.data ? {...room,...concertQueue.data.state,isHost:concertQueue.data.canManage} : room;
-  const queueAction = (name:string,extra?:Record<string,unknown>) => room?.mode === "discord"
-    ? void concertQueue.action(name,{playbackKey:room.playbackKey,...extra}) : void action(name,extra);
+  const concertQueue = useConcertQueue(
+    room?.mode === "discord" ? room.guildId : undefined,
+  );
+  const queueRoom =
+    room?.mode === "discord" && concertQueue.data
+      ? {
+          ...room,
+          ...concertQueue.data.state,
+          isHost: concertQueue.data.canManage,
+        }
+      : room;
+  const queueAction = (name: string, extra?: Record<string, unknown>) =>
+    room?.mode === "discord"
+      ? void concertQueue.action(name, {
+          playbackKey: room.playbackKey,
+          ...extra,
+        })
+      : void action(name, extra);
   const botCommand = async (
     action: "skip" | "enqueue" | "pause" | "resume",
     extras: Record<string, unknown> = {},
@@ -746,9 +780,13 @@ export default function Afterparty() {
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
     const update = async () => {
       try {
-        if (liveFresh.current) {
+        if (
+          liveFresh.current ||
+          (roomRef.current && roomRef.current.mode !== "discord")
+        ) {
           timer = setTimeout(update, 10000);
           return;
         }
@@ -757,6 +795,12 @@ export default function Afterparty() {
             (roomRef.current?.guildId
               ? "?guildId=" + roomRef.current.guildId
               : ""),
+          {
+            signal: AbortSignal.any([
+              controller.signal,
+              AbortSignal.timeout(12000),
+            ]),
+          },
         );
         if (!disposed && !liveFresh.current) setDiscord(d.state);
       } catch {
@@ -770,6 +814,7 @@ export default function Afterparty() {
     void update();
     return () => {
       disposed = true;
+      controller.abort();
       clearTimeout(timer);
     };
   }, []);
@@ -785,7 +830,6 @@ export default function Afterparty() {
       else void action("play");
     }
     if (playerReady.current && player.current && r.playing) {
-
       applyAudioPreferences(player.current, audio.current.current);
       syncRef.current(true);
       player.current.playVideo();
@@ -876,7 +920,7 @@ export default function Afterparty() {
         setPlayerError("YouTube-spilleren svarer ikke. Prøv videoen igjen.");
       }
     }, 15000);
-    Object.assign(window,{afterpartyPlaybackDiagnostics:playerDiagnostics});
+    Object.assign(window, { afterpartyPlaybackDiagnostics: playerDiagnostics });
     loadYoutube()
       .then(() => {
         if (disposed || !playerRoot.current) return;
@@ -968,11 +1012,16 @@ export default function Afterparty() {
             onStateChange: (event: { data: number }) => {
               if (disposed) return;
               if (event.data === 3) {
-                if (bufferStarted.current === null) notePlayerEvent("buffer-start");
+                if (bufferStarted.current === null)
+                  notePlayerEvent("buffer-start");
                 bufferStarted.current ??= performance.now();
                 setSyncStatus("Bufrer video");
               } else {
-                if (bufferStarted.current !== null) notePlayerEvent("buffer-end",performance.now()-bufferStarted.current);
+                if (bufferStarted.current !== null)
+                  notePlayerEvent(
+                    "buffer-end",
+                    performance.now() - bufferStarted.current,
+                  );
                 if (event.data === 1 && bufferStarted.current !== null) {
                   settleUntil.current =
                     performance.now() + syncRecoveryMs(syncModeRef.current);
@@ -1100,8 +1149,17 @@ export default function Afterparty() {
     const currentTime = p.getCurrentTime();
     // A short audio stall is not a shared pause. Keep the iframe intact and
     // let the normal drift policy reconcile once the authoritative clock moves.
-    if (r.buffering && r.playing) { setSyncStatus("Bufrer lyd i Discord"); return; }
-    if (r.isHost && r.mode !== "discord" && !r.current.live && !force && !nativeSeekPending.current) {
+    if (r.buffering && r.playing) {
+      setSyncStatus("Bufrer lyd i Discord");
+      return;
+    }
+    if (
+      r.isHost &&
+      r.mode !== "discord" &&
+      !r.current.live &&
+      !force &&
+      !nativeSeekPending.current
+    ) {
       const seek = nativeSeek.current.observe(currentTime, now, state);
       if (seek !== null) {
         nativeSeekPending.current = true;
@@ -1121,10 +1179,12 @@ export default function Afterparty() {
     );
     // Require persistent drift; a single delayed iframe sample is not a seek.
     const drift = Math.abs(currentTime - target.position);
-    if (state !== 1 || drift < (syncModeRef.current === "stable" ? 1.5 : .5))
+    if (state !== 1 || drift < (syncModeRef.current === "stable" ? 1.5 : 0.5))
       correctionCandidate.current = null;
     else correctionCandidate.current ??= now;
-    const persistent = correctionCandidate.current !== null && now - correctionCandidate.current >= 1000;
+    const persistent =
+      correctionCandidate.current !== null &&
+      now - correctionCandidate.current >= 1000;
     if (
       (force || !target.playing || persistent) &&
       (!locallyPaused.current || force) &&
@@ -1145,7 +1205,6 @@ export default function Afterparty() {
       ) &&
       !r.current.live
     ) {
-
       correctionCandidate.current = null;
       settleUntil.current = now + syncRecoveryMs(syncModeRef.current);
       nativeSeek.current.write(target.position);
@@ -1175,11 +1234,9 @@ export default function Afterparty() {
       !locallyPaused.current &&
       ![1, 3].includes(state)
     ) {
-
       p.playVideo();
     }
     if (!target.playing && state === 1) {
-
       p.pauseVideo();
     }
   }
@@ -1404,52 +1461,67 @@ export default function Afterparty() {
             </div>
           </section>
           {!directoryOpen && room && (
-            <details className="room-options"><summary>{t("Rominnstillingar")}</summary><div className="party-tools">
-              {room?.isHost && !discordMode && (
-                <button
-                  className="button subtle"
-                  aria-pressed={room.radio !== false}
-                  disabled={pending}
-                  onClick={() =>
-                    void action("radio", { enabled: room.radio === false })
-                  }
-                >
-                  <Radio size={16} />
-                  {room.radio === false ? t("Radio av") : t("Radio på")}
-                </button>
-              )}
-              {room?.isOwner && !discordMode && (
-                <label className="room-visibility">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(room.isPublic)}
+            <details className="room-options">
+              <summary>{t("Rominnstillingar")}</summary>
+              <div className="party-tools">
+                {room?.isHost && !discordMode && (
+                  <button
+                    className="button subtle"
+                    aria-pressed={room.radio !== false}
                     disabled={pending}
-                    onChange={(e) =>
-                      void action("visibility", { isPublic: e.target.checked })
+                    onClick={() =>
+                      void action("radio", { enabled: room.radio === false })
                     }
-                  />
-                  {t("Vis i Åpne rom")}
-                </label>
-              )}
+                  >
+                    <Radio size={16} />
+                    {room.radio === false ? t("Radio av") : t("Radio på")}
+                  </button>
+                )}
+                {room?.isOwner && !discordMode && (
+                  <label className="room-visibility">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(room.isPublic)}
+                      disabled={pending}
+                      onChange={(e) =>
+                        void action("visibility", {
+                          isPublic: e.target.checked,
+                        })
+                      }
+                    />
+                    {t("Vis i Åpne rom")}
+                  </label>
+                )}
 
-              <label>
-                {t("Kallenamnet ditt")}
-                <input
-                  maxLength={32}
-                  value={displayName}
-                  placeholder={t("Gjest")}
-                  onChange={(e) => {
-                    setDisplayName(e.target.value);
-                    storage.set("afterparty-display-name", e.target.value);
-                  }}
+                <label>
+                  {t("Kallenamnet ditt")}
+                  <input
+                    maxLength={32}
+                    value={displayName}
+                    placeholder={t("Gjest")}
+                    onChange={(e) => {
+                      setDisplayName(e.target.value);
+                      storage.set("afterparty-display-name", e.target.value);
+                    }}
+                  />
+                </label>
+                <button className="button subtle" onClick={toggleTV}>
+                  {tv ? t("Avslutt TV-modus") : t("TV-modus")}
+                </button>
+              </div>
+              {queueRoom && (!discordMode || concertQueue.data) && (
+                <QueueSettings
+                  room={queueRoom}
+                  busy={discordMode ? concertQueue.busy : pending}
+                  onAction={queueAction}
                 />
-              </label>
-              <button className="button subtle" onClick={toggleTV}>
-                {tv ? t("Avslutt TV-modus") : t("TV-modus")}
-              </button>
-            </div>
-              {queueRoom && (!discordMode || concertQueue.data) && <QueueSettings room={queueRoom} busy={discordMode ? concertQueue.busy : pending} onAction={queueAction}/>}
-              {discordMode && !concertQueue.data?.canManage && <p>{t("Logg inn med Discord for å administrere denne serveren.")} <a href="/api/auth/discord">Discord</a></p>}
+              )}
+              {discordMode && !concertQueue.data?.canManage && (
+                <p>
+                  {t("Logg inn med Discord for å administrere denne serveren.")}{" "}
+                  <a href="/api/auth/discord">Discord</a>
+                </p>
+              )}
             </details>
           )}
           {(sharing || tv) && room && (
@@ -1495,10 +1567,7 @@ export default function Afterparty() {
               }}
             />
           )}
-          <div
-            className="studio-grid"
-            hidden={directoryOpen || !room}
-          >
+          <div className="studio-grid" hidden={directoryOpen || !room}>
             <section
               ref={fullscreen.element}
               className={`stage-panel${fullscreen.fallback ? " fullscreen-fallback" : ""}`}
@@ -1902,7 +1971,9 @@ export default function Afterparty() {
                 >
                   <ListMusic size={20} aria-hidden="true" />
                   <span className="tab-label">{t("Kø")}</span>
-                  <span className="tab-count">{queueRoom?.queue.length ?? 0}</span>
+                  <span className="tab-count">
+                    {queueRoom?.queue.length ?? 0}
+                  </span>
                 </button>
                 <button
                   id="music-tab"
@@ -1948,12 +2019,34 @@ export default function Afterparty() {
                   <div className="queue-content">
                     {room?.current && (
                       <article className="queue-current">
-                        <img src={room.current.image || `https://i.ytimg.com/vi/${room.current.id}/mqdefault.jpg`} alt="" />
-                        <div><span>{t("Spelar no")}</span><strong>{room.current.title}</strong><small>{room.current.artist}</small></div>
+                        <img
+                          src={
+                            room.current.image ||
+                            `https://i.ytimg.com/vi/${room.current.id}/mqdefault.jpg`
+                          }
+                          alt=""
+                        />
+                        <div>
+                          <span>{t("Spelar no")}</span>
+                          <strong>{room.current.title}</strong>
+                          <small>{room.current.artist}</small>
+                        </div>
                       </article>
                     )}
-                    {queueRoom && <SocialQueue room={queueRoom} busy={discordMode ? concertQueue.busy || !concertQueue.data : pending} onAction={queueAction}/>}
-                    {discordMode && concertQueue.error && <p role="alert">{t(concertQueue.error)}</p>}
+                    {queueRoom && (
+                      <SocialQueue
+                        room={queueRoom}
+                        busy={
+                          discordMode
+                            ? concertQueue.busy || !concertQueue.data
+                            : pending
+                        }
+                        onAction={queueAction}
+                      />
+                    )}
+                    {discordMode && concertQueue.error && (
+                      <p role="alert">{t(concertQueue.error)}</p>
+                    )}
                     {!queueRoom?.queue.length && (
                       <div className="empty-queue">
                         <h3>{t("Køa er tom")}</h3>
@@ -2005,134 +2098,26 @@ export default function Afterparty() {
                   />
                 </section>
               ) : (
-                <section
-                  id="music-content"
-                  role="tabpanel"
-                  aria-labelledby="music-tab"
-                  className="discovery"
-                >
-                  <form
-                    className="search-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void find();
-                    }}
-                  >
-                    <input
-                      aria-label={t(
-                        "Søk etter låt, artist eller YouTube-lenkje",
-                      )}
-                      placeholder={t("Låt, artist eller YouTube-lenkje")}
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      maxLength={120}
-                      minLength={2}
-                      required
-                    />
-                    <button
-                      className="button primary"
-                      aria-label={t("Søk etter musikk")}
-                      disabled={searching}
-                    >
-                      {searching ? (
-                        <LoaderCircle className="spin" size={17} />
-                      ) : (
-                        <Search size={17} />
-                      )}
-                    </button>
-                  </form>
-                  <div className="search-chips">
-                    {!searched ? (
-                      <>
-                        <button
-                          className={historySort === "recent" ? "selected" : ""}
-                          onClick={() => setHistorySort("recent")}
-                        >
-                          {t("Nyleg spelt")}
-                        </button>
-                        <button
-                          className={
-                            historySort === "popular" ? "selected" : ""
-                          }
-                          onClick={() => setHistorySort("popular")}
-                        >
-                          {t("Mest spelt")}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          searchGeneration.current++;
-                          setSearching(false);
-                          setSearched(false);
-                          setQuery("");
-                        }}
-                      >
-                        {t("Historikk")} <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                  {searching ? (
-                    <div className="search-status" role="status">
-                      <LoaderCircle className="spin" size={22} /> {t("Søker …")}
-                    </div>
-                  ) : shown.length ? (
-                    <div className="music-list">
-                      {shown.map((v) => (
-                        <article className="music-row" key={v.id}>
-                          <div className="music-art">
-                            <img src={v.image} alt="" loading="lazy" />
-                            <span>{v.live ? "LIVE" : time(v.duration)}</span>
-                          </div>
-                          <div className="music-copy">
-                            <h3>{v.title}</h3>
-                            <p>{v.artist}</p>
-                            {!searched && "plays" in v && (
-                              <small>
-                                {Number(v.plays)} {t("avspillinger")}
-                              </small>
-                            )}
-                          </div>
-                          <button
-                            className="icon-button add-track"
-                            disabled={
-                              adding ||
-                              (!discordMode && !v.embeddable) ||
-                              (discordMode &&
-                                (!botOnline || !discord?.connected))
-                            }
-                            aria-label={
-                              discordMode
-                                ? t("addDiscord", { title: v.title })
-                                : t("addRoom", { title: v.title })
-                            }
-                            title={
-                              discordMode
-                                ? t("Legg i Discord-kø")
-                                : t("Legg i rommet")
-                            }
-                            onClick={() => void add(v)}
-                          >
-                            <Plus size={19} />
-                          </button>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="search-status">
-                      {searched
-                        ? t("Ingen treff. Prøv eit anna søk.")
-                        : t("Ingen låtar i historikken enno.")}
-                    </div>
-                  )}
-                  <p className="library-note">
-                    {discordMode
-                      ? !discord?.connected
-                        ? t("Start /konsert i ein talekanal i Discord.")
-                        : t("Konsertar spelar i Discord og blir viste her.")
-                      : t("Låtar blir lagde i dette rommet.")}
-                  </p>
-                </section>
+                <MusicDiscovery
+                  query={query}
+                  searching={searching}
+                  searched={searched}
+                  historySort={historySort}
+                  shown={shown}
+                  adding={adding}
+                  discordMode={discordMode}
+                  discordConnected={Boolean(botOnline && discord?.connected)}
+                  onQuery={setQuery}
+                  onSearch={() => void find()}
+                  onSort={setHistorySort}
+                  onHistory={() => {
+                    searchGeneration.current++;
+                    setSearching(false);
+                    setSearched(false);
+                    setQuery("");
+                  }}
+                  onAdd={(video) => void add(video)}
+                />
               )}
             </aside>
           </div>
@@ -2171,9 +2156,13 @@ export default function Afterparty() {
               {!discordMode && room ? t(" · 48 timer") : ""}
             </span>
             <nav className="footer-links" aria-label={t("Snarveier")}>
-              <a href="/install">{language === 'en' ? 'Install bot' : 'Legg til bot'}</a>
-              <a href="/terms">{language === 'en' ? 'Terms' : 'Vilkår'}</a>
-              <a href="/privacy">{language === 'en' ? 'Privacy' : 'Personvern'}</a>
+              <a href="/install">
+                {language === "en" ? "Install bot" : "Legg til bot"}
+              </a>
+              <a href="/terms">{language === "en" ? "Terms" : "Vilkår"}</a>
+              <a href="/privacy">
+                {language === "en" ? "Privacy" : "Personvern"}
+              </a>
               <a href="/support">Support</a>
               <a href="/patch-notes">{t("Patch notes")}</a>
               <a href="/admin" target="_top">

@@ -1,13 +1,13 @@
 /* Shared control geometry and colour. Display type belongs to headings only. */
-:root{--accent:#ff263e;--red-button:#d71931;--font-body:Arial,Helvetica,sans-serif;--muted:#b6b6bd;--line:#343438}
+:root{--accent:#ff263e;--red-button:#d71931;--font-body:Afterparty,Arial,Helvetica,sans-serif;--muted:#b6b6bd;--line:#343438}
 button,input,select,textarea{font-family:var(--font-body)}
 button>svg,a>svg,summary>svg{flex-shrink:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .stage-panel:focus{outline:none}
-.studio-shell .brand{flex-shrink:0;gap:10px;font-family:var(--font-body);font-size:21px;font-weight:800;letter-spacing:-.7px;line-height:1.1}
-.studio-shell .brand-mark{width:36px;height:36px;flex:0 0 36px;transform:none;background:var(--accent);border-radius:7px;display:grid;place-items:center}
-.brand-mark>svg{width:23px;height:23px;transform:none}
-.studio-shell .brand-sub{font-family:var(--font-body);font-size:8px;font-weight:500;letter-spacing:3.2px;margin-top:5px;line-height:1.2;color:#b6b6bd}
+.brand,.studio-shell .brand{flex-shrink:0;gap:10px;font-family:var(--font-display);font-size:23px;font-weight:900;letter-spacing:-1px;line-height:1.1}
+.brand-mark,.studio-shell .brand-mark{width:48px;height:48px;flex:0 0 48px;transform:none;background:#111113;color:#fff;border-radius:13px;display:grid;place-items:center}
+.brand-mark>img{width:100%;height:100%}
+.brand-dot{color:var(--accent)}
 .concert-shell .library-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px}
 .concert-shell .library-tabs button{width:100%;min-width:0;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;padding:10px 8px;font:600 14px/20px var(--font-body);white-space:nowrap;color:#b6b6bd}
 .concert-shell .library-tabs button>svg{width:20px;height:20px;flex:0 0 20px;stroke-width:1.8}
@@ -52,8 +52,8 @@ button>svg,a>svg,summary>svg{flex-shrink:0}
 .stage-panel[data-immersive=true] .buffer-notice{top:20px;left:20px;max-width:calc(100% - 40px)}
 .stage-panel[data-immersive=true] .stage-intro{max-width:80%;bottom:30%}
 @media(max-width:1100px){.studio-shell .sidebar{gap:24px}.studio-shell .topbar{position:static;min-height:64px;height:auto;padding-top:10px;padding-bottom:10px;border-bottom:1px solid #ffffff0d}.studio-shell .sidebar{justify-content:space-between}.concert-shell .music-list{max-height:400px}}
-@media(max-width:650px){.cinema-button{width:44px;padding:0}.cinema-button>span{display:none}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary{width:44px;padding:0;justify-content:center}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary>.settings-label{display:none}.stage-panel[data-immersive=true] .cinema-toolbar{bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px));gap:6px}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings-body{right:50%;transform:translateX(50%);width:min(360px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 164px);padding:16px}.studio-shell .brand{font-size:17px;gap:8px;letter-spacing:-.5px}.studio-shell .brand-mark{width:30px;height:30px;flex-basis:30px}.brand-mark>svg{width:20px;height:20px}.studio-shell .brand-sub{font-size:6px;letter-spacing:2.7px}.concert-shell .library-tabs button{font-size:14px;min-height:48px}.concert-shell .now-playing{flex-wrap:wrap}.concert-shell .track-details{flex-basis:50%}.concert-shell .studio-heading h1{overflow-wrap:anywhere}}
-@media(max-width:380px){.studio-shell .brand{font-size:15px;gap:7px}.studio-shell .brand-mark{width:27px;height:27px;flex-basis:27px}.studio-shell .brand-sub{font-size:5px;letter-spacing:2.5px}.studio-shell .sidebar{padding:0 12px;gap:8px}.studio-shell .nav-link{font-size:10px;padding:12px 5px}.concert-shell .library-tabs button{font-size:13px;gap:7px}}
+@media(max-width:650px){.cinema-button{width:44px;padding:0}.cinema-button>span{display:none}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary{width:44px;padding:0;justify-content:center}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary>.settings-label{display:none}.stage-panel[data-immersive=true] .cinema-toolbar{bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px));gap:6px}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings-body{right:50%;transform:translateX(50%);width:min(360px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 164px);padding:16px}.studio-shell .brand{font-size:17px;gap:8px;letter-spacing:-.5px}.studio-shell .brand-mark{width:36px;height:36px;flex-basis:36px}.brand-mark>svg{width:20px;height:20px}.studio-shell .brand-sub{font-size:6px;letter-spacing:2.7px}.concert-shell .library-tabs button{font-size:14px;min-height:48px}.concert-shell .now-playing{flex-wrap:wrap}.concert-shell .track-details{flex-basis:50%}.concert-shell .studio-heading h1{overflow-wrap:anywhere}}
+@media(max-width:380px){.studio-shell .brand{font-size:15px;gap:7px}.studio-shell .brand-mark{width:32px;height:32px;flex-basis:32px}.studio-shell .brand-sub{font-size:5px;letter-spacing:2.5px}.studio-shell .sidebar{padding:0 12px;gap:8px}.studio-shell .nav-link{font-size:10px;padding:12px 5px}.concert-shell .library-tabs button{font-size:13px;gap:7px}}
 
 .stage-pixel-ribbon rect{animation:ribbon-pulse 2.8s ease-in-out infinite alternate}.deck-ring{animation:deck-light 3s linear infinite}.speaker-stacks{opacity:.9}@keyframes ribbon-pulse{from{opacity:.15}to{opacity:.9}}@keyframes deck-light{to{stroke-dashoffset:-84}}@media(prefers-reduced-motion:reduce){.stage-pixel-ribbon rect,.deck-ring{animation:none}}
 

@@ -1,6 +1,6 @@
-import { useId } from "react";
+import { memo, useId } from "react";
 /** All lamps, beam pivots and laser emitters share one stage coordinate system. */
-export function ConcertScenery() {
+export const ConcertScenery = memo(function ConcertScenery() {
   const prefix = useId().replace(/:/g, "");
   const lamps=[100,300,500,700,900,1100];
   return <div className="concert-scenery" aria-hidden="true">
@@ -18,11 +18,7 @@ export function ConcertScenery() {
       <path d="M550 115H1080V495H550Z" fill="#1c142b" stroke="#55304d"/>
       <rect x="550" y="115" width="530" height="380" fill={`url(#${prefix}-led-grid)`}/>
       <g className="led-halo" transform="translate(815 300)" fill="none"><circle r="155" stroke="#ff263e" strokeWidth="2" opacity=".32"/><circle className="led-orbit" r="143" stroke="#ff4357" strokeWidth="8" strokeDasharray="24 28" opacity=".4"/><circle className="led-orbit-inner" r="126" stroke="#83bfff" strokeWidth="2" strokeDasharray="100 28" opacity=".35"/>{Array.from({length:36},(_,i)=><path key={i} d="M0-161V-174" transform={`rotate(${i*10})`} stroke={i%3?'#ff263e':'#a8d5ff'} strokeWidth="3" opacity=".25"/>)}</g>
-      {/* Letter bounds are centred on the ring at (815, 300), independent of font metrics. */}
-      <g className="stage-monogram" transform="translate(735 235)" fill="#ff263e" opacity=".22">
-        <path d="M70 0H0V130H70V58H35V80H47V106H23V24H70Z"/>
-        <path d="M90 0H113V49L137 0H160L128 65L160 130H135L113 82V130H90Z"/>
-      </g>
+      <image href="/afterparty-mark.svg" x="715" y="185" width="200" height="200" opacity=".8"/>
       <g className="stage-led-bars" fill="#ed577f">{Array.from({length:23},(_,i)=><rect key={i} x={585+i*20} y={425-(i%5)*11} width="8" height={25+(i%5)*11} rx="2" style={{animationDelay:`${i*-.14}s`}}/>)}</g>
       <g className="stage-light-bank">{lamps.map((x,i)=><g key={x} transform={`translate(${x} 82)`}><g className={`rig-beam ${i%2?'rig-beam-even':'rig-beam-odd'}`}><path d="M-6 0H6L190 570H-190Z" fill={i%2?`url(#${prefix}-cool-beam)`:`url(#${prefix}-warm-beam)`}/><path d="M-3 0H3L65 570H-65Z" fill={`url(#${prefix}-warm-beam)`} opacity=".4"/></g></g>)}</g>
       <g className="stage-truss" fill="none" stroke="#77717e" strokeWidth="2"><path d="M0 28H1200M0 57H1200"/>{Array.from({length:20},(_,i)=><path key={i} d={`M${i*60} 28l30 29 30-29`}/>)}</g>
@@ -58,7 +54,7 @@ export function ConcertScenery() {
       <g className="dj-booth"><path d="M645 460L684 426H970L1007 460Z" fill="#30293d" stroke="#987080"/><path d="M645 460H1007L986 564H665Z" fill={`url(#${prefix}-booth-front)`} stroke="#664159"/><path d="M661 469H991" stroke="#ff638d" strokeWidth="3"/><path d="M668 554H984" stroke="#663c79" strokeWidth="2"/>
         <g className="dj-decks">{[693,883].map((x,i)=><g key={x} transform={`translate(${x} 431)`}><path d="M-14-5H82L94 25H-26Z" fill="#10131c" stroke="#67616e"/><ellipse cx="32" cy="10" rx="27" ry="9" fill="#080b12" stroke="#c8c4cf" strokeWidth="1.5"/><ellipse className="deck-ring" cx="32" cy="10" rx="22" ry="7" fill="none" stroke={i?'#ff263e':'#8acfff'} strokeWidth="2" strokeDasharray="30 12"/><ellipse cx="32" cy="10" rx="7" ry="3" fill="#47414e"/><path d="M-1-2H20L23 3H-3Z" fill="#6ac8eb" opacity=".8"/>{[0,1,2,3].map(n=><path key={n} d={`M${n*12-6} 20h8l2 3h-8Z`} fill={n%2?'#ff263e':'#d6d3db'}/>)}<circle cx="73" cy="13" r="3" fill="#ff263e"/></g>)}</g>
         <g className="dj-mixer"><path d="M793 430H858L871 459H779Z" fill="#10131c" stroke="#77707e"/>{[797,810,823,836,849].map((x,i)=><g key={x}><circle cx={x} cy="435" r="2" fill="#c9c4ce"/><circle cx={x} cy="441" r="2" fill="#77717e"/><path d={`M${x} 446l-2 8`} stroke="#77717e"/><path d={`M${x-4} ${448+i%3*2}h6`} stroke="#e4dee8" strokeWidth="2"/></g>)}<path d="M803 456H845" stroke="#61596a"/><path d="M821 454V458" stroke="#ff263e" strokeWidth="3"/></g>
-        <text x="826" y="527" textAnchor="middle" fill="#f2b7cd" fontFamily="Barlow, sans-serif" fontSize="18" fontWeight="600" letterSpacing="8">AFTERPARTY</text>
+        <text x="826" y="527" textAnchor="middle" fill="#f2b7cd" fontFamily="Afterparty, Arial, sans-serif" fontSize="18" fontWeight="900" letterSpacing="-.5">afterparty<tspan fill="#ff263e">.</tspan></text>
       </g>
       <g className="performer-arms" transform="translate(825 415)" strokeLinejoin="round">
         <path d="M-37-20Q-45-19-49-4L-57 12L-80 19" fill="none" stroke="#18202d" strokeWidth="17" strokeLinecap="round"/>
@@ -80,4 +76,4 @@ export function ConcertScenery() {
       <g className="concert-crowd" fill="#070911">{Array.from({length:27},(_,i)=>{const x=i*48-16,y=622+(i%4)*7;return <g key={i} className={i%4===0?'crowd-dancer':''} style={{animationDelay:`${i*-.35}s`}}><ellipse cx={x} cy={y} rx={13+(i%3)} ry="17"/><path d={`M${x-22} 675V${y+27}Q${x} ${y+9} ${x+24} ${y+27}V675Z`}/>{i%5===0&&<path d={`M${x+14} ${y+34}L${x+30} ${y+4}L${x+33} ${y-35}`} fill="none" stroke="#070911" strokeWidth="9" strokeLinecap="round"/>}</g>;})}</g>
     </svg>
   </div>;
-}
+});
