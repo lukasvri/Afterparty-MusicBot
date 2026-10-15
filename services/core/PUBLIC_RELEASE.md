@@ -63,6 +63,9 @@ Only concert tracks are exposed in the public website feed. Normal Discord music
 
 ## Resource limits and metrics
 
+See [host readiness](../../docs/HOST_READINESS.md) for online backups, isolated
+restore checks, host health reporting and a bounded offline audio probe.
+
 Media extraction has a shared limit of four running processes and sixteen queued requests. Audio startup takes priority over searches. The default voice-session limit is eight. This is a resource guard, not evidence that every host can sustain eight simultaneous streams.
 
 Core 2.0.1 adds indexed history/job queries, atomic queue writes, batched acknowledgements and reduced work in the clock loop. SQLite retains WAL and `synchronous=FULL`; playback recovery is still checkpointed once per playback second.
