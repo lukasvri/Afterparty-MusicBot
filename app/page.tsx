@@ -1,2 +1,2 @@
-import Muse from './muse';
-export default function Page(){return <Muse/>;}
+import Afterparty from './afterparty';
+export default function Page(){return <Afterparty/>;}

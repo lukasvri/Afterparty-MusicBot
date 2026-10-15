@@ -63,7 +63,7 @@ test('advanced immediate queues first while skip starts the new selection',async
 
 test('extra controls stay in a private menu and preserve all secondary actions',async()=>{const t=playerFixture();let payload:any,flags:any;const bot={...t.bot,sameVoice:async()=>{}};const i={customId:'krutt:more',isButton:()=>true,deferReply:async(o:any)=>{flags=o.flags},editReply:async(p:any)=>{payload=p}};await DiscordBot.prototype.interaction.call(bot as never,i as never);assert.equal(flags,64);assert.equal(payload.components.length,2);const ids=payload.components.flatMap((r:any)=>r.components.map((b:any)=>b.data.custom_id));assert.deepEqual(ids,['krutt:back10','krutt:forward30','krutt:queue','krutt:loop','krutt:shuffle','krutt:favorite']);assert.equal(playerComponents(t.bot as never)[0].components.length,3);assert(!playerEmbed(t.bot as never).data.description!.includes('Volum'));});
 
-test('Muse timeline is bounded and the image sits beside the text, with the original button rows',()=>{
+test('Player timeline is bounded and the image sits beside the text, with the original button rows',()=>{
  const t=playerFixture();t.state.current.image='https://example.test/cover.jpg';
  const embed=playerEmbed(t.bot as never).toJSON();assert.equal(embed.thumbnail?.url,t.state.current.image);assert.equal(embed.image,undefined);
  assert.equal(progressBar(-1,100),'🔘'+'▬'.repeat(15));assert.equal(progressBar(100,100),'▬'.repeat(15)+'🔘');assert.equal(progressBar(NaN,0),'🔘'+'▬'.repeat(15));

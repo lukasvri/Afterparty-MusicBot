@@ -39,4 +39,4 @@ The host port is `127.0.0.1:3990`. Use an HTTPS proxy or tunnel for website acce
 docker build --target validation -t gutta-krutt-core:validation .
 ```
 
-This typechecks Core and runs its tests, including real FFmpeg/Opus audio. Core uses its own runtime; the Muse files under `reference/` are retained reference material with their upstream license.
+This typechecks Core and runs its tests, including real FFmpeg/Opus audio. Core uses its own runtime and command definitions. Adapted code retains its upstream license in `licenses/player-upstream.LICENSE`.

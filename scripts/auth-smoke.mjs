@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-const base=process.env.MUSE_TEST_URL??'http://127.0.0.1:5173';
+const base=process.env.AFTERPARTY_TEST_URL??process.env.MUSE_TEST_URL??'http://127.0.0.1:5173';
 if(new URL(base).hostname!=='127.0.0.1')throw Error('Synthetic identity checks are local-only.');
 if(!process.env.GK_TEST_PASSWORD)throw Error('Set the temporary local GK_TEST_PASSWORD.');
 const request=(path,options={})=>fetch(base+path,{signal:AbortSignal.timeout(20000),...options});

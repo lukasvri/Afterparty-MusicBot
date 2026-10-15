@@ -157,7 +157,7 @@
   },
   {
     "name": "disconnect",
-    "description": "sett på pause og koble Muse fra",
+    "description": "sett på pause og koble Afterparty fra",
     "default_member_permissions": null
   },
   {

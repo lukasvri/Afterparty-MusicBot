@@ -2,10 +2,10 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
-const base=process.env.MUSE_TEST_URL??'http://127.0.0.1:5173';
+const base=process.env.AFTERPARTY_TEST_URL??process.env.MUSE_TEST_URL??'http://127.0.0.1:5173';
 assert(['127.0.0.1','localhost'].includes(new URL(base).hostname),'This test must never target the live bot');
 const values=Object.fromEntries(readFileSync('.dev.vars','utf8').split('\n').filter(line=>line.includes('=')).map(line=>{const i=line.indexOf('=');return [line.slice(0,i),line.slice(i+1).replace(/^"|"$/g,'')];}));
-const headers={'Content-Type':'application/json','X-Muse-Visitor':randomUUID()};
+const headers={'Content-Type':'application/json','X-Afterparty-Visitor':randomUUID()};
 async function request(path,body,extra={}){const response=await fetch(base+path,{method:body?'POST':'GET',headers:{...headers,...extra},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});return {status:response.status,data:await response.json()};}
 const original=(await request('/api/discord')).data.state;
 const state={ready:true,connected:true,playing:true,position:40,volume:60,playbackKey:'core:local-fixture',current:{id:'M7lc1UVf-VE',title:'Local transport fixture',artist:'Test',image:'',duration:1344,live:false,embeddable:true,concert:true},queue:[],queueRevision:'local-transport-test'};

@@ -1,3 +1,4 @@
+import {visitorIdentity} from './visitor-identity.ts';
 import {env as cloudEnv} from 'cloudflare:workers';
 import {getChatGPTUser} from '@/app/chatgpt-auth';
 import type {Video, RoomState, Room} from './types';
@@ -70,7 +71,7 @@ export async function search(request:Request, query:string){
 type Row={is_public?:number;guild_id?:string;code:string;name:string;owner_hash:string;state:string;version:number;updated_at:number;expires_at:number};
 export async function row(code:string){if(!/^[A-Z0-9]{8}$/.test(code))fail(404,'Rommet finnes ikke.');const value=await db().prepare('SELECT * FROM rooms WHERE code=? AND expires_at>?').bind(code,Date.now()).first<Row>();if(!value)fail(404,'Rommet er avsluttet eller har gått ut. Lag et nytt rom.');return value;}
 export async function publicRoom(request:Request, value:Row, heartbeat=true):Promise<Room>{
-  const state=JSON.parse(value.state) as RoomState;const actor=request.headers.get('x-muse-visitor');const now=Date.now();
+  const state=JSON.parse(value.state) as RoomState;const actor=visitorIdentity(request.headers);const now=Date.now();
   const discord=Boolean(value.guild_id)||value.code==='DISCORD1';const discordOnline=discord&&now-value.updated_at<15000;
   if(discord&&!discordOnline)state.playing=false;
   const {radioHistory,...visibleState}=state;

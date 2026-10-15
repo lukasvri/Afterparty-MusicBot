@@ -1,3 +1,4 @@
+import {playerAction} from './player-compatibility.ts';
 import { Client, GatewayIntentBits, Events, MessageFlags, PermissionFlagsBits, ActivityType, ChannelType, type ChatInputCommandInteraction, type ButtonInteraction, type VoiceBasedChannel, type Guild } from 'discord.js';
 import { joinVoiceChannel, entersState, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import { readFile } from 'node:fs/promises';
@@ -75,7 +76,7 @@ export class DiscordBot {
     }
     async start(token:string){
         if(this.ownsClient){await this.client.login(token);if(!this.client.isReady())await new Promise<void>(resolve=>this.client.once(Events.ClientReady,()=>resolve()));}
-        const guild=await this.client.guilds.fetch(this.guildId),definitions=JSON.parse(await readFile(new URL('./legacy-commands.json',import.meta.url),'utf8'));
+        const guild=await this.client.guilds.fetch(this.guildId),definitions=JSON.parse(await readFile(new URL('./afterparty-commands.json',import.meta.url),'utf8'));
         await guild.commands.set(definitions);
         this.messageTimer=setInterval(()=>{
             void this.updateMessage();if(this.ownsClient)this.activity();
@@ -149,7 +150,7 @@ export class DiscordBot {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             if (interaction.isButton()) {
                 await this.sameVoice(interaction);
-                const id = interaction.customId.replace(/^(?:muse|krutt):/, '');
+                const id = playerAction(interaction.customId);
                 const e = this.engine;
                 if(id==='more'){await interaction.editReply({content:'Flere valg',components:playerMoreComponents(this)});return;}
                 if (id === 'favorite') {
