@@ -392,7 +392,7 @@ class Deployer:
         self.command(self.docker + ['run', '--rm', '--network', 'none', '--cpus=2', '--memory=3g', '--entrypoint', 'sh', validation, '-c', 'npm run check && npm test'])
         runner = self.docker + ['run', '--rm', '--cpus=2', '--memory=3g', '--user', str(os.getuid()) + ':' + str(os.getgid()), '-e', 'HOME=/tmp', '--mount', 'type=bind,src=' + str(source) + ',dst=/work', '-w', '/work', '--entrypoint', 'sh']
         self.command(runner + [validation, '-c', 'npm ci --no-audit --no-fund'])
-        self.command(runner + ['--network', 'none', validation, '-c', 'python3 -m unittest discover -s tests -v && node node_modules/typescript/bin/tsc --noEmit --incremental false && node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.mjs scripts/playback-sync.test.mjs && npm run build'])
+        self.command(runner + ['--network', 'none', validation, '-c', 'python3 -m unittest discover -s tests -v && node node_modules/typescript/bin/tsc --noEmit --incremental false && node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.ts scripts/playback-sync.test.ts && npm run build'])
         self.new_image = 'gutta-krutt-core:git-' + self.target[:12]
         self.emit('building versioned production image')
         self.command(self.docker + ['build', '--target', 'final', '--label', 'org.opencontainers.image.revision=' + self.target, '-t', self.new_image, str(source / 'services/core')])

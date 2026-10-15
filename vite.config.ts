@@ -1,7 +1,7 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import { existsSync, readFileSync } from "node:fs";
-import { readExecutionProfile } from "./scripts/execution-profile.mjs";
+import { readExecutionProfile } from "./scripts/execution-profile.ts";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 

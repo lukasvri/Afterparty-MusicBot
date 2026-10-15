@@ -13,10 +13,10 @@ test("saved room ownership, visitor identity and every preference survive the na
     "sync-mode-v1",
     "motion",
   ];
-  const values = new Map(keys.map((k) => ["muse-" + k, "saved-" + k]));
+  const values = new Map(keys.map((k: string) => ["muse-" + k, "saved-" + k]));
   const storage = {
-    getItem: (k) => values.get(k) ?? null,
-    setItem: (k, v) => values.set(k, v),
+    getItem: (k: string) => values.get(k) ?? null,
+    setItem: (k: string, v: string) => values.set(k, v),
   };
   for (const key of keys) {
     assert.equal(
@@ -31,7 +31,7 @@ test("saved room ownership, visitor identity and every preference survive the na
 });
 test("read-only browser storage still returns existing ownership", () => {
   const storage = {
-    getItem: (k) => (k === "muse-host:TESTROOM" ? "saved-token" : null),
+    getItem: (k: string) => (k === "muse-host:TESTROOM" ? "saved-token" : null),
     setItem: () => {
       throw Error("quota");
     },
@@ -77,7 +77,7 @@ test("blocked browser persistence retains host credentials for the current page"
     assert.equal(browserStorage.get("afterparty-host:SYNTHETC"), "synthetic");
   } finally {
     if (previous) Object.defineProperty(globalThis, "localStorage", previous);
-    else delete globalThis.localStorage;
+    else Reflect.deleteProperty(globalThis, "localStorage");
   }
 });
 
