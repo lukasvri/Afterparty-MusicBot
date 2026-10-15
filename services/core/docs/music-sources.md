@@ -35,6 +35,13 @@ results from the disabled selection. The admin player shows a message when no
 recommendation is found. Radio needs a current track to choose related music;
 it does not start music in an empty player.
 
+### Own website rooms
+
+User-created video rooms have independent, default-on radio with a host toggle.
+See [Own video rooms](../../../docs/OWN_ROOMS.md) for selection rules, startup
+behavior, compatibility and synthetic validation. These rooms do not require a
+Discord connection or share Discord server history.
+
 ## Lyd og avgrensingar
 
 48 kHz stereo Opus og den eksisterande FFmpeg-kryssfaden er bevarte. Standardmålet er 192 kbit/s, avgrensa av den faktiske Discord-kanalen. SoundCloud vel beste tilgjengelege lydformat. YouTube bevarer den etablerte HLS-prioriteten for stabil avspeling. Høgare utgåande bitrate kan ikkje gjenopprette kvalitet som manglar i kjelda.

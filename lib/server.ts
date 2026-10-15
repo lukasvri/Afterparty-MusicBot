@@ -4,6 +4,7 @@ import type {Video, RoomState, Room} from './types';
 import {hasPasswordSession} from './admin-session';
 import {coreUrl,coreRequest} from './core-server';
 import {recordPlay} from './party';
+import {roomRecommendation,roomRadioHistory} from '../services/core/src/room-radio.ts';
 type Env = Cloudflare.Env & {YOUTUBE_API_KEY?: string; OWNER_EMAIL?: string; ADMIN_BRIDGE_KEY?: string};
 const env = () => cloudEnv as Env;
 export class ApiError extends Error {constructor(public status: number, message: string){super(message);}}
@@ -72,11 +73,12 @@ export async function publicRoom(request:Request, value:Row, heartbeat=true):Pro
   const state=JSON.parse(value.state) as RoomState;const actor=request.headers.get('x-muse-visitor');const now=Date.now();
   const discord=Boolean(value.guild_id)||value.code==='DISCORD1';const discordOnline=discord&&now-value.updated_at<15000;
   if(discord&&!discordOnline)state.playing=false;
+  const {radioHistory,...visibleState}=state;
   if(heartbeat && actor && /^[a-f0-9-]{32,40}$/.test(actor))await db().prepare('INSERT INTO visitors(key,room,until) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET until=excluded.until WHERE until<?').bind(`${value.code}:${actor}`,value.code,now+45000,now+30000).run();
   const viewers=await db().prepare('SELECT count(*) AS n FROM visitors WHERE room=? AND until>?').bind(value.code,now).first<{n:number}>();
   if(!discord&&coreUrl()){try{const data=await coreRequest<{room:Room}>('/v1/rooms','POST',{operation:'import',...value});return {...data.room,isPublic:value.is_public===1,viewers:viewers?.n??0,isHost:await hash(bearer(request))===value.owner_hash};}catch{fail(503,'Rommet venter på sanntidstjenesten. Prøv igjen.');}}
   const position=state.position+(state.playing?(discord?Math.min(12000,now-value.updated_at):now-value.updated_at)/1000:0);
-  return {code:value.code,name:value.name,...state,isPublic:value.is_public===1,position:state.current&&!state.current.live?Math.min(state.current.duration,position):position,version:value.version,serverTime:now,viewers:viewers?.n??0,isHost:!discord&&await hash(bearer(request))===value.owner_hash,expiresAt:value.expires_at,...(discord?{mode:'discord' as const,guildId:value.guild_id,discordOnline,syncValidForMs:Math.max(0,12000-(now-value.updated_at))}:{})};
+  return {code:value.code,name:value.name,...visibleState,radio:state.radio!==false,isPublic:value.is_public===1,position:state.current&&!state.current.live?Math.min(state.current.duration,position):position,version:value.version,serverTime:now,viewers:viewers?.n??0,isHost:!discord&&await hash(bearer(request))===value.owner_hash,expiresAt:value.expires_at,...(discord?{mode:'discord' as const,guildId:value.guild_id,discordOnline,syncValidForMs:Math.max(0,12000-(now-value.updated_at))}:{})};
 }
 export async function createRoom(request:Request,name:string,isPublic=false){
   await limit(request,'create-room',5,3600000);await limit(request,'room-budget',100,86400000,true);
@@ -114,11 +116,13 @@ export async function mutate(request:Request,code:string,input:Record<string,unk
     if(action==='add'){if(state.queue.length>=50)fail(400,'Køen har plass til 50 videoer.');if(state.current?.id===video.id||state.queue.some(v=>v.id===video.id))fail(409,'Videoen er allerede i rommet.');if(!state.current){state.current=video;state.position=0;state.playing=false;}else state.queue.push(video);}else{state.current=video;state.position=0;state.playing=true;}
   }else if(action==='play'||action==='pause'){if(!state.current)fail(400,'Legg til en video først.');state.playing=action==='play';}
   else if(action==='seek'){if(!state.current||state.current.live||typeof input.position!=='number'||!Number.isFinite(input.position))fail(400,'Denne videoen kan ikke spoles.');state.position=Math.max(0,Math.min(state.current.duration-1,input.position));}
-  else if(action==='next'){state.current=state.queue.shift()??null;state.position=0;state.playing=Boolean(state.current);}
+  else if(action==='next'){const recommended=await roomRecommendation(state,async query=>(await search(request,query)).videos);state.radioHistory=roomRadioHistory(state);state.current=state.queue.shift()??recommended;state.position=0;state.playing=Boolean(state.current);}
+  else if(action==='radio'){if(typeof input.enabled!=='boolean')fail(400,'Velg radio på eller av.');state.radio=input.enabled;}
   else if(action==='remove'){if(!Number.isInteger(input.index)||Number(input.index)<0||Number(input.index)>=state.queue.length)fail(400,'Køplassen finnes ikke.');state.queue.splice(Number(input.index),1);}
   else if(action==='clear'){state.queue=[];}else fail(400,'Ukjent handling.');
   if(state.current&&(!state.playbackKey||action==='next'||action==='play-video'))state.playbackKey=`room:${code}:${value.version+1}`;
-  const result=await db().prepare('UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?').bind(JSON.stringify(state),now,code,value.version).run();if(!result.meta.changes)fail(409,'En annen endring kom først. Prøv igjen.');
+  const updatedAt=action==='next'?Date.now():now;
+  const result=await db().prepare('UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?').bind(JSON.stringify(state),updatedAt,code,value.version).run();if(!result.meta.changes)fail(409,'En annen endring kom først. Prøv igjen.');
   return {room:await publicRoom(request,await row(code))};
 }
 export async function adminRooms(request:Request){if(!await isAdmin(request))fail(403,'Denne siden er bare for administratoren.');const all=await db().prepare('SELECT * FROM rooms WHERE expires_at>? ORDER BY updated_at DESC LIMIT 100').bind(Date.now()).all<Row>();return {rooms:await Promise.all(all.results.map(r=>publicRoom(request,r,false)))};}

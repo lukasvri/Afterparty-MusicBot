@@ -100,3 +100,29 @@ test('bounded extractor queue releases slots when a waiting request is cancelled
  const occupied=Array.from({length:4},()=>runJson(process.execPath,['-e','setTimeout(()=>process.stdout.write("{}"),150)']));
  const controller=new AbortController(),queued=runJson(process.execPath,['-e','process.stdout.write("{}")'],controller.signal);controller.abort();await assert.rejects(queued,/avbrutt|opptatt/);await Promise.all(occupied);assert.deepEqual(await runJson(process.execPath,['-e','process.stdout.write("{}")']),{});
 });
+
+test('radio search survives an unavailable candidate in the no-key extractor fallback',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),seed={...track('Syn Cole - Feel Good | Future House | NCS - Copyright Free','seed1234567'),artist:'NCS',concert:true};
+  p.youtube=async()=>{throw Error('API unavailable');};
+  p.extract=async args=>{
+   if(args.some(arg=>arg.startsWith('ytsearch')))return {entries:[{id:'next1234567'},{id:'other123456'},{id:'blocked1234'}]};
+   const id=new URL(args.at(-1)!).searchParams.get('v');
+   if(id==='blocked1234')throw Error('Video unavailable');
+   return {title:'Syn Cole - Synthetic '+id,artist:'Syn Cole',duration:200,playable_in_embed:true};
+  };
+  const next=await p.radio(seed,[]);assert.equal(next?.id,'next1234567');assert.equal(next?.embeddable,true);
+  await assert.rejects(p.video(['blocked1234']),/Video unavailable/);
+ }finally{t.close();}
+});
+
+test('empty cached searches are refreshed so a radio retry can recover',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),query='Syn Cole audio -"Feel Good"';let calls=0;
+  t.store.set('search:v2:'+JSON.stringify([query.toLowerCase(),20,true]),{at:Date.now(),tracks:[]});
+  p.youtube=async()=>{calls++;return {items:[{id:{videoId:'next1234567'}}]};};
+  p.video=async()=>[track('Syn Cole - Synthetic Next','next1234567')];
+  assert.equal((await p.search(query,20,true))[0]?.id,'next1234567');assert.equal(calls,1);
+  await p.search(query,20,true);assert.equal(calls,1);
+ }finally{t.close();}
+});

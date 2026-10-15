@@ -111,3 +111,5 @@ body::before{background:radial-gradient(ellipse at 60% 0,#6f17251a,transparent 6
 @media(prefers-reduced-motion:reduce){.rig-beam,.laser-fan,.stage-led-bars rect,.dj-head,.dj-arm,.dj-mixing-hand,.crowd-dancer,.stage-mist{animation:none!important}}
 
 .concert-shell .room-switch[hidden]{display:none}
+
+.audio-unlock{position:absolute;top:14px;right:14px;z-index:6}
