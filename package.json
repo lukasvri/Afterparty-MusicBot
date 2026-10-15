@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -15,7 +15,10 @@
     "test:fullscreen": "node --experimental-strip-types scripts/fullscreen.test.mjs",
     "setup:cloud": "bash scripts/cloud.sh setup",
     "check:all": "bash scripts/cloud.sh check",
-    "project": "node scripts/project.mjs"
+    "project": "node scripts/project.mjs",
+    "release:check": "node scripts/releases.mjs --check",
+    "release:notes": "node scripts/releases.mjs --notes",
+    "release:changelog": "node scripts/releases.mjs --write"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",
