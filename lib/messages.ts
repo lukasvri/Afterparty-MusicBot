@@ -1,3 +1,4 @@
+import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
  "Slå på lyd":["Slå på lyd","Enable sound"],
@@ -1221,6 +1222,6 @@ export const messages: Record<string, readonly [string, string]> = {
 };
 
 export function translate(language: Language, text: string, values: Record<string, string | number> = {}): string {
-  const translated = messages[text]?.[language === "en" ? 1 : 0] ?? text;
+  const translated = messages[text]?.[language === "en" ? 1 : 0] ?? (language === "en" ? partyMessages[text] : undefined) ?? text;
   return translated.replace(/\{(\w+)\}/g, (match, key: string) => Object.hasOwn(values, key) ? String(values[key]) : match);
 }

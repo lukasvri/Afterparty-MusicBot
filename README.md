@@ -125,7 +125,7 @@ npm run setup:cloud
 npm run check:all
 ```
 
-These commands need Node.js 24.17+, Python 3.11+ and FFmpeg. They install both locked dependency trees and run **60 Core tests**, **29 website behavior tests**, deployment recovery tests, both typechecks and a website production build without production credentials or Docker. GitHub Actions validates Core's Docker image, the website and deployment recovery on pushes and pull requests. See the [Codex Cloud workflow](docs/CODEX_CLOUD.md) for cloud setup and local production updates.
+These commands need Node.js 24.17+, Python 3.11+ and FFmpeg. They install both locked dependency trees and run Core tests and website behavior tests, deployment recovery tests, both typechecks and a website production build without production credentials or Docker. GitHub Actions validates Core's Docker image, the website and deployment recovery on pushes and pull requests. See the [Codex Cloud workflow](docs/CODEX_CLOUD.md) for cloud setup and local production updates.
 
 <details>
 <summary><strong>Repository map</strong></summary>
@@ -142,6 +142,14 @@ docs/                Installation and configuration guides
 ```
 
 </details>
+
+## Party experience
+
+Browser rooms now support server-owned progression, cohosts, single-use ownership
+transfer, moderated requests, queue votes, history and queue undo. The website
+adds private-by-default setup, mobile controls, local QR sharing, TV mode and
+editable device-local evenings with import/export. See the
+[experience architecture and validation guide](docs/AFTERPARTY_EXPERIENCE.md).
 
 ## Current limitations
 

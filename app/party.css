@@ -1,0 +1,500 @@
+/* Party workflows: shared tokens, mobile controls and a focused television surface. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  background: #fff;
+  color: #111;
+  padding: 12px;
+  transform: translateY(-150%);
+}
+.skip-link:focus {
+  transform: none;
+}
+.start-evening {
+  border: 1px solid #563442;
+  background: #171317;
+  border-radius: 12px;
+  padding: 28px;
+  margin-bottom: 28px;
+}
+.start-evening h2 {
+  font-size: 28px;
+  margin: 8px 0 12px;
+}
+.start-evening p {
+  color: #c8bdc3;
+  line-height: 1.6;
+}
+.start-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+.start-options button {
+  padding: 22px;
+  text-align: left;
+  border: 1px solid #795064;
+  border-radius: 8px;
+  background: #22191f;
+  color: #fff;
+  min-height: 100px;
+}
+.start-options button:hover {
+  border-color: #ff596c;
+  background: #301b24;
+}
+.start-options strong,
+.start-options span {
+  display: block;
+}
+.start-options strong {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+.start-options span {
+  color: #c8bdc3;
+  line-height: 1.5;
+}
+.party-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0;
+}
+.party-tools label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.party-tools input,
+.evening-library input,
+.room-sharing input {
+  min-height: 44px;
+  background: #101012;
+  color: #fff;
+  border: 1px solid #795064;
+  border-radius: 5px;
+  padding: 10px;
+  font-size: 16px;
+  max-width: 100%;
+}
+.party-tools > span {
+  font-size: 13px;
+  color: #c8bdc3;
+  margin: auto 0;
+}
+.room-sharing {
+  border: 1px solid #563442;
+  background: #171317;
+  border-radius: 10px;
+  margin: 20px 0;
+  padding: 20px;
+}
+.room-sharing > div {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.room-sharing img {
+  border-radius: 6px;
+}
+.share-url {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+.room-sharing details {
+  margin-top: 16px;
+}
+.room-sharing details p {
+  margin: 12px 0;
+  line-height: 1.6;
+}
+.room-sharing details button {
+  margin: 6px;
+}
+.room-sharing details label {
+  display: grid;
+  gap: 8px;
+}
+.room-sharing > p {
+  margin-top: 12px;
+}
+.room-audience {
+  margin: 20px 0;
+  border: 1px solid #563442;
+  padding: 14px;
+  border-radius: 6px;
+}
+.room-audience label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+}
+.concert-shell .room-dialog .room-audience input {
+  width: 20px;
+  min-height: 20px;
+  accent-color: #ff263e;
+}
+.room-dialog {
+  overscroll-behavior: contain;
+}
+.room-dialog form > label {
+  display: block;
+  margin: 14px 0 8px;
+}
+.room-dialog form > input {
+  width: 100%;
+}
+.room-dialog [role="alert"] {
+  margin: 12px 0;
+  color: #ffb4c0;
+}
+.social-queue {
+  padding: 8px 0;
+}
+.queue-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.queue-summary > span {
+  margin-right: auto;
+}
+.social-queue button,
+.evening-library button:not(.button) {
+  min-height: 44px;
+  min-width: 44px;
+  border: 1px solid #654253;
+  border-radius: 5px;
+  background: #21191e;
+  color: #fff;
+  padding: 8px;
+  touch-action: manipulation;
+}
+.social-queue button:hover,
+.evening-library button:not(.button):hover {
+  border-color: #ff596c;
+}
+.social-track {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid #ffffff15;
+}
+.social-track > div {
+  flex: 1;
+  min-width: 120px;
+}
+.social-track strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.social-track small {
+  display: block;
+  color: #c8bdc3;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.queue-help {
+  font-size: 12px;
+  color: #c8bdc3;
+  line-height: 1.6;
+  margin: 16px 0;
+}
+.approval-choice {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  font-size: 13px;
+}
+.approval-choice input {
+  width: 20px;
+  height: 20px;
+  accent-color: #ff263e;
+}
+.evening-library {
+  padding: 20px;
+}
+.evening-library h2 {
+  font-size: 24px;
+}
+.evening-library h3 {
+  margin-top: 24px;
+}
+.evening-library p {
+  font-size: 13px;
+  color: #c8bdc3;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+.evening-library form,
+.evening-library label {
+  display: grid;
+  gap: 10px;
+}
+.evening-library details {
+  margin: 16px 0;
+  border: 1px solid #563442;
+  border-radius: 6px;
+  padding: 12px;
+}
+.evening-library summary {
+  min-height: 44px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.evening-library li,
+.saved-track {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+}
+.evening-library li > span,
+.saved-track > span {
+  flex: 1;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.evening-library ol {
+  list-style: none;
+  padding: 0;
+}
+.library-transfer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.library-transfer input {
+  width: 100%;
+  font-size: 12px;
+}
+.library-transfer label {
+  width: 100%;
+}
+.evening-library .button {
+  margin: 6px 0;
+}
+.library-panel [role="tab"] {
+  min-width: 0;
+}
+.mobile-party-nav {
+  display: none;
+}
+.concert-shell[data-empty="true"] .stage:not([data-current="true"]) {
+  aspect-ratio: 2.4;
+  min-height: 260px;
+}
+.concert-shell[data-empty="true"]
+  .stage:not([data-current="true"])
+  .stage-intro {
+  top: 20%;
+  bottom: auto;
+}
+.concert-shell[data-empty="true"] .stage-intro h2 {
+  font-size: 32px;
+}
+.concert-shell[data-empty="true"] .concert-venue {
+  opacity: 0.5;
+}
+.concert-shell .studio-heading {
+  margin-top: 20px;
+}
+[data-tv="true"] .sidebar,
+[data-tv="true"] .topbar,
+[data-tv="true"] .studio-heading,
+[data-tv="true"] .party-tools,
+[data-tv="true"] .library-panel,
+[data-tv="true"] .studio-foot,
+[data-tv="true"] .start-evening {
+  display: none !important;
+}
+[data-tv="true"] .content {
+  width: calc(100% - 40px);
+  padding: 20px 0;
+}
+[data-tv="true"] .studio-grid {
+  display: block;
+}
+[data-tv="true"] .main {
+  margin: 0;
+}
+[data-tv="true"] .stage {
+  max-height: 80vh;
+}
+[data-tv="true"] .tv-invite {
+  position: relative;
+  margin: 0 0 16px;
+  padding: 12px;
+}
+[data-tv="true"] .tv-invite img {
+  width: 100px;
+  height: 100px;
+}
+[data-tv="true"] .tv-invite .share-url {
+  max-width: 450px;
+}
+button,
+a,
+input,
+select,
+summary {
+  touch-action: manipulation;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 650px) {
+  .start-evening {
+    padding: 20px;
+  }
+  .start-evening h2 {
+    font-size: 25px;
+  }
+  .start-options {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .start-options button {
+    padding: 16px;
+    min-height: 90px;
+  }
+  .concert-shell .studio-heading h1 {
+    font-size: 42px;
+  }
+  .concert-shell[data-empty="true"] .stage:not([data-current="true"]) {
+    aspect-ratio: 1.5;
+    min-height: 230px;
+  }
+  .concert-shell[data-empty="true"]
+    .stage:not([data-current="true"])
+    .stage-intro {
+    max-width: 85%;
+    top: 12%;
+    left: 6%;
+  }
+  .concert-shell[data-empty="true"] .stage-intro h2 {
+    font-size: 26px !important;
+  }
+  .concert-shell[data-empty="true"] .stage-intro p {
+    max-width: 260px !important;
+  }
+  .party-tools > span {
+    width: 100%;
+  }
+  .party-tools label {
+    flex: 1;
+    min-width: 140px;
+  }
+  .room-sharing > div {
+    justify-content: center;
+  }
+  .room-sharing img {
+    width: 140px;
+    height: 140px;
+  }
+  .room-sharing .share-url {
+    width: 100%;
+    flex-basis: 100%;
+  }
+  .concert-shell {
+    padding-bottom: 88px;
+  }
+  .mobile-party-nav {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: #151316f5;
+    border-top: 1px solid #795064;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+    gap: 6px;
+  }
+  .mobile-party-nav button {
+    min-height: 48px;
+    border: 0;
+    border-radius: 6px;
+    background: #281b23;
+    color: #fff;
+    font-size: 13px;
+  }
+  .mobile-party-nav button:hover,
+  .mobile-party-nav button:focus-visible {
+    background: #5b2535;
+  }
+  .concert-shell .toast {
+    bottom: 90px;
+    max-width: calc(100vw - 24px);
+  }
+  .library-panel,
+  .stage-panel {
+    scroll-margin-top: 16px;
+    scroll-margin-bottom: 90px;
+  }
+  .concert-shell .language-switch button {
+    min-width: 40px;
+    min-height: 44px;
+  }
+  .concert-shell .motion-toggle {
+    min-width: 44px;
+  }
+  .evening-library {
+    padding: 16px;
+  }
+  [data-tv="true"].concert-shell {
+    padding-bottom: 0;
+  }
+}
+/* Keep setup tools compact; share details open only when requested. */
+.skip-link:not(:focus) {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.concert-shell .library-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.concert-shell .library-tabs button {
+  font-size: 13px;
+  gap: 5px;
+}
+.concert-shell .share-button {
+  width: auto;
+  gap: 8px;
+}
+.concert-shell .studio-heading h1 {
+  font-size: clamp(36px, 4vw, 64px);
+  overflow-wrap: anywhere;
+}
+.concert-shell .studio-heading > div:first-child {
+  min-width: 0;
+}
+.concert-shell .room-switch {
+  flex-wrap: wrap;
+}
+@media (max-width: 650px) {
+  .concert-shell .studio-heading h1 {
+    font-size: 36px;
+  }
+}
