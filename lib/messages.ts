@@ -34,6 +34,10 @@ export const messages: Record<string, readonly [string, string]> = {
     "Venter på boten",
     "Waiting for the bot"
   ],
+  "Venter på neste video": [
+    "Venter på neste video",
+    "Waiting for the next video"
+  ],
   "Venter på rommet": [
     "Venter på rommet",
     "Waiting for the room"

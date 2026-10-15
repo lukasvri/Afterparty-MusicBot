@@ -32,5 +32,5 @@ jobs:
       - name: Typecheck, browser behavior tests and production build
         run: |
           node node_modules/typescript/bin/tsc --noEmit --incremental false
-          node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.mjs scripts/playback-sync.test.mjs
+          node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.mjs scripts/playback-sync.test.mjs scripts/rooms.test.mjs
           npm run build
