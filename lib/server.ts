@@ -420,7 +420,7 @@ export async function publicRoom(
       state.position + (state.playing ? Math.max(0, Date.now() - Math.max(value.updated_at, state.startsAt ?? value.updated_at)) / 1000 : 0),
       recommended,
     );
-    const saved = { ...state, ...next };
+    const saved = next;
     await db()
       .prepare(
         "UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?",
@@ -698,7 +698,7 @@ export async function mutate(
     .prepare(
       "UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?",
     )
-    .bind(JSON.stringify({ ...state, ...next }), now, code, value.version)
+    .bind(JSON.stringify(next), now, code, value.version)
     .run();
   if (!result.meta.changes)
     fail(409, "En annen endring kom først. Prøv igjen.");

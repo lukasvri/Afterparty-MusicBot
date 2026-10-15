@@ -418,3 +418,16 @@ test("ownership transfer removes previous grants but keeps the stable Core autho
     f.close();
   }
 });
+
+test('D1 persists removal of consumed undo and old radio retry state', async () => {
+ const f=fixture();
+ try {
+  await f.save('TESTROOM',{current:seed,queue:[next],playing:false,position:20,undoQueue:[next],radioRetryAt:Date.now()+60000,cohostHashes:['synthetic-cohost']});
+  await mutate(f.request,'TESTROOM',{action:'play-video',videoId:next.id,version:1});
+  const saved=JSON.parse(f.sqlite.prepare('SELECT state FROM rooms WHERE code=?').get('TESTROOM').state);
+  assert.equal(saved.undoQueue,undefined);
+  assert.equal(saved.radioRetryAt,undefined);
+  assert.deepEqual(saved.queue,[]);
+  assert.deepEqual(saved.cohostHashes,['synthetic-cohost']);
+ } finally {f.close();}
+});
