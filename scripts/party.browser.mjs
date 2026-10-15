@@ -113,7 +113,7 @@ try {
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
   }
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Visible room controls and radio retry cooldown" }).waitFor();
+  await page.getByRole("heading", { name: "Queue artwork and radio retry cooldown" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -150,8 +150,9 @@ try {
   assert(await queued.isVisible(), "Manually queued track must be visible");
   assert.equal(await page.locator("#queue-tab .tab-count").innerText(), "1");
 
+  await page.locator(".room-options > summary").click();
   const radio = page.getByRole("button", {name:"Radio på",exact:true});
-  assert(await radio.isVisible(), "Radio must be visible with room settings closed");
+  assert(await radio.isVisible(), "Radio must be available in room settings");
   await radio.click();
   await page.getByRole("button", {name:"Radio av",exact:true}).waitFor();
   assert(commands.some(c => c.action === "radio" && c.enabled === false));
@@ -168,7 +169,6 @@ try {
     assert(visible,"Queued track must be inside the visible queue area");
   }
   await page.setViewportSize({width:390,height:844});
-  await page.locator(".room-options > summary").click();
   await page.locator(".room-options .queue-options summary").click();
   await page
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
