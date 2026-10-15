@@ -1514,7 +1514,7 @@ export default function Afterparty() {
           )}
           <div
             className="studio-grid"
-            hidden={directoryOpen || (!room && panel === "queue")}
+            hidden={directoryOpen || !room}
           >
             <section
               ref={fullscreen.element}
@@ -2246,7 +2246,7 @@ export default function Afterparty() {
         firstQuery={firstQuery}
         onFirstQuery={setFirstQuery}
       />
-      {!tv && !directoryOpen && (
+      {!tv && !directoryOpen && room && (
         <nav className="mobile-party-nav" aria-label={t("Festkontroll")}>
           <button
             onClick={() =>

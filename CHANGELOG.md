@@ -4,6 +4,17 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.0.0: Your people, your music: Afterparty v2
+
+2026-10-15
+
+- A new welcome page puts the animated stage, private room creation, invitations and patch notes up front. The DJ and lighting rig stay fully visible on mobile and desktop.
+- Core now advances room playback even when the host disconnects. Shared queue rules protect concurrent requests and preserve newer songs when undoing changes.
+- Guests can request songs, vote and vote to skip. Hosts can moderate requests, reorder the queue and undo queue changes.
+- Invite cohosts with single-use links, revoke access or transfer room ownership. Share rooms by link or QR code and open a focused TV view.
+- Keep device-local favorites, editable saved evenings and listening history, with validated import and export.
+- Mobile navigation, first-song search, English copy and admin volume and seek controls have been improved. Browser transport, player setup and room logic are separated into reusable modules.
+
 ## v1.0.0: Shared semantic versioning for Afterparty
 
 2026-10-15

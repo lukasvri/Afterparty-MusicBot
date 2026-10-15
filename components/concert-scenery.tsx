@@ -1,20 +1,22 @@
+import { useId } from "react";
 /** All lamps, beam pivots and laser emitters share one stage coordinate system. */
 export function ConcertScenery() {
+  const prefix = useId().replace(/:/g, "");
   const lamps=[100,300,500,700,900,1100];
   return <div className="concert-scenery" aria-hidden="true">
-    <svg className="concert-venue" viewBox="0 0 1200 675" preserveAspectRatio="xMidYMid slice">
+    <svg className="concert-venue" viewBox="0 0 1200 675" preserveAspectRatio="xMidYMid meet">
       <defs>
-        <radialGradient id="venue-glow"><stop stopColor="#8c264b"/><stop offset=".55" stopColor="#2b1330"/><stop offset="1" stopColor="#090b16"/></radialGradient>
-        <linearGradient id="warm-beam" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ffe0be" stopOpacity=".55"/><stop offset=".45" stopColor="#ffad9e" stopOpacity=".17"/><stop offset="1" stopColor="#ed6f9e" stopOpacity="0"/></linearGradient>
-        <linearGradient id="cool-beam" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#a0ccff" stopOpacity=".5"/><stop offset=".5" stopColor="#7262ff" stopOpacity=".15"/><stop offset="1" stopColor="#658aff" stopOpacity="0"/></linearGradient>
-        <linearGradient id="booth-front" x1="0" x2="0" y1="0" y2="1"><stop stopColor="#292237"/><stop offset="1" stopColor="#0e101d"/></linearGradient>
-        <linearGradient id="laser-fade"><stop stopColor="#82fff4" stopOpacity=".85"/><stop offset="1" stopColor="#83b6ff" stopOpacity=".1"/></linearGradient>
-        <linearGradient id="stage-floor" x1="0" x2="0" y1="0" y2="1"><stop stopColor="#8d315b" stopOpacity=".22"/><stop offset="1" stopColor="#070912"/></linearGradient>
-        <pattern id="led-grid" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="1" fill="#f2a5c3" opacity=".12"/></pattern>
+        <radialGradient id={`${prefix}-venue-glow`}><stop stopColor="#8c264b"/><stop offset=".55" stopColor="#2b1330"/><stop offset="1" stopColor="#090b16"/></radialGradient>
+        <linearGradient id={`${prefix}-warm-beam`} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ffe0be" stopOpacity=".55"/><stop offset=".45" stopColor="#ffad9e" stopOpacity=".17"/><stop offset="1" stopColor="#ed6f9e" stopOpacity="0"/></linearGradient>
+        <linearGradient id={`${prefix}-cool-beam`} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#a0ccff" stopOpacity=".5"/><stop offset=".5" stopColor="#7262ff" stopOpacity=".15"/><stop offset="1" stopColor="#658aff" stopOpacity="0"/></linearGradient>
+        <linearGradient id={`${prefix}-booth-front`} x1="0" x2="0" y1="0" y2="1"><stop stopColor="#292237"/><stop offset="1" stopColor="#0e101d"/></linearGradient>
+        <linearGradient id={`${prefix}-laser-fade`}><stop stopColor="#82fff4" stopOpacity=".85"/><stop offset="1" stopColor="#83b6ff" stopOpacity=".1"/></linearGradient>
+        <linearGradient id={`${prefix}-stage-floor`} x1="0" x2="0" y1="0" y2="1"><stop stopColor="#8d315b" stopOpacity=".22"/><stop offset="1" stopColor="#070912"/></linearGradient>
+        <pattern id={`${prefix}-led-grid`} width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="1" fill="#f2a5c3" opacity=".12"/></pattern>
       </defs>
-      <rect width="1200" height="675" fill="url(#venue-glow)"/>
+      <rect width="1200" height="675" fill={`url(#${prefix}-venue-glow)`}/>
       <path d="M550 115H1080V495H550Z" fill="#1c142b" stroke="#55304d"/>
-      <rect x="550" y="115" width="530" height="380" fill="url(#led-grid)"/>
+      <rect x="550" y="115" width="530" height="380" fill={`url(#${prefix}-led-grid)`}/>
       <g className="led-halo" transform="translate(815 300)" fill="none"><circle r="155" stroke="#ff263e" strokeWidth="2" opacity=".32"/><circle className="led-orbit" r="143" stroke="#ff4357" strokeWidth="8" strokeDasharray="24 28" opacity=".4"/><circle className="led-orbit-inner" r="126" stroke="#83bfff" strokeWidth="2" strokeDasharray="100 28" opacity=".35"/>{Array.from({length:36},(_,i)=><path key={i} d="M0-161V-174" transform={`rotate(${i*10})`} stroke={i%3?'#ff263e':'#a8d5ff'} strokeWidth="3" opacity=".25"/>)}</g>
       {/* Letter bounds are centred on the ring at (815, 300), independent of font metrics. */}
       <g className="stage-monogram" transform="translate(735 235)" fill="#ff263e" opacity=".22">
@@ -22,13 +24,13 @@ export function ConcertScenery() {
         <path d="M90 0H113V49L137 0H160L128 65L160 130H135L113 82V130H90Z"/>
       </g>
       <g className="stage-led-bars" fill="#ed577f">{Array.from({length:23},(_,i)=><rect key={i} x={585+i*20} y={425-(i%5)*11} width="8" height={25+(i%5)*11} rx="2" style={{animationDelay:`${i*-.14}s`}}/>)}</g>
-      <g className="stage-light-bank">{lamps.map((x,i)=><g key={x} transform={`translate(${x} 82)`}><g className={`rig-beam ${i%2?'rig-beam-even':'rig-beam-odd'}`}><path d="M-6 0H6L190 570H-190Z" fill={i%2?'url(#cool-beam)':'url(#warm-beam)'}/><path d="M-3 0H3L65 570H-65Z" fill="url(#warm-beam)" opacity=".4"/></g></g>)}</g>
+      <g className="stage-light-bank">{lamps.map((x,i)=><g key={x} transform={`translate(${x} 82)`}><g className={`rig-beam ${i%2?'rig-beam-even':'rig-beam-odd'}`}><path d="M-6 0H6L190 570H-190Z" fill={i%2?`url(#${prefix}-cool-beam)`:`url(#${prefix}-warm-beam)`}/><path d="M-3 0H3L65 570H-65Z" fill={`url(#${prefix}-warm-beam)`} opacity=".4"/></g></g>)}</g>
       <g className="stage-truss" fill="none" stroke="#77717e" strokeWidth="2"><path d="M0 28H1200M0 57H1200"/>{Array.from({length:20},(_,i)=><path key={i} d={`M${i*60} 28l30 29 30-29`}/>)}</g>
       <g>{lamps.map((x,i)=><g key={x} transform={`translate(${x} 57)`}><path d="M-12 0V12H12V0M0 12V19" stroke="#aaa3ae" strokeWidth="3" fill="none"/><rect x="-17" y="16" width="34" height="14" rx="3" fill="#292331" stroke="#695463"/><rect x="-12" y="23" width="24" height="5" rx="2" fill={i%2?'#bbddff':'#ffe0bd'}/></g>)}</g>
-      <path d="M0 500H1200V675H0Z" fill="url(#stage-floor)"/>
+      <path d="M0 500H1200V675H0Z" fill={`url(#${prefix}-stage-floor)`}/>
       <g stroke="#a0527a" strokeWidth="1" opacity=".18"><path d="M0 500H1200M0 540H1200M0 610H1200M600 500L0 675M720 500L400 675M840 500L800 675M960 500L1200 675"/></g>
       <ellipse className="stage-mist" cx="820" cy="490" rx="430" ry="100" fill="#b74c7c" opacity=".08"/>
-      <g transform="translate(605 506)"><g className="laser-fan laser-fan-left" fill="none" stroke="url(#laser-fade)" strokeWidth="1.7">{[-420,-330,-240,-150,-60].map((y,i)=><path key={i} d={`M0 0L${350+i*100} ${y}`} />)}</g><rect x="-12" y="-7" width="24" height="14" rx="3" fill="#222033"/><circle r="3" fill="#92fff0"/></g>
+      <g transform="translate(605 506)"><g className="laser-fan laser-fan-left" fill="none" stroke={`url(#${prefix}-laser-fade)`} strokeWidth="1.7">{[-420,-330,-240,-150,-60].map((y,i)=><path key={i} d={`M0 0L${350+i*100} ${y}`} />)}</g><rect x="-12" y="-7" width="24" height="14" rx="3" fill="#222033"/><circle r="3" fill="#92fff0"/></g>
       <g transform="translate(1065 506)"><g className="laser-fan laser-fan-right" fill="none" stroke="#f277c5" strokeWidth="1.5">{[-420,-330,-240,-150,-60].map((y,i)=><path key={i} d={`M0 0L${-350-i*100} ${y}`} />)}</g><rect x="-12" y="-7" width="24" height="14" rx="3" fill="#222033"/><circle r="3" fill="#ffb5e1"/></g>
       <g className="speaker-stacks" fill="#0c0e17" stroke="#49434e" strokeWidth="2">{[472,1105].map(x=><g key={x} transform={`translate(${x} 285)`}><path d="M0 0H60L75 18V230H0Z"/><path d="M60 0V215L75 230M0 215H60"/><rect x="8" y="14" width="44" height="35" rx="3" fill="#181923"/>{[90,155].map(y=><g key={y}><circle cx="30" cy={y} r="24"/><circle cx="30" cy={y} r="17" fill="#181923"/><circle cx="30" cy={y} r="6" fill="#292632"/></g>)}<path d="M8 204H50" stroke="#ff263e" strokeWidth="3"/></g>)}</g>
       <g className="stage-pixel-ribbon" fill="#ff263e">{Array.from({length:36},(_,i)=><rect key={i} x={40+i*32} y="587" width="20" height="3" rx="1" style={{animationDelay:`${i*-.12}s`}}/>)}</g>
@@ -53,7 +55,7 @@ export function ConcertScenery() {
         <path d="M-24-56Q-38-23-15-12" fill="none" stroke="#080c13" strokeWidth="2"/>
         <path d="M-8-9H8" stroke="#c2cbd3" strokeWidth="2"/>
       </g>
-      <g className="dj-booth"><path d="M645 460L684 426H970L1007 460Z" fill="#30293d" stroke="#987080"/><path d="M645 460H1007L986 564H665Z" fill="url(#booth-front)" stroke="#664159"/><path d="M661 469H991" stroke="#ff638d" strokeWidth="3"/><path d="M668 554H984" stroke="#663c79" strokeWidth="2"/>
+      <g className="dj-booth"><path d="M645 460L684 426H970L1007 460Z" fill="#30293d" stroke="#987080"/><path d="M645 460H1007L986 564H665Z" fill={`url(#${prefix}-booth-front)`} stroke="#664159"/><path d="M661 469H991" stroke="#ff638d" strokeWidth="3"/><path d="M668 554H984" stroke="#663c79" strokeWidth="2"/>
         <g className="dj-decks">{[693,883].map((x,i)=><g key={x} transform={`translate(${x} 431)`}><path d="M-14-5H82L94 25H-26Z" fill="#10131c" stroke="#67616e"/><ellipse cx="32" cy="10" rx="27" ry="9" fill="#080b12" stroke="#c8c4cf" strokeWidth="1.5"/><ellipse className="deck-ring" cx="32" cy="10" rx="22" ry="7" fill="none" stroke={i?'#ff263e':'#8acfff'} strokeWidth="2" strokeDasharray="30 12"/><ellipse cx="32" cy="10" rx="7" ry="3" fill="#47414e"/><path d="M-1-2H20L23 3H-3Z" fill="#6ac8eb" opacity=".8"/>{[0,1,2,3].map(n=><path key={n} d={`M${n*12-6} 20h8l2 3h-8Z`} fill={n%2?'#ff263e':'#d6d3db'}/>)}<circle cx="73" cy="13" r="3" fill="#ff263e"/></g>)}</g>
         <g className="dj-mixer"><path d="M793 430H858L871 459H779Z" fill="#10131c" stroke="#77707e"/>{[797,810,823,836,849].map((x,i)=><g key={x}><circle cx={x} cy="435" r="2" fill="#c9c4ce"/><circle cx={x} cy="441" r="2" fill="#77717e"/><path d={`M${x} 446l-2 8`} stroke="#77717e"/><path d={`M${x-4} ${448+i%3*2}h6`} stroke="#e4dee8" strokeWidth="2"/></g>)}<path d="M803 456H845" stroke="#61596a"/><path d="M821 454V458" stroke="#ff263e" strokeWidth="3"/></g>
         <text x="826" y="527" textAnchor="middle" fill="#f2b7cd" fontFamily="Barlow, sans-serif" fontSize="18" fontWeight="600" letterSpacing="8">GUTTA KRUTT</text>
