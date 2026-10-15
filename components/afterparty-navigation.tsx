@@ -1,5 +1,5 @@
 "use client";
-import { AudioLines, Radio, ShieldCheck, Users } from "lucide-react";
+import { Radio, ShieldCheck, Users } from "lucide-react";
 import { useLanguage } from "./language";
 export function Logo() {
   const { t } = useLanguage();
@@ -9,9 +9,6 @@ export function Logo() {
       href="/"
       aria-label={t("Afterparty forsiden")}
     >
-      <span className="brand-mark">
-        <AudioLines size={23} />
-      </span>
       <span>
         AFTERPARTY
       </span>

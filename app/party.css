@@ -505,7 +505,7 @@ button:disabled {
 .welcome-release > span:first-child { color:#ff8a9a; background:#ff536715; border:1px solid #ff536740; border-radius:5px; padding:5px 8px; font-weight:700; }
 .release-link { margin-left:auto; display:flex; align-items:center; gap:6px; color:#fff; }
 .welcome-hero { display:grid; grid-template-columns:1fr 1.15fr; gap:20px; align-items:center; padding:44px 0; }
-.welcome-copy { position:relative; z-index:1; }
+.welcome-copy { position:relative; z-index:1; min-width:0; container-type:inline-size; }
 .welcome-copy h1 { font-family:var(--font-display); font-size:clamp(52px,5.6vw,88px); font-weight:400; line-height:1.02; letter-spacing:-1px; margin:18px 0 22px; }
 .welcome-copy h1 span { color:#ff5367; }
 .welcome-copy > p { font-size:15px; max-width:380px; line-height:1.8; color:#c9bdc5; margin-bottom:26px; }
@@ -576,7 +576,7 @@ button:disabled {
 .concert-shell[data-welcome="true"] .content { width:calc(100% - clamp(32px,5vw,128px)); min-height:calc(100svh - 88px); display:flex; flex-direction:column; }
 .concert-shell[data-welcome="true"] .start-evening { flex:1; display:flex; flex-direction:column; margin-bottom:0; }
 .concert-shell[data-welcome="true"] .welcome-hero { flex:1; grid-template-columns:minmax(300px,.8fr) minmax(0,1.4fr); gap:clamp(24px,5vw,100px); }
-.concert-shell[data-welcome="true"] .welcome-copy h1 { font-size:clamp(54px,5.8vw,148px); }
+.concert-shell[data-welcome="true"] .welcome-copy h1 { font-size:clamp(48px,20cqi,144px); letter-spacing:-.035em; padding-bottom:.12em; background:linear-gradient(115deg,#fff5ed 15%,#ffbdc7 65%,#ff5367); background-clip:text; color:transparent; }
 .concert-shell[data-welcome="true"] .welcome-art { width:100%; }
 .concert-shell[data-welcome="true"] .studio-foot { margin-top:28px; }
 .room-options .queue-options { border-top:1px solid #ffffff20; padding:8px 16px; }
@@ -589,3 +589,10 @@ button:disabled {
 .social-track > button:first-of-type { grid-column:2; }
 .social-track > button:nth-of-type(2) { grid-column:3; justify-self:start; }
 .social-track > button:nth-of-type(3) { grid-column:3; justify-self:end; }
+
+/* Text-only identity until the final Afterparty logo is ready. */
+.studio-shell .brand { letter-spacing:.04em; font-size:20px; }
+.concert-shell[data-welcome="true"] .welcome-art { border-color:#ff536735; box-shadow:0 28px 80px #0006,0 0 100px #a72c4820; }
+.concert-shell[data-welcome="true"] .welcome-copy .party-kicker { font-size:10px; letter-spacing:.2em; color:#d7a6b1; }
+@media(max-width:650px) { .studio-shell .brand { font-size:17px; } }
+@media(prefers-contrast:more) { .concert-shell[data-welcome="true"] .welcome-copy h1 { background:none; color:var(--text,#fff); } }
