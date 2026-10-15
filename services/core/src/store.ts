@@ -1,8 +1,8 @@
 import {DatabaseSync} from 'node:sqlite';
-import {mkdirSync,readFileSync,existsSync} from 'node:fs';
-import {dirname,join} from 'node:path';
+import {mkdirSync} from 'node:fs';
+import {dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {defaultSettings,type Settings,type Track,type PublicTrack} from './types.ts';
+import {defaultSettings,type Settings,type PublicTrack} from './types.ts';
 export class Store{
  db:DatabaseSync;
  constructor(file:string){mkdirSync(dirname(file),{recursive:true,mode:0o700});this.db=new DatabaseSync(file);this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
@@ -27,8 +27,6 @@ export class Store{
  bridgeResults(){return this.db.prepare("SELECT id,status,result FROM jobs WHERE sent=0 AND status IN ('done','failed','unknown') AND json_extract(payload,'$.bridge')=1 ORDER BY at LIMIT 20").all().map(r=>({id:String(r.id),ok:r.status==='done',message:String(r.result)}));}
  acknowledgeJobs(ids:string[]){const q=this.db.prepare('UPDATE jobs SET sent=1 WHERE id=?');if(ids.length)this.transaction(()=>{for(const id of ids)q.run(id);});}
  jobs(){return this.db.prepare('SELECT id,payload,status,result,at AS createdAt FROM jobs ORDER BY at DESC LIMIT 30').all().map(r=>({...r,payload:JSON.parse(String(r.payload))}));}
- importMuse(dir:string,guild:string){if(!guild)throw new Error('Discord-serveren mangler i datamigreringen.');if(this.get('muse-imported',false))return;const file=join(dir,'db.sqlite');if(!existsSync(file))return;const old=new DatabaseSync(file,{readOnly:true});try{const settings=old.prepare('SELECT * FROM Setting WHERE guildId=?').get(guild);if(settings){const clean:Record<string,unknown>={};for(const key of Object.keys(defaultSettings))if(key in settings)clean[key]=settings[key];for(const key of ['leaveIfNoListeners','queueAddResponseEphemeral','autoAnnounceNextSong','turnDownVolumeWhenPeopleSpeak'])if(key in clean)clean[key]=Boolean(clean[key]);this.set('settings',{...defaultSettings,...clean});}for(const r of old.prepare('SELECT * FROM FavoriteQuery WHERE guildId=?').all(guild))this.favorite(String(r.authorId),String(r.name),String(r.query));
- for(const [name,key] of [['admin-queue-snapshots.json','legacy-snapshots'],['crossfade-settings.json','legacy-crossfade']] as const){try{this.set(key,JSON.parse(readFileSync(join(dir,name),'utf8')));}catch{}}
- const legacy=this.get<any[]>('legacy-snapshots',[]);this.set('snapshots',legacy.filter(s=>s.guildId===guild).map(s=>({...s,tracks:s.songs.map((t:any)=>({id:t.url,title:t.title,artist:t.artist,image:t.thumbnailUrl??'',duration:t.length,live:t.isLive,embeddable:t.source===0,source:t.source===0?'youtube':'soundcloud',url:t.source===0?undefined:t.url,requestedBy:t.requestedBy,entryId:randomUUID(),offset:t.offset??0}))})));const crossfade=this.get<Record<string,number>>('legacy-crossfade',{});if(Number.isFinite(crossfade[guild]))this.set('settings',{...this.settings(),crossfade:crossfade[guild]});this.set('muse-imported',true);}finally{old.close();}}
+
  close(){this.db.close();}
 }

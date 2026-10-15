@@ -1,7 +1,7 @@
 'use client';
 import {LanguageSwitch,useLanguage} from '@/components/language';
 import {ArrowLeft,ArrowUpRight,Check,FileText} from 'lucide-react';
-import {Sidebar} from '../muse';
+import {Sidebar} from '@/components/afterparty-navigation';
 
 const updates=[
  {version:'36',date:'14. oktober 2026',title:'Sentrert kø og en ny DJ-figur',items:['Tom kø har et sentrert lydikon, overskrift, forklaring og musikknapp.','DJ-en har fått caps, tydeligere hodetelefoner, en hånd ved øret og en hånd på mikseren. Nye detaljer på konsollen og roligere hodebevegelse.']},

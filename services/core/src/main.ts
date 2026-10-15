@@ -1,3 +1,4 @@
+import {importPreviousData} from './data-import.ts';
 import {join} from 'node:path';
 import {Client,Events,GatewayIntentBits,ActivityType} from 'discord.js';
 import {UserError} from './types.ts';
@@ -5,7 +6,7 @@ import {Store} from './store.ts';import {Providers} from './providers.ts';import
 const env=process.env,shadow=env.CORE_MODE==='shadow',root=env.DATA_DIR??'./data',defaultId=env.DISCORD_GUILD_ID??'';
 const key=env.PUBLIC_SITE_ADMIN_KEY??'',site=env.PUBLIC_SITE_URL??'';
 if(!key||!site||!defaultId)throw new Error('Brokobling og eksisterende Discord-server må være konfigurert lokalt.');
-const store=new Store(join(root,'core.sqlite'));if(env.LEGACY_DATA_DIR)store.importMuse(env.LEGACY_DATA_DIR,defaultId);
+const store=new Store(join(root,'core.sqlite'));if(env.LEGACY_DATA_DIR)importPreviousData(store,env.LEGACY_DATA_DIR,defaultId);
 const sink=new DiscordSink(),engine=new Engine(store,new Providers(store),sink),commands=new Commands(engine);
 const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildVoiceStates]}),metrics=new Metrics(),guilds=new Guilds(defaultId,store.get<Record<string,string>>('guild-room-codes',{}),codes=>store.set('guild-room-codes',codes));
 const publishers=new Map<string,Publisher>(),starting=new Map<string,Promise<void>>();let closing=false;

@@ -2,7 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {ArrowUpRight,ShieldCheck,LoaderCircle,LogOut,Play,Pause,SkipForward,Square,Shuffle,Plus,Trash2,RefreshCw} from 'lucide-react';
 import {useLanguage,LanguageSwitch} from '@/components/language';
-import {Sidebar} from '../muse';
+import {Sidebar} from '@/components/afterparty-navigation';
 import type {DiscordState,Room} from '@/lib/types';
 type Guild={id:string;name:string;roomCode:string;installed:boolean};
 type Job={id:string;status:string;result?:string;payload:{action:string}};

@@ -514,7 +514,7 @@ elements.settingsForm.addEventListener('submit', async (event) => {
     });
     state.settings = result.settings;
     settingsDirty = false;
-    elements.settingsStatus.textContent = 'Endringene er lagret i Muse-databasen.';
+    elements.settingsStatus.textContent = 'Endringene er lagret i Afterparty-databasen.';
     renderSettings();
     showToast('Innstillingene er lagret.');
   } catch (error) {

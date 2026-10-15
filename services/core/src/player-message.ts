@@ -1,7 +1,8 @@
+import {isPlayerButton} from './player-compatibility.ts';
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, type Message } from 'discord.js';
 import {UserError} from './types.ts';
 import type { DiscordBot } from './discord.ts';
-/** Muse's 16-position timeline, with bounded values for live and loading tracks. */
+/** 16-position timeline, with bounded values for live and loading tracks. */
 export function progressBar(position:number,duration:number){
     const progress=duration>0&&Number.isFinite(position)?position/duration:0;
     const dot=Math.max(0,Math.min(15,Math.floor(16*progress)));
@@ -25,7 +26,7 @@ export function playerEmbed(bot: DiscordBot) {
         .setFooter({text:`Kilde: ${track.artist}`.slice(0,2048)})
         .setThumbnail(track.image||null);
 }
-// Familiar controls from reference/muse/playback-message.ts.
+// Afterparty player controls; attribution is retained in THIRD_PARTY_NOTICES.md.
 const icons:Record<string,string>={skip:'⏭️',stop:'⏹️',more:'⚙️',back10:'⏪',forward30:'⏩',queue:'📜',loop:'🔁',shuffle:'🔀',favorite:'⭐'};
 const control=(id:string,label:string,style=ButtonStyle.Secondary)=>new ButtonBuilder().setCustomId('krutt:'+id).setLabel(label).setStyle(style).setEmoji(id==='pause-resume'?(label==='Fortsett'?'▶️':'⏸️'):icons[id]);
 export function playerComponents(bot: DiscordBot) {
@@ -87,7 +88,7 @@ export class PlayerMessage {
                 }
                 if (!this.message) {
                     const recent = await channel.messages.fetch({ limit: 20 });
-                    this.message = recent.find(m => own(m) && m.components.some(r => 'components' in r && r.components.some(c => 'customId' in c && /^(muse|krutt):/.test(c.customId ?? '')))) ?? null;
+                    this.message = recent.find(m => own(m) && m.components.some(r => 'components' in r && r.components.some(c => 'customId' in c && isPlayerButton(c.customId ?? '')))) ?? null;
                 }
             }
             if (!this.message && !bot.engine.current && !bot.engine.queue.length)

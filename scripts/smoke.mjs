@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
-const base=process.env.MUSE_TEST_URL??'http://127.0.0.1:5173';
+const base=process.env.AFTERPARTY_TEST_URL??process.env.MUSE_TEST_URL??'http://127.0.0.1:5173';
 const envfile=process.env.SMOKE_ENV_FILE??'.dev.vars';
 const values=Object.fromEntries(readFileSync(envfile,'utf8').split('\n').filter(l=>l.includes('=')).map(l=>{const i=l.indexOf('=');return [l.slice(0,i),l.slice(i+1).replace(/^"|"$/g,'')];}));
 const bridge=values.ADMIN_BRIDGE_KEY??values.PUBLIC_SITE_ADMIN_KEY;
-const guest={'Content-Type':'application/json','X-Muse-Visitor':randomUUID()};let code;let checks=0;
+const guest={'Content-Type':'application/json','X-Afterparty-Visitor':randomUUID()};let code;let checks=0;
 async function req(path,options={}){const r=await fetch(base+path,{headers:guest,signal:AbortSignal.timeout(20000),...options});const raw=await r.text();let data;try{data=JSON.parse(raw);}catch{data={error:raw};}return {status:r.status,data};}
 function check(actual,expected,label){assert.deepEqual(actual,expected,label);checks++;console.log('PASS '+label);}
 try{
  let r=await req('/api/admin/rooms');check(r.status,403,'Anonymous admin access rejected');
  r=await req('/api/rooms',{method:'POST',body:JSON.stringify({name:'Kontrollrom for testing'})});check(r.status,200,'Create durable room');code=r.data.room.code;const token=r.data.token;assert.match(code,/^[A-Z0-9]{8}$/);assert.equal(token.length,64);checks++;
- const host={...guest,Authorization:`Bearer ${token}`};const guest2={...guest,'X-Muse-Visitor':randomUUID()};
+ const host={...guest,Authorization:`Bearer ${token}`};const guest2={...guest,'X-Afterparty-Visitor':randomUUID()};
  r=await req(`/api/rooms/${code}`,{headers:host});check(r.data.isHost,true,'Host role resolved from secret');assert.equal(r.data.owner_hash,undefined);assert.equal(r.data.token,undefined);checks++;
  let room=r.data;
  r=await req(`/api/rooms/${code}`,{method:'POST',body:JSON.stringify({version:room.version,action:'play'})});check(r.status,403,'Guests cannot control playback');

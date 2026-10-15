@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 const base='http://127.0.0.1:5173';
 const values=Object.fromEntries(readFileSync('.dev.vars','utf8').split('\n').filter(l=>l.includes('=')).map(l=>{const i=l.indexOf('=');return [l.slice(0,i),l.slice(i+1).replace(/^"|"$/g,'')];}));
-const headers={'Content-Type':'application/json','X-Muse-Visitor':randomUUID()};
+const headers={'Content-Type':'application/json','X-Afterparty-Visitor':randomUUID()};
 const created=[];
 async function req(path,options={}){const r=await fetch(base+path,{headers,signal:AbortSignal.timeout(30000),...options});return {status:r.status,data:await r.json()};}
 try{

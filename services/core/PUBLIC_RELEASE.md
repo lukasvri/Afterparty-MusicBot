@@ -51,7 +51,7 @@ A bot restart interrupts voice playback. Choose a suitable time and take a verif
 4. From `services/core/`, run `docker compose build`. The image build must pass validation.
 5. Run `docker compose up -d --no-build`, then check health, recent logs, the player and website sign-in.
 
-If the new image fails, select the preserved compatible Core image in Compose and recreate the service. Review any schema migrations before using an older image. Restore a backup only after stopping Core and verifying that it matches the selected version. Do not overwrite newer data casually. Muse rollback is not a supported recovery path for the multi-server Core databases.
+If the new image fails, select the preserved compatible Core image in Compose and recreate the service. Review any schema migrations before using an older image. Restore a backup only after stopping Core and verifying that it matches the selected version. Do not overwrite newer data casually. Rollback to a previous bot engine is not a supported recovery path for the multi-server Core databases.
 
 ## Server isolation and access
 

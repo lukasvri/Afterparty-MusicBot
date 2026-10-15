@@ -22,6 +22,7 @@ COPY --from=production-dependencies /app/node_modules node_modules
 COPY --from=validation /app/src src
 COPY --from=validation /app/validation.ok /app/validation.ok
 COPY package.json ./
+COPY licenses licenses
 RUN mkdir -p /data && chown node:node /data
 USER node
 ENV DATA_DIR=/data CORE_PORT=3990

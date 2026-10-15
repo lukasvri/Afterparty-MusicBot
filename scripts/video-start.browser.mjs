@@ -5,14 +5,17 @@ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE??'playwright');
 const base=process.env.PREVIEW_URL??'http://127.0.0.1:5173';
 assert(['127.0.0.1','localhost'].includes(new URL(base).hostname),'Synthetic browser checks require a local preview');
 
-async function fixture({playing=false,blocked=false,host=true,nextGate=null,nextFails=false}={}){
+async function fixture({playing=false,blocked=false,host=true,nextGate=null,nextFails=false,previousStorage=true}={}){
  const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox']});
  const page=await browser.newPage({viewport:{width:1500,height:1000}}),commands=[];
  const video=id=>({id,title:'Synthetic '+id,artist:'Synthetic artist',image:'',duration:200,live:false,embeddable:true});
  let current=video('seed1234567'),version=1,radio=true;
  const room=()=>({code:'TESTROOM',name:'Synthetic own room',current,queue:[],playing,radio,position:20,version,serverTime:Date.now(),viewers:1,isHost:host,expiresAt:Date.now()+60000});
- await page.addInitScript(({blocked})=>{
-  localStorage.setItem('gutta-language','en');localStorage.setItem('muse-audio',JSON.stringify({level:77,muted:false,lastAudible:77}));
+ await page.addInitScript(({blocked,previousStorage})=>{
+  localStorage.setItem('gutta-language','en');
+  const prefix=previousStorage?'muse-':'afterparty-';
+  localStorage.setItem(prefix+'audio',JSON.stringify({level:77,muted:false,lastAudible:77}));
+  localStorage.setItem(prefix+'host:TESTROOM','synthetic-host-token');localStorage.setItem(prefix+'visitor','synthetic-visitor');
   window.__blockAudio=blocked;window.__videoCalls=[];window.__transportCalls=[];
   window.YT={Player:class{
    constructor(_target,options){this.options=options;this.state=5;this.position=0;this.volume=77;this.muted=false;this.at=performance.now();window.__fakePlayer=this;queueMicrotask(()=>options.events.onReady());}
@@ -27,12 +30,14 @@ async function fixture({playing=false,blocked=false,host=true,nextGate=null,next
    mute(){this.muted=true;}unMute(){this.muted=false;}isMuted(){return this.muted;}
    seekTo(value){window.__transportCalls.push('seek');this.position=value;this.at=performance.now();}setPlaybackRate(){}destroy(){}
   }};
- },{blocked});
+ },{blocked,previousStorage});
  await page.route('**/*',async route=>{
   const url=new URL(route.request().url());if(url.origin!==new URL(base).origin)return route.abort();
   if(!url.pathname.startsWith('/api/'))return route.continue();
   let result;
   if(url.pathname==='/api/rooms/TESTROOM'){
+   assert.equal(route.request().headers()['x-afterparty-visitor'],'synthetic-visitor');
+   assert.equal(route.request().headers().authorization,'Bearer synthetic-host-token');
    if(route.request().method()==='POST'){
     const command=route.request().postDataJSON();commands.push(command);
     if(command.action==='played')result={ok:true};
@@ -76,7 +81,7 @@ test('blocked audible startup falls back to muted video without changing saved a
   await page.waitForFunction(()=>window.__fakePlayer?.state===1,{},{timeout:4000});
   assert.equal(await page.evaluate(()=>window.__fakePlayer.muted),true);
   await page.clock.install();await page.clock.fastForward(1500);
-  assert.equal((await page.evaluate(()=>JSON.parse(localStorage.getItem('muse-audio')))).muted,false);
+  assert.equal((await page.evaluate(()=>JSON.parse(localStorage.getItem('afterparty-audio')))).muted,false);
   await page.evaluate(()=>{window.__blockAudio=false;});await page.getByRole('button',{name:'Enable sound',exact:true}).click();
   assert.equal(await page.evaluate(()=>window.__fakePlayer.muted),false);
   assert.equal(await page.evaluate(()=>window.__fakePlayer.volume),77);
@@ -134,4 +139,12 @@ test('a guest holds the ended video without sending a host command',async()=>{
   assert.equal(await page.evaluate(()=>window.__fakePlayer.state),0);
   assert.deepEqual(await page.evaluate(()=>window.__transportCalls),[]);assert.equal(commands.length,0);
  }finally{await browser.close();}
+});
+
+test('fresh Afterparty storage works without any old browser keys',async()=>{
+ const f=await fixture({previousStorage:false});try{
+  await f.page.locator('.stage-intro button').click();await f.page.waitForFunction(()=>window.__fakePlayer?.state===1);
+  assert.equal(await f.page.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('muse-'))),false);
+  assert.equal(await f.page.evaluate(()=>JSON.parse(localStorage.getItem('afterparty-audio')).level),77);
+ }finally{await f.browser.close();}
 });
