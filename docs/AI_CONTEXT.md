@@ -48,6 +48,12 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - Chat provides interactive decisions, Work handles broader multi-step research and app work, and Codex implements and validates repository changes.
 - All tools should verify current source and PRs before claiming a feature exists or that a production change has gone live. See [AI collaboration](AI_WORKFLOW.md) for Dot setup, permissions and delegated tasks.
 
+## Development branches and Rust research
+
+- `main` remains the reviewed production source; `nightly` is the integration branch for ongoing development. Changes must be reviewed and tested, and merging code is never proof of deployment.
+- Rust work is an isolated PCM mixer experiment for evaluating performance. It is not integrated into the Node.js/TypeScript Discord Core or authorized to use production credentials, host files or real playback.
+- The Linux laptop also hosts production Core. Keep development worktrees, build output and synthetic benchmarks separate from the production checkout and data; avoid competing with active audio playback.
+
 ## Active work and uncertainties
 
 Do not maintain an unverified list of `in progress` features here. Inspect [open PRs](https://github.com/lukasvri/Afterparty-MusicBot/pulls) and [issues](https://github.com/lukasvri/Afterparty-MusicBot/issues) directly.

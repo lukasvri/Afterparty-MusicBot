@@ -113,6 +113,12 @@ This installs both locked dependency trees, runs deployment recovery, website an
 
 Automated checks do not establish live Discord audio quality or multi-server production capacity. Repository-wide lint still has existing failures; the [release review](docs/RELEASE_REVIEW.md) records its measured baseline and the remaining live checks.
 
+## Rust audio research (experimental)
+
+Afterparty's current Discord Core runs on **TypeScript/Node.js and FFmpeg**. We are exploring **Rust** for a small, isolated PCM audio-mixing component, with a focus on volume control, crossfades and measurable performance under load. A prototype is **not** a replacement for the existing audio engine, and it has no production or Discord connection.
+
+Development is staged on the [`nightly` branch](https://github.com/lukasvri/Afterparty-MusicBot/tree/nightly) and promoted to `main` only after review and testing. Rust will not appear in the GitHub language chart for `main` until Rust source files are actually merged there. The [offline Rust prototype](experiments/rust-audio/) and [development notes](docs/RUST_DEVELOPMENT.md) explain what is being tested and how to run it safely.
+
 ## Explore further
 
 | I want to… | Read |
