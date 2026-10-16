@@ -45,4 +45,4 @@ documentation in English. Do not use em dashes.
   locally after validation, a complete backup and a check of active playback.
   Never use `docker compose down -v` during an update.
 
-See [Cloud workflow](docs/CODEX_CLOUD.md) and [operations](services/core/PUBLIC_RELEASE.md).
+See [Cloud workflow](docs/CLOUD_DEVELOPMENT.md) and [operations](services/core/PUBLIC_RELEASE.md).

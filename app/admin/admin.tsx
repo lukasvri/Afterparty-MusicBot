@@ -358,9 +358,6 @@ export default function Admin() {
                     {t("Logg inn")}
                   </button>
                 </form>
-                <a href="/signin-with-chatgpt?return_to=%2Fadmin">
-                  {t("Eierkonto")}
-                </a>
               </details>
             </section>
           ) : (

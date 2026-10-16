@@ -32,7 +32,7 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 ## Develop and release
 
 - [Contributing](../CONTRIBUTING.md): current source, code boundaries and PR validation.
-- [Codex Cloud](CODEX_CLOUD.md): source-only cloud development and the local production boundary.
+- [Cloud development](CLOUD_DEVELOPMENT.md): source-only cloud development and the local production boundary.
 - [TypeScript conventions](TYPESCRIPT.md): application code, Node tooling and incremental consolidation.
 - [Release policy](RELEASING.md): shared versioning and generated release notes.
 - [Changelog](../CHANGELOG.md): product versions and preserved historical notes.
@@ -47,6 +47,7 @@ These are dated reviews of specific changes, not a live checklist of production 
 
 | Record | Context |
 | --- | --- |
+| [Final source release check](FINAL_RELEASE_CHECK.md) | Current source gates, presentation cleanup and remaining host validation |
 | [Release review](RELEASE_REVIEW.md) | Playback, query and search optimization; ap identity; validation limits |
 | [Core reliability validation](../services/core/docs/reliability-validation.md) | Audio cancellation, race recovery and bridge query measurement |
 | [Independence and compatibility](AFTERPARTY_INDEPENDENCE.md) | Removal of old reference code while retaining stored-data and protocol inputs |

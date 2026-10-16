@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Effective: 15 October 2026
+Effective: 16 October 2026
 
 This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://afterparty.lukasvri.chatgpt.site/support). Independently hosted copies are operated separately.
 
@@ -11,7 +11,6 @@ This policy describes the hosted Afterparty Discord bot and Afterparty website. 
 - **Discord operation:** server, channel, role, message and user identifiers, server names, command inputs and voice connection state are processed to route commands, check permissions, maintain the player message and play requested audio. Requester IDs can be saved with queued tracks, recovery state, favorites and saved queues.
 - **Music and rooms:** searches, media links, track metadata, playback history, queues, settings, room codes, host credentials stored as hashes, chosen display names, requests, votes and moderation state support playback and shared rooms.
 - **Optional admin login:** Discord sign-in requests the `identify` and `guilds` scopes. We process your Discord ID, display name, server list and permissions to check which servers you may manage. The Discord access token and identity are stored in an encrypted grant for the session. The application does not request your Discord password or email through these scopes.
-- **Optional ChatGPT owner access:** when you use the hosting platform’s ChatGPT sign-in, it can supply your account ID, email and name to the website. The website uses this identity to check owner administration access. This is separate from Discord sign-in.
 - **Website security and preferences:** session cookies, random visitor identifiers, hashes derived from IP addresses, request counters and operational errors support authentication, viewer counts, rate limits and troubleshooting. Hosting providers process connection information such as IP addresses and request metadata.
 - **Device storage:** your browser can retain language, volume, display name, visitor ID, room host credentials and saved evening settings in local storage. These remain until you clear the site’s browser data or remove them through the interface.
 
@@ -22,9 +21,9 @@ The bot uses server and voice-state events. It does not request Discord’s Mess
 
 Queues, current tracks and player messages are visible to people with access to the relevant Discord channel or shared room. Room display names, requests and votes may be visible to other participants. Rooms are private by default; choosing public visibility lists the room. Shared concert playback and concert history can appear on the public website. Ordinary Discord music and private member details are filtered from the public concert feed.
 
-Discord processes bot interactions and optional sign-in. OpenAI Sites and Cloudflare provide website delivery and database infrastructure; the bot’s operator runs the audio engine and its local databases. Searches, requested links and playback requests are sent to the media or metadata providers needed for that feature, including YouTube/Google, Spotify and SoundCloud. Embedded YouTube players, thumbnails and Google Fonts make requests from your browser and may process connection data under their own policies.
+Discord processes bot interactions and optional sign-in. The website hosting platform and Cloudflare provide website delivery and database infrastructure; the bot’s operator runs the audio engine and its local databases. Searches, requested links and playback requests are sent to the media or metadata providers needed for that feature, including YouTube/Google, Spotify and SoundCloud. Embedded YouTube players and thumbnails make requests from your browser. Display fonts are served by the website. Media providers may process connection data under their own policies.
 
-We do not sell personal data or use Discord API data for advertising or training AI models. Data is used to provide the requested functions, maintain security and handle support. Providers may process information in other countries under their own terms and privacy arrangements. See [Discord](https://discord.com/privacy), [OpenAI](https://openai.com/policies/privacy-policy/), [Cloudflare](https://www.cloudflare.com/privacypolicy/), [Google](https://policies.google.com/privacy), [Spotify](https://www.spotify.com/legal/privacy-policy/) and [SoundCloud](https://soundcloud.com/pages/privacy).
+We do not sell personal data or use Discord API data for advertising or training AI models. Data is used to provide the requested functions, maintain security and handle support. Providers may process information in other countries under their own terms and privacy arrangements. See [Discord](https://discord.com/privacy), [the hosting platform](https://openai.com/policies/privacy-policy/), [Cloudflare](https://www.cloudflare.com/privacypolicy/), [Google](https://policies.google.com/privacy), [Spotify](https://www.spotify.com/legal/privacy-policy/) and [SoundCloud](https://soundcloud.com/pages/privacy).
 
 
 ## Storage and retention
