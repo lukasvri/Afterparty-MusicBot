@@ -15,7 +15,7 @@ npm run setup:cloud
 npm run check:all
 ```
 
-These commands install the locked website and Core dependency trees, run deployment recovery and application tests, typecheck both projects and build the website. Docker is not required for this workflow. For a full local installation with your own test Discord application, follow [installation](docs/INSTALLATION.md). Cloud tasks follow [AGENTS.md](AGENTS.md) and the [cloud workflow](docs/CODEX_CLOUD.md).
+These commands install the locked website and Core dependency trees, run deployment recovery and application tests, typecheck both projects and build the website. Docker is not required for this workflow. For a full local installation with your own test Discord application, follow [installation](docs/INSTALLATION.md). Cloud tasks follow [AGENTS.md](AGENTS.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
 
 ## Find the right part of the code
 

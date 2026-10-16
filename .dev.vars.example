@@ -3,4 +3,5 @@ ADMIN_BRIDGE_KEY=
 GUTTA_CORE_PUBLIC_URL=https://core.example.com
 GUTTA_CORE_SITE_ORIGIN=https://afterparty.example.com
 YOUTUBE_API_KEY=
-OWNER_EMAIL=
+# Optional owner-password fallback. Store a PBKDF2 hash, never a plaintext password.
+ADMIN_PASSWORD_HASH=

@@ -1,7 +1,6 @@
 import { metadataGenres } from "../services/core/src/radio.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { env as cloudEnv } from "cloudflare:workers";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
 import type { Video, RoomState, Room } from "./types";
 import { hasPasswordSession } from "./admin-session";
 import { coreUrl, coreRequest } from "./core-server";
@@ -20,7 +19,6 @@ import {
 } from "../services/core/src/room-radio.ts";
 type Env = Cloudflare.Env & {
   YOUTUBE_API_KEY?: string;
-  OWNER_EMAIL?: string;
   ADMIN_BRIDGE_KEY?: string;
 };
 const env = () => cloudEnv as Env;
@@ -59,12 +57,7 @@ export const isAdmin = async (request?: Request) => {
   )
     return true;
   if (request && (await hasPasswordSession(request))) return true;
-  const user = await getChatGPTUser();
-  return Boolean(
-    user &&
-    env().OWNER_EMAIL &&
-    user.email.toLowerCase() === env().OWNER_EMAIL!.toLowerCase(),
-  );
+  return false;
 };
 export async function limit(
   request: Request,

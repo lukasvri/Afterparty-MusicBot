@@ -35,13 +35,31 @@ Local file: `.dev.vars` in the repository root. In production, use the hosting p
 | `GUTTA_CORE_PUBLIC_URL` | Yes for Core integration | Core's HTTPS origin, for example `https://core.example.com` |
 | `GUTTA_CORE_SITE_ORIGIN` | Recommended | Your website origin; otherwise derived from the request URL |
 | `YOUTUBE_API_KEY` | For website search | YouTube Data API key with access to the required API |
-| `OWNER_EMAIL` | Optional | Legacy owner access through the Sites identity integration; leave blank for Discord-only administration |
 
 Discord OAuth credentials belong in **Core's** environment. They are not browser configuration. The website calls Core to perform the token exchange.
 
 The website also requires a **D1 database binding named `DB`**. A binding is not an API key. The generic `.openai/hosting.json` declares the binding name; your hosting platform must supply the actual production database.
 
-`ADMIN_PASSWORD_HASH` is an optional legacy owner-login mechanism, not required for the recommended Discord OAuth setup. Do not put a plaintext password in that setting.
+`ADMIN_PASSWORD_HASH` is an optional owner-password mechanism, not required for the recommended Discord OAuth setup. Do not put a plaintext password in that setting. Hosting account headers do not grant administration. Existing installations that used only hosting identity must configure Discord OAuth or the password fallback before updating.
+
+To generate the supported PBKDF2 hash locally in Bash, read the password without echoing it or saving it in shell history:
+
+```bash
+read -rs -p 'Afterparty owner password: ' afterparty_admin_password
+printf '\n'
+printf '%s' "$afterparty_admin_password" | node --input-type=module -e '
+import { randomBytes, pbkdf2Sync } from "node:crypto";
+import { readFileSync } from "node:fs";
+const password = readFileSync(0, "utf8");
+if (!password.length || password.length > 200) throw Error("Use 1 to 200 characters.");
+const salt = randomBytes(16);
+const hash = pbkdf2Sync(password, salt, 100000, 32, "sha256");
+console.log("pbkdf2$100000$" + salt.toString("hex") + "$" + hash.toString("hex"));
+'
+unset afterparty_admin_password
+```
+
+Store only the resulting hash as `ADMIN_PASSWORD_HASH` in the website's secret settings. Keep it private. Rotating the hash invalidates existing password sessions. Password access is limited to the initial owner server; administration of other servers requires Discord sign-in.
 
 ## Matching values
 

@@ -16,11 +16,6 @@ const hooks = registerHooks({
         url: moduleUrl("export const env=globalThis.__roomTestEnv;"),
         shortCircuit: true,
       };
-    if (specifier === "@/app/chatgpt-auth")
-      return {
-        url: moduleUrl("export const getChatGPTUser=async()=>null;"),
-        shortCircuit: true,
-      };
     if (
       context.parentURL?.endsWith("/lib/server.ts") &&
       specifier === "./admin-session"

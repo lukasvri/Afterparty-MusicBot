@@ -109,7 +109,7 @@ npm run setup:cloud
 npm run check:all
 ```
 
-This installs both locked dependency trees, runs deployment recovery, website and Core tests, checks both TypeScript projects, and builds the website. Audio tests use real FFmpeg with synthetic tones. Browser automation uses simulated playback and isolated fixtures. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CODEX_CLOUD.md).
+This installs both locked dependency trees, runs deployment recovery, website and Core tests, checks both TypeScript projects, and builds the website. Audio tests use real FFmpeg with synthetic tones. Browser automation uses simulated playback and isolated fixtures. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
 
 Automated checks do not establish live Discord audio quality or multi-server production capacity. Repository-wide lint still has existing failures; the [release review](docs/RELEASE_REVIEW.md) records its measured baseline and the remaining live checks.
 
