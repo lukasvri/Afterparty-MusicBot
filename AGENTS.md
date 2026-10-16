@@ -46,3 +46,8 @@ documentation in English. Do not use em dashes.
   Never use `docker compose down -v` during an update.
 
 See [Cloud workflow](docs/CLOUD_DEVELOPMENT.md) and [operations](services/core/PUBLIC_RELEASE.md).
+
+## Shared AI context
+
+- For ChatGPT Chat, Work and Codex handoffs, consult [shared project context](docs/AI_CONTEXT.md) and [AI collaboration workflow](docs/AI_WORKFLOW.md). The live repository and reviewed PRs, not assistant chat history, are the source of truth.
+- Keep the context document to lasting, verified decisions. Use GitHub issues and PRs for current task progress. Never confuse merged code with production deployment.
