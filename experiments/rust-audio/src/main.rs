@@ -34,5 +34,8 @@ fn main() {
     let seconds = started.elapsed().as_secs_f64().max(f64::EPSILON);
     println!("Experimental Rust PCM mixer only, not end-to-end audio");
     println!("frames={ITERATIONS} seconds={seconds:.4}");
-    println!("frames_per_second={:.0} checksum={checksum}", ITERATIONS as f64 / seconds);
+    println!(
+        "frames_per_second={:.0} checksum={checksum}",
+        ITERATIONS as f64 / seconds
+    );
 }
