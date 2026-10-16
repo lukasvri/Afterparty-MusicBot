@@ -29,3 +29,30 @@ test('queued tracks and disabled radio bypass recommendation coordination',()=>{
  assert.equal(needsRecommendation({...initial(),queue:[]},{action:'next'}),true);
  assert.equal(needsRecommendation({...initial(),current:null,queue:[],history:[current],radio:false},{action:'radio',enabled:true}),true);
 });
+
+test('undo counts pending guest requests toward the room capacity without losing state', () => {
+ const queue = Array.from({length: 49}, (_, i) => track(`saved${String(i).padStart(6, '0')}`));
+ let state = changeRoom({...initial(), queue, approvalRequired: true}, {action: 'clear'}, true, 30);
+ for (const id of ['request0001', 'request0002']) {
+  state = changeRoom(state, {action: 'add', video: track(id)}, false, 30);
+ }
+ const before = structuredClone(state);
+ assert.throws(() => changeRoom(state, {action: 'undo'}, true, 30), /Køen er for full/);
+ assert.deepEqual(state, before);
+ // Freeing one pending slot makes the same undo possible at exactly 50 tracks.
+ state = changeRoom(state, {action: 'reject', videoId: 'request0002'}, true, 30);
+ const restored = changeRoom(state, {action: 'undo'}, true, 30);
+ assert.deepEqual(restored.queue.map(v => v.id), queue.map(v => v.id));
+ assert.deepEqual(restored.requests?.map(v => v.id), ['request0001']);
+ assert.equal(restored.undoQueue, undefined);
+});
+
+test('undo counts new queued tracks and pending requests together', () => {
+ const queue = Array.from({length: 48}, (_, i) => track(`saved${String(i).padStart(6, '0')}`));
+ let state = changeRoom({...initial(), queue, approvalRequired: true}, {action: 'clear'}, true, 30);
+ state = changeRoom(state, {action: 'add', video: manual}, true, 30);
+ for (const id of ['request0001', 'request0002']) {
+  state = changeRoom(state, {action: 'add', video: track(id)}, false, 30);
+ }
+ assert.throws(() => changeRoom(state, {action: 'undo'}, true, 30), /Køen er for full/);
+});

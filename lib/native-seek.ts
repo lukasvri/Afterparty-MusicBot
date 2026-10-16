@@ -7,11 +7,17 @@ export class NativeSeekTracker {
   reset() { this.sample = null; this.candidate = null; this.written = false; }
   write(position: number) { this.reset(); this.written = true; this.target = position; }
   get pending() { return this.candidate !== null; }
+  acknowledge(position: number, at: number) {
+    if (this.written && Number.isFinite(position) && Math.abs(position - this.target) < 1) {
+      this.written = false;
+      this.sample = { position, at };
+    }
+  }
   observe(position: number, at: number, state: number): number | null {
     if (!Number.isFinite(position)) return null;
     if (this.written) {
       // A delayed API seek is still our seek, even after slow buffering.
-      if (Math.abs(position - this.target) < 1) { this.written = false; this.sample = { position, at }; }
+      this.acknowledge(position, at);
       return null;
     }
     const previous = this.sample;

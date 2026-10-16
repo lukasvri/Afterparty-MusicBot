@@ -18,3 +18,14 @@ test('programmatic seeks remain suppressed through arbitrarily slow buffering',(
  assert.equal(t.observe(80.25,10250,1),null);
  assert.equal(t.pending,false);
 });
+test('a load landing is acknowledged while Core buffering or permissions delay seek detection',()=>{
+ const t=new NativeSeekTracker();
+ t.write(0);
+ t.acknowledge(0.1,100);
+ // Core remains buffering while the iframe has already advanced past its target.
+ assert.equal(t.observe(2.5,2500,1),null);
+ assert.equal(t.observe(80,2600,3),null);
+ assert.equal(t.observe(80,2700,2),80);
+ assert.equal(t.observe(35,2800,3),null);
+ assert.equal(t.observe(35,2900,2),35);
+});

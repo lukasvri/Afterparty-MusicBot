@@ -254,7 +254,7 @@ export function changeRoom(
     const additions = state.queue.filter(
       (v) => !restored.some((saved) => saved.id === v.id),
     );
-    if (restored.length + additions.length > 50)
+    if (restored.length + additions.length + (state.requests?.length ?? 0) > 50)
       throw new UserError(
         "Køen er for full til å angre. Fjern noen låter først.",
       );
