@@ -411,6 +411,7 @@ export class Providers {
             const next = await this.matchSong(song);
             if (
               canPlayRadioTrack(seed, next) &&
+              rankRadio(seed, [next], recent, [...banned], true).length > 0 &&
               next.id !== seed.id &&
               !banned.has(next.id) &&
               !recentSongs.has(songIdentity(next))

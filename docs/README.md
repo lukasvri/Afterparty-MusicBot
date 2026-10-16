@@ -24,6 +24,7 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 ## Understand the experience
 
 - [Own rooms](OWN_ROOMS.md): browser room queues, radio, permissions and scheduling.
+- [Radio selection](RADIO.md): persistent original song, similarity evidence and automatic music filtering.
 - [Party experience](AFTERPARTY_EXPERIENCE.md): shared queue controls, invitations, saved evenings, moderation and TV mode.
 - [Concert stability](CONCERT_STABILITY.md): playback recovery, synchronization and video diagnostics.
 - [Music sources](../services/core/docs/music-sources.md): YouTube, SoundCloud, Spotify matching, radio and audio quality. Earlier sections retain their original Norwegian wording.

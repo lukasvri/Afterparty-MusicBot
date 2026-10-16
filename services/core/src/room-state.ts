@@ -1,5 +1,6 @@
 import { UserError } from "./types.ts";
 import type { RoomVideo } from "./protocol.ts";
+import { roomRadioSeed, playableRoomQueue } from "./room-radio.ts";
 
 /** Durable room state, shared by Core and the Worker fallback. Never publish vote identities. */
 export type RoomPlayback = {
@@ -10,6 +11,7 @@ export type RoomPlayback = {
   startsAt?: number;
   playbackKey?: string;
   radio?: boolean;
+  radioSeed?: RoomVideo;
   radioHistory?: RoomVideo[];
   approvalRequired?: boolean;
   requests?: RoomVideo[];
@@ -24,7 +26,7 @@ export const guestActions = new Set(["add", "vote", "skip-vote"]);
 export function publicPlayback(state: RoomPlayback) {
   return {
     current: state.current,
-    queue: state.queue,
+    queue: playableRoomQueue(state),
     playing: state.playing,
     position: state.position,
     startsAt: state.startsAt,
@@ -56,7 +58,7 @@ export function finished(state: RoomPlayback, updatedAt: number, now: number) {
 }
 export function prefetchDue(state:RoomPlayback,updatedAt:number,now:number){
  const remaining=(state.current?.duration??0)-state.position-Math.max(0,now-Math.max(updatedAt,state.startsAt??updatedAt))/1000;
- return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && !state.queue.length && remaining>0 && now>=(state.radioRetryAt??0));
+ return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && !playableRoomQueue(state).length && remaining>0 && now>=(state.radioRetryAt??0));
 }
 export function needsRecommendation(
   state: RoomPlayback,
@@ -65,7 +67,7 @@ export function needsRecommendation(
   // A queued track already wins over radio. Avoid allocating a shared lookup
   // and yielding the revision to concurrent commands when no search is needed.
   const enabling = input.action === "radio" && input.enabled === true;
-  if (state.queue.length || (state.radio === false && !enabling)) return false;
+  if (playableRoomQueue(state).length || (state.radio === false && !enabling)) return false;
   const actor = String(input.participantHash ?? "");
   return (
     input.action === "next" || input.action === "radio-prefetch" ||
@@ -90,6 +92,11 @@ export function changeRoom(
   if (!host && !guestActions.has(action))
     throw new UserError("Bare verten eller medverten kan styre rommet.", 403);
   const state: RoomPlayback = structuredClone(previous);
+  // Upgrade older rooms lazily. Automatic recommendations retain this anchor;
+  // only an explicitly selected track that becomes current replaces it.
+  const original = roomRadioSeed(state);
+  if (original) state.radioSeed = structuredClone(original);
+  state.queue = playableRoomQueue(state);
   state.position = position;
   const video = input.video as RoomVideo | undefined;
   const valid = (v: RoomVideo | undefined): v is RoomVideo =>
@@ -120,6 +127,10 @@ export function changeRoom(
       ...(state.current ? [state.current] : []),
     ].slice(-20);
     state.current = state.queue.shift() ?? recommended;
+    if (state.current && !state.current.radio && state.current !== recommended)
+      state.radioSeed = structuredClone(state.current);
+    if (state.current === recommended && recommended)
+      state.current = { ...recommended, radio: true };
     state.position = 0;
     state.playing = Boolean(state.current);
     state.playbackKey = crypto.randomUUID();
@@ -149,6 +160,7 @@ export function changeRoom(
       delete state.undoQueue;
       delete state.radioRetryAt;
       state.current = track;
+      state.radioSeed = structuredClone(track);
       state.position = 0;
       state.playing = true;
       state.playbackKey = crypto.randomUUID();
@@ -166,6 +178,7 @@ export function changeRoom(
       if (state.approvalRequired && !host) (state.requests ??= []).push(track);
       else if (!state.current) {
         state.current = track;
+        state.radioSeed = structuredClone(track);
         state.position = 0;
         state.playing = false;
         state.playbackKey = crypto.randomUUID();
@@ -210,6 +223,7 @@ export function changeRoom(
       if (state.queue.length >= 50) throw new UserError("Køen er full.");
       if (!state.current) {
         state.current = track;
+        state.radioSeed = structuredClone(track);
         state.position = 0;
         state.playing = false;
         state.playbackKey = crypto.randomUUID();

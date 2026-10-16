@@ -18,6 +18,8 @@ Core owns room progression when connected. It can advance finished videos even i
 
 Manually queued tracks take priority over radio. Radio is enabled by default, can be switched off by a host, and prepares an embeddable recommendation while the current track plays. Explicit genre metadata helps selection; without it, selection falls back to artist matching. Recent room history helps avoid repeats. Provider availability can leave the room without a suitable recommendation.
 
+The original manually selected song remains the radio seed across automatic tracks and service restarts. A newly selected manual song replaces it when it becomes current. Broad genre labels alone cannot justify unrelated artists. Searches and saved automatic suggestions share the instructional-video filter. See [radio selection](RADIO.md) for the exact lifecycle and provider evidence.
+
 Early skips share an in-flight radio lookup instead of starting a duplicate search. Failed or empty lookups use a cooldown before retrying. A failed skip keeps the current track intact; failed automatic radio ends a completed track cleanly. Every asynchronous result checks the room revision, so a newer pause, queue edit or radio toggle wins.
 
 ## Start video and sound
