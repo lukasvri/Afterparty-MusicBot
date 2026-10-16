@@ -39,7 +39,7 @@ preserves unsaved settings, and response generation checks reject old replies.
 
 Provider responses, saved queues, Discord interactions and synthetic fixtures
 use explicit types. Internal page links and image elements use the framework's
-components. Existing external image delivery and OAuth links remain supported.
+components. Internal links disable Vinext's failing RSC prefetch and retain the original full-page navigation. Browser checks exercise actual link clicks and reject client routing errors. Existing external image delivery and OAuth links remain supported.
 
 ## Reproduce
 

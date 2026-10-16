@@ -9,6 +9,9 @@ const browser = await chromium.launch({
 });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const clientErrors = [];
+  page.on("pageerror", error => clientErrors.push(error.message));
+  page.on("console", message => { if(message.type() === "error" && message.text().includes("[vinext]")) clientErrors.push(message.text()); });
   await page.route("**/*", route => {
     const url = new URL(route.request().url());
     if (url.origin !== base) return route.abort();
@@ -35,5 +38,12 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, pathname + " fits mobile");
     await page.setViewportSize({ width: 1440, height: 1000 });
   }
+  await page.goto(base + '/support');
+  await page.getByRole('navigation',{name:'Service information'}).getByRole('link',{name:'Terms of Service',exact:true}).click();
+  await page.getByRole('heading',{name:'Terms of Service',exact:true}).waitFor();
+  assert.equal(new URL(page.url()).pathname,'/terms');
+  await page.getByRole('navigation',{name:'Service information'}).getByRole('link',{name:'Music room',exact:true}).click();
+  await page.getByRole('heading',{name:'Afterparty',exact:true}).waitFor();
+  assert.deepEqual(clientErrors,[], 'Navigation and prefetch must not report client errors');
   console.log("PASS home, admin, install, support, privacy, terms and release notes: no platform presentation, intact Discord sign-in and desktop/mobile layout");
 } finally { await browser.close(); }

@@ -6,7 +6,7 @@ import { useLanguage } from "./language";
 export function Logo() {
   const { t } = useLanguage();
   return (
-    <Link className="brand" href="/" aria-label={t("Afterparty forsiden")}>
+    <Link prefetch={false} target="_top" className="brand" href="/" aria-label={t("Afterparty forsiden")}>
       <span className="brand-mark" aria-hidden="true">
         <Image unoptimized width={48} height={48} src="/afterparty-mark.svg" alt="" />
       </span>
@@ -33,7 +33,7 @@ export function Sidebar({
     <aside className="sidebar">
       <Logo />
       <nav aria-label={t("Hovedmeny")}>
-        <Link
+        <Link prefetch={false} target="_top"
           className={
             !admin && view === "music" ? "nav-link active" : "nav-link"
           }
@@ -51,7 +51,7 @@ export function Sidebar({
         >
           <Radio size={17} /> {t("Musikk")}
         </Link>
-        <Link
+        <Link prefetch={false} target="_top"
           className={
             !admin && view === "rooms" ? "nav-link active" : "nav-link"
           }
@@ -69,10 +69,9 @@ export function Sidebar({
         >
           <Users size={17} /> {t("Åpne rom")}
         </Link>
-        <Link
+        <Link prefetch={false} target="_top"
           className={admin ? "nav-link active" : "nav-link"}
           href="/admin"
-          target="_top"
         >
           <ShieldCheck size={17} /> Admin
         </Link>
