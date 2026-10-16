@@ -1,0 +1,67 @@
+name: Experimental Rust audio nightly
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/rust-audio-nightly.yml"
+      - "experiments/rust-audio/**"
+      - "scripts/rust-nightly.ps1"
+      - "docs/RUST_NIGHTLY.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-audio-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-rust-audio:
+    name: Offline mixer (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-latest
+            extension: ""
+          - platform: windows-x64
+            runner: windows-latest
+            extension: ".exe"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up stable Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup component add rustfmt clippy
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path experiments/rust-audio/Cargo.toml --all -- --check
+      - name: Lint with Clippy
+        run: cargo clippy --manifest-path experiments/rust-audio/Cargo.toml --all-targets --locked -- -D warnings
+      - name: Unit tests
+        run: cargo test --manifest-path experiments/rust-audio/Cargo.toml --locked
+      - name: Build release executable
+        run: cargo build --manifest-path experiments/rust-audio/Cargo.toml --release --locked
+      - name: Offline mixer benchmark and stage artifacts
+        shell: bash
+        env:
+          BIN_EXT: ${{ matrix.extension }}
+        run: |
+          mkdir -p artifacts
+          binary="experiments/rust-audio/target/release/afterparty-rust-audio${BIN_EXT}"
+          "$binary" --bench | tee artifacts/benchmark.txt
+          cp "$binary" "artifacts/afterparty-rust-audio${BIN_EXT}"
+          printf '%s\n' "$GITHUB_SHA" > artifacts/commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rust-audio-${{ matrix.platform }}-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
