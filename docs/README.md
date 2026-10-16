@@ -57,3 +57,8 @@ These are dated reviews of specific changes, not a live checklist of production 
 ## Documentation images
 
 The [asset notes](assets/README.md) identify the generated brand banner and synthetic local screenshots. Images live in this repository so they remain available when the README is viewed on a fork or branch.
+
+## AI collaboration
+
+- [AI collaboration workflow](AI_WORKFLOW.md): roles for Chat, Work and Codex, shared context, and practical handoff prompts.
+- [Shared AI project context](AI_CONTEXT.md): durable product decisions, source-of-truth rules and important architecture boundaries.
