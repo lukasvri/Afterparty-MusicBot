@@ -17,6 +17,12 @@ and no shared production databases.
   or a Rust compiler channel. Existing `nightly` and Rust branches are preserved.
 - Focused `experiment/rust-*` branches target `dev` through PRs, where Rust checks run for
   changes in this experiment. CI does not start the bot or deploy artifacts.
+- Before reviewing or editing code, fetch the canonical repository's `main`
+  and `dev`, branch from current `dev` and incorporate the latest remote `main`
+  into the task branch. Before submitting the PR, fetch both branches again,
+  incorporate any newer `main` and rerun affected checks on the combined result.
+  Preserve existing Rust work when incorporating updates, as required by
+  [source freshness](../AGENTS.md#source-freshness).
 - CI checks formatting, Clippy, locked tests and release builds on Linux and
   Windows with both the declared minimum Rust 1.85.0 and current stable.
 - Any future adoption of Rust in `main` needs a separate owner decision,
