@@ -1,0 +1,9 @@
+[package]
+name = "afterparty-rust-audio"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85.0"
+description = "Isolated Afterparty PCM mixer experiment"
+publish = false
+
+[dependencies]
