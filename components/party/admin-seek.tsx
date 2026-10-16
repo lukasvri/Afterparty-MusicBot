@@ -22,15 +22,15 @@ export function AdminSeek({
   const [value, setValue] = useState(position),
     [editing, setEditing] = useState(false),
     sample = useRef({ position, at: 0 });
-  const [previous, setPrevious] = useState({trackId, position});
-  if(previous.trackId !== trackId || previous.position !== position){
-    setPrevious({trackId, position});
+  const [previous, setPrevious] = useState({trackId, position, playing});
+  if(previous.trackId !== trackId || previous.position !== position || previous.playing !== playing){
+    setPrevious({trackId, position, playing});
     if(previous.trackId !== trackId){setEditing(false);setValue(position);}
     else if(!editing) setValue(position);
   }
   useEffect(() => {
     sample.current = { position, at: performance.now() };
-  }, [trackId, position]);
+  }, [trackId, position, playing]);
   useEffect(() => {
     const timer = setInterval(() => {
       if (!editing)
