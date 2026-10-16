@@ -40,7 +40,13 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - [Cloud development](CLOUD_DEVELOPMENT.md): fresh checkout, setup, checks and safe local release process.
 - [Contributing](../CONTRIBUTING.md): module map and review standards.
 - [Changelog](../CHANGELOG.md): generated release notes, **not** proof of deployment.
-- [AI collaboration](AI_WORKFLOW.md): using Chat, Work and Codex without losing the handoff.
+- [AI collaboration](AI_WORKFLOW.md): using Dot, Chat, Work and Codex without losing the handoff.
+
+## AI coordination
+
+- The personal dot is the proposed ongoing coordinator for planning and follow-up, not an authority for unreviewed code merges or live deployment.
+- Chat provides interactive decisions, Work handles broader multi-step research and app work, and Codex implements and validates repository changes.
+- All tools should verify current source and PRs before claiming a feature exists or that a production change has gone live. See [AI collaboration](AI_WORKFLOW.md) for Dot setup, permissions and delegated tasks.
 
 ## Active work and uncertainties
 
