@@ -20,6 +20,9 @@ async function fixture({
   jitter = false,
   streaming = false,
   staleNext = "",
+  discord = false,
+  seekDelay = 0,
+  seekFails = false,
 } = {}) {
   const browser = await chromium.launch({
     headless: true,
@@ -57,9 +60,20 @@ async function fixture({
     version,
     serverTime: Date.now(),
     viewers: 1,
-    isHost: host,
+    isHost: discord ? false : host,
+    ...(discord ? { mode: "discord", guildId: "123456789012345678", playbackKey: "synthetic-playback" } : {}),
     expiresAt: Date.now() + 60000,
   });
+  let seekJob = null;
+  const finishSeek = () => {
+    if (!seekJob || Date.now() < seekJob.readyAt || seekJob.status !== "processing") return;
+    seekJob.status = seekFails ? "failed" : "done";
+    if (!seekFails) {
+      position = seekJob.seconds;
+      anchor = Date.now();
+      version++;
+    }
+  };
   await page.addInitScript(
     ({ blocked, previousStorage, jitter, streaming }) => {
       localStorage.setItem("gutta-language", "en");
@@ -210,7 +224,30 @@ async function fixture({
         }
       } else result = room();
     } else if (url.pathname === "/api/realtime") result = { url: null };
-    else if (url.pathname === "/api/discord") result = { state: null };
+    else if (url.pathname === "/api/discord/queue" && discord) result = {
+      state: { queue: [], requests: [], revision: "synthetic-revision" }, canManage: host,
+    };
+    else if (url.pathname === "/api/admin/control" && discord) {
+      assert(host, "Guests must never attempt privileged seeking");
+      if (route.request().method() === "POST") {
+        const input = route.request().postDataJSON();
+        assert.equal(input.guildId, "123456789012345678");
+        assert.equal(input.operation, "command");
+        assert.equal(input.command.action, "seek");
+        assert.equal(input.command.queueRevision, "synthetic-revision");
+        commands.push(input.command);
+        seekJob = { id: input.commandId, status: "processing", seconds: input.command.seconds, readyAt: Date.now() + seekDelay };
+        finishSeek();
+        result = { id: seekJob.id, status: seekJob.status };
+      } else {
+        finishSeek();
+        result = { commands: [{ ...seekJob, result: seekFails ? "Synthetic seek failure" : "" }] };
+      }
+    }
+    else if (url.pathname === "/api/discord") result = { state: discord ? {
+      ...room(), ready: true, connected: true, online: true,
+      volume: 80, queueRevision: "synthetic-revision", roomCode: "TESTROOM",
+    } : null };
     else if (url.pathname === "/api/history") result = { videos: [] };
     else
       return route.fulfill({
@@ -243,6 +280,48 @@ async function fixture({
     },
   };
 }
+for (const playing of [true, false])
+test(`Discord native seeking follows authorized audio while ${playing ? "playing" : "paused"}`, async () => {
+  const { browser, page, commands, expectedPosition } = await fixture({ discord: true, playing, seekDelay: 1800 });
+  try {
+    await page.locator(".stage-intro button").click();
+    await page.waitForFunction(() => window.__fakePlayer);
+    await page.waitForTimeout(1400);
+    for (const seconds of [80, 35]) {
+      await page.evaluate((seconds) => {
+        const p = window.__fakePlayer;
+        p.emit(3);
+        p.position = seconds;
+        p.at = performance.now();
+        p.emit(2);
+      }, seconds);
+      await page.waitForTimeout(3200);
+      const measured = await page.evaluate(() => window.__fakePlayer.getCurrentTime());
+      assert(Math.abs(measured - expectedPosition()) < 1, "Video follows confirmed Core position");
+      assert(Math.abs(measured - seconds) < 5, "Seeking must not snap back to the old position");
+    }
+    assert.equal(commands.filter((c) => c.action === "seek").length, 2);
+    await page.evaluate(() => window.__fakePlayer.emit(3));
+    await page.waitForTimeout(1800);
+    await page.evaluate((playing) => window.__fakePlayer.emit(playing ? 1 : 2), playing);
+    await page.waitForTimeout(2200);
+    assert.equal(commands.filter((c) => c.action === "seek").length, 2, "Buffering never publishes a seek");
+  } finally { await browser.close(); }
+});
+for (const host of [true, false])
+test(`Discord native seeking ${host ? "recovers from a rejected command" : "keeps guest controls local"}`, async () => {
+  const { browser, page, commands, expectedPosition } = await fixture({ discord: true, playing: true, host, seekDelay: 600, seekFails: true });
+  try {
+    await page.locator(".stage-intro button").click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.waitForTimeout(1400);
+    await page.evaluate(() => { const p = window.__fakePlayer; p.emit(3); p.position = 80; p.at = performance.now(); p.emit(1); });
+    await page.waitForTimeout(7000);
+    assert.equal(commands.filter((c) => c.action === "seek").length, host ? 1 : 0);
+    assert(Math.abs(await page.evaluate(() => window.__fakePlayer.getCurrentTime()) - expectedPosition()) < 1);
+  } finally { await browser.close(); }
+});
+
 test("one centre play click starts a paused own room and its local video", async () => {
   const { browser, page, commands } = await fixture();
   try {

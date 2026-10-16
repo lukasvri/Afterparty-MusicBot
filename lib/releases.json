@@ -1,5 +1,16 @@
 [
   {
+    "version": "2.1.2",
+    "date": "2026-10-16",
+    "title": "Discord video seeking and release readiness",
+    "items": [
+      "Native YouTube seeking in a Discord concert now sends an authenticated seek to Core for the selected server. Video waits for command confirmation and then follows the fresh shared position. Guests cannot change the shared position, and buffering does not publish seek commands.",
+      "Radio recommendations retain the original seed and exclude instructional videos. Discord voice connection errors are handled without losing other servers or startup recovery.",
+      "Browser audio preferences, room callbacks and administration drafts remain consistent across updates. Internal page links retain working native navigation.",
+      "The release lint backlog is resolved, and validation now requires zero lint warnings. This entry also records the previously missing release notes for those maintenance changes."
+    ]
+  },
+  {
     "version": "2.1.1",
     "date": "2026-10-15",
     "title": "Private queue isolation and accurate crossfade recovery",
