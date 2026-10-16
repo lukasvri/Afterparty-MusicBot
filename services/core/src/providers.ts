@@ -16,6 +16,7 @@ export { normalized, scoreMatch } from "./matching.ts";
 import {
   radioArtist,
   radioQuery,
+  specificRadioGenre,
   rankRadio,
   songIdentity,
   canPlayRadioTrack,
@@ -437,7 +438,7 @@ export class Providers {
       return rankRadio(seed, found, recent, [...banned])[0] ?? null;
     }
     const artist = radioArtist(seed);
-    if (!artist) return null;
+    if (!artist && !specificRadioGenre(seed)) return null;
     const found = await this.search(radioQuery(seed), 20, true);
     this.recommendationStatus = "artist";
     return (
