@@ -1,3 +1,4 @@
+import type {YouTubeResponses, ExtractedMedia} from "./external-types.ts";
 import { metadataGenres } from "./radio.ts";
 import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
@@ -63,7 +64,7 @@ export class Providers {
     );
     this.recommendations = new Recommendations(store, env.LASTFM_API_KEY ?? "");
   }
-  async youtube(path: string, params: Record<string, string>) {
+  async youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) {
     const url = new URL("https://www.googleapis.com/youtube/v3/" + path);
     for (const [k, v] of Object.entries({ ...params, key: this.key }))
       url.searchParams.set(k, v);
@@ -73,10 +74,10 @@ export class Providers {
         "YouTube-søket er midlertidig utilgjengelig.",
         response.status === 403 || response.status === 429 ? 429 : 502,
       );
-    return response.json() as Promise<any>;
+    return response.json() as Promise<YouTubeResponses[K]>;
   }
   async extract(args: string[], signal?: AbortSignal, priority = false) {
-    return runJson(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority);
+    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority);
   }
   async video(ids: string[], skipUnavailable = false): Promise<Track[]> {
     if (!ids.length) return [];
@@ -139,7 +140,7 @@ export class Providers {
             remember({
               id,
               genres: metadataGenres(v.description, v.tags),
-              title: v.title,
+              title: v.title ?? "YouTube",
               artist: v.artist ?? v.uploader ?? "YouTube",
               image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
               duration: Number(v.duration) || 0,
@@ -207,7 +208,7 @@ export class Providers {
         safeSearch: "moderate",
         ...(musicOnly ? { videoCategoryId: "10" } : {}),
       });
-      ids = data.items.map((i: any) => i.id.videoId);
+      ids = data.items.map((i) => i.id.videoId);
     } catch {
       const data = await this.extract([
         "--flat-playlist",
@@ -216,8 +217,8 @@ export class Providers {
         `ytsearch${count}:${query}`,
       ]);
       ids = (data.entries ?? [])
-        .map((t: any) => t.id)
-        .filter((id: string) => /^[\w-]{11}$/.test(id));
+        .map((t) => t?.id)
+        .filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id));
     }
     return this.video(ids, true);
   }
@@ -248,7 +249,7 @@ export class Providers {
             maxResults: "50",
             ...(page ? { pageToken: page } : {}),
           });
-          ids.push(...data.items.map((i: any) => i.contentDetails.videoId));
+          ids.push(...data.items.map((i) => i.contentDetails.videoId));
           page = data.nextPageToken ?? "";
         } while (page && ids.length < this.store.settings().playlistLimit);
         const tracks: Track[] = [];
@@ -279,7 +280,7 @@ export class Providers {
       return resolveSoundcloud(
         query,
         this.store.settings().playlistLimit,
-        (args) => runJson(process.env.YTDLP_PATH ?? "yt-dlp", args),
+        (args) => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args),
       );
     if (/^https?:\/\//.test(query))
       throw new UserError("Bruk en YouTube-, Spotify- eller SoundCloud-lenke.");
@@ -313,7 +314,7 @@ export class Providers {
     );
     if (
       data.is_preview ||
-      (data.full_duration && data.duration < data.full_duration - 2)
+      (data.full_duration && Number(data.duration) < data.full_duration - 2)
     )
       throw new UserError("Kilden tilbyr bare en forhåndsvisning.");
     if (typeof data.url !== "string" || !/^https?:\/\//.test(data.url))
@@ -429,7 +430,7 @@ export class Providers {
       const found = await resolveSoundcloud(
         `sc:${radioArtist(seed)}`,
         5,
-        (args) => runJson(process.env.YTDLP_PATH ?? "yt-dlp", args),
+        (args) => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args),
         5,
       );
       this.recommendationStatus = "soundcloud";

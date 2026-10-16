@@ -29,8 +29,9 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Typecheck, browser behavior tests and production build
+      - name: Lint, typecheck, browser behavior tests and production build
         run: |
+          npm run lint
           node node_modules/typescript/bin/tsc --noEmit --incremental false
-          node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/native-seek.test.ts scripts/rooms.test.mjs scripts/bridge.test.mjs scripts/admin-auth.test.mjs scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts
+          npm run test:unit
           npm run build

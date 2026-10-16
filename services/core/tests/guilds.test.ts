@@ -1,3 +1,4 @@
+import type {AddressInfo} from 'node:net';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtempSync,rmSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';import {randomUUID} from 'node:crypto';
 import {Guilds} from '../src/guilds.ts';import {DiscordOAuth,canManageGuild} from '../src/oauth.ts';import {Store} from '../src/store.ts';import {Engine} from '../src/engine.ts';import {Commands} from '../src/commands.ts';import {Providers} from '../src/providers.ts';import {createServers} from '../src/server.ts';import type {Sink} from '../src/audio.ts';
 const A='100000000000000001',B='100000000000000002';
@@ -11,10 +12,10 @@ test('guilds isolate state, queue, settings, favorites, commands and streams whi
  for(const id of [A,B]){const store=new Store(join(dir,id,'db.sqlite'));const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};const engine=new Engine(store,new Providers(store,{}),sink),commands=new Commands(engine);engine.ready=true;engine.connected=true;engine.current={id:'abcdefghijk',entryId:id,title:'Song '+id,artist:'Artist',image:'',duration:100,live:false,embeddable:true,concert:true};resources.push({store,engine,commands});guilds.register({id,name:id,roomCode:guilds.roomCode(id),engine,commands,bot:{privateState:()=>({settings:engine.settings})} as never});}
  const [one,two]=resources;one.engine.setSettings({radio:false});one.store.favorite('person','favorite','query');assert(two.engine.settings.radio);assert.equal(two.store.favorites().length,0);one.engine.enqueue([{...one.engine.current!,id:'bcdefghijkl',entryId:randomUUID()}]);assert.equal(two.engine.queue.length,0);
  const oauth=new DiscordOAuth('key','app','secret','https://site.example',async()=>Response.json([{id:A,name:'A',permissions:'32'}]));const grant=oauth.seal({access:'token',expiresAt:Date.now()+60000,user:{id:A,name:'User'}});
- const server=await createServers(one.engine,one.commands,{key:'key',origin:'https://site.example',hosts:[],passwordHash:'',privateState:()=>({}),guilds,oauth,publicPort:0,adminPort:false,host:'127.0.0.1'});const base='http://127.0.0.1:'+(server.publicServer.address() as any).port;
+ const server=await createServers(one.engine,one.commands,{key:'key',origin:'https://site.example',hosts:[],passwordHash:'',privateState:()=>({}),guilds,oauth,publicPort:0,adminPort:false,host:'127.0.0.1'});const base='http://127.0.0.1:'+(server.publicServer.address() as AddressInfo).port;
  try{
   assert.equal(server.adminServer.address(),null);const header={Authorization:'Bearer key','Content-Type':'application/json'};
-  const state=await fetch(base+'/v1/state?guildId='+B).then(r=>r.json()) as any;assert.equal(state.state.guildId,B);assert.equal(state.state.current.title,'Song '+B);assert.equal(state.state.queue.length,0);
+  const state=await fetch(base+'/v1/state?guildId='+B).then(r=>r.json()) as {state:{guildId:string;current:{title:string};queue:unknown[]}};assert.equal(state.state.guildId,B);assert.equal(state.state.current.title,'Song '+B);assert.equal(state.state.queue.length,0);
   assert.equal((await fetch(base+'/v1/admin?guildId='+B,{headers:header})).status,403);
   assert.equal((await fetch(base+'/v1/admin?guildId='+B,{headers:{...header,'X-Discord-Grant':grant}})).status,403);
   const id='public:'+randomUUID(),input={id,scope:'public',guildId:B,action:'pause',playbackKey:'core:'+B};

@@ -65,7 +65,7 @@ test('an encoder crash is an output error and disposes its input',async()=>{
  try{process.env.FFMPEG_PATH=process.execPath;encoded=encodeOpus(mixer,96000);}
  finally{if(previous===undefined)delete process.env.FFMPEG_PATH;else process.env.FFMPEG_PATH=previous;}
  const closed=new Promise<void>(resolve=>encoded.process.once('close',()=>resolve()));
- try{await assert.rejects(async()=>{for await(const _ of encoded.stream){}},/Lydkodingen stoppet/);await closed;assert.equal(mixer.destroyed,true);}
+ try{await assert.rejects(async()=>{for await(const chunk of encoded.stream){assert(Buffer.isBuffer(chunk));}},/Lydkodingen stoppet/);await closed;assert.equal(mixer.destroyed,true);}
  finally{encoded.stream.destroy();encoded.process.kill('SIGKILL');mixer.destroy();await closed;}
 });
 

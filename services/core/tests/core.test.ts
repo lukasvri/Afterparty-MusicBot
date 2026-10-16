@@ -160,10 +160,10 @@ test('clock and recovery avoid snapshots while preserving position and revision'
  const t=setup();try{
   t.engine.settings.radio=false;t.engine.current=track();t.engine.segments=[{track:t.engine.current,startFrame:0,offset:10}];t.engine.lastEntry=t.engine.current.entryId;t.sink.ms=2000;
   let snapshots=0,clocks=0;const snapshot=t.engine.snapshot.bind(t.engine);t.engine.snapshot=()=>{snapshots++;return snapshot();};t.engine.on('clock',()=>clocks++);
-  const revision=t.engine.revision();t.engine.tick();assert.equal(snapshots,0);assert.equal(clocks,1);assert.equal(t.store.get<any>('recovery',null).position,12);
+  const revision=t.engine.revision();t.engine.tick();assert.equal(snapshots,0);assert.equal(clocks,1);assert.equal(t.store.get<{position:number}|null>('recovery',null)?.position,12);
   assert.equal(t.engine.revision(),revision);t.engine.queue.push(track('bcdefghijkl'));assert.notEqual(t.engine.revision(),revision);
   const added=t.engine.revision();t.engine.queue[0].entryId='replacement';assert.notEqual(t.engine.revision(),added);
-  t.engine.pause();t.engine.checkpoint();assert.equal(t.store.get<any>('recovery',null).paused,true);
+  t.engine.pause();t.engine.checkpoint();assert.equal(t.store.get<{paused:boolean}|null>('recovery',null)?.paused,true);
  }finally{t.close();}
 });
 

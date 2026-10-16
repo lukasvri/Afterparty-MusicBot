@@ -1,12 +1,14 @@
 "use client";
+import Image from "next/image";
+import Link from "next/link";
 import { Radio, ShieldCheck, Users } from "lucide-react";
 import { useLanguage } from "./language";
 export function Logo() {
   const { t } = useLanguage();
   return (
-    <a className="brand" href="/" aria-label={t("Afterparty forsiden")}>
+    <Link className="brand" href="/" aria-label={t("Afterparty forsiden")}>
       <span className="brand-mark" aria-hidden="true">
-        <img src="/afterparty-mark.svg" width="48" height="48" alt="" />
+        <Image unoptimized width={48} height={48} src="/afterparty-mark.svg" alt="" />
       </span>
       <span>
         afterparty
@@ -14,7 +16,7 @@ export function Logo() {
           .
         </span>
       </span>
-    </a>
+    </Link>
   );
 }
 export function Sidebar({
@@ -31,7 +33,7 @@ export function Sidebar({
     <aside className="sidebar">
       <Logo />
       <nav aria-label={t("Hovedmeny")}>
-        <a
+        <Link
           className={
             !admin && view === "music" ? "nav-link active" : "nav-link"
           }
@@ -48,8 +50,8 @@ export function Sidebar({
           }
         >
           <Radio size={17} /> {t("Musikk")}
-        </a>
-        <a
+        </Link>
+        <Link
           className={
             !admin && view === "rooms" ? "nav-link active" : "nav-link"
           }
@@ -66,14 +68,14 @@ export function Sidebar({
           }
         >
           <Users size={17} /> {t("Åpne rom")}
-        </a>
-        <a
+        </Link>
+        <Link
           className={admin ? "nav-link active" : "nav-link"}
           href="/admin"
           target="_top"
         >
           <ShieldCheck size={17} /> Admin
-        </a>
+        </Link>
       </nav>
     </aside>
   );

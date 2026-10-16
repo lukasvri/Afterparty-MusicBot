@@ -61,7 +61,7 @@ export class PlayerMessage {
     constructor(bot: DiscordBot) { this.bot = bot; }
     private notice='';
     private noticeUntil=0;
-    async confirmQueue(count:number,concert:boolean,_query:string):Promise<void>{
+    async confirmQueue(count:number,concert:boolean):Promise<void>{
         this.notice=`Lagt til ${count} ${concert?'konsert':'sang'+(count===1?'':'er')} i køen.`;
         this.noticeUntil=Date.now()+15000;
         await this.update(true,true);

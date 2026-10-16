@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { LiveClock } from "@/lib/live-clock";
 import { readLiveState, type LiveState } from "@/lib/live-room";
 
@@ -10,13 +10,11 @@ export function useLiveDiscord(
   guildId?: string,
   enabled = true,
 ) {
-  const callback = useRef(onState),
-    disconnect = useRef(onDisconnect),
+  const callback = useEffectEvent(onState),
+    disconnect = useEffectEvent(() => onDisconnect?.()),
     fresh = useRef(false);
   const latest = useRef<LiveState | null>(null),
     sampleAt = useRef(0);
-  callback.current = onState;
-  disconnect.current = onDisconnect;
   const key = guildId ?? "";
   const [status, setStatus] = useState<{
     key: string | null;
@@ -53,7 +51,7 @@ export function useLiveDiscord(
       if (!stopped && fresh.current) {
         fresh.current = false;
         update({ live: false });
-        disconnect.current?.();
+        disconnect();
       }
     };
     const clock = async () => {
@@ -84,7 +82,7 @@ export function useLiveDiscord(
             (state.playing && !state.buffering ? age / 1000 : 0),
         };
         update({ live: true, phase: "live:http" });
-        callback.current(state, age);
+        callback(state, age);
       } catch {
         update({ phase: "invalid-message" });
       }

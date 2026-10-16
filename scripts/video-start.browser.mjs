@@ -18,6 +18,7 @@ async function fixture({
   nextFails = false,
   previousStorage = true,
   jitter = false,
+  streaming = false,
   staleNext = "",
 } = {}) {
   const browser = await chromium.launch({
@@ -60,7 +61,7 @@ async function fixture({
     expiresAt: Date.now() + 60000,
   });
   await page.addInitScript(
-    ({ blocked, previousStorage, jitter }) => {
+    ({ blocked, previousStorage, jitter, streaming }) => {
       localStorage.setItem("gutta-language", "en");
       const prefix = previousStorage ? "muse-" : "afterparty-";
       localStorage.setItem(
@@ -69,6 +70,13 @@ async function fixture({
       );
       localStorage.setItem(prefix + "host:TESTROOM", "synthetic-host-token");
       localStorage.setItem(prefix + "visitor", "synthetic-visitor");
+      if(streaming){
+        window.__streams = [];
+        window.EventSource = class extends EventTarget {
+          constructor(url){super();this.url=url;this.closed=false;window.__streams.push(this);queueMicrotask(()=>this.dispatchEvent(new Event('open')));}
+          close(){this.closed=true;}
+        };
+      }
       window.__blockAudio = blocked;
       window.__jitter = jitter;
       window.__videoCalls = [];
@@ -146,7 +154,7 @@ async function fixture({
         },
       };
     },
-    { blocked, previousStorage, jitter },
+    { blocked, previousStorage, jitter, streaming },
   );
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
@@ -579,4 +587,51 @@ test("quality changes preserve the iframe and never reload the song or publish t
   } finally {
     await browser.close();
   }
+});
+
+test("audio preferences update without replacing the player and survive mute and cross-tab changes", async () => {
+  const {browser, page, commands} = await fixture({playing:true,previousStorage:false});
+  try {
+    await page.locator('.stage-intro button').click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.evaluate(() => {window.__originalPlayer = window.__fakePlayer;});
+    await page.waitForTimeout(1200);
+    const before = commands.length;
+    await page.evaluate(() => window.__fakePlayer.setVolume(23));
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('afterparty-audio') ?? '{}').level === 23);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.press('m');
+    await page.waitForFunction(() => window.__fakePlayer.muted);
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('afterparty-audio')).level),23);
+    await page.keyboard.press('m');
+    await page.waitForFunction(() => !window.__fakePlayer.muted);
+    await page.evaluate(() => {
+      localStorage.setItem('afterparty-audio', JSON.stringify({level:41,muted:true,lastAudible:41}));
+      dispatchEvent(new StorageEvent('storage',{key:'afterparty-audio'}));
+    });
+    await page.waitForFunction(() => window.__fakePlayer.volume === 41 && window.__fakePlayer.muted);
+    assert(await page.evaluate(() => window.__fakePlayer === window.__originalPlayer));
+    assert.equal(commands.length,before,'Device audio must not publish a shared transport command');
+  } finally { await browser.close(); }
+});
+
+test("live room callbacks accept new timelines after rendering without reconnecting", async () => {
+  const {browser, page} = await fixture({playing:true,streaming:true});
+  try {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.locator('.stage-intro button').click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.getByRole('button',{name:'Bokmål',exact:true}).click();
+    await page.evaluate(() => {
+      const source = window.__streams.find(stream => stream.url.includes('room=TESTROOM'));
+      source.dispatchEvent(new MessageEvent('message',{data:JSON.stringify({type:'room',room:{
+        code:'TESTROOM',name:'Synthetic own room',current:{id:'next1234567',title:'Fresh live title',artist:'Synthetic artist',image:'',duration:200,live:false,embeddable:true},queue:[],playing:true,position:45,version:2,serverTime:Date.now(),viewers:1,isHost:true,expiresAt:Date.now()+60000,syncSource:'live',syncEpoch:'synthetic-stream',syncValidForMs:5000,
+      }})}));
+    });
+    await page.waitForFunction(() => window.__videoCalls.at(-1) === 'next1234567');
+    assert.equal(await page.evaluate(() => window.__streams.length),1);
+    assert.equal(await page.evaluate(() => window.__streams[0].closed),false);
+    assert.deepEqual(errors,[]);
+  } finally { await browser.close(); }
 });

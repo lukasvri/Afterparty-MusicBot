@@ -16,9 +16,10 @@ case "${1:-check}" in
     npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
     ;;
   check)
+    npm run lint
     python3 -m unittest discover -s tests -v
     node node_modules/typescript/bin/tsc --noEmit --incremental false
-    node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/native-seek.test.ts scripts/rooms.test.mjs scripts/bridge.test.mjs scripts/admin-auth.test.mjs scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts
+    npm run test:unit
     npm --prefix services/core run check
     npm --prefix services/core test
     npm run build

@@ -6,3 +6,5 @@ export function publicTrack(t:Track|null):PublicTrack|null{return t?{id:t.id,tit
 export type Settings={playlistLimit:number;secondsToWaitAfterQueueEmpties:number;leaveIfNoListeners:boolean;queueAddResponseEphemeral:boolean;autoAnnounceNextSong:boolean;defaultVolume:number;defaultQueuePageSize:number;turnDownVolumeWhenPeopleSpeak:boolean;turnDownVolumeWhenPeopleSpeakTarget:number;crossfade:number;radio:boolean;audioBitrateKbps:number};
 export const defaultSettings:Settings={playlistLimit:50,secondsToWaitAfterQueueEmpties:300,leaveIfNoListeners:true,queueAddResponseEphemeral:true,autoAnnounceNextSong:false,defaultVolume:100,defaultQueuePageSize:10,turnDownVolumeWhenPeopleSpeak:false,turnDownVolumeWhenPeopleSpeakTarget:30,crossfade:6,radio:true,audioBitrateKbps:192};
 export class UserError extends Error{status:number;constructor(message:string,status=400){super(message);this.status=status;}}
+
+export type SavedQueue = {id: string; name: string; createdAt: string; tracks: Track[]};

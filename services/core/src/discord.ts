@@ -1,5 +1,5 @@
 import {playerAction} from './player-compatibility.ts';
-import { Client, GatewayIntentBits, Events, MessageFlags, PermissionFlagsBits, ActivityType, ChannelType, type ChatInputCommandInteraction, type ButtonInteraction, type VoiceBasedChannel, type Guild } from 'discord.js';
+import { Client, GatewayIntentBits, Events, MessageFlags, PermissionFlagsBits, ActivityType, ChannelType, type Interaction, type VoiceState, type ChatInputCommandInteraction, type ButtonInteraction, type VoiceBasedChannel, type Guild } from 'discord.js';
 import { joinVoiceChannel, entersState, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import { readFile } from 'node:fs/promises';
 import { PlayerMessage, playerEmbed, playerComponents, playerMoreComponents, formatTime } from './player-message.ts';
@@ -8,7 +8,7 @@ import { Engine } from './engine.ts';
 import { Metrics } from './metrics.ts';
 import { Commands } from './commands.ts';
 import { DiscordSink } from './audio.ts';
-import { UserError, type Track } from './types.ts';
+import { UserError, type Track, type SavedQueue } from './types.ts';
 export class DiscordBot {
     metrics:Metrics;
     ownsClient:boolean;
@@ -59,7 +59,7 @@ export class DiscordBot {
             this.voteEntry = engine.current?.entryId ?? '';
         } void this.updateMessage(); });
     }
-    handleInteraction(interaction:any){
+    handleInteraction(interaction:Interaction){
         if(interaction.guildId!==this.guildId)return;
         if(interaction.isAutocomplete()){
             const focused=interaction.options.getFocused(),now=Date.now(),last=this.autocompleteAt.get(interaction.user.id)??0;if(focused.length<3||now-last<1000){void interaction.respond([]);return;}if(this.autocompleteAt.size>1000)this.autocompleteAt.clear();this.autocompleteAt.set(interaction.user.id,now);
@@ -67,12 +67,12 @@ export class DiscordBot {
         }
         if(interaction.isChatInputCommand()||interaction.isButton())void this.interaction(interaction);
     }
-    voiceState(before:any,after:any){
+    voiceState(before:VoiceState,after:VoiceState){
         if(after.guild.id!==this.guildId||!this.connection)return;
         const channelId=this.connection.joinConfig.channelId;
         if(after.id===this.client.user?.id&&!after.channelId){this.disconnect();return;}
-        const channel=after.guild.channels.cache.get(channelId);
-        if(!this.testing&&channel?.isVoiceBased()&&this.engine.settings.leaveIfNoListeners&&channel.members.filter((m:any)=>!m.user.bot).size===0)this.disconnect();
+        const channel=channelId?after.guild.channels.cache.get(channelId):undefined;
+        if(!this.testing&&channel?.isVoiceBased()&&this.engine.settings.leaveIfNoListeners&&channel.members.filter(m=>!m.user.bot).size===0)this.disconnect();
     }
     async start(token:string){
         if(this.ownsClient){await this.client.login(token);if(!this.client.isReady())await new Promise<void>(resolve=>this.client.once(Events.ClientReady,()=>resolve()));}
@@ -204,7 +204,7 @@ export class DiscordBot {
                 await this.sameVoice(interaction, true);
                 if(!this.musicChannelId&&interaction.guild){const target=interaction.guild!.channels.cache.find(c=>c.isTextBased()&&c.name==='musikk')??interaction.channel;if(target?.isTextBased()&&'send'in target){this.musicChannelId=target.id;e.store.set('music-channel',target.id);}}
                 const count = await this.commands.add(text('query', true), interaction.user.id, {next:name === 'play-next' || boolean('immediate') || boolean('skip'),immediate:boolean('skip'),shuffle:boolean('shuffle')});
-                await this.playerMessage.confirmQueue(count,false,text('query',true));
+                await this.playerMessage.confirmQueue(count,false);
                 await this.updateMessage(true);
                 await interaction.deleteReply();
                 return;
@@ -245,7 +245,7 @@ export class DiscordBot {
                         throw new UserError('Bruk en gyldig YouTube-lenke.');
                     await this.sameVoice(interaction, true);
                     const count=await this.commands.add(id, interaction.user.id, {concert:true});
-                    await this.playerMessage.confirmQueue(count,true,link);
+                    await this.playerMessage.confirmQueue(count,true);
                     await this.updateMessage(true);
                     await interaction.deleteReply();
                 }
@@ -274,7 +274,7 @@ export class DiscordBot {
                 if (!favorite)
                     throw new UserError('Fant ikke favoritten.');
                 const count=await this.commands.add(favorite.query, interaction.user.id, {next:boolean('immediate') || boolean('skip'),immediate:boolean('skip'),shuffle:boolean('shuffle')});
-                await this.playerMessage.confirmQueue(count,false,favorite.name);
+                await this.playerMessage.confirmQueue(count,false);
                 await interaction.deleteReply();
                 return;
             }
@@ -372,7 +372,7 @@ export class DiscordBot {
         this.client.user?.setActivity(text, { type: ActivityType.Listening });
         this.lastActivity = text;
     } }
-    privateState() { const e = this.engine, s = e.snapshot(), guild = this.client.guilds.cache.get(this.guildId); const song = (t: Track | null) => t ? { title: t.title, artist: t.artist, length: t.duration, thumbnailUrl: t.image, isLive: t.live, url: t.url ?? 'https://www.youtube.com/watch?v=' + t.id, source: t.source ?? 'youtube', requestedBy: t.requestedBy } : null; const memory = process.memoryUsage(); return { bot: { guildCount: guild ? 1 : 0, ready: e.ready, user: this.client.user?.username ?? 'Afterparty' }, guildId: this.guildId, guilds: guild ? [{ id: guild.id, name: guild.name, iconUrl: guild.iconURL() }] : [], activity: this.commands.activity, performance: this.metrics.snapshot(this.client.ws.ping), player: { queueRevision: e.revision(), connected: e.connected, current: song(e.current), loopCurrentQueue: e.loopQueue, loopCurrentSong: e.loop, position: s.position, queue: e.queue.map((t, i) => ({ ...song(t), position: i + 1 })), status: s.playing ? 'playing' : e.current ? 'paused' : 'idle', volume: e.volume, bitrate: e.bitrate, radioProvider: e.providers.recommendationStatus, radioError: e.radioError, lastfmConfigured: e.providers.recommendations.enabled }, settings: { ...e.settings, updatedAt: new Date().toISOString() }, sleepTimerEndsAt: this.commands.sleepUntil, snapshots: e.store.get<any[]>('snapshots', []).map(q => ({ id: q.id, name: q.name, createdAt: q.createdAt, duration: q.tracks.reduce((n: number, t: Track) => n + t.duration, 0), songCount: q.tracks.length })) }; }
+    privateState() { const e = this.engine, s = e.snapshot(), guild = this.client.guilds.cache.get(this.guildId); const song = (t: Track | null) => t ? { title: t.title, artist: t.artist, length: t.duration, thumbnailUrl: t.image, isLive: t.live, url: t.url ?? 'https://www.youtube.com/watch?v=' + t.id, source: t.source ?? 'youtube', requestedBy: t.requestedBy } : null; return { bot: { guildCount: guild ? 1 : 0, ready: e.ready, user: this.client.user?.username ?? 'Afterparty' }, guildId: this.guildId, guilds: guild ? [{ id: guild.id, name: guild.name, iconUrl: guild.iconURL() }] : [], activity: this.commands.activity, performance: this.metrics.snapshot(this.client.ws.ping), player: { queueRevision: e.revision(), connected: e.connected, current: song(e.current), loopCurrentQueue: e.loopQueue, loopCurrentSong: e.loop, position: s.position, queue: e.queue.map((t, i) => ({ ...song(t), position: i + 1 })), status: s.playing ? 'playing' : e.current ? 'paused' : 'idle', volume: e.volume, bitrate: e.bitrate, radioProvider: e.providers.recommendationStatus, radioError: e.radioError, lastfmConfigured: e.providers.recommendations.enabled }, settings: { ...e.settings, updatedAt: new Date().toISOString() }, sleepTimerEndsAt: this.commands.sleepUntil, snapshots: e.store.get<SavedQueue[]>('snapshots', []).map(q => ({ id: q.id, name: q.name, createdAt: q.createdAt, duration: q.tracks.reduce((n: number, t: Track) => n + t.duration, 0), songCount: q.tracks.length })) }; }
     async close() { if(this.stateListener)this.engine.off('state',this.stateListener);if(this.ownsMetrics)this.metrics.close(); if (this.messageTimer)
         clearInterval(this.messageTimer); this.disconnect(); if(this.ownsClient)await this.client.destroy(); }
 }

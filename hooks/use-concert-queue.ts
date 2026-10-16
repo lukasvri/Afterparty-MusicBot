@@ -15,9 +15,12 @@ export function useConcertQueue(guildId: string | undefined) {
     } | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [previousGuild, setPreviousGuild] = useState(guildId);
+  if(previousGuild !== guildId){setPreviousGuild(guildId);setBusy(false);setData(null);setError("");}
   const generation = useRef(0),
     pending = useRef(false),
     serial = useRef(0);
+  const invalidate = useCallback(() => { generation.current++; }, []);
   const refresh = useCallback(async () => {
     if (!guildId) return;
     const g = generation.current,
@@ -29,11 +32,8 @@ export function useConcertQueue(guildId: string | undefined) {
     if (g === generation.current && id === serial.current) setData(result);
   }, [guildId]);
   useEffect(() => {
-    generation.current++;
+    invalidate();
     pending.current = false;
-    setBusy(false);
-    setData(null);
-    setError("");
     if (!guildId) return;
     let stopped = false;
     const update = async () => {
@@ -48,10 +48,10 @@ export function useConcertQueue(guildId: string | undefined) {
     void update();
     return () => {
       stopped = true;
-      generation.current++;
+      invalidate();
       clearTimeout(timer);
     };
-  }, [guildId, refresh]);
+  }, [guildId, refresh, invalidate]);
   const action = async (name: string, extra: Record<string, unknown> = {}) => {
     if (!guildId || !data || pending.current) return;
     const g = generation.current,

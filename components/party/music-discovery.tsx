@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { LoaderCircle, Plus, Search, X } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import { time, type Video, type HistoryVideo } from "@/lib/types";
@@ -102,7 +103,7 @@ export function MusicDiscovery({
           {shown.map((v) => (
             <article className="music-row" key={v.id}>
               <div className="music-art">
-                <img src={v.image} alt="" loading="lazy" />
+                <Image unoptimized width={320} height={180} src={v.image} alt="" loading="lazy" />
                 <span>{v.live ? "LIVE" : time(v.duration)}</span>
               </div>
               <div className="music-copy">

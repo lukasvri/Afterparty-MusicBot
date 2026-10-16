@@ -107,3 +107,72 @@ test("evening imports validate limits and preserve an existing library on malfor
   };
   assert.deepEqual(readLibrary(JSON.stringify(saved)), saved);
 });
+
+test("browser subscriptions notify same-page edits, isolate keys and unsubscribe", async () => {
+  const { browserStorage } = await import("../lib/browser-storage.ts");
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const events = new EventTarget(), values = new Map<string, string>();
+  Object.defineProperty(globalThis, "window", {configurable:true, value:events});
+  Object.defineProperty(globalThis, "localStorage", {configurable:true, value:{
+    getItem:(key:string)=>values.get(key)??null,
+    setItem:(key:string,value:string)=>values.set(key,value),
+  }});
+  let notifications = 0;
+  const key = "afterparty-synthetic-subscription";
+  const unsubscribe = browserStorage.subscribe(key, () => {notifications++;});
+  try {
+    assert(browserStorage.set(key, "first"));
+    assert.equal(browserStorage.get(key), "first");
+    assert.equal(notifications, 1);
+    browserStorage.set(key + "-other", "other");
+    assert.equal(notifications, 1);
+    values.set(key, "another-tab");
+    const changed = new Event("storage");
+    Object.defineProperty(changed, "key", {value:key});
+    events.dispatchEvent(changed);
+    assert.equal(browserStorage.get(key), "another-tab");
+    assert.equal(notifications, 2);
+    unsubscribe();
+    browserStorage.set(key, "after-unsubscribe");
+    events.dispatchEvent(changed);
+    assert.equal(notifications, 2);
+  } finally {
+    unsubscribe();
+    if(originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if(originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
+
+test("blocked storage still notifies subscribers and cross-tab clearing invalidates memory", async () => {
+  const { browserStorage } = await import("../lib/browser-storage.ts");
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const events = new EventTarget();
+  Object.defineProperty(globalThis, "window", {configurable:true, value:events});
+  Object.defineProperty(globalThis, "localStorage", {configurable:true, value:{
+    getItem:()=>null,
+    setItem:()=>{throw Error("blocked");},
+  }});
+  let notifications = 0;
+  const key = "afterparty-synthetic-blocked-subscription";
+  const unsubscribe = browserStorage.subscribe(key, () => {notifications++;});
+  try {
+    assert.equal(browserStorage.set(key, "remembered"), false);
+    assert.equal(browserStorage.get(key), "remembered");
+    assert.equal(notifications, 1);
+    const cleared = new Event("storage");
+    Object.defineProperty(cleared, "key", {value:null});
+    events.dispatchEvent(cleared);
+    assert.equal(browserStorage.get(key), null);
+    assert.equal(notifications, 2);
+  } finally {
+    unsubscribe();
+    if(originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if(originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
