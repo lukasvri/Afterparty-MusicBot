@@ -119,7 +119,7 @@ Afterparty's current Discord Core runs on **TypeScript/Node.js and FFmpeg**. We 
 
 TypeScript development, fixes and new application features continue on `main` through reviewed PRs. The separate [`dev` branch](https://github.com/lukasvri/Afterparty-MusicBot/tree/dev), initially created from the latest `main`, is for isolated Rust testing. Existing `nightly` and Rust experiment branches are preserved separately; they are not merged into `main` as part of this setup. Any future adoption of Rust in `main` requires a separate decision and review. See the [branch strategy](CONTRIBUTING.md#branch-strategy).
 
-Creating `dev` does not copy the earlier Rust prototype into it. Read the [experimental Rust source](https://github.com/lukasvri/Afterparty-MusicBot/tree/experiment/rust-audio-nightly-20261016/experiments/rust-audio) for the initial offline mixer. Rust will not appear in the GitHub language chart for `main` until Rust source files are actually merged there.
+Rust testing continues with the [offline Rust mixer on `dev`](https://github.com/lukasvri/Afterparty-MusicBot/tree/dev/experiments/rust-audio) and its [development notes](https://github.com/lukasvri/Afterparty-MusicBot/blob/dev/docs/RUST_DEVELOPMENT.md), transferred from `nightly` with its tests and latest rounding fix. The [earlier experimental source](https://github.com/lukasvri/Afterparty-MusicBot/tree/experiment/rust-audio-nightly-20261016/experiments/rust-audio) remains preserved. Rust will not appear in the GitHub language chart for `main` until Rust source files are actually merged there.
 
 ## Explore further
 
