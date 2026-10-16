@@ -17,7 +17,7 @@ Dependency installation requires access to npm's registry. These checks require 
 
 Keep production secrets and private-network access outside the environment. Do not upload local `.env`, `.dev.vars`, `compose.local.yml`, `hosting.local.json`, databases, backups or deployment archives. Fetch the latest upstream `main` before each new task and preserve local work when incorporating updates.
 
-The check command runs isolated automated suites. Integration scripts such as `smoke.mjs`, `open-rooms.test.mjs` and `discord-transport.test.mjs` require an explicitly configured test service. They are not production release evidence from cloud validation.
+The check command runs isolated automated suites. Integration scripts such as `smoke.ts`, `open-rooms.test.ts` and `discord-transport.test.ts` require an explicitly configured test service. They are not production release evidence from cloud validation.
 
 ## Keep existing configuration local
 

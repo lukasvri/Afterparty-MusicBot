@@ -55,11 +55,11 @@ With Playwright and Chromium available, set `PREVIEW_URL`, and optionally
 `PLAYWRIGHT_MODULE` and `CHROMIUM_PATH`, then run:
 
 ```bash
-node scripts/party.browser.mjs
-node scripts/concert-queue.browser.mjs
-node scripts/video-start.browser.mjs
-node scripts/admin.browser.mjs
-node scripts/service-pages.browser.mjs
+node scripts/party.browser.ts
+node scripts/concert-queue.browser.ts
+node scripts/video-start.browser.ts
+node scripts/admin.browser.ts
+node scripts/service-pages.browser.ts
 ```
 
 ## Production boundary

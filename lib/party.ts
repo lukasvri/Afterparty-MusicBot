@@ -60,4 +60,15 @@ export async function enqueueCommand(request:Request,input:Record<string,unknown
  const id=publicControl?`public:${input.commandId}`:crypto.randomUUID(),now=Date.now();const alreadyApplied=!coreUrl()&&publicControl&&(action==='pause'&&!state.playing||action==='resume'&&state.playing);const status=alreadyApplied?'done':'pending';await db().prepare("INSERT OR IGNORE INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES(?,?,?,?,?,?)").bind(id,JSON.stringify(payload),status,now,now+30000,guildId??null).run();if(coreUrl()&&!alreadyApplied){try{const receipt=await coreRequest<{id:string;status:string}>('/v1/command','POST',{id,scope:publicControl?'public':'admin',bridge:true,...payload});const result=await coreRequest<{command:{status:string;result:string}|null}>('/v1/jobs?id='+encodeURIComponent(id)+(guildId?'&guildId='+guildId:''));return {id,status:result.command?.status??receipt.status};}catch{/* the durable, idempotent bridge retains the same command ID */}}return {id,status,...(alreadyApplied?{}:await commandTicket({id,scope:publicControl?'public':'admin',...payload}))};
 }
 
-export async function publicCommand(id:string,guildId?:string){if(!/^public:[a-f0-9-]{36}$/.test(id))fail(400,'Ugyldig kommando-ID.');if(coreUrl()){try{return (await coreRequest<{command:unknown}>('/v1/jobs?id='+encodeURIComponent(id)+(guildId?'&guildId='+guildId:''))).command;}catch{/* retain the durable bridge as fallback */}}return db().prepare('SELECT id,status,result FROM bot_commands WHERE id=?').bind(id).first();}
+type PublicCommand = {id:string;status:string;result:string|null};
+export async function publicCommand(id:string,guildId?:string):Promise<PublicCommand|null>{
+ if(!/^public:[a-f0-9-]{36}$/.test(id))fail(400,'Ugyldig kommando-ID.');
+ if(guildId!==undefined&&!/^\d{14,22}$/.test(guildId))fail(400,'Ugyldig server.');
+ if(coreUrl()){
+  try{return (await coreRequest<{command:PublicCommand|null}>('/v1/jobs?id='+encodeURIComponent(id)+(guildId?'&guildId='+guildId:''))).command;}
+  catch{/* retain the same guild boundary when the direct transport is unavailable */}
+ }
+ // Legacy unscoped jobs belong only to the authenticated bridge's default guild.
+ return db().prepare("SELECT id,status,result FROM bot_commands WHERE id=? AND (guild_id IS ? OR (guild_id IS NULL AND EXISTS (SELECT 1 FROM rooms WHERE code='DISCORD1' AND guild_id=?)))")
+  .bind(id,guildId??null,guildId??null).first<PublicCommand>();
+}

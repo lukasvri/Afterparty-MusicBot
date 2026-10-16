@@ -1,0 +1,129 @@
+{
+  "recordedAt": "2026-10-16T23:31:33.818068+00:00",
+  "scope": "Offline PCM mixing on the same shared development host, not end-to-end audio or voice capacity.",
+  "environment": {
+    "node": "24.19.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logicalCpus": 9
+  },
+  "workload": {
+    "iterations": 30000,
+    "warmup": 3000,
+    "rounds": 5,
+    "frameBytes": 3840,
+    "frameDurationMs": 20,
+    "sampleRateHz": 48000,
+    "channels": 2,
+    "encoding": "signed 16-bit little-endian PCM",
+    "firstSample": 1000,
+    "secondSample": -1000,
+    "progress": "(n % 100) / 100",
+    "volume": 85
+  },
+  "typescript": {
+    "implementation": "Actual Core mixPcm imported by services/core/benchmarks/pcm.ts",
+    "referenceCommit": "4d0b7984404811751d4529e1fd13ac22a9698d78",
+    "median": {
+      "elapsedMs": 691.775791,
+      "microsecondsPerFrame": 23.059193033333333,
+      "framesPerSecond": 43366.65201399047
+    },
+    "samples": [
+      {
+        "round": 1,
+        "elapsedMs": 748.907285,
+        "microsecondsPerFrame": 24.963576166666666,
+        "framesPerSecond": 40058.36316574221,
+        "checksum": 3780300
+      },
+      {
+        "round": 2,
+        "elapsedMs": 691.775791,
+        "microsecondsPerFrame": 23.059193033333333,
+        "framesPerSecond": 43366.65201399047,
+        "checksum": 3780300
+      },
+      {
+        "round": 3,
+        "elapsedMs": 674.219045,
+        "microsecondsPerFrame": 22.47396816666667,
+        "framesPerSecond": 44495.92491116889,
+        "checksum": 3780300
+      },
+      {
+        "round": 4,
+        "elapsedMs": 691.6869969999998,
+        "microsecondsPerFrame": 23.056233233333323,
+        "framesPerSecond": 43372.21912529318,
+        "checksum": 3780300
+      },
+      {
+        "round": 5,
+        "elapsedMs": 704.1013280000002,
+        "microsecondsPerFrame": 23.470044266666672,
+        "framesPerSecond": 42607.50378814794,
+        "checksum": 3780300
+      }
+    ]
+  },
+  "rust": {
+    "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "sourceCommit": "9d02b04e1f1e29929e34c9a723be4cc6f2d8da3e",
+    "build": "rustc --edition=2024 -C opt-level=3, library and executable",
+    "testResult": {
+      "passed": 10,
+      "failed": 0
+    },
+    "medianElapsedMs": 197.6,
+    "medianMicrosecondsPerFrame": 6.586666666666667,
+    "samples": [
+      {
+        "round": 1,
+        "frames": 30000,
+        "seconds": 0.1966,
+        "framesPerSecond": 152567,
+        "checksum": 3780300
+      },
+      {
+        "round": 2,
+        "frames": 30000,
+        "seconds": 0.1976,
+        "framesPerSecond": 151843,
+        "checksum": 3780300
+      },
+      {
+        "round": 3,
+        "frames": 30000,
+        "seconds": 0.2003,
+        "framesPerSecond": 149768,
+        "checksum": 3780300
+      },
+      {
+        "round": 4,
+        "frames": 30000,
+        "seconds": 0.192,
+        "framesPerSecond": 156246,
+        "checksum": 3780300
+      },
+      {
+        "round": 5,
+        "frames": 30000,
+        "seconds": 0.203,
+        "framesPerSecond": 147767,
+        "checksum": 3780300
+      }
+    ]
+  },
+  "medianRatioTsToRust": 3.500889630566802,
+  "limitations": [
+    "Each timing is a round mean, not p95/p99 real-time scheduling latency.",
+    "TypeScript uses 3000 JIT warm-up iterations and five measured rounds in one process.",
+    "Rust uses five invocations of the existing native benchmark; only its internal mixing loop is timed.",
+    "Rust elapsed times are printed to four decimal places in seconds.",
+    "No other task test or build was intentionally run during this comparison, but the host is shared.",
+    "FFmpeg, pipes, provider I/O, process boundaries, browser playback and Discord transport are excluded.",
+    "Matching this workload checksum and ten Rust tests is not exhaustive cross-runtime equivalence."
+  ]
+}

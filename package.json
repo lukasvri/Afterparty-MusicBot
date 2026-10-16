@@ -6,21 +6,22 @@
     "node": ">=24.17.0"
   },
   "scripts": {
-    "install:ci": "node scripts/install-ci.mjs",
+    "install:ci": "node scripts/install-ci.ts",
     "dev": "node scripts/run-framework.ts dev",
     "build": "node scripts/run-framework.ts build",
     "start": "node --import ./scripts/sites-env.ts ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --max-warnings 0",
     "db:generate": "drizzle-kit generate",
-    "test:fullscreen": "node --experimental-strip-types scripts/fullscreen.test.mjs",
+    "test:fullscreen": "node scripts/fullscreen.test.ts",
     "setup:cloud": "bash scripts/cloud.sh setup",
     "check:all": "bash scripts/cloud.sh check",
     "project": "node scripts/project.ts",
     "release:check": "node scripts/releases.ts --check",
     "release:notes": "node scripts/releases.ts --notes",
     "release:changelog": "node scripts/releases.ts --write",
-    "test:party": "node scripts/party.browser.mjs",
-    "test:unit": "node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/native-seek.test.ts scripts/rooms.test.mjs scripts/bridge.test.mjs scripts/admin-auth.test.mjs scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts"
+    "test:party": "node scripts/party.browser.ts",
+    "test:sync": "node --test --test-concurrency=1 --test-timeout=45000 scripts/sync.browser.ts",
+    "test:unit": "node --test scripts/fullscreen.test.ts scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/live-command.test.ts scripts/native-seek.test.ts scripts/rooms.test.ts scripts/bridge.test.ts scripts/admin-auth.test.ts scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -43,6 +44,7 @@
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.8",
+    "playwright": "1.62.1",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",

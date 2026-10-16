@@ -40,7 +40,7 @@ The browser workflow uses synthetic API responses and a local preview only:
 PREVIEW_URL=http://127.0.0.1:8787 \
 PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
 CHROMIUM_PATH=/path/to/chromium \
-node scripts/party.browser.mjs
+node scripts/party.browser.ts
 ```
 
 It exercises private setup, first-song search, focus and scrolling, adding tracks, moderation, saved evenings, favorites, QR generation, TV mode, browser back navigation and mobile overflow. Automated audio and browser tests do not establish what people hear on a production Discord voice connection.

@@ -98,8 +98,8 @@ and Opus encoders. It does not connect to Discord or mount production data.
 docker run --rm --network none --read-only \
   --cpus=1.5 --cpu-shares=128 --memory=768m --memory-swap=768m \
   --pids-limit=512 --tmpfs /tmp:size=128m,mode=1777 \
-  --mount type=bind,src="$PWD/scripts/audio-capacity.mjs",dst=/app/capacity.mjs,readonly \
-  --entrypoint node YOUR_VALIDATED_CORE_IMAGE /app/capacity.mjs
+  --mount type=bind,src="$PWD/scripts/audio-capacity.ts",dst=/app/capacity.ts,readonly \
+  --entrypoint node YOUR_VALIDATED_CORE_IMAGE /app/capacity.ts
 ```
 
 This measures unpaced local audio computation, startup overhead and task/memory

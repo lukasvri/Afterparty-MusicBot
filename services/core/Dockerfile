@@ -13,6 +13,7 @@ COPY tsconfig.json ./
 COPY src src
 COPY public public
 COPY tests tests
+COPY benchmarks benchmarks
 RUN npm run check && npm test && touch /app/validation.ok
 
 FROM dependencies AS production-dependencies
