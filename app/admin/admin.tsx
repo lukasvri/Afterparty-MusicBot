@@ -1011,7 +1011,7 @@ export default function Admin() {
           )}
           <footer className="page-footer">
             <span>AFTERPARTY</span>
-            <Link href="/">
+            <Link prefetch={false} target="_top" href="/">
               {t("Til musikken")} <ArrowUpRight size={13} />
             </Link>
           </footer>
