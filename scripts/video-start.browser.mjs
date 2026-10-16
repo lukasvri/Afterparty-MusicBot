@@ -23,6 +23,7 @@ async function fixture({
   discord = false,
   seekDelay = 0,
   seekFails = false,
+  core = null,
 } = {}) {
   const browser = await chromium.launch({
     headless: true,
@@ -174,6 +175,7 @@ async function fixture({
     const url = new URL(route.request().url());
     if (url.origin !== new URL(base).origin) return route.abort();
     if (!url.pathname.startsWith("/api/")) return route.continue();
+    if (core && await core.route(route, url, commands, host)) return;
     let result;
     if (url.pathname === "/api/rooms/TESTROOM") {
       assert.equal(
@@ -262,7 +264,7 @@ async function fixture({
   });
   try {
     await page.goto(base + "/?room=TESTROOM", { waitUntil: "networkidle" });
-    await page.locator(".stage-intro button").waitFor();
+    if (!core) await page.locator(".stage-intro button").waitFor();
   } catch (error) {
     await browser.close();
     throw error;
@@ -671,7 +673,7 @@ test("quality changes preserve the iframe and never reload the song or publish t
 test("audio preferences update without replacing the player and survive mute and cross-tab changes", async () => {
   const {browser, page, commands} = await fixture({playing:true,previousStorage:false});
   try {
-    await page.locator('.stage-intro button').click();
+    await page.locator('.stage-intro button').filter({hasText:/Start video/}).click();
     await page.waitForFunction(() => window.__fakePlayer?.state === 1);
     await page.evaluate(() => {window.__originalPlayer = window.__fakePlayer;});
     await page.waitForTimeout(1200);
@@ -699,7 +701,7 @@ test("live room callbacks accept new timelines after rendering without reconnect
   try {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.locator('.stage-intro button').click();
+    await page.locator('.stage-intro button').filter({hasText:/Start video/}).click();
     await page.waitForFunction(() => window.__fakePlayer?.state === 1);
     await page.getByRole('button',{name:'Bokmål',exact:true}).click();
     await page.evaluate(() => {
@@ -713,4 +715,38 @@ test("live room callbacks accept new timelines after rendering without reconnect
     assert.equal(await page.evaluate(() => window.__streams[0].closed),false);
     assert.deepEqual(errors,[]);
   } finally { await browser.close(); }
+});
+
+for (const source of ['website', 'discord'])
+test(`Core integration: ${source} add from idle then manager seeks forward and backward`, async () => {
+ const {concertCore} = await import('./concert-core-fixture.mjs');
+ const core = await concertCore();
+ let f;
+ try {
+  f = await fixture({discord:true,core});
+  const {page,commands} = f;
+  page.setDefaultTimeout(10000);
+  if(source==='website') {
+   await page.locator('#music-tab').click();
+   await page.locator('.search-form input').fill('Synthetic concert');
+   await page.locator('.search-form input').press('Enter');
+   await page.getByRole('button',{name:/Legg.*Synthetic concert|Add.*Synthetic concert/}).click();
+  } else await core.addDiscord();
+  await page.locator('.stage-intro button').filter({hasText:/Start video/}).click();
+  await page.waitForFunction(()=>window.__fakePlayer?.state===1);
+  await page.waitForTimeout(1600);
+  assert(core.engine.loading, 'Core is preparing the newly added track');
+  core.release();
+  await page.waitForFunction(()=>window.__fakePlayer.getCurrentTime()>2);
+  await page.waitForTimeout(500);
+  for(const seconds of [80,35]) {
+   await page.evaluate(seconds=>{const p=window.__fakePlayer;p.emit(3);p.position=seconds;p.at=performance.now();p.emit(2);},seconds);
+   await page.waitForTimeout(1800);
+   assert(Math.abs(core.engine.snapshot().position-seconds)<4, 'Native seek must reach Core instead of snapping back');
+   const measured=await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   assert(Math.abs(measured-core.engine.snapshot().position)<1,'Browser follows Core after seek');
+  }
+  assert.equal(commands.filter(c=>c.action==='seek').length,2);
+  await core.verifyPermissions();
+ } finally { if(f) await f.browser.close(); await core.close(); }
 });

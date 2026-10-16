@@ -1195,6 +1195,10 @@ export default function Afterparty() {
     if (state !== 3) transportChangedRef.current = false;
     if (state === 1) recordPlayback();
     const currentTime = p.getCurrentTime();
+    // The iframe can finish our load/seek while Core is still buffering or
+    // manager permissions are loading. Observe the landing before those guards
+    // so subsequent user scrubs are not mistaken for our unfinished write.
+    nativeSeek.current.acknowledge(currentTime, now);
     // A short audio stall is not a shared pause. Keep the iframe intact and
     // let the normal drift policy reconcile once the authoritative clock moves.
     if (r.buffering && r.playing) {
