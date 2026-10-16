@@ -1,52 +1,37 @@
-# Own video rooms
+# Your own video room
 
-Own rooms use their own video queue and host token. They do not require a Discord
-connection and do not read a Discord server's playback history or favorites.
+[Documentation](README.md) · [Party experience](AFTERPARTY_EXPERIENCE.md) · [Architecture](ARCHITECTURE.md)
 
-Radio is enabled by default, including for existing rooms. The host can switch
-it off with **Radio on** beside the room controls. When the host's player reaches
-the end, or the host presses Next, manually queued videos take priority. If the
-queue is empty, radio searches for another embeddable song by the current artist.
-Live streams do not seed radio. The previous 20 videos are retained privately in
-the room state to avoid recent repeats. The same selection rules apply with Core
-and with the standalone website database.
+Create a browser room from the welcome screen, search for music and share its link. No account or Discord connection is required. Rooms start with link-only access; the host can choose public listing. Each room has its own queue, permissions and playback state, separate from every Discord server.
 
-A result is committed only if the room version still matches. A concurrent queue
-edit, pause or radio toggle invalidates a pending result. A failed lookup leaves
-the current state intact and the host can retry Next. A successful search without
-a suitable candidate ends playback. Selection happens at the transition and may
-introduce a gap. Automatic transitions still require the host's player to be open.
+## Share and manage
 
-**Start video** opens the local YouTube player and resumes a paused room when the
-viewer has transport permission. Pressing play before opening a video already
-playing in the room starts the local player. Guests cannot resume a paused room.
-If the browser blocks audible autoplay, the player tries muted playback once and
-offers **Enable sound**. This temporary fallback does not overwrite saved volume
-or mute preferences. Browser policy and video availability can still prevent
-playback.
+The creator receives a private host credential. Keep it safe: a room code identifies the room, but does not grant host control. Normal shared links and QR codes contain the room code only.
 
-No database migration is required. The optional radio flag and bounded history
-are stored in the existing room JSON. Update both the website and Core when Core
-provides room state, so the controls and engine support the same actions.
+Hosts can control playback, order the queue, moderate requests and choose room settings. Guests can request music and participate in queue votes. Hosts can invite cohosts or transfer ownership using room-specific, single-use invitations. Ownership transfer revokes old cohosts and outstanding invitations. See [authority and privacy](AFTERPARTY_EXPERIENCE.md#authority-and-privacy) for the exact access boundaries.
 
-## Synthetic regression checks
+Host credentials and preferences are saved locally. When browser storage is blocked, the current page keeps them in memory and offers a private recovery-link download. Keep that link to recover control after a reload. Invitation and recovery links contain private credentials; ordinary room links do not.
 
-`npm run check:all` includes Core room and HTTP bridge tests and standalone
-website handler tests using an in-memory SQLite adapter for D1. The tests cover
-manual queue priority, persistence, permissions, stale asynchronous results and
-the playback clock after a delayed lookup. Provider tests cover one unavailable
-search candidate and recovery from an empty cached search.
+## Playback and radio
 
-For the browser flow, start `npm run dev -- --host 127.0.0.1` and, with Playwright
-and Chromium installed, run:
+Core owns room progression when connected. It can advance finished videos even if every browser disconnects. Without Core, the website fallback advances expired tracks when a room is read; it does not provide unattended progression without requests. Live streams require an explicit skip.
 
-```bash
-node --test --test-concurrency=1 scripts/video-start.browser.mjs
-```
+Manually queued tracks take priority over radio. Radio is enabled by default, can be switched off by a host, and prepares an embeddable recommendation while the current track plays. Explicit genre metadata helps selection; without it, selection falls back to artist matching. Recent room history helps avoid repeats. Provider availability can leave the room without a suitable recommendation.
 
-`PREVIEW_URL` can select a different localhost preview. `PLAYWRIGHT_MODULE` can
-point to an external Playwright module and `CHROMIUM_PATH` to a browser binary.
-All API and YouTube responses are synthetic; external browser requests are
-blocked. These checks prove the control flow, not actual YouTube availability,
-browser autoplay permissions or audible playback in Discord. Real own-room host
-and guest playback still needs a local manual check after review.
+Early skips share an in-flight radio lookup instead of starting a duplicate search. Failed or empty lookups use a cooldown before retrying. A failed skip keeps the current track intact; failed automatic radio ends a completed track cleanly. Every asynchronous result checks the room revision, so a newer pause, queue edit or radio toggle wins.
+
+## Start video and sound
+
+The website uses the official YouTube embed. Opening the local player starts a video already playing in the room. Only a viewer with transport permission can resume a paused room for everyone.
+
+If audible autoplay is blocked, the player tries muted playback and offers **Enable sound**. This temporary fallback does not overwrite saved volume or mute preferences. Browser policy, buffering and video availability still affect each viewer independently.
+
+Local volume, synchronization preferences and saved evenings stay on the device. Shared playback commands change the room timeline. Saved evenings can be edited and imported/exported; they are not synchronized to an account. TV mode provides a larger playback layout with guest sharing controls.
+
+## Persistence and updates
+
+Room state uses the existing JSON records and backward-compatible defaults for optional fields. Core and the website share queue rules, moderation, voting and undo behavior. Update both services together when changing these commands. Back up production data and follow [operations](../services/core/PUBLIC_RELEASE.md) before an update.
+
+## Verification
+
+`npm run check:all` covers isolated room scheduling, radio races, revisions, permissions, moderation, invitations, ownership transfer and storage behavior. Chromium fixtures cover local player startup, autoplay recovery and queue interaction. Tests use synthetic providers and a simulated video player; they do not guarantee third-party availability or perfect synchronization between real viewers.

@@ -1,0 +1,64 @@
+# How Afterparty fits together
+
+[Documentation](README.md) · [Installation](INSTALLATION.md) · [Configuration](CONFIGURATION.md)
+
+Afterparty has a self-hosted Core service and a website. The services share state through an authenticated HTTPS connection; they do not share a database file.
+
+```mermaid
+flowchart TB
+    subgraph Browser[Browser]
+        UI[Afterparty interface]
+        Video[Official YouTube embed]
+        Local[Device-local evenings and preferences]
+        UI --> Video
+        UI --> Local
+    end
+    subgraph Website[Workers / D1 or Sites]
+        Routes[Pages and API routes]
+        D1[(Room data and bridge jobs)]
+        Routes --> D1
+    end
+    subgraph Host[Your Core host]
+        Core[Discord and room services]
+        Audio[FFmpeg decode / mix / Opus]
+        Guilds[(SQLite per Discord server)]
+        Core --> Audio
+        Core --> Guilds
+    end
+    UI <-->|HTTPS| Routes
+    Routes <-->|Authenticated HTTPS| Core
+    UI <-->|Ticketed live transport| Core
+    Audio --> Voice[Discord voice channels]
+```
+
+## Discord playback
+
+`services/core/src/main.ts` connects the Discord bot, creates the guild registry, starts the HTTP services and runs the website bridge. Each guild has an engine, commands and store. The initial owner server uses `/data/core.sqlite`; additional servers use `/data/guilds/<server-id>/core.sqlite`.
+
+Providers resolve playable sources and metadata. FFmpeg decodes, mixes and encodes audio for Discord. The engine owns the playback timeline, queue revisions, recovery and radio decisions. A shared extraction gate bounds concurrent media processes and prioritizes audio startup.
+
+Ordinary `/play` tracks are private Discord music. `/konsert` exposes concert state to the website. Public concert operations do not gain access to a guild's private tracks, requester information or administration.
+
+## Browser rooms
+
+The website stores browser room data in D1. Core's room service supplies live room updates and progression; the website includes fallback room handling when that transport is unavailable. Browser rooms have their own queues, revisions, host tokens and permissions. They do not share Discord guild history.
+
+Each browser plays video through the official YouTube embed and applies the shared timeline. Buffering, autoplay and network delay still differ between devices. Local volume, synchronization preferences, diagnostics and saved evenings stay on the device. See [own rooms](OWN_ROOMS.md) for the exact behavior and recovery boundaries.
+
+## Commands and live state
+
+Browser APIs and hooks live in `app/api/`, `lib/` and `hooks/`. The website authorizes commands before forwarding them to Core. Direct live transport uses short-lived tickets. WebSocket and continuous HTTP updates carry live state; polling and queued bridge jobs provide fallback paths.
+
+Queue revisions reject stale edits. Clock sampling accounts for transport delay, while each client compensates for its own buffering. The website displays playback state; it does not independently advance Discord audio.
+
+## Access and secrets
+
+Core and the website use a shared bridge secret. Discord OAuth supplies administrative identity and server permissions. Ownership, Administrator or Manage Server permission is checked for the selected guild; legacy owner access does not grant another guild's administration.
+
+Bot tokens, OAuth client secrets, environment files and deployment-specific hosting settings stay private on the host or hosting platform. The repository contains templates only. See [configuration](CONFIGURATION.md) and [security](../SECURITY.md).
+
+## Build and operations
+
+The website uses React, Vinext, Vite and Cloudflare Workers/D1 with Sites integration. Core uses Node.js, Discord libraries, SQLite, FFmpeg and yt-dlp. Compose runs Core separately from the website. A website deployment does not keep an offline Core host available.
+
+`npm run check:all` validates isolated application and recovery behavior and builds the website. Production listening, source availability, reconnect behavior and simultaneous real voice capacity require host validation. [Host readiness](HOST_READINESS.md) and [operations](../services/core/PUBLIC_RELEASE.md) cover backups and reviewed updates.
