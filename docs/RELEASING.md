@@ -1,9 +1,11 @@
 # Versioning and release notes
 
-Afterparty uses one product version for the website and Core, starting at
-**v1.0.0**. Package manifests use `1.0.0`; Git tags and GitHub Releases use
-`v1.0.0`. The old integer labels are historical identifiers, not semantic major
-versions. Never rename or renumber those entries or move existing tags.
+Afterparty uses one product version for the website and Core. The current version
+is recorded in both package manifests and `lib/releases.json`. Package versions
+omit the `v` prefix; Git tags and GitHub Releases include it, for example package
+`2.1.1` and tag `v2.1.1`. Semantic versioning began at `v1.0.0`. The old integer
+labels are historical identifiers, not semantic major versions. Never rename or
+renumber those entries or move existing tags.
 
 ## Choose the next version
 
@@ -14,7 +16,7 @@ versions. Never rename or renumber those entries or move existing tags.
   for example `1.4.9` to `2.0.0`. Breaking compatibility requires a major release.
 
 For a release containing several changes, use the largest applicable increment.
-Start with `1.0.0`; do not reinterpret historical V36 as `36.0.0`.
+Continue from the current shared version; do not reinterpret historical V36 as `36.0.0`.
 The tested `nextVersion` helper in `scripts/releases.ts` encodes these rules.
 
 ## Prepare a release in a pull request

@@ -1,69 +1,69 @@
 <div align="center">
 
-# Afterparty
+<img src="docs/assets/afterparty-banner.png" alt="Afterparty: white ap lettering, a red dot and a black DJ platter with a red illuminated rim" width="100%" />
 
-**Your Discord music bot. Your shared concert room. Your server.**
+# Music brings people together.
 
-Play music in Discord, bring video into a shared room, and manage everything from one web interface.
+**A self-hosted Discord music bot. A shared video room. One place for the evening.**
 
-[![Core validation](https://github.com/lukasvri/Afterparty-MusicBot/actions/workflows/core.yml/badge.svg)](https://github.com/lukasvri/Afterparty-MusicBot/actions/workflows/core.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-24.17%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Validation](https://github.com/lukasvri/Afterparty-MusicBot/actions/workflows/core.yml/badge.svg)](https://github.com/lukasvri/Afterparty-MusicBot/actions/workflows/core.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-ff263e?style=flat-square)](LICENSE)
+[![Node](https://img.shields.io/badge/Node.js-24.17%2B-171717?style=flat-square)](https://nodejs.org/)
 
-[Website](https://afterparty.lukasvri.chatgpt.site) · [Installation guide](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) · [Operations](services/core/PUBLIC_RELEASE.md) · [Codex Cloud](docs/CODEX_CLOUD.md) · [Report an issue](https://github.com/lukasvri/Afterparty-MusicBot/issues)
+[**Open Afterparty**](https://afterparty.lukasvri.chatgpt.site) · [**Install your own**](docs/INSTALLATION.md) · [**Documentation**](docs/README.md) · [**Changelog**](CHANGELOG.md)
 
 </div>
 
----
+## The evening, your way
 
-## What you can do
+Play music in a Discord voice channel, share a concert with video, or open a private browser room without an account. Afterparty keeps the queue, controls and shared timeline together.
 
-| In Discord | On the website |
-| --- | --- |
-| Play music with `/play` | Watch shared concert videos |
-| Use radio, favorites and saved queues | Open rooms with host controls |
-| Pause, seek, skip and crossfade tracks | Manage your Discord servers through `/admin` |
-| Keep one player message instead of chat spam | Follow the Core playback clock |
+| Discord music | Shared concerts | Your own rooms |
+| --- | --- | --- |
+| Search or paste a link with `/play` | Use `/konsert` for Discord audio and website video | Start a private room and invite friends with a link or QR code |
+| Radio, favorites and saved queues | Requests, votes and moderated queues | Host controls, cohosts and ownership transfer |
+| Pause, seek, skip and crossfade | Playback follows Core's audio clock | Save evenings locally, import/export and use TV mode |
+| Separate settings and storage for each server | Ordinary Discord music stays private | Browser rooms work without a Discord connection |
 
-Each Discord server has its own queue, settings and SQLite database. Ordinary `/play` music stays out of the public concert feed. Use `/konsert` when you want to share a concert.
+YouTube video uses the official embedded player. SoundCloud provides audio; Spotify links are matched to a playable source. Provider availability and browser autoplay rules still apply.
 
-## Before you install
+## Built for the big screen. Ready for your pocket.
 
-This project has **two services**: a Docker-based audio engine and a Cloudflare Workers/D1 website. The audio engine runs on your computer or server and must stay online. The website is built with React and Vinext, with Sites integration included.
+<a href="docs/assets/afterparty-desktop.png"><img src="docs/assets/afterparty-desktop.png" alt="Afterparty desktop welcome screen with ap branding, room controls and an illustrated concert stage" width="100%" /></a>
 
-> **Hosting status:** Core has a ready-to-use Compose file. The website requires your own Workers/D1 or Sites deployment and an HTTPS connection to Core. There is no single-command production installer for the complete stack. Start with the guide below, which separates local preview from a full installation.
+<details>
+<summary><strong>See the mobile view</strong></summary>
+<br />
+<img src="docs/assets/afterparty-mobile.png" alt="Afterparty mobile welcome screen with the same room controls and concert stage" width="320" />
 
-| You need | Used for |
-| --- | --- |
-| Git and Docker with Compose v2 | Downloading and running Core |
-| Node.js 24.17+ and npm | Building and previewing the website |
-| Your own Discord application and test server | Bot token, server installation and admin sign-in |
-| A Workers/D1 or Sites hosting setup | The production website and room database |
-| HTTPS addresses for the website and Core | Admin sign-in and communication between services |
+</details>
 
-Examples use Bash on Linux, macOS or Windows through WSL2.
+Screenshots show a local preview with synthetic API responses, in English. They illustrate the interface, not a connected production bot.
 
-## Get started
+## Run your own Afterparty
 
-### 1. Download the project
+The full stack has two services. **Core** runs on your computer or server and sends audio to Discord. The **website** runs on Cloudflare Workers/D1 or Sites and provides rooms, video and administration. Core's host must stay online for Discord playback.
+
+| Service | What it needs | Start here |
+| --- | --- | --- |
+| Core | Docker with Compose v2, your Discord application and an HTTPS endpoint | [Installation](docs/INSTALLATION.md) · [Core guide](services/core/README.md) |
+| Website | Node.js 24.17+, Workers/D1 or Sites hosting, your database and HTTPS origin | [Website setup](docs/INSTALLATION.md#5-build-and-preview-the-website) |
+| Connection | A shared bridge secret and Discord OAuth configuration | [Configuration reference](docs/CONFIGURATION.md) |
+
+There is no one-command production installer for both services. The installation guide covers configuration, database migrations, hosting and your first track.
+
+### Fresh installation
 
 ```bash
 git clone https://github.com/lukasvri/Afterparty-MusicBot.git
 cd Afterparty-MusicBot
-```
-
-### 2. Create your configuration files
-
-```bash
 cp services/core/.env.example services/core/.env
 cp .dev.vars.example .dev.vars
 ```
 
-Fill them with **your own** credentials. The [installation guide](docs/INSTALLATION.md#2-create-and-install-your-discord-bot) shows where to find each value. The same bridge secret goes into Core's `PUBLIC_SITE_ADMIN_KEY` and the website's `ADMIN_BRIDGE_KEY`.
+Fill in your own credentials and URLs using the [installation guide](docs/INSTALLATION.md). These copy commands are for a fresh clone; keep existing private configuration when updating.
 
-### 3. Build and start Core
-
-After completing the Discord and URL setup in the guide:
+After configuring and installing your Discord application:
 
 ```bash
 cd services/core
@@ -71,106 +71,62 @@ docker compose up -d --build
 curl --fail http://127.0.0.1:3990/health
 ```
 
-Expected response:
+`ready: true` confirms Discord readiness. Continue with [website setup](docs/INSTALLATION.md#5-build-and-preview-the-website) and the [first-track checklist](docs/INSTALLATION.md#8-play-your-first-track) to verify the complete system.
 
-```json
-{"ready":true,"engine":"gutta-krutt-core"}
-```
-
-This confirms the bot is connected to Discord. It does not verify the website or audio playback yet.
-
-### 4. Set up the website and play your first track
-
-Follow [the website setup steps](docs/INSTALLATION.md#5-build-and-preview-the-website), then the [first-use checklist](docs/INSTALLATION.md#8-play-your-first-track). The guide covers database setup, HTTPS, Discord login and common errors.
-
-**[Open the complete step-by-step guide →](docs/INSTALLATION.md)**
-
-## How it fits together
+## One engine, separate spaces
 
 ```mermaid
 flowchart LR
-    User[Listener] --> Discord[Discord voice channel]
-    User --> Web[Afterparty website]
-    Web <-->|HTTPS: state and commands| Core[Core audio engine]
-    Core -->|Opus audio| Discord
-    Core --> SQLite[(SQLite per server)]
-    Web --> D1[(Cloudflare D1)]
+    Listener[Listener] --> Website[Afterparty website]
+    Listener --> Voice[Discord voice channel]
+    Website <-->|HTTPS: state and authorized commands| Core[Core audio engine]
+    Core -->|Opus audio| Voice
+    Core --> Guilds[(SQLite per Discord server)]
+    Website --> Rooms[(D1 room storage)]
 ```
 
-Core owns audio playback and the shared timeline. The website displays state and sends authorized commands. FFmpeg handles decoding and Opus encoding; SQLite preserves queues, settings and recovery information.
+Core owns Discord audio playback and its clock. The website displays that state and sends authorized commands. Each Discord server keeps its own queue, settings, favorites and database. Browser rooms have their own queues and permissions. See [architecture](docs/ARCHITECTURE.md) for the boundaries and transport.
 
-## Everyday commands
+## Keep the music running
 
 Run these from `services/core/`:
 
 | Task | Command |
 | --- | --- |
-| Start an already-built bot | `docker compose up -d --no-build` |
-| See container status | `docker compose ps` |
+| Start the existing image | `docker compose up -d --no-build` |
+| Check containers | `docker compose ps` |
 | Read recent logs | `docker compose logs --tail=100 core` |
-| Stop without deleting data | `docker compose stop` |
+| Stop Core | `docker compose stop core` |
 
-Data is stored in the `core-data` Docker volume. Back up the entire volume, including `guilds/`. See [updates and backups](services/core/PUBLIC_RELEASE.md) before upgrading. `docker compose down -v` deletes the volume.
+Back up the complete `/data` volume, including `guilds/`, before an update. `docker compose down -v` deletes the data volume. [Operations and recovery](services/core/PUBLIC_RELEASE.md) covers safe updates; [host readiness](docs/HOST_READINESS.md) covers live backups, restore checks and health reports. [Remote deployment](docs/REMOTE_DEPLOY.md) keeps credentials and production data on the bot host.
 
-## Development and checks
+## Work on the project
 
-To update an existing bot privately from another computer, see
-[Remote deployment with deploy-core](docs/REMOTE_DEPLOY.md). Tests and backups
-run on the bot host; production credentials and data stay there.
-
-From the repository root:
+With Node.js 24.17+, Python 3.11+ and FFmpeg installed:
 
 ```bash
 npm run setup:cloud
 npm run check:all
 ```
 
-These commands need Node.js 24.17+, Python 3.11+ and FFmpeg. They install both locked dependency trees and run Core tests and website behavior tests, deployment recovery tests, both typechecks and a website production build without production credentials or Docker. GitHub Actions validates Core's Docker image, the website and deployment recovery on pushes and pull requests. See the [Codex Cloud workflow](docs/CODEX_CLOUD.md) for cloud setup and local production updates.
+This installs both locked dependency trees, runs deployment recovery, website and Core tests, checks both TypeScript projects, and builds the website. Audio tests use real FFmpeg with synthetic tones. Browser automation uses simulated playback and isolated fixtures. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CODEX_CLOUD.md).
 
-<details>
-<summary><strong>Repository map</strong></summary>
+Automated checks do not establish live Discord audio quality or multi-server production capacity. Repository-wide lint still has existing failures; the [release review](docs/RELEASE_REVIEW.md) records its measured baseline and the remaining live checks.
 
-```text
-app/                 Website pages and API routes
-components/, hooks/  Player UI and browser behavior
-lib/                 Website state, authorization and Core transport
-db/, drizzle/        D1 schema and migrations
-services/core/       Discord bot, audio engine, Compose and tests
-build/               Sites and Cloudflare integration
-scripts/             Development commands and browser behavior tests
-docs/                Installation and configuration guides
-```
+## Explore further
 
-</details>
+| I want to… | Read |
+| --- | --- |
+| Install and configure the stack | [Installation](docs/INSTALLATION.md) · [Configuration](docs/CONFIGURATION.md) |
+| Understand rooms and permissions | [Own rooms](docs/OWN_ROOMS.md) · [Party experience](docs/AFTERPARTY_EXPERIENCE.md) |
+| Understand audio and synchronization | [Music sources](services/core/docs/music-sources.md) · [Concert stability](docs/CONCERT_STABILITY.md) |
+| Prepare an update or release | [Operations](services/core/PUBLIC_RELEASE.md) · [Release policy](docs/RELEASING.md) |
+| Use the visual identity | [Branding and assets](docs/BRANDING.md) |
 
-## Party experience
+Some slash commands and application messages use Norwegian. Spotify matching can differ from the original recording; chapter splitting and SponsorBlock are not implemented. Independent clients have different buffering and network delays, so synchronization is approximate.
 
-Browser rooms now support server-owned progression, cohosts, single-use ownership
-transfer, moderated requests, queue votes, history and queue undo. The website
-adds private-by-default setup, mobile controls, local QR sharing, TV mode and
-editable device-local evenings with import/export. See the
-[experience architecture and validation guide](docs/AFTERPARTY_EXPERIENCE.md).
+## Contribute, report, remix
 
-## Current limitations
+[Open an issue](https://github.com/lukasvri/Afterparty-MusicBot/issues) for a reproducible problem, or read [CONTRIBUTING.md](CONTRIBUTING.md) before a pull request. Report vulnerabilities through [SECURITY.md](SECURITY.md). Keep tokens, private logs, server IDs and databases out of public reports.
 
-- Website deployment needs your own hosting configuration; local preview is not a deployed service.
-- Some application messages and slash commands are Norwegian. The installation documentation is in English.
-- Spotify links are matched to playable audio sources. SoundCloud plays as audio; YouTube video uses the official embedded player.
-- Chapter splitting and SponsorBlock are not implemented.
-- Separate clients have their own buffers and network delays; perfect synchronization is not guaranteed.
-- Concurrent load across multiple real Discord servers has not been established by a production load test.
-
-## Contributing and security
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. For credential exposure or vulnerabilities, follow [SECURITY.md](SECURITY.md). Never include tokens, `.env` files, private logs or databases in an issue.
-
-## License
-
-Released under the [MIT license](LICENSE). Third-party code keeps its own notices; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The software license does not grant rights to music, video or third-party artwork.
-
-## Versions and release notes
-
-Website and Core share v1.0.0. See the [changelog](CHANGELOG.md) and
-[release policy](docs/RELEASING.md) for patch, minor and major increments.
-The website and GitHub release notes use the same source. Historical integer
-versions remain available; release entries do not prove production deployment.
+Afterparty is released under the [MIT license](LICENSE). Retained upstream code and fonts keep their [third-party notices](THIRD_PARTY_NOTICES.md). The license does not grant rights to music, video or third-party artwork. Website and Core versions are recorded in their package manifests and the shared [changelog](CHANGELOG.md); a release entry does not prove production deployment.
