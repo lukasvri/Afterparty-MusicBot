@@ -1,6 +1,9 @@
 "use client";
+import Image from "next/image";
+import Link from "next/link";
+import { useClientReady } from "@/hooks/use-browser-value";
 import { AdminSeek } from "@/components/party/admin-seek";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   ShieldCheck,
@@ -55,7 +58,7 @@ async function api<T>(
     ...(input !== undefined ? { body: JSON.stringify(input) } : {}),
     signal: AbortSignal.timeout(35000),
   });
-  const d = (await r.json()) as any;
+  const d = (await r.json()) as T & {error?: string};
   if (!r.ok) throw Error(d.error ?? "Tjenesten svarer ikke.");
   return d;
 }
@@ -112,14 +115,13 @@ export default function Admin() {
     alive = useRef(true),
     actionBusy = useRef(false);
   const selected = guilds.find((g) => g.id === guildId);
-  async function loadGuilds() {
-    try {
-      const r = await api<{
+  function loadGuilds() {
+      return api<{
         authenticated: boolean;
         globalAdmin: boolean;
         guilds: Guild[];
         invite: string;
-      }>("/api/admin/guilds");
+      }>("/api/admin/guilds").then(r => {
       if (!alive.current) return;
       setAuthenticated(r.authenticated);
       setGlobalAdmin(r.globalAdmin);
@@ -130,47 +132,50 @@ export default function Admin() {
           ? previous
           : (r.guilds.find((g) => g.installed)?.id ?? r.guilds[0]?.id ?? ""),
       );
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setChecking(false);
-    }
+    }, e => {
+      if(alive.current) setError((e as Error).message);
+    }).finally(() => { if(alive.current) setChecking(false); });
   }
-  async function refresh(id = guildId) {
+  const refresh = useCallback((id = guildId) => {
     if (!id || refreshing.current) return;
     const version = generation.current;
     refreshing.current = true;
-    try {
-      const r = await api<Detail>("/api/admin/control?guildId=" + id);
+    return api<Detail>("/api/admin/control?guildId=" + id).then(r => {
       if (alive.current && version === generation.current) {
         setDetail(r);
         if (!volumeDirty.current) setVolume(r.state.volume);
         setError("");
       }
-    } catch (e) {
-      if (version === generation.current) setError((e as Error).message);
-    } finally {
-      refreshing.current = false;
-    }
+    }, e => {
+      if (alive.current && version === generation.current) setError((e as Error).message);
+    }).finally(() => { refreshing.current = false; });
+  }, [guildId]);
+  const invalidate = useCallback(() => { generation.current++; }, []);
+  const clientReady = useClientReady();
+  const [checkedLogin, setCheckedLogin] = useState(false);
+  if(clientReady && !checkedLogin){
+    setCheckedLogin(true);
+    if(new URLSearchParams(location.search).has("login")) setError("Discord-innloggingen kunne ikke fullføres. Kontroller appoppsettet og prøv igjen.");
   }
   useEffect(() => {
     alive.current = true;
     void loadGuilds();
-    if (new URLSearchParams(location.search).has("login"))
-      setError(
-        "Discord-innloggingen kunne ikke fullføres. Kontroller appoppsettet og prøv igjen.",
-      );
     return () => {
       alive.current = false;
-      generation.current++;
+      invalidate();
     };
-  }, []);
-  useEffect(() => {
-    generation.current++;
+  }, [invalidate]);
+  const scope = `${authenticated}:${guildId}:${selected?.installed}`;
+  const [previousScope, setPreviousScope] = useState(scope);
+  if(previousScope !== scope){
+    setPreviousScope(scope);
     setDetail(null);
     setChannels([]);
     setChannelId("");
     setSettings({});
+  }
+  useEffect(() => {
+    invalidate();
     volumeDirty.current = false;
     if (!authenticated || !selected?.installed) return;
     void refresh();
@@ -178,11 +183,13 @@ export default function Admin() {
       if (!document.hidden && !actionBusy.current) void refresh();
     }, 5000);
     return () => clearInterval(t);
-  }, [authenticated, guildId, selected?.installed]);
-  useEffect(() => {
-    if (tab === "settings" && detail?.guildId === guildId)
-      setSettings(detail.settings);
-  }, [tab, detail?.guildId, guildId]);
+  }, [authenticated, guildId, selected?.installed, refresh, invalidate]);
+  const settingsKey = `${tab}:${guildId}:${detail?.guildId ?? ""}`;
+  const [previousSettingsKey, setPreviousSettingsKey] = useState(settingsKey);
+  if(previousSettingsKey !== settingsKey){
+    setPreviousSettingsKey(settingsKey);
+    if(tab === "settings" && detail?.guildId === guildId) setSettings(detail.settings);
+  }
   async function control(
     operation: string,
     extra: Record<string, unknown> = {},
@@ -194,7 +201,7 @@ export default function Admin() {
     const id = guildId,
       version = generation.current;
     try {
-      const result = await api<any>("/api/admin/control", "POST", {
+      const result = await api<{id: string; status: string; channels?: Array<{id: string; name: string; voice: boolean}>}>("/api/admin/control", "POST", {
         guildId: id,
         operation,
         ...extra,
@@ -232,13 +239,10 @@ export default function Admin() {
       commandId: crypto.randomUUID(),
       command: { action, queueRevision: detail?.state.queueRevision, ...extra },
     });
-  async function loadRooms() {
-    try {
-      const r = await api<{ rooms: Room[] }>("/api/admin/rooms");
-      setRooms(r.rooms);
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  function loadRooms() {
+    return api<{rooms: Room[]}>("/api/admin/rooms").then(r => {
+      if(alive.current) setRooms(r.rooms);
+    }, e => { if(alive.current) setError((e as Error).message); });
   }
   useEffect(() => {
     if (tab === "rooms" && globalAdmin) void loadRooms();
@@ -279,7 +283,7 @@ export default function Admin() {
   async function readChannels() {
     try {
       const result = await control("channels");
-      if (result) setChannels(result.channels);
+      if (result?.channels) setChannels(result.channels);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -478,7 +482,7 @@ export default function Admin() {
                         </div>
                         <div className="bot-deck">
                           {current ? (
-                            <img src={current.image} alt="" />
+                            <Image unoptimized width={320} height={320} src={current.image} alt="" />
                           ) : (
                             <div className="bot-empty-art">GK</div>
                           )}
@@ -1007,9 +1011,9 @@ export default function Admin() {
           )}
           <footer className="page-footer">
             <span>AFTERPARTY</span>
-            <a href="/">
+            <Link href="/">
               {t("Til musikken")} <ArrowUpRight size={13} />
-            </a>
+            </Link>
           </footer>
         </div>
       </main>

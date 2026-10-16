@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ConcertQueue } from './concert-queue.ts';
 import { Engine } from './engine.ts';
-import { UserError, type Track, type Settings } from './types.ts';
+import { UserError, type Track, type Settings, type SavedQueue } from './types.ts';
 export class Commands {
     engine: Engine;
     concertQueue: ConcertQueue;
@@ -138,14 +138,14 @@ export class Commands {
                 this.sleepUntil = null;
                 break;
             case 'snapshot-save': {
-                const snapshots = e.store.get<any[]>('snapshots', []);
+                const snapshots = e.store.get<SavedQueue[]>('snapshots', []);
                 snapshots.unshift({ id: randomUUID(), name: String(input.name ?? 'Spilleliste').slice(0, 80), createdAt: new Date().toISOString(), tracks: [...(e.current ? [e.current] : []), ...e.queue] });
                 e.store.set('snapshots', snapshots.slice(0, 100));
                 break;
             }
             case 'snapshot-restore':
             case 'snapshot-load': {
-                const s = e.store.get<any[]>('snapshots', []).find(s => s.id === input.id);
+                const s = e.store.get<SavedQueue[]>('snapshots', []).find(s => s.id === input.id);
                 if (!s)
                     throw new UserError('Fant ikke spillelisten.');
                 if (input.replace)
@@ -154,7 +154,7 @@ export class Commands {
                 break;
             }
             case 'snapshot-delete':
-                e.store.set('snapshots', e.store.get<any[]>('snapshots', []).filter(s => s.id !== input.id));
+                e.store.set('snapshots', e.store.get<SavedQueue[]>('snapshots', []).filter(s => s.id !== input.id));
                 break;
             case 'cleanup-duplicates': {
                 const seen = new Set([e.current?.id]);

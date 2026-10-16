@@ -1,3 +1,4 @@
+import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres } from "../services/core/src/radio.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { env as cloudEnv } from "cloudflare:workers";
@@ -15,7 +16,6 @@ import {
 } from "../services/core/src/room-state.ts";
 import {
   roomRecommendation,
-  roomRadioHistory,
   playableRoomQueue,
 } from "../services/core/src/room-radio.ts";
 type Env = Cloudflare.Env & {
@@ -230,7 +230,7 @@ async function cached<T>(key: string, provider: () => Promise<T>): Promise<T> {
     inFlight.delete(key);
   }
 }
-async function youtube(path: string, params: Record<string, string>) {
+async function youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) {
   const key = env().YOUTUBE_API_KEY;
   if (!key) fail(503, "Musikksøket er ikke konfigurert ennå.");
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`);
@@ -242,7 +242,7 @@ async function youtube(path: string, params: Record<string, string>) {
       response.status === 403 ? 429 : 502,
       "YouTube-søket er midlertidig utilgjengelig. Prøv igjen senere.",
     );
-  return response.json() as Promise<any>;
+  return response.json() as Promise<YouTubeResponses[K]>;
 }
 function duration(input: string) {
   const m = input?.match(/^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
@@ -283,7 +283,7 @@ export async function videos(
       id: ids.join(","),
       part: "snippet,contentDetails,status",
     });
-    return data.items.map((v: any) => ({
+    return data.items.map((v) => ({
       id: v.id,
       genres: metadataGenres(v.snippet.description, v.snippet.tags),
       title: decode(v.snippet.title),
@@ -325,7 +325,7 @@ export async function search(request: Request, query: string) {
     });
     return videos(
       request,
-      data.items.map((v: any) => v.id.videoId),
+      data.items.map((v) => v.id.videoId),
     );
   });
   return { videos: result };

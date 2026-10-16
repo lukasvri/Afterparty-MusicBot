@@ -558,7 +558,7 @@ document.addEventListener('visibilitychange', () => {
   scheduleRefresh();
 });
 
-const sessionReady = api('/api/session').then(data=>{isAuthenticated=data.authenticated;document.body.classList.toggle('needs-login',!isAuthenticated);if(isAuthenticated){void refresh({silent:false});scheduleRefresh();}}).catch(error=>{document.querySelector('#login-error').textContent=error.message;});
+void api('/api/session').then(data=>{isAuthenticated=data.authenticated;document.body.classList.toggle('needs-login',!isAuthenticated);if(isAuthenticated){void refresh({silent:false});scheduleRefresh();}}).catch(error=>{document.querySelector('#login-error').textContent=error.message;});
  document.querySelector('#login-form').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('button');button.disabled=true;document.querySelector('#login-error').textContent='';try{await api('/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:document.querySelector('#login-password').value})});document.querySelector('#login-password').value='';isAuthenticated=true;document.body.classList.remove('needs-login');await refresh({silent:false});scheduleRefresh();}catch(error){document.querySelector('#login-error').textContent=error.message;}finally{button.disabled=false;}});
  document.querySelector('#logout').addEventListener('click',async()=>{try{await api('/api/session',{method:'DELETE',headers:{'Content-Type':'application/json'},body:'{}'});location.reload();}catch(error){showToast(error.message,true);}});
 

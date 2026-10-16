@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { loadYoutube, type Player } from "@/lib/youtube-player";
 import { headers, request } from "@/lib/browser-api";
 import { useConcertQueue } from "@/hooks/use-concert-queue";
@@ -12,7 +13,7 @@ import { SocialQueue, QueueSettings } from "@/components/party/social-queue";
 import { EveningLibrary } from "@/components/party/evening-library";
 import { browserStorage as storage } from "@/lib/browser-storage";
 import { Sidebar } from "@/components/afterparty-navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   AudioLines,
@@ -36,6 +37,7 @@ import {
   X,
 } from "lucide-react";
 import { Room, Video, type DiscordState, type HistoryVideo } from "@/lib/types";
+import { useBrowserValue, useClientReady } from "@/hooks/use-browser-value";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useAudioPreferences } from "@/hooks/use-audio-preferences";
 import { useImmersiveControls } from "@/hooks/use-immersive-controls";
@@ -68,21 +70,23 @@ export default function Afterparty() {
   const navigate = (view: "music" | "rooms") => {
     setDirectoryOpen(view === "rooms");
     const url = new URL(location.href);
-    view === "rooms"
-      ? url.searchParams.set("view", "rooms")
-      : url.searchParams.delete("view");
+    if(view === "rooms") url.searchParams.set("view", "rooms");
+    else url.searchParams.delete("view");
     history.pushState(null, "", url.pathname + url.search);
   };
-  const fullscreen = useFullscreen();
+  const {element: fullscreenElement, active: fullscreenActive, fallback: fullscreenFallback, toggle: toggleFullscreen} = useFullscreen();
   const audio = useAudioPreferences();
-  const [motion, setMotion] = useState(true),
-    [panel, setPanel] = useState<"queue" | "music" | "library">("queue"),
-    [syncOffset, setSyncOffset] = useState(0),
+  const motion = useBrowserValue("afterparty-motion") !== "off";
+  const setMotion = (value: boolean) => storage.set("afterparty-motion", value ? "on" : "off");
+  const storedOffset = Number(useBrowserValue("afterparty-sync-offset", "0"));
+  const syncOffset = Number.isFinite(storedOffset) ? Math.max(-5, Math.min(5, storedOffset)) : 0;
+  const displayName = useBrowserValue("afterparty-display-name", "") ?? "";
+  const setDisplayName = (value: string) => storage.set("afterparty-display-name", value);
+  const [panel, setPanel] = useState<"queue" | "music" | "library">("queue"),
     [syncStatus, setSyncStatus] = useState("Ventar på video"),
     [syncDrift, setSyncDrift] = useState<number | null>(null),
     [botPending, setBotPending] = useState(false);
   const [firstQuery, setFirstQuery] = useState(""),
-    [displayName, setDisplayName] = useState(""),
     [tv, setTV] = useState(false),
     [sharing, setSharing] = useState(false);
   const syncOffsetRef = useRef(0),
@@ -93,26 +97,20 @@ export default function Afterparty() {
     joinGeneration = useRef(0);
   useEffect(() => {
     mounted.current = true;
-    const value = Number(storage.get("afterparty-sync-offset") ?? 0);
-    if (Number.isFinite(value)) {
-      syncOffsetRef.current = Math.max(-5, Math.min(5, value));
-      setSyncOffset(syncOffsetRef.current);
-    }
     return () => {
       mounted.current = false;
     };
   }, []);
+  useLayoutEffect(() => { syncOffsetRef.current = syncOffset; }, [syncOffset]);
   const adjustSync = (value: number) => {
     syncOffsetRef.current = value;
-    setSyncOffset(value);
     storage.set("afterparty-sync-offset", String(value));
     syncRef.current(true);
   };
   const fullscreenToggle = () => {
     if (roomRef.current?.current) {
       setConsent(true);
-      void fullscreen
-        .toggle()
+      void toggleFullscreen()
         .catch(() => announce("Fullskjerm kunne ikke avsluttes. Prøv Escape."));
     }
   };
@@ -138,30 +136,24 @@ export default function Afterparty() {
     [historySort, setHistorySort] = useState<"recent" | "popular">("recent");
   const loggedPlay = useRef("");
   const [settingsOpen, setSettingsOpen] = useState(false),
-    [syncMode, setSyncMode] = useState<SyncMode>("precise"),
     [quality, setQuality] = useState(""),
     [playerEpoch, setPlayerEpoch] = useState(0),
     [bufferSeconds, setBufferSeconds] = useState(0);
   const temporaryMute = useRef(false),
     mutedFallbackTried = useRef(false);
   const [autoplayMuted, setAutoplayMuted] = useState(false);
+  const syncMode = readSyncMode(useBrowserValue("afterparty-sync-mode-v1"));
   const syncModeRef = useRef<SyncMode>("precise"),
     bufferStarted = useRef<number | null>(null),
     settleUntil = useRef(0),
-    locallyPaused = useRef(false),
     audioWriteUntil = useRef(0),
     nativeSeek = useRef(new NativeSeekTracker()),
     nativeSeekPending = useRef(false),
     transportChangedRef = useRef(false),
     correctionCandidate = useRef<number | null>(null);
-  useEffect(() => {
-    const mode = readSyncMode(storage.get("afterparty-sync-mode-v1"));
-    syncModeRef.current = mode;
-    setSyncMode(mode);
-  }, []);
+  useLayoutEffect(() => { syncModeRef.current = syncMode; }, [syncMode]);
   const changeSyncMode = (mode: SyncMode) => {
     syncModeRef.current = mode;
-    setSyncMode(mode);
     storage.set("afterparty-sync-mode-v1", mode);
   };
   const reloadPlayer = () => {
@@ -170,7 +162,6 @@ export default function Afterparty() {
     setBufferSeconds(0);
     bufferStarted.current = null;
     settleUntil.current = 0;
-    locallyPaused.current = false;
 
     setQuality("");
     setConsent(true);
@@ -312,7 +303,7 @@ export default function Afterparty() {
         accept(compensateDelivery(next, performance.now() - started));
       }
     },
-    [accept],
+    [accept, liveFresh, realtime.latest, realtime.sampleAt],
   );
   const join = useCallback(
     async (code: string, recordHistory = true) => {
@@ -473,9 +464,9 @@ export default function Afterparty() {
         setPending(false);
       }
     },
-    [accept, refresh],
+    [accept, refresh, announce, t, setPending, setError],
   );
-  actionRef.current = action;
+  useLayoutEffect(() => { actionRef.current = action; }, [action]);
   const add = async (video: Video) => {
     if (roomRef.current?.mode === "discord") {
       await botCommand("enqueue", { videoId: video.id });
@@ -580,15 +571,20 @@ export default function Afterparty() {
       setPending(false);
     }
   };
+  const clientReady = useClientReady();
+  const [urlInitialized, setUrlInitialized] = useState(false);
+  if (clientReady && !urlInitialized) {
+    setUrlInitialized(true);
+    const params = new URLSearchParams(location.search);
+    setLoadingRoom(params.has("room"));
+    setTV(params.get("tv") === "1");
+    setDirectoryOpen(params.get("view") === "rooms");
+  }
   useEffect(() => {
-    setMotion(storage.get("afterparty-motion") !== "off");
-    setDisplayName(storage.get("afterparty-display-name") ?? "");
     if (!storage.get("afterparty-visitor"))
       storage.set("afterparty-visitor", crypto.randomUUID());
     const params = new URLSearchParams(location.search),
       code = params.get("room");
-    setTV(params.get("tv") === "1");
-    setDirectoryOpen(params.get("view") === "rooms");
     const fragment = new URLSearchParams(location.hash.slice(1));
     const invitation = fragment.get("host"),
       access = fragment.get("access");
@@ -608,10 +604,18 @@ export default function Afterparty() {
           return join(code, false);
         })
         .catch((e) => setError(e.message));
-    } else if (code)
-      void join(code, false).then(() => {
-        if (params.get("view") === "rooms") setDirectoryOpen(true);
-      });
+    } else if (code) {
+      const generation = ++joinGeneration.current;
+      const started = performance.now();
+      void request<Room>(`/api/rooms/${code}`, {headers: headers(code)}).then(next => {
+        if(!mounted.current || generation !== joinGeneration.current) return;
+        pollGeneration.current++;
+        activeCode.current = code;
+        accept(compensateDelivery(next, performance.now() - started));
+        setDirectoryOpen(params.get("view") === "rooms");
+        setLoadingRoom(false);
+      }, e => { if(mounted.current && generation === joinGeneration.current){setError(e.message);setLoadingRoom(false);} });
+    }
     const pop = () => {
       const p = new URLSearchParams(location.search);
       setDirectoryOpen(p.get("view") === "rooms");
@@ -637,7 +641,7 @@ export default function Afterparty() {
       window.removeEventListener("popstate", pop);
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
-  }, []);
+  }, [join, accept]);
   useEffect(() => {
     if (panel === "music" && !directoryOpen && !tv) {
       requestAnimationFrame(() => {
@@ -657,7 +661,8 @@ export default function Afterparty() {
     const next = !tv;
     setTV(next);
     const url = new URL(location.href);
-    next ? url.searchParams.set("tv", "1") : url.searchParams.delete("tv");
+    if(next) url.searchParams.set("tv", "1");
+    else url.searchParams.delete("tv");
     history.pushState(null, "", url.pathname + url.search);
   };
 
@@ -817,13 +822,12 @@ export default function Afterparty() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, []);
+  }, [liveFresh]);
   function startVideo() {
     const r = roomRef.current;
     if (!r?.current) return;
     setConsent(true);
     setAutoplayBlocked(false);
-    locallyPaused.current = false;
     mutedFallbackTried.current = false;
     if (!r.playing && (r.mode === "discord" || r.isHost)) {
       if (r.mode === "discord") void botCommand("resume");
@@ -897,7 +901,7 @@ export default function Afterparty() {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", focus);
     };
-  }, [room?.code, refresh]);
+  }, [room?.code, room?.mode, refresh, liveFresh, roomLive.fresh]);
   useEffect(() => {
     const timer = setInterval(() => {
       const current = roomRef.current;
@@ -910,6 +914,8 @@ export default function Afterparty() {
     }, 100);
     return () => clearInterval(timer);
   }, []);
+  const playerAudioReady = useEffectEvent((p: Player) => applyAudioPreferences(p, audio.current.current));
+  const playerRefresh = useEffectEvent((code: string) => refresh(code));
   useEffect(() => {
     if (!consent || !playerRoot.current) return;
     let disposed = false;
@@ -975,7 +981,7 @@ export default function Afterparty() {
               setAutoplayBlocked(false);
               const p = player.current;
               if (!p) return;
-              applyAudioPreferences(p, audio.current.current);
+              playerAudioReady(p);
               syncRef.current(true);
             },
             onError: (event: { data: number }) => {
@@ -1031,17 +1037,15 @@ export default function Afterparty() {
                 setBufferSeconds(0);
               }
               if (event.data === 1) {
-                const resuming = locallyPaused.current;
-                locallyPaused.current = false;
                 setAutoplayBlocked(false);
-                syncRef.current(resuming);
+                syncRef.current();
               }
               const r = roomRef.current;
               if (event.data === 0 && r?.current) {
                 const key = `${r.code}:${r.playbackKey ?? r.current.id}`;
                 if (lastEnded.current !== key) {
                   lastEnded.current = key;
-                  void refresh(r.code).catch(() => {});
+                  void playerRefresh(r.code).catch(() => {});
                 }
               }
             },
@@ -1089,8 +1093,6 @@ export default function Afterparty() {
     }
     const now = performance.now(),
       target = playbackTarget(r, received.current, now, syncOffsetRef.current);
-    if (!target.playing && (r.mode === "discord" || r.isHost))
-      locallyPaused.current = false;
     if (target.stale) {
       p.pauseVideo();
       setSyncStatus(
@@ -1111,7 +1113,6 @@ export default function Afterparty() {
       nativeSeek.current.write(target.position);
       transportChangedRef.current = false;
       correctionCandidate.current = null;
-      locallyPaused.current = false;
 
       lastCorrection.current = now;
       settleUntil.current = now + syncRecoveryMs(syncModeRef.current);
@@ -1125,12 +1126,11 @@ export default function Afterparty() {
       mutedFallbackTried.current = false;
       audioWriteUntil.current = now + 1000;
       applyAudioPreferences(p, audio.current.current);
-      target.playing
-        ? p.loadVideoById({
+      if(target.playing) p.loadVideoById({
             videoId: r.current.id,
             startSeconds: target.position,
-          })
-        : p.cueVideoById({
+          });
+      else p.cueVideoById({
             videoId: r.current.id,
             startSeconds: target.position,
           });
@@ -1187,7 +1187,6 @@ export default function Afterparty() {
       now - correctionCandidate.current >= 1000;
     if (
       (force || !target.playing || persistent) &&
-      (!locallyPaused.current || force) &&
       canCorrectPlayback(
         state,
         target.playing,
@@ -1222,16 +1221,13 @@ export default function Afterparty() {
               ? "Bufrer video"
               : autoplayBlocked
                 ? "Trykk start"
-                : locallyPaused.current
-                  ? "Video på pause"
-                  : target.playing
+                : target.playing
                     ? "Synk aktiv"
                     : "På pause",
       );
     if (
       target.playing &&
       !autoplayBlocked &&
-      !locallyPaused.current &&
       ![1, 3].includes(state)
     ) {
       p.playVideo();
@@ -1240,7 +1236,7 @@ export default function Afterparty() {
       p.pauseVideo();
     }
   }
-  syncRef.current = syncPlayer;
+  useLayoutEffect(() => { syncRef.current = syncPlayer; });
   useEffect(() => {
     syncRef.current();
   }, [room, consent, playerError]);
@@ -1264,7 +1260,7 @@ export default function Afterparty() {
   const needsVideoStart = Boolean(
     current &&
     !audioOnly &&
-    (!consent || autoplayBlocked || locallyPaused.current),
+    (!consent || autoplayBlocked),
   );
   const playLabel = needsVideoStart
     ? t("Start videoen")
@@ -1277,16 +1273,13 @@ export default function Afterparty() {
     else void action("pause");
   };
   const controls = useImmersiveControls(
-    fullscreen.active,
+    fullscreenActive,
     Boolean(playerError || autoplayBlocked || !current || settingsOpen),
-    fullscreen.element,
+    fullscreenElement,
   );
-  const hideChrome = fullscreen.active && !controls.visible;
-  const shortcutRef = useRef({
-    fullscreenToggle,
-    toggleMute: audio.toggleMute,
-  });
-  shortcutRef.current = { fullscreenToggle, toggleMute: audio.toggleMute };
+  const hideChrome = fullscreenActive && !controls.visible;
+  const fullscreenShortcut = useEffectEvent(fullscreenToggle);
+  const muteShortcut = useEffectEvent(audio.toggleMute);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (
@@ -1305,11 +1298,11 @@ export default function Afterparty() {
         return;
       if (event.key.toLowerCase() === "f" && roomRef.current?.current) {
         event.preventDefault();
-        shortcutRef.current.fullscreenToggle();
+        fullscreenShortcut();
       }
       if (event.key.toLowerCase() === "m" && roomRef.current?.current) {
         event.preventDefault();
-        shortcutRef.current.toggleMute();
+        muteShortcut();
       }
     };
     document.addEventListener("keydown", key);
@@ -1317,7 +1310,7 @@ export default function Afterparty() {
   }, []);
   const playerSettings = current && (
     <PlayerSettings
-      compact={fullscreen.active}
+      compact={fullscreenActive}
       open={settingsOpen}
       onOpen={setSettingsOpen}
       mode={syncMode}
@@ -1569,11 +1562,11 @@ export default function Afterparty() {
           )}
           <div className="studio-grid" hidden={directoryOpen || !room}>
             <section
-              ref={fullscreen.element}
-              className={`stage-panel${fullscreen.fallback ? " fullscreen-fallback" : ""}`}
-              data-immersive={fullscreen.active}
+              ref={fullscreenElement}
+              className={`stage-panel${fullscreenFallback ? " fullscreen-fallback" : ""}`}
+              data-immersive={fullscreenActive}
               data-controls-visible={controls.visible}
-              tabIndex={fullscreen.active ? -1 : undefined}
+              tabIndex={fullscreenActive ? -1 : undefined}
               onPointerMove={controls.onPointerMove}
               onPointerDown={controls.onPointerDown}
               onPointerUp={controls.onPointerUp}
@@ -1647,7 +1640,7 @@ export default function Afterparty() {
                     </button>
                   </>
                 )}
-                {fullscreen.active && playerSettings}
+                {fullscreenActive && playerSettings}
                 <button
                   className="cinema-button"
                   data-fullscreen-close
@@ -1684,7 +1677,7 @@ export default function Afterparty() {
                   playerLoading) && (
                   <>
                     {current ? (
-                      <img className="stage-cover" src={current.image} alt="" />
+                      <Image unoptimized width={480} height={270} className="stage-cover" src={current.image} alt="" />
                     ) : (
                       <ConcertScenery />
                     )}
@@ -1829,7 +1822,7 @@ export default function Afterparty() {
                     )}
                   </div>
                 )}
-                {fullscreen.active && !controls.visible && (
+                {fullscreenActive && !controls.visible && (
                   <div
                     className="fullscreen-wake"
                     aria-hidden="true"
@@ -1905,18 +1898,18 @@ export default function Afterparty() {
                     data-fullscreen-button
                     disabled={!current}
                     aria-label={
-                      fullscreen.active
+                      fullscreenActive
                         ? t("Gå ut av fullskjerm")
                         : t("Fullskjerm")
                     }
                     title={
-                      fullscreen.active
+                      fullscreenActive
                         ? t("Gå ut av fullskjerm")
                         : t("Fullskjerm")
                     }
                     onClick={fullscreenToggle}
                   >
-                    {fullscreen.active ? (
+                    {fullscreenActive ? (
                       <Minimize2 size={20} />
                     ) : (
                       <Maximize2 size={20} />
@@ -1924,7 +1917,7 @@ export default function Afterparty() {
                   </button>
                 </div>
               </div>
-              {!fullscreen.active && playerSettings}
+              {!fullscreenActive && playerSettings}
               {room && !room.isHost && !discordMode && (
                 <p className="guest-hint">
                   {t("Verten styrer avspillingen. Du kan legge til sanger.")}
@@ -2019,7 +2012,7 @@ export default function Afterparty() {
                   <div className="queue-content">
                     {room?.current && (
                       <article className="queue-current">
-                        <img
+                        <Image unoptimized width={480} height={270}
                           src={
                             room.current.image ||
                             `https://i.ytimg.com/vi/${room.current.id}/mqdefault.jpg`

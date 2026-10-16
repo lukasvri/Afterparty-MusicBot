@@ -20,18 +20,20 @@ export function AdminSeek({
   const { t } = useLanguage();
 
   const [value, setValue] = useState(position),
-    editing = useRef(false),
-    sample = useRef({ position, at: performance.now() });
+    [editing, setEditing] = useState(false),
+    sample = useRef({ position, at: 0 });
+  const [previous, setPrevious] = useState({trackId, position});
+  if(previous.trackId !== trackId || previous.position !== position){
+    setPrevious({trackId, position});
+    if(previous.trackId !== trackId){setEditing(false);setValue(position);}
+    else if(!editing) setValue(position);
+  }
   useEffect(() => {
     sample.current = { position, at: performance.now() };
-    if (!editing.current) setValue(position);
   }, [trackId, position]);
   useEffect(() => {
-    editing.current = false;
-  }, [trackId]);
-  useEffect(() => {
     const timer = setInterval(() => {
-      if (!editing.current)
+      if (!editing)
         setValue(
           Math.min(
             duration,
@@ -41,10 +43,10 @@ export function AdminSeek({
         );
     }, 500);
     return () => clearInterval(timer);
-  }, [duration, playing]);
+  }, [duration, playing, editing]);
   const commit = () => {
-    if (editing.current) {
-      editing.current = false;
+    if (editing) {
+      setEditing(false);
       onSeek(value);
     }
   };
@@ -59,15 +61,15 @@ export function AdminSeek({
         value={value}
         disabled={disabled}
         onPointerDown={() => {
-          editing.current = true;
+          setEditing(true);
         }}
         onChange={(e) => {
-          editing.current = true;
+          setEditing(true);
           setValue(Number(e.target.value));
         }}
         onPointerUp={commit}
         onPointerCancel={() => {
-          editing.current = false;
+          setEditing(false);
           setValue(position);
         }}
         onKeyUp={(e) => {

@@ -1,12 +1,14 @@
 'use client';
-import {createContext,useContext,useEffect,useMemo,useState,type ReactNode} from 'react';
+import {createContext,useContext,useEffect,useMemo,type ReactNode} from 'react';
+import {useBrowserValue} from '@/hooks/use-browser-value';
+import {browserStorage} from '@/lib/browser-storage';
 import {translate,type Language} from '@/lib/messages';
-const LanguageContext=createContext({language:'nb' as Language,setLanguage:(_language:Language)=>{},t:(text:string,values?:Record<string,string|number>)=>translate('nb',text,values)});
+const LanguageContext=createContext<{language:Language;setLanguage:(language:Language)=>void;t:(text:string,values?:Record<string,string|number>)=>string}>({language:'nb',setLanguage:()=>{},t:(text,values)=>translate('nb',text,values)});
 export function LanguageProvider({children}:{children:ReactNode}){
- const [language,setLanguageState]=useState<Language>('nb');
- useEffect(()=>{try{if(localStorage.getItem('gutta-language')==='en')setLanguageState('en');}catch{}const sync=(event:StorageEvent)=>{if(event.key==='gutta-language')setLanguageState(event.newValue==='en'?'en':'nb');};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);},[]);
+ const saved=useBrowserValue('gutta-language','nb');
+ const language:Language=saved==='en'?'en':'nb';
  useEffect(()=>{document.documentElement.lang=language;},[language]);
- const value=useMemo(()=>({language,setLanguage:(next:Language)=>{setLanguageState(next);try{localStorage.setItem('gutta-language',next);}catch{}},t:(text:string,values?:Record<string,string|number>)=>translate(language,text,values)}),[language]);
+ const value=useMemo(()=>({language,setLanguage:(next:Language)=>{browserStorage.set('gutta-language',next);},t:(text:string,values?:Record<string,string|number>)=>translate(language,text,values)}),[language]);
  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 export const useLanguage=()=>useContext(LanguageContext);

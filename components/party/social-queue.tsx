@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useLanguage } from "@/components/language";
 import type { Room } from "@/lib/types";
 import { time } from "@/lib/types";
@@ -18,22 +19,26 @@ export function SocialQueue({
       ? Math.max(0, room.current.duration - room.position)
       : 0;
   let unknown = Boolean(room.current?.live);
+  const entries = [];
+  for (const [i, v] of room.queue.entries()) {
+    const eta = (v.waitSeconds === null || (v.waitSeconds === undefined && unknown))
+      ? t("Etter direktesendinga")
+      : `${room.playing ? t("Om lag") : t("Når avspelinga startar: ca.")} ${time(v.waitSeconds ?? wait)}`;
+    entries.push({v, i, eta});
+    wait += v.duration;
+    unknown ||= v.live;
+  }
   return (
     <section className="social-queue" aria-label={t("Felles spelekø")}>
       {!room.current && room.radio !== false && !!room.history?.length && room.isHost && <div className="radio-retry">
         <p>{t("Radioen fann ikkje neste låt.")}</p>
         <button disabled={busy} onClick={() => onAction("radio", { enabled: true })}>{t("Prøv radio igjen")}</button>
       </div>}
-      {room.queue.map((v, i) => {
-        const eta = (v.waitSeconds === null || (v.waitSeconds === undefined && unknown))
-          ? t("Etter direktesendinga")
-          : `${room.playing ? t("Om lag") : t("Når avspelinga startar: ca.")} ${time(v.waitSeconds ?? wait)}`;
-        wait += v.duration;
-        unknown ||= v.live;
+      {entries.map(({v, i, eta}) => {
         return (
           <article className="social-track" key={v.entryId ?? v.id}>
             <span className="queue-number">{i + 1}</span>
-            <img className="queue-art" src={v.image || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" />
+            <Image unoptimized width={48} height={48} className="queue-art" src={v.image || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" />
             <div>
               <strong>{v.title}</strong>
               <small>{v.artist}</small>

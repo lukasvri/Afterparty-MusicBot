@@ -10,7 +10,7 @@
     "dev": "node scripts/run-framework.ts dev",
     "build": "node scripts/run-framework.ts build",
     "start": "node --import ./scripts/sites-env.ts ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --max-warnings 0",
     "db:generate": "drizzle-kit generate",
     "test:fullscreen": "node --experimental-strip-types scripts/fullscreen.test.mjs",
     "setup:cloud": "bash scripts/cloud.sh setup",
@@ -19,7 +19,8 @@
     "release:check": "node scripts/releases.ts --check",
     "release:notes": "node scripts/releases.ts --notes",
     "release:changelog": "node scripts/releases.ts --write",
-    "test:party": "node scripts/party.browser.mjs"
+    "test:party": "node scripts/party.browser.mjs",
+    "test:unit": "node --test scripts/fullscreen.test.mjs scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/native-seek.test.ts scripts/rooms.test.mjs scripts/bridge.test.mjs scripts/admin-auth.test.mjs scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

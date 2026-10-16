@@ -17,7 +17,7 @@ documentation in English. Do not use em dashes.
 ## Development and validation
 
 - Use Node.js 24.17+, Python 3.11+ and FFmpeg. Run `npm run setup:cloud` to install both locked
-  dependency trees, then `npm run check:all` for website typechecks, browser
+  dependency trees, then `npm run check:all` for lint with zero warnings, website typechecks, browser
   behavior tests, deployer recovery tests, Core typechecks and tests including real audio, and a website
   production build. Docker is not required for these checks.
 - Core lives in `services/core/src/`; the website is in `app/`, `components/`,

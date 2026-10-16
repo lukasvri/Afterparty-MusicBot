@@ -1,12 +1,16 @@
 import {UserError} from './types.ts';
 import type {CatalogSong} from './matching.ts';
+type SpotifySong = {id?:string; name?:string; is_local?:boolean; type?:string; artists?:{name:string}[]; external_ids?:{isrc?:string}; duration_ms?:number};
+type SpotifyPage = {items?: (SpotifySong & {item?:SpotifySong|null; track?:SpotifySong|null})[]; next?:string|null};
+type EmbeddedSong = {uri?:string; title?:string; name?:string; subtitle?:string; artists?:{name:string}[]; duration?:number; duration_ms?:number};
+type EmbedData = {props?:{pageProps?:{state?:{data?:{entity?: EmbeddedSong & {trackList?:EmbeddedSong[]}}}}}};
 export function spotifyRef(query:string):{kind:string;id:string}|null{
  const uri=query.match(/^spotify:(track|album|playlist):([A-Za-z0-9]{22})$/);if(uri)return {kind:uri[1],id:uri[2]};
  try{const u=new URL(query);if(u.protocol!=='https:'||u.hostname!=='open.spotify.com')return null;const m=u.pathname.match(/^\/(?:intl-[a-z-]+\/)?(track|album|playlist)\/([A-Za-z0-9]{22})\/?$/);return m?{kind:m[1],id:m[2]}:null;}catch{return null;}
 }
-function catalog(t:any):CatalogSong|null{
+function catalog(t:SpotifySong|null|undefined):CatalogSong|null{
  if(!t||t.is_local||t.type==='episode'||!t.name||!Array.isArray(t.artists)||!t.artists.length)return null;
- return {id:t.id,isrc:t.external_ids?.isrc,title:t.name,artist:t.artists.map((a:any)=>a.name).join(' '),duration:Number(t.duration_ms)/1000};
+ return {id:t.id,isrc:t.external_ids?.isrc,title:t.name,artist:t.artists.map((a)=>a.name).join(' '),duration:Number(t.duration_ms)/1000};
 }
 export class SpotifyCatalog{
  token={value:'',until:0};private refreshing:Promise<string>|null=null;
@@ -15,11 +19,11 @@ export class SpotifyCatalog{
  async access(){
   if(Date.now()<this.token.until)return this.token.value;
   if(this.refreshing)return this.refreshing;
-  this.refreshing=(async()=>{const r=await this.request('https://accounts.spotify.com/api/token',{method:'POST',headers:{Authorization:'Basic '+Buffer.from(this.id+':'+this.secret).toString('base64'),'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=client_credentials',signal:AbortSignal.timeout(10000)});if(!r.ok)throw new UserError('Spotify-tilgangen kunne ikke bekreftes.',502);const t=await r.json() as any;this.token={value:t.access_token,until:Date.now()+t.expires_in*1000-60000};return this.token.value;})().finally(()=>{this.refreshing=null;});return this.refreshing;
+  this.refreshing=(async()=>{const r=await this.request('https://accounts.spotify.com/api/token',{method:'POST',headers:{Authorization:'Basic '+Buffer.from(this.id+':'+this.secret).toString('base64'),'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=client_credentials',signal:AbortSignal.timeout(10000)});if(!r.ok)throw new UserError('Spotify-tilgangen kunne ikke bekreftes.',502);const t=await r.json() as {access_token:string;expires_in:number};this.token={value:t.access_token,until:Date.now()+t.expires_in*1000-60000};return this.token.value;})().finally(()=>{this.refreshing=null;});return this.refreshing;
  }
- async api(path:string){
+ async api<T=SpotifySong>(path:string){
   const url=new URL(path,'https://api.spotify.com/v1/');if(url.origin!=='https://api.spotify.com'||!url.pathname.startsWith('/v1/'))throw new UserError('Ugyldig Spotify-side.');
-  for(let attempt=0;attempt<2;attempt++){const r=await this.request(url,{headers:{Authorization:'Bearer '+await this.access()},signal:AbortSignal.timeout(12000)});if(r.status===401&&!attempt){this.token.until=0;continue;}if(!r.ok)throw new UserError(r.status===429?'Spotify er opptatt. Prøv igjen om litt.':'Spotify-listen er privat eller utilgjengelig.',r.status===429?429:502);return await r.json() as any;}throw new UserError('Spotify-tilgangen er utløpt.',502);
+  for(let attempt=0;attempt<2;attempt++){const r=await this.request(url,{headers:{Authorization:'Bearer '+await this.access()},signal:AbortSignal.timeout(12000)});if(r.status===401&&!attempt){this.token.until=0;continue;}if(!r.ok)throw new UserError(r.status===429?'Spotify er opptatt. Prøv igjen om litt.':'Spotify-listen er privat eller utilgjengelig.',r.status===429?429:502);return await r.json() as T;}throw new UserError('Spotify-tilgangen er utløpt.',502);
  }
  async apiLoad(kind:string,id:string,limit:number):Promise<CatalogSong[]>{
   if(!this.id||!this.secret)throw new UserError('Spotify API-tilgang mangler.');
@@ -27,7 +31,7 @@ export class SpotifyCatalog{
   let path:string|null=kind==='playlist'?`playlists/${id}/items?limit=50`:`albums/${id}/tracks?limit=50`;
   const tracks:CatalogSong[]=[];const visited=new Set<string>();
   while(path&&tracks.length<limit&&!visited.has(path)){
-   visited.add(path);const data=await this.api(path);
+   visited.add(path);const data:SpotifyPage=await this.api<SpotifyPage>(path);
    for(const item of data.items??[]){const t=catalog(item.item??item.track??item);if(t)tracks.push(t);if(tracks.length>=limit)break;}
    path=data.next??null;
   }
@@ -42,8 +46,8 @@ export class SpotifyCatalog{
    if(!r.ok)throw error;
    const html=await r.text(),match=html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
    if(!match)throw error;
-   const entity=JSON.parse(match[1]).props?.pageProps?.state?.data?.entity;
-   const songs:CatalogSong[]=(entity?.trackList??(entity?[entity]:[])).map((t:any)=>({id:t.uri?.split(':').at(-1),title:t.title??t.name,artist:t.subtitle??t.artists?.map((a:any)=>a.name).join(' '),duration:Number(t.duration??t.duration_ms??0)/1000})).filter((t:CatalogSong)=>t.title&&t.artist);
+   const entity=(JSON.parse(match[1]) as EmbedData).props?.pageProps?.state?.data?.entity;
+   const songs:CatalogSong[]=(entity?.trackList??(entity?[entity]:[])).map((t)=>({id:t.uri?.split(':').at(-1),title:t.title??t.name??'',artist:t.subtitle??t.artists?.map((a)=>a.name).join(' ')??'',duration:Number(t.duration??t.duration_ms??0)/1000})).filter((t:CatalogSong)=>t.title&&t.artist);
    if(!songs.length)throw error;return songs.slice(0,limit);
   }
  }

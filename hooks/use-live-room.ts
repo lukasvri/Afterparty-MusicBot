@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { LiveClock } from "@/lib/live-clock";
 import { readRoomTimeline } from "@/services/core/src/protocol";
 import type { Room } from "@/lib/types";
@@ -7,25 +7,22 @@ export function useLiveRoom(
   code: string | undefined,
   onRoom: (room: Room) => void,
 ) {
-  const callback = useRef(onRoom);
-  callback.current = onRoom;
+  const callback = useEffectEvent(onRoom);
   const fresh = useRef(false);
-  const [live, setLive] = useState(false),
-    [rtt, setRtt] = useState<number | null>(null);
+  const [status, setStatus] = useState<{code: string | undefined; live: boolean; rtt: number | null}>({code, live: false, rtt: null});
   useEffect(() => {
     fresh.current = false;
-    setLive(false);
-    setRtt(null);
     if (!code || code === "DISCORD1") return;
     let stopped = false,
       last = 0,
       latestTime = 0,
       epoch = "";
+    const update = (change: {live?:boolean; rtt?:number|null}) => setStatus(previous => ({...(previous.code === code ? previous : {code, live:false, rtt:null}), ...change}));
     const controller = new AbortController(),
       timing = new LiveClock();
     const clock = async () => {
       const trip = await timing.sample(controller.signal);
-      if (!stopped && trip !== null) setRtt(trip);
+      if (!stopped && trip !== null) update({rtt:trip});
     };
     const source = new EventSource("/api/realtime/stream?room=" + code);
     source.addEventListener("open", () => {
@@ -47,7 +44,7 @@ export function useLiveRoom(
         epoch = room.syncEpoch;
         last = performance.now();
         fresh.current = true;
-        setLive(true);
+        update({live:true});
         const age = timing.age(room.serverTime);
         const advance = room.playing
           ? Math.max(
@@ -57,7 +54,7 @@ export function useLiveRoom(
                 Math.max(room.serverTime, room.startsAt ?? 0),
             ) / 1000
           : 0;
-        callback.current({
+        callback({
           ...room,
           position: room.position + advance,
           serverTime: room.serverTime + age,
@@ -68,12 +65,12 @@ export function useLiveRoom(
     source.addEventListener("error", () => {
       if (stopped) return;
       fresh.current = false;
-      setLive(false);
+      update({live:false});
     });
     const timer = setInterval(() => {
       if (performance.now() - last > 5000) {
         fresh.current = false;
-        setLive(false);
+        update({live:false});
       }
       void clock();
     }, 4000);
@@ -85,5 +82,5 @@ export function useLiveRoom(
       clearInterval(timer);
     };
   }, [code]);
-  return { live, rtt, fresh };
+  return { live: status.code === code && status.live, rtt: status.code === code ? status.rtt : null, fresh };
 }

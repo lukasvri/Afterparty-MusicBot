@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useBrowserValue } from './use-browser-value';
 import { browserStorage } from "@/lib/browser-storage";
 import {
   emptyLibrary,
@@ -8,17 +9,17 @@ import {
 } from "@/lib/evening-library";
 import type { Video } from "@/lib/types";
 export function useEveningLibrary() {
-  const [library, setLibrary] = useState<EveningLibrary>(emptyLibrary),
-    [error, setError] = useState("");
-  useEffect(() => {
+  const raw = useBrowserValue('afterparty-library-v1');
+  const parsed = useMemo(() => {
     try {
-      setLibrary(readLibrary(browserStorage.get("afterparty-library-v1")));
+      return { library: readLibrary(raw), error: '' };
     } catch (e) {
-      setError((e as Error).message);
+      return { library: emptyLibrary(), error: (e as Error).message };
     }
-  }, []);
+  }, [raw]);
+  const { library } = parsed;
+  const [writeError, setError] = useState('');
   function update(next: EveningLibrary) {
-    setLibrary(next);
     setError(
       browserStorage.set("afterparty-library-v1", JSON.stringify(next))
         ? ""
@@ -27,7 +28,7 @@ export function useEveningLibrary() {
   }
   return {
     library,
-    error,
+    error: writeError || parsed.error,
     update,
     favorite(video: Video) {
       const exists = library.favorites.some((v) => v.id === video.id);

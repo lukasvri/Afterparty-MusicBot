@@ -1,3 +1,4 @@
+import type {YouTubeResponses} from '../src/external-types.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';
@@ -13,7 +14,7 @@ const setup=()=>{const dir=mkdtempSync(join(tmpdir(),'gutta-provider-'));const s
 test('concurrent identical searches share one lookup and return independent queue entry identities',async()=>{
  const t=setup(),gate=deferred<void>();try{
   const p=new Providers(t.store,{});let calls=0;
-  p.youtube=async()=>{calls++;await gate.promise;return {items:[{id:{videoId:'abcdefghijk'}}]};};
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;await gate.promise;return {items:[{id:{videoId:'abcdefghijk'}}]} as YouTubeResponses[K];};
   p.video=async()=>[track()];
   const pending=Array.from({length:20},()=>p.search('Artist audio',8,true));
   gate.resolve();const results=await Promise.all(pending);
@@ -30,7 +31,7 @@ test('a failed shared search is released so the next request can recover',async(
   p.extract=async()=>{throw Error('synthetic unavailable extractor');};
   const failed=await Promise.allSettled([p.search('Artist audio'),p.search('Artist audio')]);
   assert(failed.every(result=>result.status==='rejected'));assert.equal(calls,1);
-  p.youtube=async()=>{calls++;return {items:[{id:{videoId:'abcdefghijk'}}]};};p.video=async()=>[track()];
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;return {items:[{id:{videoId:'abcdefghijk'}}]} as YouTubeResponses[K];};p.video=async()=>[track()];
   assert.equal((await p.search('Artist audio'))[0].id,'abcdefghijk');assert.equal(calls,2);
  }finally{t.close();}
 });
@@ -49,7 +50,7 @@ test('Spotify references support URI and regional URLs without accepting spoofed
 });
 test('Spotify paginates in order and ignores episodes and local files',async()=>{
  const song=(id:string)=>({id,name:'Song '+id,artists:[{name:'Artist'}],duration_ms:200000,type:'track',external_ids:{isrc:source.isrc}});const calls:string[]=[];
- const fake=async(url:any)=>{calls.push(String(url));if(String(url).includes('/api/token'))return Response.json({access_token:'test',expires_in:3600});if(String(url).includes('offset=2'))return Response.json({items:[{item:song('two')}],next:null});return Response.json({items:[{track:song('one')},{track:{...song('local'),is_local:true}},{track:{...song('podcast'),type:'episode'}}],next:'https://api.spotify.com/v1/playlists/list/items?offset=2'});};
+ const fake=async(url:Parameters<typeof fetch>[0])=>{calls.push(String(url));if(String(url).includes('/api/token'))return Response.json({access_token:'test',expires_in:3600});if(String(url).includes('offset=2'))return Response.json({items:[{item:song('two')}],next:null});return Response.json({items:[{track:song('one')},{track:{...song('local'),is_local:true}},{track:{...song('podcast'),type:'episode'}}],next:'https://api.spotify.com/v1/playlists/list/items?offset=2'});};
  const p=new SpotifyCatalog('id','secret',fake as typeof fetch);const songs=await p.load('playlist','list',3);assert.deepEqual(songs.map(t=>t.id),['one','two']);assert.equal(songs[0].isrc,source.isrc);assert.equal(calls.filter(s=>s.includes('/api/token')).length,1);
 });
 test('matching uses ISRC first, verifies candidate and caches a fresh entry identity',async()=>{
@@ -75,9 +76,9 @@ test('audio bitrate follows requested quality and the actual voice channel ceili
 
 test('public Spotify embed fallback is retained while rate limits are not retried through it',async()=>{
  let embeds=0;
- const fake=async(url:any)=>{if(String(url).includes('/embed/')){embeds++;return new Response('<script id="__NEXT_DATA__">'+JSON.stringify({props:{pageProps:{state:{data:{entity:{trackList:[{title:'Song',subtitle:'Artist',duration:200000}]}}}}}})+'</script>');}return new Response('',{status:403});};
+ const fake=async(url:Parameters<typeof fetch>[0])=>{if(String(url).includes('/embed/')){embeds++;return new Response('<script id="__NEXT_DATA__">'+JSON.stringify({props:{pageProps:{state:{data:{entity:{trackList:[{title:'Song',subtitle:'Artist',duration:200000}]}}}}}})+'</script>');}return new Response('',{status:403});};
  const p=new SpotifyCatalog('','',fake as typeof fetch);assert.equal((await p.load('playlist','test',5))[0].title,'Song');assert.equal(embeds,1);
- const rateLimited=new SpotifyCatalog('id','secret',async(url:any)=>String(url).includes('/api/token')?Response.json({access_token:'test',expires_in:3600}):new Response('',{status:429}));await assert.rejects(rateLimited.load('playlist','test',5),/opptatt/);
+ const rateLimited=new SpotifyCatalog('id','secret',async(url:Parameters<typeof fetch>[0])=>String(url).includes('/api/token')?Response.json({access_token:'test',expires_in:3600}):new Response('',{status:429}));await assert.rejects(rateLimited.load('playlist','test',5),/opptatt/);
 });
 
 test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions and falls back on provider failure',async()=>{
@@ -104,19 +105,19 @@ test('concert radio falls back past incompatible recommendations to an embeddabl
 });
 
 test('Last.fm handles Topic tracks whose titles omit the artist',async()=>{
- const t=setup();try{let queried='';const r=new Recommendations(t.store,'test',async(url:any)=>{queried=String(url);return Response.json({similartracks:{track:[]}})});await r.similar(track('Example Song'));const query=new URL(queried);assert.equal(query.searchParams.get('track'),'Example Song');assert.equal(query.searchParams.get('artist'),'Artist');}finally{t.close();}
+ const t=setup();try{let queried='';const r=new Recommendations(t.store,'test',async(url:Parameters<typeof fetch>[0])=>{queried=String(url);return Response.json({similartracks:{track:[]}})});await r.similar(track('Example Song'));const query=new URL(queried);assert.equal(query.searchParams.get('track'),'Example Song');assert.equal(query.searchParams.get('artist'),'Artist');}finally{t.close();}
 });
 
 test('Last.fm preserves a hyphenated Topic title while using the actual artist',async()=>{
  const t=setup();try{
-  let queried='';const r=new Recommendations(t.store,'synthetic-key',async(url:any)=>{queried=String(url);return Response.json({similartracks:{track:[]}});});
+  let queried='';const r=new Recommendations(t.store,'synthetic-key',async(url:Parameters<typeof fetch>[0])=>{queried=String(url);return Response.json({similartracks:{track:[]}});});
   await r.similar(track('Example Song - Remastered'));
   const query=new URL(queried);assert.equal(query.searchParams.get('artist'),'Artist');assert.equal(query.searchParams.get('track'),'Example Song - Remastered');
  }finally{t.close();}
 });
 
 test('YouTube search falls back on quota failure and preserves literal query semantics in its cache',async()=>{
- const t=setup();try{const p=new Providers(t.store,{});let searches=0;p.youtube=async(path:any)=>{if(path==='search')throw Error('quota');return {items:[{id:'abcdefghijk',snippet:{title:'Song',channelTitle:'Artist'},contentDetails:{duration:'PT3M20S'},status:{embeddable:true}}]};};p.extract=async args=>{searches++;assert(args.some(a=>a.startsWith('ytsearch')));return {entries:[{id:'abcdefghijk'}]};};
+ const t=setup();try{const p=new Providers(t.store,{});let searches=0;p.youtube=async <K extends keyof YouTubeResponses>(path:K)=>{if(path==='search')throw Error('quota');return {items:[{id:'abcdefghijk',snippet:{title:'Song',channelTitle:'Artist'},contentDetails:{duration:'PT3M20S'},status:{embeddable:true}}]} as YouTubeResponses[K];};p.extract=async args=>{searches++;assert(args.some(a=>a.startsWith('ytsearch')));return {entries:[{id:'abcdefghijk'}]};};
  assert.equal((await p.search('Artist audio -"Song"',5))[0].id,'abcdefghijk');await p.search('Artist audio -"Song"',5);assert.equal(searches,1);await p.search('Artist audio Song',5);assert.equal(searches,2);
  }finally{t.close();}
 });
@@ -146,7 +147,7 @@ test('empty cached searches are refreshed so a radio retry can recover',async()=
  const t=setup();try{
   const p=new Providers(t.store,{}),query='Syn Cole audio -"Feel Good"';let calls=0;
   t.store.set('search:v2:'+JSON.stringify([query.toLowerCase(),20,true]),{at:Date.now(),tracks:[]});
-  p.youtube=async()=>{calls++;return {items:[{id:{videoId:'next1234567'}}]};};
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;return {items:[{id:{videoId:'next1234567'}}]} as YouTubeResponses[K];};
   p.video=async()=>[track('Syn Cole - Synthetic Next','next1234567')];
   assert.equal((await p.search(query,20,true))[0]?.id,'next1234567');assert.equal(calls,1);
   await p.search(query,20,true);assert.equal(calls,1);
@@ -156,7 +157,7 @@ test('empty cached searches are refreshed so a radio retry can recover',async()=
 test('video metadata retains explicit genre tags for unlabelled song titles',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{});
-  p.youtube=async()=>({items:[{id:'abcdefghijk',snippet:{title:'Artist - Song',channelTitle:'Publisher',tags:['future house'],description:'Genre: Future House\nNew release'},contentDetails:{duration:'PT3M20S'},status:{embeddable:true}}]});
+  p.youtube=async <K extends keyof YouTubeResponses>()=>({items:[{id:'abcdefghijk',snippet:{title:'Artist - Song',channelTitle:'Publisher',tags:['future house'],description:'Genre: Future House\nNew release'},contentDetails:{duration:'PT3M20S'},status:{embeddable:true}}]} as YouTubeResponses[K]);
   const [video]=await p.video(['abcdefghijk']);
   assert.deepEqual(video.genres,['future house']);
  }finally{t.close();}

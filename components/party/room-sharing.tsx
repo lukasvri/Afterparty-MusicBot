@@ -1,6 +1,8 @@
 "use client";
+import Image from "next/image";
 import { useLanguage } from "@/components/language";
 import { useEffect, useState } from "react";
+import { useClientReady } from "@/hooks/use-browser-value";
 import { browserStorage } from "@/lib/browser-storage";
 import type { Room } from "@/lib/types";
 export function RoomSharing({
@@ -16,16 +18,19 @@ export function RoomSharing({
 }) {
   const { t } = useLanguage();
 
-  const [url, setUrl] = useState(""),
-    [qr, setQr] = useState(""),
+  const ready = useClientReady();
+  const url = ready ? `${location.origin}/?room=${room.code}` : "";
+  const [qr, setQr] = useState(""),
     [message, setMessage] = useState(""),
     [invite, setInvite] = useState(""),
     [busy, setBusy] = useState(false);
-  useEffect(() => {
+  const [previousCode, setPreviousCode] = useState(room.code);
+  if (previousCode !== room.code) {
+    setPreviousCode(room.code);
     setInvite("");
     setMessage("");
-    setUrl(`${location.origin}/?room=${room.code}`);
-  }, [room.code]);
+    setQr("");
+  }
   useEffect(() => {
     let stopped = false;
     if (url)
@@ -47,7 +52,7 @@ export function RoomSharing({
     return () => {
       stopped = true;
     };
-  }, [url]);
+  }, [url, t]);
   async function manage(action: string) {
     if (busy) return;
     if (
@@ -86,7 +91,7 @@ export function RoomSharing({
     >
       <div>
         {qr && (
-          <img
+          <Image unoptimized
             src={qr}
             width={180}
             height={180}

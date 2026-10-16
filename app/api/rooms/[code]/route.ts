@@ -1,5 +1,4 @@
 import {coreUrl,coreRequest} from '@/lib/core-server';
-import {discord} from '@/lib/party';
 import {readLiveState,liveRoom} from '@/lib/live-room';
 import {api,body,row,publicRoom,mutate,limit} from '@/lib/server';
 type Context={params:Promise<{code:string}>};

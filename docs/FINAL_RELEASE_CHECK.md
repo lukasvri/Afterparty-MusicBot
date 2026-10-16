@@ -1,51 +1,72 @@
 # Final source release check
 
-16 October 2026. Base: freshly fetched `main` at `98603ce`, including the merged documentation cleanup. This records source validation, not production deployment. Website and Core remain at the shared source version `2.1.1`; no new release or tag is published by this task.
+16 October 2026. This check starts from freshly fetched `main` at `9429b3a`.
+Website and Core share version `2.1.1`. No release tag is created by this check.
 
-## Result
+## Source validation
 
-Application tests, typechecks, production build, browser fixtures, version consistency and production dependency audits pass. The full release gate remains incomplete because repository lint still fails and live host validation has not been performed.
+The repository lint backlog is resolved without disabling rules, adding ignores
+or suppressing warnings. `npm run lint` now rejects warnings, and lint runs in
+`npm run check:all`, website CI and the host deployment preflight.
 
 | Check | Result |
 | --- | --- |
-| Locked installation and `npm run check:all` | Pass: 56 Python operations/recovery tests, 64 website tests, 148 Core tests, both TypeScript checks and website build |
-| Real synthetic audio | Pass in Core tests, including FFmpeg stereo decoding, crossfade and Opus at 96 and 192 kbit/s |
-| `npm run release:check` | Pass: shared versions and generated notes agree |
-| Chromium party and concert queue | Pass with isolated API and player fixtures |
-| Chromium video startup | All 13 tests pass |
-| Chromium service pages | Home, admin, install, support, privacy, terms and patch notes load; desktop/mobile fit; no visible platform branding or platform login links |
-| Website and Core production npm audits | Zero findings in both dependency trees |
-| Documentation references | Local paths, image references and heading anchors checked |
-| New auth, hosting and page-check tooling lint | Pass without warnings |
-| Repository-wide lint | Fails: 109 errors and 29 warnings, matching the pre-change baseline |
-| Live Discord listening, real reconnects and host capacity | Not run in this cloud task |
-| Production update, container validation and rollback on the deployment host | Not performed |
+| Repository lint | Zero errors and zero warnings |
+| Website unit and integration checks | 67 pass, including storage notifications and blocked persistence |
+| Operations and recovery checks | 56 Python tests pass |
+| Core typecheck and tests in Docker | 170 tests pass, including real FFmpeg decoding, crossfade and Opus |
+| Website TypeScript and production build | Pass |
+| Version consistency | Shared versions and generated release notes agree |
+| Browser party and concert fixtures | Private setup, search, queue, moderation, saved evenings, QR, TV, language and responsive layout |
+| Browser video fixtures | Host/guest startup, autoplay fallback, radio progression, stale revisions, buffering and iframe preservation |
+| Browser service pages | Home, admin, install, support, privacy, terms and patch notes load on desktop and mobile |
 
-## What changed
+Core validation runs with FFmpeg inside the validation Docker image. Browser
+fixtures use synthetic APIs against an isolated local production preview. They
+never connect a production Discord account or database.
 
-The application no longer uses hosting account identity for administration. Discord OAuth and the owner-password fallback remain, including per-guild access checks. New regressions exercise rejected identity headers, password expiry/rotation, both session revocations and owner-server isolation. `/api/me` now checks the incoming password session as well.
+## Changes relevant to the checks
 
-Unused connector preview code and its direct dependencies are removed. Twelve lockfile package entries disappear; retained dependency versions are unchanged. Website pages, browser rooms, video, shared queues, Core audio, database migrations, private host configuration selection and hosting build output remain. Build-output tests check selected bindings, migration copies and preserved private source files.
+Saved audio, language, display preferences and evening libraries subscribe to
+browser storage with stable hydration snapshots. Changes in another tab
+invalidate the memory fallback. Blocked persistence still retains the current
+page's state and reports a failed durable write.
 
-The public interface and policy text use Afterparty presentation. The existing website hostname remains because the website is staying on its current host. Host-required configuration/output paths, working privacy-provider links and third-party copyright notices remain for compatibility and attribution. The application does not control provider-managed changes outside this repository.
+Player and live-stream callbacks observe committed React values. Video quality,
+volume, mute and language updates do not recreate the player or its stream.
+Admin server changes reset the selected server's form state. Background polling
+preserves unsaved settings, and response generation checks reject old replies.
 
-## Before a production update
+Provider responses, saved queues, Discord interactions and synthetic fixtures
+use explicit types. Internal page links and image elements use the framework's
+components. Existing external image delivery and OAuth links remain supported.
 
-An installation that previously used only hosting identity must configure and verify Discord OAuth or an owner password before applying this change. See [configuration](CONFIGURATION.md). The owner password does not grant another server's administration.
+## Reproduce
 
-Resolve the existing lint backlog before calling the full source gate green. On the deployment host, use the [host readiness](HOST_READINESS.md) and [operations](../services/core/PUBLIC_RELEASE.md) workflows to validate the container, backups and recovery, then verify real listening and reconnects with the intended voice-session limit. Source tests do not establish live provider availability or what a person hears.
+With Node.js 24.17+, Python 3.11+ and FFmpeg installed:
 
-After the reviewed website update, verify the live `/admin` sign-in and logout, `/install` invitation, room creation and concert playback. Keep the current origin and Discord OAuth callback until a separate domain migration is planned. This task does not deploy the website, restart the bot or change its hosting address.
+```bash
+npm run setup:cloud
+npm run check:all
+```
 
-## Reproduce the browser checks
-
-Build the website and start an isolated local preview with `npm run start`. With Playwright and Chromium available, set `PREVIEW_URL`, and `PLAYWRIGHT_MODULE`/`CHROMIUM_PATH` if needed, then run:
+Build the website and start an isolated local preview with `npm run start`.
+With Playwright and Chromium available, set `PREVIEW_URL`, and optionally
+`PLAYWRIGHT_MODULE` and `CHROMIUM_PATH`, then run:
 
 ```bash
 node scripts/party.browser.mjs
 node scripts/concert-queue.browser.mjs
 node scripts/video-start.browser.mjs
+node scripts/admin.browser.mjs
 node scripts/service-pages.browser.mjs
 ```
 
-These fixtures require a local preview and use synthetic responses. They do not operate a production bot or account.
+## Production boundary
+
+Source checks do not establish provider availability, audible Discord quality,
+real load across multiple servers or cold boot recovery of the PC. The host's
+[readiness](HOST_READINESS.md) and [operations](../services/core/PUBLIC_RELEASE.md)
+checks remain required for production updates. Preserve the complete per-server
+backup, existing private configuration and current OAuth callback. Verify live
+health and the published site after deploying the same GitHub revision to both.

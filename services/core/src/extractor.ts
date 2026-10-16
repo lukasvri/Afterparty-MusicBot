@@ -52,11 +52,11 @@ async function acquire(signal?: AbortSignal, priority = false) {
   });
 }
 
-function spawnJson(
+function spawnJson<T>(
   command: string,
   args: string[],
   signal?: AbortSignal,
-): Promise<any> {
+): Promise<T> {
   if (signal?.aborted)
     return Promise.reject(new UserError("Forespørselen ble avbrutt."));
   return new Promise((resolve, reject) => {
@@ -110,7 +110,7 @@ function spawnJson(
 }
 
 /** Bounded subprocess admission shared by all server providers. */
-export async function runJson(
+export async function runJson<T = Record<string, unknown>>(
   command: string,
   args: string[],
   signal?: AbortSignal,
@@ -118,7 +118,7 @@ export async function runJson(
 ) {
   await acquire(signal, priority);
   try {
-    return await spawnJson(command, args, signal);
+    return await spawnJson<T>(command, args, signal);
   } finally {
     active--;
     waiting.shift()?.enter();

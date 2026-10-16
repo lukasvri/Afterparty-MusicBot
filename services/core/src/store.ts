@@ -158,7 +158,7 @@ export class Store {
       "SELECT id,payload,status,result,at AS createdAt FROM jobs ORDER BY at DESC LIMIT 30",
     )
       .all()
-      .map((r) => ({ ...r, payload: JSON.parse(String(r.payload)) }));
+      .map((r) => ({ id: String(r.id), status: String(r.status), result: String(r.result), createdAt: Number(r.createdAt), payload: JSON.parse(String(r.payload)) as Record<string, unknown> }));
   }
 
   close() {

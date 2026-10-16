@@ -3,6 +3,8 @@ import {useCallback,useEffect,useRef,useState,type RefObject,type PointerEvent} 
 const IDLE_MS=2600;
 export function useImmersiveControls(active:boolean,keepVisible:boolean,root:RefObject<HTMLElement|null>){
   const [visible,setVisible]=useState(true);
+  const [context,setContext]=useState({active,keepVisible});
+  if(context.active!==active||context.keepVisible!==keepVisible){setContext({active,keepVisible});setVisible(true);}
   const timer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const held=useRef(false),keyboard=useRef(false);
   const clear=useCallback(()=>{if(timer.current)clearTimeout(timer.current);timer.current=null;},[]);
@@ -26,7 +28,7 @@ export function useImmersiveControls(active:boolean,keepVisible:boolean,root:Ref
     show();
   },[show]);
   const release=useCallback(()=>{held.current=false;arm();},[arm]);
-  useEffect(()=>{setVisible(true);held.current=false;keyboard.current=false;arm();return clear;},[active,keepVisible,arm,clear]);
+  useEffect(()=>{held.current=false;keyboard.current=false;arm();return clear;},[active,keepVisible,arm,clear]);
   useEffect(()=>{
     if(!active)return;
     const key=()=>{keyboard.current=true;show();};
