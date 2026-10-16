@@ -1,14 +1,31 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import { registerHooks, stripTypeScriptTypes } from "node:module";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { pbkdf2Sync } from "node:crypto";
 
-const context = { env: {}, coreCalls: [] };
-globalThis.__afterpartyAuthTest = context;
+interface FixtureStatement {
+  bind(...values: SQLInputValue[]): FixtureStatement;
+  first(): Promise<Record<string, SQLOutputValue> | null>;
+  run(): Promise<{ meta: { changes: number } }>;
+  all(): Promise<{ results: Record<string, SQLOutputValue>[] }>;
+}
+interface FixtureDatabase {
+  prepare(sql: string): FixtureStatement;
+  batch(statements: FixtureStatement[]): Promise<unknown[]>;
+}
+type FixtureEnvironment = {
+  DB?: FixtureDatabase;
+  ADMIN_PASSWORD_HASH?: string;
+  ADMIN_BRIDGE_KEY?: string;
+  OWNER_EMAIL?: string;
+};
+const context: { env: FixtureEnvironment; coreCalls: unknown[][] } = { env: {}, coreCalls: [] };
+const globals = globalThis as typeof globalThis & { __afterpartyAuthTest: typeof context };
+globals.__afterpartyAuthTest = context;
 const root = new URL("../", import.meta.url);
-const moduleUrl = (source) => "data:text/javascript," + encodeURIComponent(source);
+const moduleUrl = (source: string) => "data:text/javascript," + encodeURIComponent(source);
 const hooks = registerHooks({
   resolve(specifier, options, next) {
     if (specifier === "cloudflare:workers") return {
@@ -59,10 +76,10 @@ function fixture() {
 // Reset fields without replacing the imported environment object.
 const env = context.env;
 function setup() {
-  for (const key of Object.keys(env)) delete env[key];
+  for (const key of Object.keys(env)) Reflect.deleteProperty(env, key);
   context.coreCalls.length = 0;
   const sqlite = fixture();
-  const prepare = (sql, args = []) => ({
+  const prepare = (sql: string, args: SQLInputValue[] = []): FixtureStatement => ({
     bind(...values) { return prepare(sql, values); },
     async first() { return sqlite.prepare(sql).get(...args) ?? null; },
     async run() { return { meta: { changes: Number(sqlite.prepare(sql).run(...args).changes) } }; },
@@ -76,7 +93,7 @@ function setup() {
   const salt = "a1".repeat(16);
   env.ADMIN_PASSWORD_HASH = `pbkdf2$100000$${salt}$${pbkdf2Sync("synthetic-password", Buffer.from(salt, "hex"), 100000, 32, "sha256").toString("hex")}`;
   env.ADMIN_BRIDGE_KEY = "synthetic-bridge";
-  const request = (cookie = "", method = "GET", input) => new Request("https://afterparty.example/admin", {
+  const request = (cookie = "", method = "GET", input?: Record<string, unknown>) => new Request("https://afterparty.example/admin", {
     method, headers: { cookie, "Content-Type": "application/json" },
     ...(input === undefined ? {} : { body: JSON.stringify(input) }),
   });
@@ -110,11 +127,13 @@ test("password sessions authenticate handlers and lose access after expiry or ro
     assert.equal(await isAdmin(f.request(cookie)), true);
     assert.deepEqual(await (await me.GET(f.request(cookie))).json(), { admin: true });
     const authenticated = await (await session.GET(f.request(cookie))).json();
+    assert(authenticated && typeof authenticated === "object" && "authenticated" in authenticated && "method" in authenticated);
     assert.equal(authenticated.authenticated, true);
     assert.equal(authenticated.method, "password");
     f.sqlite.prepare("UPDATE admin_sessions SET expires_at=?").run(Date.now() - 1);
     assert.equal(await hasPasswordSession(f.request(cookie)), false);
     const rotated = await f.signIn();
+    assert(env.ADMIN_PASSWORD_HASH);
     env.ADMIN_PASSWORD_HASH = env.ADMIN_PASSWORD_HASH.replace(/a1/g, "b2");
     assert.equal(await isAdmin(f.request(rotated)), false);
   } finally { f.sqlite.close(); }
@@ -126,7 +145,7 @@ test("logout revokes password and Discord sessions and clears both cookies", asy
     const ownerCookie = await f.signIn(), discordToken = "c3".repeat(32);
     f.sqlite.prepare("INSERT INTO discord_admin_sessions VALUES(?,?,?)").run(await hash(discordToken), "synthetic-encrypted-grant", Date.now() + 60000);
     const request = f.request(ownerCookie + "; gk-discord=" + discordToken, "DELETE", {});
-    const badOrigin = new Request(request, { headers: { cookie: request.headers.get("cookie"), "Content-Type": "application/json", Origin: "https://foreign.example" } });
+    const badOrigin = new Request(request, { headers: { cookie: request.headers.get("cookie") ?? "", "Content-Type": "application/json", Origin: "https://foreign.example" } });
     assert.equal((await session.DELETE(badOrigin)).status, 403);
     assert.equal(await isAdmin(f.request(ownerCookie)), true);
     const response = await session.DELETE(f.request(ownerCookie + "; gk-discord=" + discordToken, "DELETE", {}));
@@ -135,8 +154,8 @@ test("logout revokes password and Discord sessions and clears both cookies", asy
     const cookies = response.headers.getSetCookie();
     assert.equal(cookies.length, 2);
     assert(cookies.every(cookie => cookie.includes("Max-Age=0") && cookie.includes("HttpOnly")));
-    assert.equal(f.sqlite.prepare("SELECT count(*) AS n FROM admin_sessions").get().n, 0);
-    assert.equal(f.sqlite.prepare("SELECT count(*) AS n FROM discord_admin_sessions").get().n, 0);
+    assert.equal(f.sqlite.prepare("SELECT count(*) AS n FROM admin_sessions").get()?.n, 0);
+    assert.equal(f.sqlite.prepare("SELECT count(*) AS n FROM discord_admin_sessions").get()?.n, 0);
     assert.equal(await isAdmin(f.request(ownerCookie)), false);
   } finally { f.sqlite.close(); }
 });
@@ -148,6 +167,6 @@ test("owner-password access remains limited to the initial guild", async () => {
     const access = await adminGuilds(request);
     assert.deepEqual(access.guilds.map(g => g.id), ["222222222222222222"]);
     assert.deepEqual(await adminContext(request, "222222222222222222"), { guildId: "222222222222222222" });
-    await assert.rejects(adminContext(request, "333333333333333333"), error => error.status === 403);
+    await assert.rejects(adminContext(request, "333333333333333333"), (error: unknown) => error instanceof Error && "status" in error && error.status === 403);
   } finally { f.sqlite.close(); }
 });

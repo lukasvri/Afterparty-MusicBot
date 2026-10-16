@@ -1,8 +1,10 @@
 // Synthetic UI workflows. Run only against a local production preview.
 import assert from "node:assert/strict";
+import type { Room, Video } from "../lib/types.ts";
+type RoomRequest = { action?: string; enabled?: boolean; actorHash?: string; isPublic?: boolean };
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ?? "playwright"
-);
+) as typeof import("playwright");
 const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:8787";
 assert(["127.0.0.1", "localhost"].includes(new URL(base).hostname));
 const browser = await chromium.launch({
@@ -14,7 +16,7 @@ try {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
-  const track = {
+  const track: Video = {
     id: "seed1234567",
     title: "Synthetic evening song",
     artist: "Test artist",
@@ -23,7 +25,7 @@ try {
     live: false,
     embeddable: true,
   };
-  let room = {
+  let room: Room = {
     code: "TESTROOM",
     name: "Synthetic evening",
     current: null,
@@ -41,13 +43,13 @@ try {
     history: [],
     voteCounts: {},
   };
-  const commands = [];
+  const commands: RoomRequest[] = [];
   await context.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     if (url.origin !== base) return route.abort();
     if (!url.pathname.startsWith("/api/")) return route.continue();
-    let data = {};
-    const input =
+    let data: unknown = {};
+    const input: RoomRequest | null =
       route.request().method() === "POST"
         ? route.request().postDataJSON()
         : null;
@@ -98,8 +100,8 @@ try {
     await page.getByRole("heading", { name: "Afterparty", exact:true }).waitFor();
     const geometry = await page.locator(".welcome-art").evaluate(el => {
       const frame = el.getBoundingClientRect();
-      const head = el.querySelector(".performer-head").getBoundingClientRect();
-      const rig = el.querySelector(".stage-truss").getBoundingClientRect();
+      const head = el.querySelector(".performer-head")!.getBoundingClientRect();
+      const rig = el.querySelector(".stage-truss")!.getBoundingClientRect();
       return { contained: head.top >= frame.top && head.bottom <= frame.bottom && head.left >= frame.left && head.right <= frame.right && rig.top >= frame.top,
         overflow: document.documentElement.scrollWidth > innerWidth };
     });
@@ -107,6 +109,7 @@ try {
     assert(!geometry.overflow, "Welcome page must fit the viewport");
     if(width===2560){
       const content=await page.locator('.content').boundingBox();
+      assert(content, 'The welcome content must be visible');
       assert(content.width>2300,'1440p welcome should use the available screen width');
       assert(content.height>1200,'1440p welcome should occupy the viewport height');
     }
@@ -163,7 +166,7 @@ try {
     await page.setViewportSize({width,height:1440});
     assert(await queued.isVisible());
     const visible = await queued.evaluate(el => {
-      const r=el.getBoundingClientRect(), p=el.closest(".queue-content").getBoundingClientRect();
+      const r=el.getBoundingClientRect(), p=el.closest(".queue-content")!.getBoundingClientRect();
       return r.width>0 && r.height>0 && r.top>=p.top && r.bottom<=p.bottom;
     });
     assert(visible,"Queued track must be inside the visible queue area");
@@ -174,7 +177,7 @@ try {
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
     .click();
   await page.waitForFunction(
-    () => document.querySelector(".approval-choice input")?.checked,
+    () => document.querySelector<HTMLInputElement>(".approval-choice input")?.checked,
   );
   assert(commands.some((c) => c.action === "approval" && c.enabled));
   await page.getByRole("tab", { name: "Kveldar", exact: true }).click();
