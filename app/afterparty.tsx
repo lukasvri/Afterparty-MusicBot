@@ -669,6 +669,54 @@ export default function Afterparty() {
   const concertQueue = useConcertQueue(
     room?.mode === "discord" ? room.guildId : undefined,
   );
+  async function seekDiscord(seconds: number) {
+    const target = roomRef.current,
+      generation = pollGeneration.current;
+    if (!target?.guildId || target.mode !== "discord" || !concertQueue.data?.canManage ||
+      discord?.guildId !== target.guildId || !discord.queueRevision)
+      return;
+    const current = () => mounted.current &&
+      generation === pollGeneration.current &&
+      roomRef.current?.playbackKey === target.playbackKey &&
+      roomRef.current?.code === target.code;
+    setError("");
+    try {
+      // Keep privileged seeking separate from the public transport endpoint.
+      const sent = await request<{ id: string; status: string }>("/api/admin/control", {
+        method: "POST",
+        headers: headers(),
+        signal: AbortSignal.timeout(35000),
+        body: JSON.stringify({
+          guildId: target.guildId,
+          operation: "command",
+          commandId: crypto.randomUUID(),
+          command: { action: "seek", seconds, queueRevision: discord.queueRevision },
+        }),
+      });
+      let status = sent.status;
+      const deadline = performance.now() + 35000;
+      while (current() && status === "processing" && performance.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (!current()) return;
+        const result = await request<{ commands: Array<{ id: string; status: string; result?: string }> }>(
+          "/api/admin/control?guildId=" + target.guildId,
+        );
+        const job = result.commands.find((job) => job.id === sent.id);
+        status = job?.status ?? "processing";
+        if (job && ["failed", "unknown", "expired"].includes(job.status))
+          throw new Error(job.result || "Boten bekreftet ikke kommandoen.");
+      }
+      if (!current()) return;
+      if (status !== "done") throw new Error("Boten bekreftet ikke kommandoen.");
+      // A cached stream sample can predate the command. Read public authority
+      // directly, retaining concert filtering and rejecting older snapshots.
+      const started = performance.now(),
+        next = await request<Room>(`/api/rooms/${target.code}`, { headers: headers(target.code) });
+      if (current()) accept(compensateDelivery(next, performance.now() - started));
+    } catch (error) {
+      if (current()) setError((error as Error).message);
+    }
+  }
   const queueRoom =
     room?.mode === "discord" && concertQueue.data
       ? {
@@ -1154,8 +1202,9 @@ export default function Afterparty() {
       return;
     }
     if (
-      r.isHost &&
-      r.mode !== "discord" &&
+      (r.mode === "discord"
+        ? concertQueue.data?.canManage && discord?.guildId === r.guildId && Boolean(discord?.queueRevision)
+        : r.isHost) &&
       !r.current.live &&
       !force &&
       !nativeSeekPending.current
@@ -1163,7 +1212,10 @@ export default function Afterparty() {
       const seek = nativeSeek.current.observe(currentTime, now, state);
       if (seek !== null) {
         nativeSeekPending.current = true;
-        void actionRef.current("seek", { position: seek }).finally(() => {
+        const command = r.mode === "discord"
+          ? seekDiscord(seek)
+          : actionRef.current("seek", { position: seek });
+        void command.finally(() => {
           nativeSeekPending.current = false;
           nativeSeek.current.reset();
         });

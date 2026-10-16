@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.1.2: Discord video seeking and release readiness
+
+2026-10-16
+
+- Native YouTube seeking in a Discord concert now sends an authenticated seek to Core for the selected server. Video waits for command confirmation and then follows the fresh shared position. Guests cannot change the shared position, and buffering does not publish seek commands.
+- Radio recommendations retain the original seed and exclude instructional videos. Discord voice connection errors are handled without losing other servers or startup recovery.
+- Browser audio preferences, room callbacks and administration drafts remain consistent across updates. Internal page links retain working native navigation.
+- The release lint backlog is resolved, and validation now requires zero lint warnings. This entry also records the previously missing release notes for those maintenance changes.
+
 ## v2.1.1: Private queue isolation and accurate crossfade recovery
 
 2026-10-15
