@@ -88,7 +88,16 @@ export class DiscordBot {
         paused: boolean;
     } | null>('recovery', null); if (!id || !this.engine.queue.length)
         return; const channel = await guild.channels.fetch(id).catch(() => null); if (!channel?.isVoiceBased() || !channel.members.some(m => !m.user.bot))
-        return; await this.join(channel); await this.engine.startNext(); if (recovery?.paused && this.engine.current)
+        return;
+        try {
+            await this.join(channel);
+        } catch (error) {
+            if (!(error instanceof UserError)) throw error;
+            this.engine.lastError = 'Kunne ikke gjenopprette taletilkoblingen. Bruk /play for å prøve igjen.';
+            this.engine.changed();
+            return;
+        }
+        await this.engine.startNext(); if (recovery?.paused && this.engine.current)
         this.engine.pause(); }
     async diagnostic() { if (this.engine.current || this.engine.queue.length || this.engine.connected)
         throw new UserError('Testen krever en tom bot.'); const guild = await this.client.guilds.fetch(this.guildId); const channels = await guild.channels.fetch(); const channel = channels.find(c => c?.type === ChannelType.GuildVoice && !c.members.some(m => !m.user.bot) && c.permissionsFor(guild.members.me!).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])); if (!channel?.isVoiceBased())
@@ -125,17 +134,29 @@ export class DiscordBot {
     async join(channel:VoiceBasedChannel){if(this.connection?.joinConfig.channelId===channel.id&&this.engine.connected)return;this.admitVoice?.();this.joining=true;try{await this.connectVoice(channel);}finally{this.joining=false;}}
     async connectVoice(channel: VoiceBasedChannel) { if (this.connection?.joinConfig.channelId === channel.id && this.engine.connected)
         return; const me = channel.guild.members.me; if (!me || !channel.permissionsFor(me).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]))
-        throw new UserError('Boten mangler tilgang til å bli med og spille lyd.'); this.connection?.destroy(); this.connection = joinVoiceChannel({ guildId: this.guildId, channelId: channel.id, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: !this.engine.settings.turnDownVolumeWhenPeopleSpeak }); try {
-        await entersState(this.connection, VoiceConnectionStatus.Ready, 20000);
+        throw new UserError('Boten mangler tilgang til å bli med og spille lyd.'); this.connection?.destroy(); this.connection = joinVoiceChannel({ guildId: this.guildId, channelId: channel.id, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: !this.engine.settings.turnDownVolumeWhenPeopleSpeak }); const connection = this.connection; this.watchVoiceErrors(connection); try {
+        await entersState(connection, VoiceConnectionStatus.Ready, 20000);
     }
     catch {
-        this.connection.destroy();
-        this.connection = null;
+        if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
+        if (this.connection === connection) this.connection = null;
         throw new UserError('Kunne ikke koble til talekanalen. Prøv igjen.');
-    } this.engine.store.set('voice-channel', channel.id); this.connection.subscribe(this.sink.player); this.engine.channelBitrate = channel.bitrate; this.engine.setConnection(true); let disconnectedAt:number|null=null;this.connection.on(VoiceConnectionStatus.Ready,()=>{if(disconnectedAt!==null){this.engine.diagnostics.note("voice-reconnected",performance.now()-disconnectedAt);disconnectedAt=null;}});this.connection.on(VoiceConnectionStatus.Disconnected, () => { disconnectedAt=performance.now();this.engine.diagnostics.note("voice-disconnected"); const connection = this.connection; if (!connection)
+    }
+    if (this.connection !== connection) throw new UserError('Taletilkoblingen ble avbrutt. Prøv igjen.');
+    this.engine.store.set('voice-channel', channel.id); this.connection.subscribe(this.sink.player); this.engine.channelBitrate = channel.bitrate; this.engine.setConnection(true); let disconnectedAt:number|null=null;this.connection.on(VoiceConnectionStatus.Ready,()=>{if(disconnectedAt!==null){this.engine.diagnostics.note("voice-reconnected",performance.now()-disconnectedAt);disconnectedAt=null;}});this.connection.on(VoiceConnectionStatus.Disconnected, () => { disconnectedAt=performance.now();this.engine.diagnostics.note("voice-disconnected"); const connection = this.connection; if (!connection)
         return; void Promise.race([entersState(connection, VoiceConnectionStatus.Signalling, 5000), entersState(connection, VoiceConnectionStatus.Connecting, 5000)]).catch(() => { if (this.connection === connection)
         this.disconnect(); }); }); this.connection.receiver.speaking.on('start', id => { if (id === this.client.user?.id)
         return; this.talking.add(id); this.engine.ducking = this.engine.settings.turnDownVolumeWhenPeopleSpeak && this.talking.size > 0; }); this.connection.receiver.speaking.on('end', id => { this.talking.delete(id); this.engine.ducking = this.engine.settings.turnDownVolumeWhenPeopleSpeak && this.talking.size > 0; }); }
+    watchVoiceErrors(connection: VoiceConnection) {
+        // The library forwards WebSocket errors here, including during startup.
+        // Keep its reconnect state machine alive without an unhandled error event.
+        connection.on('error', () => {
+            if (this.connection !== connection) return;
+            this.engine.lastError = 'Discord-taletilkoblingen ble avbrutt. Venter på ny tilkobling.';
+            this.engine.diagnostics.note('voice-error');
+            this.engine.changed();
+        });
+    }
     disconnect() { this.connection?.destroy(); this.connection = null; this.talking.clear(); this.engine.ducking = false; this.engine.setConnection(false); }
     async sameVoice(interaction: ChatInputCommandInteraction | ButtonInteraction, join = false) { const member = await interaction.guild!.members.fetch(interaction.user.id), channel = member.voice.channel; if (!channel)
         throw new UserError('Bli med i en talekanal først.'); if (this.connection && channel.id !== this.connection.joinConfig.channelId)

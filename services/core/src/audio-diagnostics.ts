@@ -9,6 +9,7 @@ export type AudioReason =
   | "recovery-exhausted"
   | "crossfade-unavailable"
   | "voice-disconnected"
+  | "voice-error"
   | "voice-reconnected";
 /** Only fixed reason codes and durations. Never provider stderr, URLs or IDs. */
 export class AudioDiagnostics {
