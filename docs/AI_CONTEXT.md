@@ -1,0 +1,53 @@
+# Shared AI project context
+
+[Documentation](README.md) · [AI workflow](AI_WORKFLOW.md) · [Architecture](ARCHITECTURE.md) · [Branding](BRANDING.md)
+
+This is a **small, durable decision record** for assistants working on Afterparty. It was checked against the repository on **16 October 2026**. Refresh `main`, related PRs and the specific source files before making claims about current implementation. This is not a live deployment dashboard or an exhaustive description of the code.
+
+## Product and identity
+
+- Public product name: **Afterparty**. The website and Discord music bot share this display identity.
+- Product direction: a self-hosted Discord music bot, a shared concert/video experience and private browser rooms.
+- Visual direction: dark/black background, white lowercase `ap` lettering and a restrained red accent (`#ff263e`). Keep interfaces clean, readable, consistent and professional.
+- Reuse the canonical vector logo and existing UI components. Do not recreate the brand from old discussion screenshots or replace it with photorealistic/AI-looking artwork.
+- Public documentation is written in English, with no em dashes. Replies to the repository owner can be in Nynorsk.
+
+## Architectural boundaries
+
+- GitHub repository: `lukasvri/Afterparty-MusicBot`; protected reference for new work: latest remote `main`.
+- Website: `app/`, `components/`, `hooks/`, `lib/`; hosted separately from Core.
+- Discord audio and room Core: `services/core/src/`. Core drives Discord playback and owns the shared playback clock.
+- The site and Core communicate across authenticated HTTPS and do not share a database file. Browser rooms and Discord servers have separate queue, permission and persistence boundaries.
+- Keep ordinary Discord playback private. Concert/public state must not leak normal server queues. Preserve queue revision and stale-command safeguards.
+- Retain persisted and integration identifiers even when display branding changes. Read [branding compatibility](BRANDING.md#compatibility) before renaming keys, API identifiers, paths or environment variables.
+- Live Core settings, secrets, databases, backups and hosting-specific IDs remain outside GitHub and cloud work.
+
+## What counts as verified?
+
+| Claim | Evidence |
+| --- | --- |
+| Intended feature or accepted design decision | This file or a decision documented in a reviewed issue/PR |
+| Feature implemented | Current source and related tests on a named branch/commit |
+| Feature merged | Current GitHub `main` |
+| Feature deployed and working | Host-side deployment, health and relevant live checks, not a repository commit |
+| Work in progress | Open GitHub issues and PRs, checked at the time of the question |
+
+## Technical starting points
+
+- [AGENTS.md](../AGENTS.md): repository-wide instructions, safe cloud tasks, test commands and production boundary.
+- [Architecture](ARCHITECTURE.md): service/data boundary, transport and playback responsibilities.
+- [Branding](BRANDING.md): logo, design direction, compatibility rules and Discord application settings.
+- [Cloud development](CLOUD_DEVELOPMENT.md): fresh checkout, setup, checks and safe local release process.
+- [Contributing](../CONTRIBUTING.md): module map and review standards.
+- [Changelog](../CHANGELOG.md): generated release notes, **not** proof of deployment.
+- [AI collaboration](AI_WORKFLOW.md): using Chat, Work and Codex without losing the handoff.
+
+## Active work and uncertainties
+
+Do not maintain an unverified list of `in progress` features here. Inspect [open PRs](https://github.com/lukasvri/Afterparty-MusicBot/pulls) and [issues](https://github.com/lukasvri/Afterparty-MusicBot/issues) directly.
+
+No general claim about the current production bot, website deployment or user-facing audio quality is made here. Automated checks, real FFmpeg tests and browser fixtures are valuable, but live playback, provider availability, host-specific configuration and production rollback require separate verification.
+
+## Keep this file trustworthy
+
+Update only when the owner makes a lasting product decision or a reviewed change alters the architectural/design contract. Cite relevant existing documentation or the PR in the change. For day-to-day progress use issues/PRs rather than duplicating their state in this file. Never include passwords, tokens, private server data, personal information or unverified promises.
