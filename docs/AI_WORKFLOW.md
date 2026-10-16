@@ -54,7 +54,7 @@ To grant optional local computer access, open the dot's profile on that computer
 ## Beginning a task
 
 1. Identify the goal, expected behavior, affected area and acceptance criteria. If it is a straightforward implementation, go directly to Codex.
-2. Check GitHub `main` and relevant open PRs or issues. Check actual local changes before starting a branch or switching worktrees. Keep a task on a distinct branch based on the latest remote `main`.
+2. Check GitHub `main` and relevant open PRs or issues. Check actual local changes before starting a branch or switching worktrees. Normal TypeScript fixes and features use a distinct branch based on the latest remote `main` and target `main`. Isolated Rust tasks use a focused `experiment/rust-*` branch from current `dev` and target `dev`. For both paths, fetch upstream and ensure the task branch includes the latest remote `main` before reviewing or editing code. Before submission, fetch `main` and the target branch again, incorporate any newer `main` and rerun affected checks while preserving existing work. Follow the [branch strategy](../CONTRIBUTING.md#branch-strategy), and do not merge existing `nightly` or Rust branches into `main` as part of the setup.
 3. Read `AGENTS.md`, `docs/AI_CONTEXT.md`, and the specific source or documentation involved. Read architecture, branding, cloud operations and compatibility contracts as applicable.
 4. Do not turn an idea, conversation promise or previous assistant answer into an assertion that the feature exists. Verify the repository or current PR.
 5. Use Work for external research when needed; use Codex for implementation. For parallel Codex agents, assign non-overlapping modules or worktrees and review their combined changes.
@@ -72,7 +72,7 @@ To grant optional local computer access, open the dot's profile on that computer
 **Dot, Chat or Work to Codex:**
 
 ```text
-In lukasvri/Afterparty-MusicBot, read AGENTS.md, docs/AI_CONTEXT.md and the latest upstream main, then review open related PRs. Goal: [specific outcome]. Acceptance criteria: [observable behavior]. Scope: [files/components]. Preserve production data, server isolation and compatibility. Implement on a dedicated branch, run relevant checks, open a draft PR and give me the PR link, verification, limitations and next steps.
+In lukasvri/Afterparty-MusicBot, read AGENTS.md, docs/AI_CONTEXT.md and the latest upstream main, then review open related PRs. Goal: [specific outcome]. Acceptance criteria: [observable behavior]. Scope: [files/components]. Target: main for TypeScript fixes and features, dev for isolated Rust experiments, following CONTRIBUTING.md#branch-strategy. Ensure the task branch includes the latest remote main before reviewing or editing code. Refresh main and the target branch again before submission, incorporate newer main and rerun affected checks. Preserve production data, server isolation and compatibility. Implement on a dedicated branch, run relevant checks, open a draft PR and give me the PR link, verification, limitations and next steps.
 ```
 
 **Codex to Dot, Chat or Work:**
