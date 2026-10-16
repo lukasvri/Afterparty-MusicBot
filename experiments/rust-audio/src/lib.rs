@@ -35,7 +35,15 @@ pub fn mix_pcm(
         } else {
             first * gain
         };
-        let output = sample.round().clamp(-32768.0, 32767.0) as i16;
+        // Match Core's Math.round: ties go toward positive infinity.
+        // Adding 0.5 first can round a value just below a tie up to the tie.
+        let lower = sample.floor();
+        let rounded = if sample - lower < 0.5 {
+            lower
+        } else {
+            lower + 1.0
+        };
+        let output = rounded.clamp(-32768.0, 32767.0) as i16;
         out[i..i + 2].copy_from_slice(&output.to_le_bytes());
     }
     Ok(out)
@@ -107,6 +115,97 @@ mod tests {
             first_sample(&mix_pcm(&frame(16000), None, 0.0, -10.0).unwrap()),
             0
         );
+    }
+
+    // Expected PCM values follow Core's Math.round: halfway values go toward
+    // positive infinity. Compare entire frames, including the final sample.
+    #[test]
+    fn volume_ties_match_core() {
+        for (input, expected) in [
+            (1001, 501),
+            (-1001, -500),
+            (1, 1),
+            (-1, 0),
+            (32767, 16384),
+            (-32767, -16383),
+            (-32768, -16384),
+        ] {
+            assert_eq!(
+                mix_pcm(&frame(input), None, 0.0, 50.0).unwrap(),
+                frame(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn volume_near_ties_match_core() {
+        for (volume, positive, negative) in [
+            (49.99999999999999, 0, 0),
+            (50.0, 1, 0),
+            (50.00000000000001, 1, -1),
+        ] {
+            assert_eq!(
+                mix_pcm(&frame(1), None, 0.0, volume).unwrap(),
+                frame(positive)
+            );
+            assert_eq!(
+                mix_pcm(&frame(-1), None, 0.0, volume).unwrap(),
+                frame(negative)
+            );
+        }
+    }
+
+    #[test]
+    fn crossfade_ties_and_adjacent_floats_match_core() {
+        let below = f64::from_bits(0.5_f64.to_bits() - 1);
+        let above = f64::from_bits(0.5_f64.to_bits() + 1);
+        for (progress, positive, negative) in [(below, 0, 0), (0.5, 1, 0), (above, 1, -1)] {
+            assert_eq!(
+                mix_pcm(&frame(0), Some(&frame(1)), progress, 100.0).unwrap(),
+                frame(positive)
+            );
+            assert_eq!(
+                mix_pcm(&frame(0), Some(&frame(-1)), progress, 100.0).unwrap(),
+                frame(negative)
+            );
+        }
+        for (first, second, expected) in [
+            (1000, 1001, 1001),
+            (-1000, -1001, -1000),
+            (-32768, 32767, 0),
+        ] {
+            assert_eq!(
+                mix_pcm(&frame(first), Some(&frame(second)), 0.5, 100.0).unwrap(),
+                frame(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn pcm_boundaries_and_control_clamping_match_core() {
+        let mut original = [0; FRAME_BYTES];
+        let samples = [i16::MIN, i16::MAX, -1, 0, 1];
+        for (index, pair) in original.chunks_exact_mut(2).enumerate() {
+            pair.copy_from_slice(&samples[index % samples.len()].to_le_bytes());
+        }
+        for volume in [100.0, 150.0] {
+            assert_eq!(mix_pcm(&original, None, 0.0, volume).unwrap(), original);
+            assert_eq!(
+                mix_pcm(&original, Some(&frame(0)), -1.0, volume).unwrap(),
+                original
+            );
+            assert_eq!(
+                mix_pcm(&frame(0), Some(&original), 2.0, volume).unwrap(),
+                original
+            );
+        }
+        for volume in [0.0, -10.0] {
+            assert_eq!(mix_pcm(&original, None, 0.0, volume).unwrap(), frame(0));
+            assert_eq!(
+                mix_pcm(&original, Some(&original), 0.5, volume).unwrap(),
+                frame(0)
+            );
+        }
     }
 
     #[test]

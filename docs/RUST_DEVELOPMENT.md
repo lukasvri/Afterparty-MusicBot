@@ -15,6 +15,8 @@ and no shared production databases.
   nightly release, deployment job or Rust compiler channel.
 - Feature branches target `nightly` through PRs, where Rust checks run for
   changes in this experiment. CI does not start the bot or deploy artifacts.
+- CI checks formatting, Clippy, locked tests and release builds on Linux and
+  Windows with both the declared minimum Rust 1.85.0 and current stable.
 - Promote tested and reviewed changes to `main` only as a separate approval
   and release step.
 
