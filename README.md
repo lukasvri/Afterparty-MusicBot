@@ -117,7 +117,7 @@ Automated checks do not establish live Discord audio quality or multi-server pro
 
 Afterparty's current Discord Core runs on **TypeScript/Node.js and FFmpeg**. We are exploring **Rust** for a small, isolated PCM audio-mixing component, with a focus on volume control, crossfades and measurable performance under load. A prototype is **not** a replacement for the existing audio engine, and it has no production or Discord connection.
 
-Development is staged on the [`nightly` branch](https://github.com/lukasvri/Afterparty-MusicBot/tree/nightly) and promoted to `main` only after review and testing. Rust will not appear in the GitHub language chart for `main` until Rust source files are actually merged there. Read the [experimental Rust source](https://github.com/lukasvri/Afterparty-MusicBot/tree/experiment/rust-audio-nightly-20261016/experiments/rust-audio) for the initial offline mixer.
+TypeScript development, fixes and new application features continue on `main` through reviewed PRs. The separate [`dev` branch](https://github.com/lukasvri/Afterparty-MusicBot/tree/dev) contains the [offline Rust prototype](experiments/rust-audio/) and its [development notes](docs/RUST_DEVELOPMENT.md). The prototype was transferred from `nightly` with its tests and latest rounding fix. Existing branches remain preserved; any future adoption of Rust in `main` requires a separate owner decision and review. Rust will not appear in the GitHub language chart for `main` until Rust source files are actually merged there.
 
 ## Explore further
 
