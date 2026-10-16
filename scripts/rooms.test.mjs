@@ -231,6 +231,21 @@ test("D1 own-room radio rejects guests and a result arriving after a pause", asy
     f.close();
   }
 });
+
+test("D1 radio uses and persists its original choice after an automatic transition", async () => {
+  const f = fixture();
+  try {
+    const changed = { ...seed, id: "changed0001", title: "Different Artist - Different style | Jazz", radio: true };
+    await f.save("TESTROOM", { current: changed, queue: [], playing: true, position: 199, radioSeed: seed });
+    const { room } = await mutate(f.request,"TESTROOM",{action:"next",version:1});
+    assert.equal(room.current?.id,next.id);
+    assert.equal(room.current?.radio,true);
+    assert(!("radioSeed" in room));
+    const saved=JSON.parse(f.sqlite.prepare("SELECT state FROM rooms").get().state);
+    assert.equal(saved.radioSeed.id,seed.id);
+    assert.equal(saved.radioHistory[0].id,changed.id);
+  } finally { f.close(); }
+});
 test("D1 starts the recommended video clock after its metadata lookup completes", async () => {
   const f = fixture(),
     now = Date.now;

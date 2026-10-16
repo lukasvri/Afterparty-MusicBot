@@ -67,7 +67,7 @@ test('SoundCloud supports search, share URLs and sets with a bounded ordered pla
  await assert.rejects(resolveSoundcloud('https://soundcloud.com/artist/blocked',1,async()=>({...sc('blocked'),is_preview:true})),/forhåndsvisning/);
 });
 test('Last.fm uses a bounded cached lookup and preserves metadata-only privacy',async()=>{
- const t=setup();try{let calls=0;const r=new Recommendations(t.store,'test',async()=>{calls++;return Response.json({similartracks:{track:[{name:'Other Song',artist:{name:'Other Artist'}}]}})});const seed={...track(),catalog:source};assert.equal((await r.similar(seed))[0].artist,'Other Artist');await r.similar(seed);assert.equal(calls,1);assert.deepEqual(await new Recommendations(t.store,'').similar(seed),[]);}finally{t.close();}
+ const t=setup();try{let calls=0;const r=new Recommendations(t.store,'test',async()=>{calls++;return Response.json({similartracks:{track:[{name:'Other Song',artist:{name:'Other Artist'},match:'0.8'}]}})});const seed={...track(),catalog:source};assert.equal((await r.similar(seed))[0].artist,'Other Artist');await r.similar(seed);assert.equal(calls,1);assert.deepEqual(await new Recommendations(t.store,'').similar(seed),[]);}finally{t.close();}
 });
 test('audio bitrate follows requested quality and the actual voice channel ceiling',()=>{
  assert.equal(audioBitrate(256000,192),192000);assert.equal(audioBitrate(64000,192),64000);assert.equal(audioBitrate(384000,384),384000);assert.equal(audioBitrate(NaN,192),64000);

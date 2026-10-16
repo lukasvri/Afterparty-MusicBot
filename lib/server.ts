@@ -16,6 +16,7 @@ import {
 import {
   roomRecommendation,
   roomRadioHistory,
+  playableRoomQueue,
 } from "../services/core/src/room-radio.ts";
 type Env = Cloudflare.Env & {
   YOUTUBE_API_KEY?: string;
@@ -675,7 +676,7 @@ export async function mutate(
       { ...state, ...(command.action === "radio" ? { radio: command.enabled === true } : {}) },
       async (query) => (await search(request, query)).videos,
     );
-  if (action === "next" && state.current && state.radio !== false && !state.queue.length && !recommended && !finished(state,value.updated_at,Date.now()))
+  if (action === "next" && state.current && state.radio !== false && !playableRoomQueue(state).length && !recommended && !finished(state,value.updated_at,Date.now()))
     fail(422,"Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.");
   const now = Date.now(),
     position =

@@ -70,6 +70,7 @@ export class Engine extends EventEmitter {
   radioAttempts = 0;
   radioRetryAt = 0;
   radioGeneration = 0;
+  radioSeed: Track | null;
   constructor(store: Store, providers: Providers, sink: Sink) {
     super();
     this.store = store;
@@ -78,6 +79,7 @@ export class Engine extends EventEmitter {
     this.settings = store.settings();
     this.volume = this.settings.defaultVolume;
     this.queue = store.get<Track[]>("queue", []);
+    this.radioSeed = store.get<Track | null>("radio-seed", null);
     const recovery = store.get<{
       track: Track;
       position: number;
@@ -169,6 +171,7 @@ export class Engine extends EventEmitter {
     )
       return;
     this.current = track;
+    this.anchorRadio(track);
     this.queue = this.queue.filter((t) => t.entryId !== track.entryId);
     this.persist();
     this.changed();
@@ -242,7 +245,21 @@ export class Engine extends EventEmitter {
     );
   }
   persist() {
-    this.store.setMany({ queue: this.queue, current: this.current });
+    this.store.setMany({
+      queue: this.queue,
+      current: this.current,
+      "radio-seed": this.radioSeed,
+    });
+  }
+  private anchorRadio(track: Track) {
+    if (
+      !this.radioSeed ||
+      (!track.radio && this.radioSeed.entryId !== track.entryId) ||
+      Boolean(this.radioSeed.concert) !== Boolean(track.concert)
+    ) {
+      this.radioSeed = structuredClone(track);
+    }
+    return this.radioSeed;
   }
   setConnection(connected: boolean) {
     this.connected = connected;
@@ -328,6 +345,8 @@ export class Engine extends EventEmitter {
     if (this.radioAttempts >= 3 || Date.now() < this.radioRetryAt)
       return Promise.resolve();
     this.radioAttempts++;
+    const original = this.anchorRadio(seed);
+    this.persist();
     const generation = this.generation,
       radioGeneration = this.radioGeneration;
     const valid = () =>
@@ -341,9 +360,9 @@ export class Engine extends EventEmitter {
       !this.queue.length;
     this.radioTask = (async () => {
       try {
-        const next = await this.providers.radio(seed, [seed.id]);
+        const next = await this.providers.radio(original, [original.id, seed.id]);
         if (!valid()) return;
-        if (next && canPlayRadioTrack(seed, next)) {
+        if (next && canPlayRadioTrack(original, next)) {
           this.radioError = "";
           this.radioRetryAt = Infinity;
           this.queue.push({
@@ -371,6 +390,7 @@ export class Engine extends EventEmitter {
   }
   async preparedNext(from: Track, signal: AbortSignal) {
     const generation = this.generation;
+    this.dropUnsafeRadio(from.radio ? this.radioSeed ?? from : from);
     const next = this.loop
       ? { ...from, entryId: randomUUID() }
       : this.queue.find((t) => t.entryId !== from.entryId);
@@ -423,6 +443,7 @@ export class Engine extends EventEmitter {
     this.abort = new AbortController();
     const signal = this.abort.signal;
     this.current = track;
+    this.anchorRadio(track);
     this.segments = [];
     this.loading = true;
     this.paused = paused;
@@ -474,12 +495,23 @@ export class Engine extends EventEmitter {
   }
   async startNext() {
     if (!this.connected) return;
+    this.dropUnsafeRadio(this.radioSeed ?? this.current);
     const next = this.queue.shift();
     if (!next) {
       this.stop(false);
       return;
     }
     await this.startTrack(next, next.offset ?? 0);
+  }
+  private dropUnsafeRadio(seed: Track | null) {
+    const queue = this.queue.filter(
+      (track) => !track.radio || canPlayRadioTrack(seed ?? track, track),
+    );
+    if (queue.length !== this.queue.length) {
+      this.queue = queue;
+      this.persist();
+      this.changed();
+    }
   }
   async naturalNext() {
     if (this.loop && this.current)
@@ -547,6 +579,7 @@ export class Engine extends EventEmitter {
     this.paused = false;
     this.lastEntry = "";
     if (clear) {
+      this.radioSeed = null;
       this.queue = [];
       this.historyEntries = [];
       this.store.set("recovery", null);

@@ -17,6 +17,8 @@ Dette strøymer ikkje Spotify sin originale lyd. Metadata og spelbar lydkjelde e
 
 ## Radio
 
+Current selection rules are documented in [Radio selection](../../../docs/RADIO.md). Core and browser rooms now retain the original explicit song choice across automatic tracks and restarts. Last.fm candidates must have a valid similarity score of at least 0.2 and their matched playback video must pass the shared music/style filter. Broad genre tags do not alone justify cross-artist playback. Instructional videos and older unsafe automatic queue entries are excluded before playback, while manual choices remain available. The earlier provider overview below retains its original wording.
+
 `LASTFM_API_KEY` ligg berre i den lokale .env-fila. Last.fm sine relaterte songar blir brukte som førsteval, med lokale favorittar som ekstra prioritet. Resultata blir mellomlagra eitt døgn. Nyleg spelte songar og radioforslag hoppa over før 60 sekund blir filtrerte bort. Slike hopp gir sju dagars cooldown, men hindrar ikkje eit uttrykkeleg manuelt songval.
 
 Utan nøkkel, ved tenestefeil eller utan sikre treff går radioen tilbake til artistbasert utval. SoundCloud har også ein artistbasert reserve. Last.fm kan føre radioen vidare til ei anna spelbar kjelde. Eksisterande tidleg kølegging, eitt forslag om gongen og prioritet for manuelle val er bevarte.

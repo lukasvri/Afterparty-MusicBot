@@ -9,7 +9,7 @@ import {
   type RoomTimeline,
   type RoomVideo,
 } from "./protocol.ts";
-import { roomRecommendation } from "./room-radio.ts";
+import { roomRecommendation, playableRoomQueue } from "./room-radio.ts";
 import {
   changeRoom,
   guestActions,
@@ -195,7 +195,7 @@ export class Rooms extends EventEmitter {
       input.action === "next" &&
       room.state.radio !== false &&
       room.state.current &&
-      !room.state.queue.length &&
+      !playableRoomQueue(room.state).length &&
       !recommended &&
       !finished(room.state, room.updatedAt, this.now())
     ) {
