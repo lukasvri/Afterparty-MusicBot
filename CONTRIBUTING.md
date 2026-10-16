@@ -6,7 +6,7 @@ Start with a concrete problem: what happened, how to reproduce it and what you e
 
 ## Set up a current checkout
 
-Fork the repository and create a focused branch from the latest upstream `main`. Fetch upstream before each new task and recheck it before submitting your PR. Preserve local work when incorporating updates.
+Fork the repository and create a focused branch from the latest upstream `main` for TypeScript fixes and new features. Isolated Rust experiments use a focused `experiment/rust-*` branch from current `dev` and target `dev`; follow [Rust development](docs/RUST_DEVELOPMENT.md). Fetch upstream before each new task, inspect the latest `main` and recheck the target branch before submitting your PR. Preserve local work when incorporating updates.
 
 Use Node.js 24.17+, Python 3.11+ and FFmpeg. From the repository root:
 

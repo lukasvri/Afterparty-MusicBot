@@ -14,7 +14,8 @@ This is a **small, durable decision record** for assistants working on Afterpart
 
 ## Architectural boundaries
 
-- GitHub repository: `lukasvri/Afterparty-MusicBot`; protected reference for new work: latest remote `main`.
+- GitHub repository: `lukasvri/Afterparty-MusicBot`; normal TypeScript development, fixes and new application features target the latest remote `main` through reviewed PRs.
+- `dev` is for isolated Rust testing. The offline PCM mixer and its tests were transferred from `nightly`; existing branches remain preserved. Rust work targets `dev`, with no automatic promotion into `main`. Any future adoption in `main` requires a separate owner decision and review. See [Rust development](RUST_DEVELOPMENT.md).
 - Website: `app/`, `components/`, `hooks/`, `lib/`; hosted separately from Core.
 - Discord audio and room Core: `services/core/src/`. Core drives Discord playback and owns the shared playback clock.
 - The site and Core communicate across authenticated HTTPS and do not share a database file. Browser rooms and Discord servers have separate queue, permission and persistence boundaries.
