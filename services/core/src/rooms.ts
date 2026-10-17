@@ -191,6 +191,15 @@ export class Rooms extends EventEmitter {
     if (input.action === "radio-prefetch" && this.skipping.has(lookupKey))
       return this.snapshot(code);
     this.skipping.delete(lookupKey);
+    if (input.action === "radio" && input.enabled === true && !recommended) {
+      // Persist enabling and backoff even for an empty retry. Current playback
+      // and its shared clock remain untouched; mutate retains the revision guard.
+      this.mutate(code, input);
+      throw new UserError(
+        "Radioen fann ingen passande låtar. Prøv radio igjen eller legg til ei låt.",
+        422,
+      );
+    }
     if (
       input.action === "next" &&
       room.state.radio !== false &&

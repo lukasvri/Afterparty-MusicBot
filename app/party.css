@@ -552,11 +552,24 @@ button:disabled {
 /* Author display rules must not override inactive surfaces. */
 .concert-shell [hidden] { display: none !important; }
 
-/* Keep secondary controls out of the listening surface. */
-.room-options { margin: 0 0 16px; }
-.room-options > summary, .queue-options > summary { cursor:pointer; color:#bfb5bd; font-size:12px; padding:10px 0; min-height:40px; }
-.room-options .party-tools { padding:16px; border:1px solid #ffffff20; border-radius:8px; align-items:center; }
-.queue-options { margin:12px 0; }
+/* One settings surface for room, queue and device video preferences. */
+.video-settings .settings-section { display:grid; gap:13px; min-width:0; }
+.video-settings .settings-section + .settings-section { border-top:1px solid #ffffff20; padding-top:16px; }
+.video-settings .settings-section h3 { margin:0; font:600 13px/1.5 var(--font-body); color:#fff; }
+.video-settings .party-tools { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:12px; margin:0; min-width:0; }
+.video-settings .party-tools > .button { min-width:0; min-height:44px; }
+.video-settings .party-tools .room-radio-control { grid-column:1/-1; justify-self:start; }
+.video-settings .party-tools .room-visibility { grid-column:1/-1; display:flex; min-width:0; }
+.video-settings .party-tools .display-name { display:grid; gap:6px; min-width:0; width:100%; }
+.video-settings .display-name input { width:100%; min-width:0; box-sizing:border-box; }
+.video-settings .queue-options { display:grid; gap:13px; margin:0; }
+.video-settings .queue-summary { justify-content:flex-start; margin:0; }
+.video-settings .queue-options .queue-help { margin:0; }
+@media(max-width:600px) {
+  .video-settings .party-tools { grid-template-columns:minmax(0,1fr); }
+  .video-settings .party-tools .display-name { min-width:0; }
+  .video-settings .party-tools .tv-mode-button { justify-self:start; }
+}
 .queue-options .queue-help { margin:12px 0; }
 .queue-summary { justify-content:flex-end; }
 .social-track > div, .track-details, .queue-current > div { min-width:0; }
@@ -568,7 +581,7 @@ button:disabled {
 .concert-shell .library-panel .empty-queue h3 { font-size:18px; margin-bottom:12px; }
 .video-settings .admin-seek { display:grid; gap:12px; width:100%; padding:12px 0; }
 .video-settings .admin-seek input { width:100%; }
-[data-tv="true"] .room-options { display:none; }
+[data-tv="true"] .video-settings { display:none; }
 
 /* A welcome screen, not a narrow document column, on large displays. */
 .concert-shell[data-welcome="true"] .content { width:calc(100% - clamp(32px,5vw,128px)); min-height:calc(100svh - 88px); display:flex; flex-direction:column; }
@@ -577,7 +590,6 @@ button:disabled {
 .concert-shell[data-welcome="true"] .welcome-copy h1 { font-size:clamp(34px,16cqi,110px); font-weight:900; letter-spacing:-.055em; padding-bottom:.12em; white-space:nowrap; color:var(--text,#fff); }
 .concert-shell[data-welcome="true"] .welcome-art { width:100%; }
 .concert-shell[data-welcome="true"] .studio-foot { margin-top:28px; }
-.room-options .queue-options { border-top:1px solid #ffffff20; padding:8px 16px; }
 @media(max-width:950px) {
   .concert-shell[data-welcome="true"] .welcome-hero { display:flex; flex-direction:column; align-items:center; gap:32px; padding:32px 0; }
   .concert-shell[data-welcome="true"] .welcome-copy { width:100%; max-width:620px; text-align:center; }

@@ -689,7 +689,7 @@ export async function mutate(
               Math.max(value.updated_at, state.startsAt ?? value.updated_at),
           ) / 1000
         : 0);
-  const next = changeRoom(state, command, host, position, recommended);
+  const next = changeRoom(state, { ...command, now }, host, position, recommended);
   const result = await db()
     .prepare(
       "UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?",
@@ -698,6 +698,8 @@ export async function mutate(
     .run();
   if (!result.meta.changes)
     fail(409, "En annen endring kom først. Prøv igjen.");
+  if (needsRecommendation(state, command) && action === "radio" && command.enabled === true && !recommended)
+    fail(422, "Radioen fann ingen passande låtar. Prøv radio igjen eller legg til ei låt.");
   return { room: await publicRoom(request, await row(code), true, false) };
 }
 export async function adminRooms(request: Request) {
