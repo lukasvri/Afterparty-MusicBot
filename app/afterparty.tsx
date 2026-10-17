@@ -63,7 +63,7 @@ import { deliverCommand, type CommandReceipt } from "@/lib/live-command";
 import { LanguageSwitch, useLanguage } from "@/components/language";
 import { OpenRooms } from "@/components/open-rooms";
 import { ConcertScenery } from "@/components/concert-scenery";
-import { PlayerSettings } from "@/components/player-settings";
+import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
 
 export default function Afterparty() {
   const { t, language } = useLanguage();
@@ -137,6 +137,7 @@ export default function Afterparty() {
   const [discord, setDiscord] = useState<DiscordState | null>(null),
     [historySort, setHistorySort] = useState<"recent" | "popular">("recent");
   const loggedPlay = useRef("");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("room");
   const [settingsOpen, setSettingsOpen] = useState(false),
     [quality, setQuality] = useState(""),
     [playerEpoch, setPlayerEpoch] = useState(0),
@@ -1429,6 +1430,8 @@ export default function Afterparty() {
       compact={fullscreenActive}
       open={settingsOpen}
       onOpen={setSettingsOpen}
+      active={settingsTab}
+      onTab={setSettingsTab}
       mode={syncMode}
       onMode={changeSyncMode}
       quality={t(quality)}
