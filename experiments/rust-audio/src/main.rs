@@ -12,10 +12,15 @@ fn main() -> ExitCode {
             bench();
             ExitCode::SUCCESS
         }
-        (Some(mode), None) if mode == "--stream" => {
+        (Some(mode), None) if mode == "--stream" || mode == "--echo-stream" => {
             let input = io::stdin();
             let output = io::stdout();
-            match stream::serve(&mut input.lock(), &mut output.lock()) {
+            let result = if mode == "--echo-stream" {
+                stream::serve_echo(&mut input.lock(), &mut output.lock())
+            } else {
+                stream::serve(&mut input.lock(), &mut output.lock())
+            };
+            match result {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     eprintln!("PCM stream error: {error}");
@@ -24,7 +29,7 @@ fn main() -> ExitCode {
             }
         }
         _ => {
-            eprintln!("Usage: afterparty-rust-audio --bench | --stream");
+            eprintln!("Usage: afterparty-rust-audio --bench | --stream | --echo-stream");
             ExitCode::from(2)
         }
     }

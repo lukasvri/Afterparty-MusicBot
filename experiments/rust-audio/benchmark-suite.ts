@@ -5,14 +5,15 @@ import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { cpus, platform, release, arch } from "node:os";
 import { resolve } from "node:path";
-import { setImmediate as yieldTurn } from "node:timers/promises";
+import { setImmediate as yieldTurn, setTimeout as wait } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { mixPcm } from "../../services/core/src/audio.ts";
 import { FRAME_BYTES, RustAudioWorker, defaultExecutable, type MixInput } from "./worker-client.ts";
 import { measurementProcess } from "./benchmark-process.ts";
+import { processCpu, cpuDelta } from "./process-cpu.ts";
 
 export function options(args: string[]) {
-  if (args.length > 5) throw new RangeError("Usage: benchmark-suite.ts [frames=1000] [repeats=3] [guilds=1,4,16] [warmup=100] [none|copy|opus]");
+  if (args.length > 7) throw new RangeError("Usage: benchmark-suite.ts [frames=1000] [repeats=3] [guilds=1,4,16] [warmup=100] [none|copy|opus] [saturated|paced] [mix|echo]");
   function integer(value: string | undefined, fallback: number, min: number, max: number) {
     const result = value === undefined ? fallback : Number(value);
     if (!Number.isSafeInteger(result) || result < min || result > max)
@@ -26,7 +27,11 @@ export function options(args: string[]) {
   const warmup = integer(args[3], 100, 1, 1000);
   const ffmpeg = args[4] ?? "none";
   if (!["none", "copy", "opus"].includes(ffmpeg)) throw new RangeError("FFmpeg stage must be none, copy or opus");
-  return { frames, repeats, guilds, warmup, ffmpeg };
+  const cadence = args[5] ?? "saturated", control = args[6] ?? "mix";
+  if (!["saturated", "paced"].includes(cadence) || !["mix", "echo"].includes(control)) throw new RangeError("Invalid cadence/control");
+  if (cadence === "paced" && frames > 2000) throw new RangeError("Paced runs are limited to 2000 frames per guild");
+  if (control === "echo" && ffmpeg !== "none") throw new RangeError("Echo is a PCM-only protocol control, not an encoder comparison");
+  return { frames, repeats, guilds, warmup, ffmpeg, cadence, control };
 }
 
 export function fixture(guild: number): MixInput {
@@ -108,10 +113,10 @@ function ffmpegStage(mode: string) {
 }
 
 async function run(mode: string, config: ReturnType<typeof options>, signal: AbortSignal) {
-  if (mode !== "rust" && mode !== "typescript") throw new RangeError("Unknown mixer");
+  if (!["rust", "rust-echo", "typescript"].includes(mode)) throw new RangeError("Unknown mixer");
   const guilds = config.guilds[0];
   const inputs = Array.from({ length: guilds }, (_, guild) => fixture(guild));
-  const references = inputs.map((input) => mixPcm(input.a, input.b, input.progress, input.volume));
+  const references = inputs.map((input) => mode === "rust-echo" ? input.a : mixPcm(input.a, input.b, input.progress, input.volume));
   const workers: RustAudioWorker[] = [], stages: ReturnType<typeof ffmpegStage>[] = [];
   const startupFirstReplyMs: number[] = [], samples: number[] = [], batchSamples: number[] = [];
   const cancel = () => {
@@ -120,10 +125,10 @@ async function run(mode: string, config: ReturnType<typeof options>, signal: Abo
   };
   signal.addEventListener("abort", cancel, { once: true });
   try {
-    if (mode === "rust") for (let guild = 0; guild < guilds; guild++) {
+    if (mode !== "typescript") for (let guild = 0; guild < guilds; guild++) {
       signal.throwIfAborted();
       const start = performance.now();
-      const worker = new RustAudioWorker({ timeoutMs: 10_000 });
+      const worker = new RustAudioWorker({ timeoutMs: 10_000, args: [mode === "rust-echo" ? "--echo-stream" : "--stream"] });
       workers.push(worker);
       assert.deepEqual(await worker.mix(inputs[guild], signal), references[guild]);
       startupFirstReplyMs.push(performance.now() - start);
@@ -131,16 +136,31 @@ async function run(mode: string, config: ReturnType<typeof options>, signal: Abo
     async function mix(guild: number) {
       const input = inputs[guild];
       signal.throwIfAborted();
-      return mode === "rust" ? workers[guild].mix(input, signal) : mixPcm(input.a, input.b, input.progress, input.volume);
+      return mode !== "typescript" ? workers[guild].mix(input, signal) : mixPcm(input.a, input.b, input.progress, input.volume);
     }
     for (let frame = 0; frame < config.warmup; frame++) {
       await Promise.all(inputs.map(async (_, guild) => assert.deepEqual(await mix(guild), references[guild])));
       await yieldTurn();
     }
+    const pids = workers.flatMap((worker) => worker.pid ? [worker.pid] : []);
+    // Probe our own PID too, then discard it, so TS gets the same out-of-band
+    // OS helper/startup pause as Rust. Parent CPU still uses process.cpuUsage.
+    const sampleCpu = () => {
+      const snapshot = processCpu([process.pid, ...pids]);
+      return { ...snapshot, values: snapshot.values.filter((entry) => entry.pid !== process.pid) };
+    };
+    const cpuBefore = sampleCpu();
+    const chunksBefore = workers.reduce((total, worker) => total + worker.transportStats.replyChunks, 0);
     const cpu = process.cpuUsage(), started = performance.now();
     if (config.ffmpeg !== "none") for (let guild = 0; guild < guilds; guild++) stages.push(ffmpegStage(config.ffmpeg));
-    let batchesOver20Ms = 0;
+    let batchesOver20Ms = 0, missedScheduledDeadlines = 0;
+    const scheduleLags: number[] = [], scheduledSamples: number[] = [];
     for (let frame = 0; frame < config.frames; frame++) {
+      const scheduled = started + frame * 20;
+      if (config.cadence === "paced") {
+        while (performance.now() < scheduled) await wait(Math.max(1, Math.floor(scheduled - performance.now())), undefined, { signal });
+        scheduleLags.push(performance.now() - scheduled);
+      }
       const batch = performance.now();
       await Promise.all(inputs.map(async (_, guild) => {
         const output = await mix(guild);
@@ -148,15 +168,20 @@ async function run(mode: string, config: ReturnType<typeof options>, signal: Abo
         if (frame === 0 || frame === config.frames - 1) assert.deepEqual(output, references[guild]);
         if (stages[guild]) await stages[guild].write(output);
         samples.push(performance.now() - batch);
+        if (config.cadence === "paced") scheduledSamples.push(performance.now() - scheduled);
       }));
       const duration = performance.now() - batch;
       batchSamples.push(duration);
       if (duration > 20) batchesOver20Ms++;
+      if (config.cadence === "paced" && performance.now() > scheduled + 20) missedScheduledDeadlines++;
       await yieldTurn();
     }
     const submittedMs = performance.now() - started;
     const ffmpeg = await Promise.all(stages.map((stage) => stage.finish()));
     const elapsedMs = performance.now() - started, usedCpu = process.cpuUsage(cpu);
+    const cpuAfter = sampleCpu(), rustChildCpuMs = cpuDelta(cpuBefore, cpuAfter);
+    const parentCpuMs = (usedCpu.user + usedCpu.system) / 1000;
+    const ffmpegCpuMs = ffmpeg.every((stage) => stage.cpuMs !== null) ? ffmpeg.reduce((total, stage) => total + stage.cpuMs!, 0) : null;
     for (const stage of ffmpeg) {
       assert(stage.outputBytes > 0, "FFmpeg must emit audio bytes");
       if (config.ffmpeg === "copy") assert.equal(stage.outputBytes, config.frames * FRAME_BYTES);
@@ -164,7 +189,14 @@ async function run(mode: string, config: ReturnType<typeof options>, signal: Abo
     // OS probes run after the full timed pipeline, while Rust workers remain alive.
     return { mode, guilds, framesPerGuild: config.frames, warmupFramesPerGuild: config.warmup, ffmpegMode: config.ffmpeg,
       elapsedMs, submittedMs, finalFlushMs: elapsedMs - submittedMs, framesPerSecond: config.frames * guilds / elapsedMs * 1000,
-      parentCpuMs: (usedCpu.user + usedCpu.system) / 1000, parentLifetimePeakRssBytes: process.resourceUsage().maxRSS * 1024,
+      parentCpuMs, rustChildCpuMs, rustLifetimeCpuMs: cpuAfter.error ? null : cpuAfter.values.reduce((sum, entry) => sum + entry.cpuMs, 0),
+      rustCpuCounter: { source: cpuAfter.source, counterUnitMs: cpuAfter.counterUnitMs,
+        practicalPrecision: "not established; scheduler CPU accounting may be coarser", error: cpuBefore.error ?? cpuAfter.error },
+      pipelineCpuMs: rustChildCpuMs !== null && ffmpegCpuMs !== null ? parentCpuMs + rustChildCpuMs + ffmpegCpuMs : null,
+      replyDataEvents: workers.reduce((total, worker) => total + worker.transportStats.replyChunks, 0) - chunksBefore,
+      cadence: config.cadence, scheduleLag: scheduleLags.length ? percentiles(scheduleLags) : null,
+      scheduledLatency: scheduledSamples.length ? percentiles(scheduledSamples) : null, missedScheduledDeadlines,
+      parentLifetimePeakRssBytes: process.resourceUsage().maxRSS * 1024,
       rustChildMemory: childPeakRss(workers.flatMap((worker) => worker.pid ? [worker.pid] : [])),
       startupFirstReplyMs, latency: percentiles(samples), batchLatency: percentiles(batchSamples), batchesOver20Ms, ffmpeg };
   } finally {
@@ -188,9 +220,11 @@ async function main(args: string[]) {
   }
   const config = options(args), runs = [];
   for (const guilds of config.guilds) for (let repeat = 0; repeat < config.repeats; repeat++) {
-    for (const mode of repeat % 2 ? ["rust", "typescript"] : ["typescript", "rust"]) {
+    const modes = config.control === "echo" ? ["typescript", "rust", "rust-echo"] : ["typescript", "rust"];
+    const offset = repeat % modes.length;
+    for (const mode of [...modes.slice(offset), ...modes.slice(0, offset)]) {
       const report = await measurementProcess([fileURLToPath(import.meta.url), "--run", mode,
-        String(config.frames), "1", String(guilds), String(config.warmup), config.ffmpeg]);
+        String(config.frames), "1", String(guilds), String(config.warmup), config.ffmpeg, config.cadence, config.control]);
       runs.push({ repeat: repeat + 1, ...JSON.parse(report) });
     }
   }
@@ -199,14 +233,15 @@ async function main(args: string[]) {
   const executable = process.env.RUST_AUDIO_BIN ?? defaultExecutable;
   const rustVersion = spawnSync(process.env.RUSTC_PATH ?? "rustc", ["--version"],
     { encoding: "utf8", windowsHide: true, timeout: 10_000 });
-  console.log(JSON.stringify({ scope: "offline saturated PCM batches; one pending frame per guild; no Discord",
+  console.log(JSON.stringify({ scope: `offline ${config.cadence} PCM batches; one pending frame per guild; no Discord`,
     node: process.version, os: platform(), osRelease: release(), arch: arch(), cpu: cpus()[0]?.model,
     logicalCpus: cpus().length, rustVersion: rustVersion.status === 0 ? rustVersion.stdout.trim() : null,
     rustExecutableSha256: createHash("sha256").update(readFileSync(executable)).digest("hex"), ffmpegVersion, config, runs,
     limitations: ["Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
       "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
-      "20ms overruns describe saturation, not paced playback. No codec provider decode or network is modeled.",
-      "Parent CPU excludes Rust/FFmpeg. FFmpeg reports its own CPU; Rust child CPU is unavailable here.",
+      "Paced batches use common 20ms deadlines without unbounded catch-up queues. No provider decode or network is modeled.",
+      "Pipeline CPU sums parent, owned Rust counter deltas and FFmpeg diagnostics; counter resolution and accounting uncertainty apply.",
+      "Echo isolates aggregate protocol/copy/pipe/scheduling costs; do not subtract independent p99s to estimate pure mix latency.",
       "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."] }, null, 2));
 }
 

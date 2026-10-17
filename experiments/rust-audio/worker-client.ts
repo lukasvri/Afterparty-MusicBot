@@ -20,6 +20,7 @@ export class RustAudioWorker {
   private nextId = 0;
   private exited = false;
   private stderrTail = Buffer.alloc(0);
+  private replyChunks = 0;
   readonly closed: Promise<void>;
   readonly timeoutMs: number;
 
@@ -54,6 +55,7 @@ export class RustAudioWorker {
   get pid() { return this.child.pid; }
   get diagnostics() { return this.stderrTail.toString(); }
   get isClosed() { return this.exited; }
+  get transportStats() { return { replyChunks: this.replyChunks }; }
 
   private fail(error: Error) {
     this.failure ??= error;
@@ -61,6 +63,7 @@ export class RustAudioWorker {
   }
 
   private receive(chunk: Buffer) {
+    this.replyChunks++;
     const pending = this.pending;
     if (!pending || pending.bytes.length + chunk.length > PACKET_BYTES) {
       this.fail(new Error("Unexpected or oversized Rust worker reply"));

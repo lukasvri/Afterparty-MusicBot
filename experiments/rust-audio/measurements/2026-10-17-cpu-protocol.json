@@ -1,0 +1,4564 @@
+{
+  "observedDate": "2026-10-17",
+  "sourceBase": "6de6ec4cb6989d351ea673b510a6273448803e0c",
+  "rustTarget": "x86_64-pc-windows-gnu",
+  "rustBuild": "cargo build --release --locked",
+  "beforeDefinition": "Same profiling/echo implementation, before bounded reply coalescing. Reconstruct with baseline-reply.patch in a separate experimental checkout.",
+  "afterDefinition": "Fixed 3856-byte response submitted through one write_all plus flush.",
+  "environment": "Shared Windows development laptop. Other task benchmarks, builds and tests paused during capture. OS scheduling, CPU accounting precision and thermal state uncontrolled.",
+  "metadataNormalization": "Saturated reports renamed rustCpuCounter.resolutionMs to counterUnitMs after capture and added a precision caveat. No timing, CPU, memory or event-count value was changed.",
+  "reports": [
+    {
+      "variant": "before",
+      "condition": "pcm",
+      "scope": "offline saturated PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "30075dc903a01eba9d00141804b15cf54ab8e26f68daea5915a5e135d6d4ba2d",
+      "ffmpegVersion": null,
+      "config": {
+        "frames": 10000,
+        "repeats": 3,
+        "guilds": [
+          1,
+          4
+        ],
+        "warmup": 500,
+        "ffmpeg": "none",
+        "cadence": "saturated",
+        "control": "echo"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 216.61490000000003,
+          "submittedMs": 216.6064,
+          "finalFlushMs": 0.008500000000026375,
+          "framesPerSecond": 46164.87600806777,
+          "parentCpuMs": 265,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 265,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83812352,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.017699999999990723,
+            "p95Ms": 0.03379999999992833,
+            "p99Ms": 0.049200000000041655,
+            "maxMs": 0.47119999999995343
+          },
+          "batchLatency": {
+            "p50Ms": 0.017800000000079308,
+            "p95Ms": 0.03409999999996671,
+            "p99Ms": 0.04980000000000473,
+            "maxMs": 0.47249999999996817
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 437.26339999999993,
+          "submittedMs": 437.2576,
+          "finalFlushMs": 0.005799999999908323,
+          "framesPerSecond": 22869.510688523213,
+          "parentCpuMs": 296,
+          "rustChildCpuMs": 187.5,
+          "rustLifetimeCpuMs": 234.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 483.5,
+          "replyDataEvents": 10129,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88776704,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            36.762
+          ],
+          "latency": {
+            "p50Ms": 0.030300000000011096,
+            "p95Ms": 0.07780000000002474,
+            "p99Ms": 0.16070000000001983,
+            "maxMs": 0.999300000000062
+          },
+          "batchLatency": {
+            "p50Ms": 0.030599999999822103,
+            "p95Ms": 0.07830000000001291,
+            "p99Ms": 0.16169999999999618,
+            "maxMs": 1.0006000000000768
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust-echo",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 388.9598,
+          "submittedMs": 388.95079999999996,
+          "finalFlushMs": 0.009000000000014552,
+          "framesPerSecond": 25709.59775277548,
+          "parentCpuMs": 359,
+          "rustChildCpuMs": 78.125,
+          "rustLifetimeCpuMs": 109.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 437.125,
+          "replyDataEvents": 10153,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88391680,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            32.62459999999999
+          ],
+          "latency": {
+            "p50Ms": 0.024599999999963984,
+            "p95Ms": 0.07359999999994216,
+            "p99Ms": 0.15269999999998163,
+            "maxMs": 1.0597000000000207
+          },
+          "batchLatency": {
+            "p50Ms": 0.024800000000027467,
+            "p95Ms": 0.07410000000004402,
+            "p99Ms": 0.15419999999994616,
+            "maxMs": 1.0628000000000384
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 446.4498,
+          "submittedMs": 446.44389999999987,
+          "finalFlushMs": 0.0059000000001105946,
+          "framesPerSecond": 22398.93488584831,
+          "parentCpuMs": 406,
+          "rustChildCpuMs": 156.25,
+          "rustLifetimeCpuMs": 171.875,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 562.25,
+          "replyDataEvents": 10112,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 89014272,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            31.435100000000006
+          ],
+          "latency": {
+            "p50Ms": 0.03089999999997417,
+            "p95Ms": 0.07979999999997744,
+            "p99Ms": 0.16999999999995907,
+            "maxMs": 0.7604000000000042
+          },
+          "batchLatency": {
+            "p50Ms": 0.03120000000001255,
+            "p95Ms": 0.0806999999999789,
+            "p99Ms": 0.17039999999997235,
+            "maxMs": 0.7627999999999702
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust-echo",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 345.69090000000006,
+          "submittedMs": 345.6854000000001,
+          "finalFlushMs": 0.005499999999983629,
+          "framesPerSecond": 28927.576629873678,
+          "parentCpuMs": 282,
+          "rustChildCpuMs": 93.75,
+          "rustLifetimeCpuMs": 109.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 375.75,
+          "replyDataEvents": 10100,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88383488,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            40.6978
+          ],
+          "latency": {
+            "p50Ms": 0.02329999999994925,
+            "p95Ms": 0.06069999999999709,
+            "p99Ms": 0.14800000000002456,
+            "maxMs": 1.0445999999999458
+          },
+          "batchLatency": {
+            "p50Ms": 0.023500000000012733,
+            "p95Ms": 0.061299999999960164,
+            "p99Ms": 0.14859999999998763,
+            "maxMs": 1.0489999999999782
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 232.65499999999997,
+          "submittedMs": 232.6393999999999,
+          "finalFlushMs": 0.015600000000063119,
+          "framesPerSecond": 42982.09795620124,
+          "parentCpuMs": 234,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 234,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83357696,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.01789999999994052,
+            "p95Ms": 0.04509999999993397,
+            "p99Ms": 0.052500000000009095,
+            "maxMs": 0.6761000000000195
+          },
+          "batchLatency": {
+            "p50Ms": 0.018000000000029104,
+            "p95Ms": 0.04540000000008604,
+            "p99Ms": 0.052800000000047476,
+            "maxMs": 0.6854000000000724
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust-echo",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 373.01890000000003,
+          "submittedMs": 373.0131,
+          "finalFlushMs": 0.00580000000002201,
+          "framesPerSecond": 26808.293091851374,
+          "parentCpuMs": 312,
+          "rustChildCpuMs": 109.375,
+          "rustLifetimeCpuMs": 109.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 421.375,
+          "replyDataEvents": 10095,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88178688,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            41.8271
+          ],
+          "latency": {
+            "p50Ms": 0.023899999999912325,
+            "p95Ms": 0.07039999999994961,
+            "p99Ms": 0.15269999999998163,
+            "maxMs": 1.042100000000005
+          },
+          "batchLatency": {
+            "p50Ms": 0.024100000000089494,
+            "p95Ms": 0.07110000000000127,
+            "p99Ms": 0.15440000000000964,
+            "maxMs": 1.0441000000000713
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 219.3166,
+          "submittedMs": 219.3034,
+          "finalFlushMs": 0.013199999999983447,
+          "framesPerSecond": 45596.183781802196,
+          "parentCpuMs": 249,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 249,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83886080,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.01779999999996562,
+            "p95Ms": 0.031799999999975626,
+            "p99Ms": 0.04909999999995307,
+            "maxMs": 0.7683000000000675
+          },
+          "batchLatency": {
+            "p50Ms": 0.017900000000054206,
+            "p95Ms": 0.032199999999988904,
+            "p99Ms": 0.04949999999996635,
+            "maxMs": 0.772199999999998
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 436.5929,
+          "submittedMs": 436.5876999999999,
+          "finalFlushMs": 0.005200000000058935,
+          "framesPerSecond": 22904.632668098817,
+          "parentCpuMs": 359,
+          "rustChildCpuMs": 171.875,
+          "rustLifetimeCpuMs": 203.125,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 530.875,
+          "replyDataEvents": 10056,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88051712,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            39.19970000000001
+          ],
+          "latency": {
+            "p50Ms": 0.030399999999872307,
+            "p95Ms": 0.07929999999998927,
+            "p99Ms": 0.15610000000003765,
+            "maxMs": 1.9435000000000855
+          },
+          "batchLatency": {
+            "p50Ms": 0.03059999999993579,
+            "p95Ms": 0.07999999999992724,
+            "p99Ms": 0.15660000000002583,
+            "maxMs": 1.9448999999999614
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 798.1899,
+          "submittedMs": 798.1845,
+          "finalFlushMs": 0.005400000000008731,
+          "framesPerSecond": 50113.38780408021,
+          "parentCpuMs": 969,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 969,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 90255360,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.06979999999998654,
+            "p95Ms": 0.10110000000008768,
+            "p99Ms": 0.19640000000003965,
+            "maxMs": 1.272399999999834
+          },
+          "batchLatency": {
+            "p50Ms": 0.07010000000002492,
+            "p95Ms": 0.10169999999993706,
+            "p99Ms": 0.19689999999991414,
+            "maxMs": 1.274599999999964
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 758.2199999999999,
+          "submittedMs": 758.2095,
+          "finalFlushMs": 0.010499999999865395,
+          "framesPerSecond": 52755.13703146845,
+          "parentCpuMs": 843,
+          "rustChildCpuMs": 796.875,
+          "rustLifetimeCpuMs": 843.75,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1639.875,
+          "replyDataEvents": 41098,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 111316992,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144,
+              5378048,
+              5382144,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            42.176000000000016,
+            38.95949999999999,
+            34.41629999999998,
+            42.7774
+          ],
+          "latency": {
+            "p50Ms": 0.05009999999992942,
+            "p95Ms": 0.1065000000000964,
+            "p99Ms": 0.27530000000001564,
+            "maxMs": 1.2963999999999487
+          },
+          "batchLatency": {
+            "p50Ms": 0.05989999999997053,
+            "p95Ms": 0.12940000000003238,
+            "p99Ms": 0.35570000000006985,
+            "maxMs": 1.2971000000000004
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust-echo",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 681.9331000000001,
+          "submittedMs": 681.9258000000001,
+          "finalFlushMs": 0.0072999999999865395,
+          "framesPerSecond": 58656.78026187612,
+          "parentCpuMs": 891,
+          "rustChildCpuMs": 312.5,
+          "rustLifetimeCpuMs": 343.75,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1203.5,
+          "replyDataEvents": 40179,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 107909120,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144,
+              5386240,
+              5382144,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            38.9161,
+            34.57569999999998,
+            33.4023,
+            34.6087
+          ],
+          "latency": {
+            "p50Ms": 0.04490000000009786,
+            "p95Ms": 0.092899999999986,
+            "p99Ms": 0.2459999999998672,
+            "maxMs": 4.360500000000002
+          },
+          "batchLatency": {
+            "p50Ms": 0.05399999999985994,
+            "p95Ms": 0.1109000000000151,
+            "p99Ms": 0.3532999999999902,
+            "maxMs": 4.361599999999953
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 843.0725,
+          "submittedMs": 843.0639000000001,
+          "finalFlushMs": 0.008599999999887586,
+          "framesPerSecond": 47445.504390191825,
+          "parentCpuMs": 891,
+          "rustChildCpuMs": 765.625,
+          "rustLifetimeCpuMs": 812.5,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1656.625,
+          "replyDataEvents": 41747,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 110718976,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144,
+              5390336,
+              5386240,
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            25.713300000000004,
+            25.17320000000001,
+            31.920199999999994,
+            30.34480000000002
+          ],
+          "latency": {
+            "p50Ms": 0.053100000000085856,
+            "p95Ms": 0.12750000000005457,
+            "p99Ms": 0.2702000000000453,
+            "maxMs": 1.3519999999999754
+          },
+          "batchLatency": {
+            "p50Ms": 0.06580000000008113,
+            "p95Ms": 0.15030000000001564,
+            "p99Ms": 0.37580000000002656,
+            "maxMs": 1.3536000000000286
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust-echo",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 657.4719000000001,
+          "submittedMs": 657.4637000000001,
+          "finalFlushMs": 0.008199999999987995,
+          "framesPerSecond": 60839.10202093807,
+          "parentCpuMs": 765,
+          "rustChildCpuMs": 359.375,
+          "rustLifetimeCpuMs": 468.75,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1124.375,
+          "replyDataEvents": 40151,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 111362048,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5390336,
+              5378048,
+              5386240,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            31.2783,
+            28.409700000000015,
+            31.35669999999999,
+            27.141399999999976
+          ],
+          "latency": {
+            "p50Ms": 0.044899999999984175,
+            "p95Ms": 0.08940000000006876,
+            "p99Ms": 0.24099999999998545,
+            "maxMs": 0.9996999999999616
+          },
+          "batchLatency": {
+            "p50Ms": 0.053100000000085856,
+            "p95Ms": 0.10570000000006985,
+            "p99Ms": 0.33710000000019136,
+            "maxMs": 1.003099999999904
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 748.1541000000001,
+          "submittedMs": 748.1483,
+          "finalFlushMs": 0.005800000000135697,
+          "framesPerSecond": 53464.92119738433,
+          "parentCpuMs": 906,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 906,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 90472448,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.0662000000000944,
+            "p95Ms": 0.08190000000001874,
+            "p99Ms": 0.18099999999992633,
+            "maxMs": 0.76949999999988
+          },
+          "batchLatency": {
+            "p50Ms": 0.0665000000000191,
+            "p95Ms": 0.08249999999998181,
+            "p99Ms": 0.18180000000006658,
+            "maxMs": 0.7723000000000866
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust-echo",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 667.9962999999999,
+          "submittedMs": 667.9868,
+          "finalFlushMs": 0.009499999999889042,
+          "framesPerSecond": 59880.571194780576,
+          "parentCpuMs": 844,
+          "rustChildCpuMs": 406.25,
+          "rustLifetimeCpuMs": 515.625,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1250.25,
+          "replyDataEvents": 40221,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 111611904,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5390336,
+              5382144,
+              5382144,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            41.659400000000005,
+            32.46600000000001,
+            33.58639999999997,
+            30.11840000000001
+          ],
+          "latency": {
+            "p50Ms": 0.044499999999970896,
+            "p95Ms": 0.09279999999989741,
+            "p99Ms": 0.2504999999998745,
+            "maxMs": 1.217999999999961
+          },
+          "batchLatency": {
+            "p50Ms": 0.053699999999935244,
+            "p95Ms": 0.11090000000012878,
+            "p99Ms": 0.3423999999999978,
+            "maxMs": 1.2192999999999756
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 776.0393,
+          "submittedMs": 776.0327000000001,
+          "finalFlushMs": 0.00659999999993488,
+          "framesPerSecond": 51543.781352310376,
+          "parentCpuMs": 845,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 845,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 91406336,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.07000000000005002,
+            "p95Ms": 0.08949999999992997,
+            "p99Ms": 0.19269999999994525,
+            "maxMs": 1.4009999999999536
+          },
+          "batchLatency": {
+            "p50Ms": 0.0703000000000884,
+            "p95Ms": 0.09010000000012042,
+            "p99Ms": 0.1937000000000353,
+            "maxMs": 1.4037999999999329
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 706.7058000000001,
+          "submittedMs": 706.4769,
+          "finalFlushMs": 0.22890000000006694,
+          "framesPerSecond": 56600.63919101838,
+          "parentCpuMs": 843,
+          "rustChildCpuMs": 640.625,
+          "rustLifetimeCpuMs": 656.25,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1483.625,
+          "replyDataEvents": 40679,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 108646400,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144,
+              5390336,
+              5382144,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            38.4478,
+            29.17089999999999,
+            28.989599999999996,
+            27.24520000000001
+          ],
+          "latency": {
+            "p50Ms": 0.04769999999984975,
+            "p95Ms": 0.09629999999992833,
+            "p99Ms": 0.23569999999995161,
+            "maxMs": 2.397299999999859
+          },
+          "batchLatency": {
+            "p50Ms": 0.0566999999998643,
+            "p95Ms": 0.11609999999996035,
+            "p99Ms": 0.3325999999999567,
+            "maxMs": 2.3981999999998607
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "Paced batches use common 20ms deadlines without unbounded catch-up queues. No provider decode or network is modeled.",
+        "Pipeline CPU sums parent, owned Rust counter deltas and FFmpeg diagnostics; counter resolution and accounting uncertainty apply.",
+        "Echo isolates aggregate protocol/copy/pipe/scheduling costs; do not subtract independent p99s to estimate pure mix latency.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    },
+    {
+      "variant": "before",
+      "condition": "opus",
+      "scope": "offline saturated PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "30075dc903a01eba9d00141804b15cf54ab8e26f68daea5915a5e135d6d4ba2d",
+      "ffmpegVersion": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+      "config": {
+        "frames": 5000,
+        "repeats": 3,
+        "guilds": [
+          1,
+          4
+        ],
+        "warmup": 500,
+        "ffmpeg": "opus",
+        "cadence": "saturated",
+        "control": "mix"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 537.7227999999999,
+          "submittedMs": 525.7366000000001,
+          "finalFlushMs": 11.986199999999826,
+          "framesPerSecond": 9298.47125693759,
+          "parentCpuMs": 188,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 859,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83091456,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.02189999999995962,
+            "p95Ms": 1.0185000000000173,
+            "p99Ms": 1.2516000000000531,
+            "maxMs": 37.88009999999997
+          },
+          "batchLatency": {
+            "p50Ms": 0.022199999999884312,
+            "p95Ms": 1.02049999999997,
+            "p99Ms": 1.253400000000056,
+            "maxMs": 37.88830000000007
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17563648,
+              "cpuMs": 671
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 537.7297000000001,
+          "submittedMs": 525.8563999999999,
+          "finalFlushMs": 11.8733000000002,
+          "framesPerSecond": 9298.351941505181,
+          "parentCpuMs": 234,
+          "rustChildCpuMs": 78.125,
+          "rustLifetimeCpuMs": 93.75,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 936.1250000000001,
+          "replyDataEvents": 5150,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 87048192,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            32.85400000000001
+          ],
+          "latency": {
+            "p50Ms": 0.04499999999995907,
+            "p95Ms": 0.4619000000000142,
+            "p99Ms": 0.8682000000000016,
+            "maxMs": 39.68119999999999
+          },
+          "batchLatency": {
+            "p50Ms": 0.045400000000199725,
+            "p95Ms": 0.46289999999999054,
+            "p99Ms": 0.8688000000000784,
+            "maxMs": 39.690000000000055
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17506304,
+              "cpuMs": 624.0000000000001
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 531.3852999999999,
+          "submittedMs": 519.4395999999999,
+          "finalFlushMs": 11.945699999999988,
+          "framesPerSecond": 9409.368305822538,
+          "parentCpuMs": 297,
+          "rustChildCpuMs": 125,
+          "rustLifetimeCpuMs": 156.25,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 969,
+          "replyDataEvents": 5115,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 87388160,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            27.89669999999998
+          ],
+          "latency": {
+            "p50Ms": 0.044399999999996,
+            "p95Ms": 0.5542000000000371,
+            "p99Ms": 0.8833999999999378,
+            "maxMs": 30.472099999999955
+          },
+          "batchLatency": {
+            "p50Ms": 0.04480000000000928,
+            "p95Ms": 0.5546999999999116,
+            "p99Ms": 0.8836999999998625,
+            "maxMs": 30.477999999999952
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17481728,
+              "cpuMs": 547
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 545.9092,
+          "submittedMs": 533.0093999999999,
+          "finalFlushMs": 12.899800000000141,
+          "framesPerSecond": 9159.032307936925,
+          "parentCpuMs": 218,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 827,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 82927616,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.023800000000051114,
+            "p95Ms": 0.63799999999992,
+            "p99Ms": 1.2390000000000327,
+            "maxMs": 48.20620000000008
+          },
+          "batchLatency": {
+            "p50Ms": 0.024000000000114596,
+            "p95Ms": 0.6391999999999598,
+            "p99Ms": 1.2394999999999072,
+            "maxMs": 48.21530000000007
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17444864,
+              "cpuMs": 609
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 544.3611999999999,
+          "submittedMs": 529.0853000000001,
+          "finalFlushMs": 15.275899999999865,
+          "framesPerSecond": 9185.077849045818,
+          "parentCpuMs": 173,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 735,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83197952,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.022600000000011278,
+            "p95Ms": 0.959699999999998,
+            "p99Ms": 1.2368999999998778,
+            "maxMs": 38.557199999999966
+          },
+          "batchLatency": {
+            "p50Ms": 0.022799999999961074,
+            "p95Ms": 0.9605999999999995,
+            "p99Ms": 1.2373000000000047,
+            "maxMs": 38.56200000000001
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17526784,
+              "cpuMs": 562
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 531.4464,
+          "submittedMs": 519.846,
+          "finalFlushMs": 11.600400000000036,
+          "framesPerSecond": 9408.28651769962,
+          "parentCpuMs": 297,
+          "rustChildCpuMs": 62.5,
+          "rustLifetimeCpuMs": 109.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1016.5,
+          "replyDataEvents": 5163,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 86405120,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            39.726500000000016
+          ],
+          "latency": {
+            "p50Ms": 0.05150000000003274,
+            "p95Ms": 0.37239999999997053,
+            "p99Ms": 0.8217999999999392,
+            "maxMs": 33.98860000000002
+          },
+          "batchLatency": {
+            "p50Ms": 0.052099999999995816,
+            "p95Ms": 0.3729999999998199,
+            "p99Ms": 0.8234999999999673,
+            "maxMs": 33.99810000000002
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17461248,
+              "cpuMs": 657
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 711.1473,
+          "submittedMs": 697.0042,
+          "finalFlushMs": 14.143100000000004,
+          "framesPerSecond": 28123.56877400786,
+          "parentCpuMs": 720,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 3610,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 86237184,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.09349999999994907,
+            "p95Ms": 0.14959999999996398,
+            "p99Ms": 0.41030000000000655,
+            "maxMs": 34.339399999999955
+          },
+          "batchLatency": {
+            "p50Ms": 0.09600000000000364,
+            "p95Ms": 0.27899999999999636,
+            "p99Ms": 0.7005999999998949,
+            "maxMs": 34.3433
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17301504,
+              "cpuMs": 625
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17330176,
+              "cpuMs": 797
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17526784,
+              "cpuMs": 734
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17448960,
+              "cpuMs": 734
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 784.8516,
+          "submittedMs": 770.191,
+          "finalFlushMs": 14.660599999999931,
+          "framesPerSecond": 25482.524339633124,
+          "parentCpuMs": 890,
+          "rustChildCpuMs": 593.75,
+          "rustLifetimeCpuMs": 703.125,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 4249.75,
+          "replyDataEvents": 20914,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 92172288,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144,
+              5382144,
+              5378048,
+              5386240
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            38.241000000000014,
+            34.7337,
+            23.97879999999998,
+            25.756100000000004
+          ],
+          "latency": {
+            "p50Ms": 0.09219999999982065,
+            "p95Ms": 0.21199999999998909,
+            "p99Ms": 0.6484000000000378,
+            "maxMs": 30.53239999999994
+          },
+          "batchLatency": {
+            "p50Ms": 0.10030000000006112,
+            "p95Ms": 0.310799999999972,
+            "p99Ms": 0.9547999999999774,
+            "maxMs": 30.536399999999958
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17301504,
+              "cpuMs": 532
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17424384,
+              "cpuMs": 687
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17481728,
+              "cpuMs": 813
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17436672,
+              "cpuMs": 734
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 769.5948,
+          "submittedMs": 753.8064,
+          "finalFlushMs": 15.78839999999991,
+          "framesPerSecond": 25987.701580104233,
+          "parentCpuMs": 766,
+          "rustChildCpuMs": 640.625,
+          "rustLifetimeCpuMs": 734.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 4344.625,
+          "replyDataEvents": 20817,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 92622848,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5386240,
+              5378048,
+              5386240,
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            38.93690000000001,
+            26.172300000000007,
+            28.281599999999997,
+            34.19319999999999
+          ],
+          "latency": {
+            "p50Ms": 0.09149999999999636,
+            "p95Ms": 0.18389999999999418,
+            "p99Ms": 0.6889999999999645,
+            "maxMs": 35.50080000000003
+          },
+          "batchLatency": {
+            "p50Ms": 0.09930000000008476,
+            "p95Ms": 0.2925000000000182,
+            "p99Ms": 0.8944000000000187,
+            "maxMs": 35.507499999999936
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17272832,
+              "cpuMs": 594
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17358848,
+              "cpuMs": 766
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17498112,
+              "cpuMs": 813
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17395712,
+              "cpuMs": 765.0000000000001
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 686.1949,
+          "submittedMs": 670.4265,
+          "finalFlushMs": 15.768399999999929,
+          "framesPerSecond": 29146.238189762124,
+          "parentCpuMs": 735,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 3484,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 86417408,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.09569999999996526,
+            "p95Ms": 0.14819999999997435,
+            "p99Ms": 0.3805000000000973,
+            "maxMs": 34.67039999999997
+          },
+          "batchLatency": {
+            "p50Ms": 0.09760000000005675,
+            "p95Ms": 0.22590000000013788,
+            "p99Ms": 0.5750000000000455,
+            "maxMs": 34.6742999999999
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17297408,
+              "cpuMs": 609
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17383424,
+              "cpuMs": 703
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17567744,
+              "cpuMs": 703.0000000000001
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17420288,
+              "cpuMs": 734
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 694.5362999999999,
+          "submittedMs": 679.4833,
+          "finalFlushMs": 15.052999999999884,
+          "framesPerSecond": 28796.19107021477,
+          "parentCpuMs": 594,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 3516,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 86114304,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.0947999999999638,
+            "p95Ms": 0.1414999999999509,
+            "p99Ms": 0.4094000000000051,
+            "maxMs": 35.76339999999993
+          },
+          "batchLatency": {
+            "p50Ms": 0.09729999999990468,
+            "p95Ms": 0.227800000000002,
+            "p99Ms": 0.6286000000000058,
+            "maxMs": 35.767600000000016
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17326080,
+              "cpuMs": 610
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17473536,
+              "cpuMs": 797
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17522688,
+              "cpuMs": 734
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17395712,
+              "cpuMs": 781
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 728.1812,
+          "submittedMs": 714.4167,
+          "finalFlushMs": 13.764499999999998,
+          "framesPerSecond": 27465.691231797802,
+          "parentCpuMs": 766,
+          "rustChildCpuMs": 453.125,
+          "rustLifetimeCpuMs": 500,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 4017.125,
+          "replyDataEvents": 20857,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 90578944,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5378048,
+              5386240,
+              5378048,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            28.298100000000005,
+            25.222699999999975,
+            25.407299999999992,
+            30.844100000000026
+          ],
+          "latency": {
+            "p50Ms": 0.0888999999999669,
+            "p95Ms": 0.16669999999999163,
+            "p99Ms": 0.6888000000001284,
+            "maxMs": 31.57260000000008
+          },
+          "batchLatency": {
+            "p50Ms": 0.09640000000001692,
+            "p95Ms": 0.2220999999999549,
+            "p99Ms": 0.8396999999999935,
+            "maxMs": 31.577600000000075
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17301504,
+              "cpuMs": 610
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17461248,
+              "cpuMs": 734
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17465344,
+              "cpuMs": 704
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17461248,
+              "cpuMs": 750
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "Paced batches use common 20ms deadlines without unbounded catch-up queues. No provider decode or network is modeled.",
+        "Pipeline CPU sums parent, owned Rust counter deltas and FFmpeg diagnostics; counter resolution and accounting uncertainty apply.",
+        "Echo isolates aggregate protocol/copy/pipe/scheduling costs; do not subtract independent p99s to estimate pure mix latency.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    },
+    {
+      "variant": "after",
+      "condition": "pcm",
+      "scope": "offline saturated PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "4419399d269f1768440c9bf6df00fb064d67b66c102af10b59684b174af7ee0a",
+      "ffmpegVersion": null,
+      "config": {
+        "frames": 10000,
+        "repeats": 3,
+        "guilds": [
+          1,
+          4
+        ],
+        "warmup": 500,
+        "ffmpeg": "none",
+        "cadence": "saturated",
+        "control": "echo"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 221.95889999999997,
+          "submittedMs": 221.95140000000004,
+          "finalFlushMs": 0.007499999999936335,
+          "framesPerSecond": 45053.386009752256,
+          "parentCpuMs": 219,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 219,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83230720,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.01779999999996562,
+            "p95Ms": 0.03530000000000655,
+            "p99Ms": 0.04979999999989104,
+            "maxMs": 0.6224999999999454
+          },
+          "batchLatency": {
+            "p50Ms": 0.017900000000054206,
+            "p95Ms": 0.03560000000004493,
+            "p99Ms": 0.05010000000004311,
+            "maxMs": 0.6259000000000015
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 427.0843,
+          "submittedMs": 427.0718999999999,
+          "finalFlushMs": 0.012400000000070577,
+          "framesPerSecond": 23414.58114943584,
+          "parentCpuMs": 329,
+          "rustChildCpuMs": 140.625,
+          "rustLifetimeCpuMs": 156.25,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 469.625,
+          "replyDataEvents": 10010,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 89542656,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            179.06210000000002
+          ],
+          "latency": {
+            "p50Ms": 0.03029999999989741,
+            "p95Ms": 0.0704000000000633,
+            "p99Ms": 0.16239999999993415,
+            "maxMs": 1.1073000000000093
+          },
+          "batchLatency": {
+            "p50Ms": 0.03050000000007458,
+            "p95Ms": 0.07090000000005148,
+            "p99Ms": 0.16300000000001091,
+            "maxMs": 1.1094999999999118
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust-echo",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 354.8421000000001,
+          "submittedMs": 354.8366000000001,
+          "finalFlushMs": 0.005499999999983629,
+          "framesPerSecond": 28181.548919928042,
+          "parentCpuMs": 312,
+          "rustChildCpuMs": 62.5,
+          "rustLifetimeCpuMs": 62.5,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 374.5,
+          "replyDataEvents": 10019,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88637440,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            30.7688
+          ],
+          "latency": {
+            "p50Ms": 0.02400000000000091,
+            "p95Ms": 0.06150000000002365,
+            "p99Ms": 0.14829999999994925,
+            "maxMs": 1.0235000000000127
+          },
+          "batchLatency": {
+            "p50Ms": 0.024299999999925603,
+            "p95Ms": 0.062300000000050204,
+            "p99Ms": 0.148900000000026,
+            "maxMs": 1.0270000000000437
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 451.42430000000013,
+          "submittedMs": 451.4189000000001,
+          "finalFlushMs": 0.005400000000008731,
+          "framesPerSecond": 22152.108337987116,
+          "parentCpuMs": 282,
+          "rustChildCpuMs": 234.375,
+          "rustLifetimeCpuMs": 234.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 516.375,
+          "replyDataEvents": 10022,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 89616384,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5410816
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            28.284400000000005
+          ],
+          "latency": {
+            "p50Ms": 0.031000000000062755,
+            "p95Ms": 0.08319999999991978,
+            "p99Ms": 0.1652000000000271,
+            "maxMs": 1.0441999999999325
+          },
+          "batchLatency": {
+            "p50Ms": 0.03129999999998745,
+            "p95Ms": 0.08410000000003492,
+            "p99Ms": 0.16620000000000346,
+            "maxMs": 1.0470000000000255
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust-echo",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 408.40560000000005,
+          "submittedMs": 408.39999999999986,
+          "finalFlushMs": 0.005600000000185901,
+          "framesPerSecond": 24485.462491209717,
+          "parentCpuMs": 454,
+          "rustChildCpuMs": 93.75,
+          "rustLifetimeCpuMs": 125,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 547.75,
+          "replyDataEvents": 10025,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88399872,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5394432
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            34.297
+          ],
+          "latency": {
+            "p50Ms": 0.026399999999966894,
+            "p95Ms": 0.0785000000000764,
+            "p99Ms": 0.16579999999999018,
+            "maxMs": 0.7844000000000051
+          },
+          "batchLatency": {
+            "p50Ms": 0.026700000000005275,
+            "p95Ms": 0.07949999999993906,
+            "p99Ms": 0.16599999999993997,
+            "maxMs": 0.7864000000000715
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 210.4914,
+          "submittedMs": 210.4855,
+          "finalFlushMs": 0.005899999999996908,
+          "framesPerSecond": 47507.8791817623,
+          "parentCpuMs": 219,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 219,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83197952,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.01779999999996562,
+            "p95Ms": 0.025200000000040745,
+            "p99Ms": 0.044899999999984175,
+            "maxMs": 0.7455999999999676
+          },
+          "batchLatency": {
+            "p50Ms": 0.017900000000054206,
+            "p95Ms": 0.025500000000079126,
+            "p99Ms": 0.04529999999999745,
+            "maxMs": 0.7468000000000075
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust-echo",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 376.67629999999997,
+          "submittedMs": 376.6693,
+          "finalFlushMs": 0.006999999999948159,
+          "framesPerSecond": 26547.993595562028,
+          "parentCpuMs": 376,
+          "rustChildCpuMs": 93.75,
+          "rustLifetimeCpuMs": 109.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 469.75,
+          "replyDataEvents": 10025,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 88047616,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5386240
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            35.38310000000001
+          ],
+          "latency": {
+            "p50Ms": 0.024900000000002365,
+            "p95Ms": 0.06910000000004857,
+            "p99Ms": 0.14840000000003783,
+            "maxMs": 0.9153999999999769
+          },
+          "batchLatency": {
+            "p50Ms": 0.02519999999992706,
+            "p95Ms": 0.06989999999996144,
+            "p99Ms": 0.15039999999999054,
+            "maxMs": 0.9166999999999916
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 201.3514,
+          "submittedMs": 201.34519999999998,
+          "finalFlushMs": 0.006200000000035288,
+          "framesPerSecond": 49664.41753074476,
+          "parentCpuMs": 204,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 204,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 83611648,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.01779999999996562,
+            "p95Ms": 0.020800000000008367,
+            "p99Ms": 0.028800000000046566,
+            "maxMs": 0.3047000000000253
+          },
+          "batchLatency": {
+            "p50Ms": 0.01789999999994052,
+            "p95Ms": 0.02100000000007185,
+            "p99Ms": 0.02909999999997126,
+            "maxMs": 0.30600000000004
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 564.6235,
+          "submittedMs": 564.6166,
+          "finalFlushMs": 0.006900000000086948,
+          "framesPerSecond": 17710.917097853704,
+          "parentCpuMs": 546,
+          "rustChildCpuMs": 171.875,
+          "rustLifetimeCpuMs": 187.5,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 717.875,
+          "replyDataEvents": 10016,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 90554368,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            39.70570000000001
+          ],
+          "latency": {
+            "p50Ms": 0.042300000000068394,
+            "p95Ms": 0.11159999999995307,
+            "p99Ms": 0.20309999999994943,
+            "maxMs": 1.3768999999999778
+          },
+          "batchLatency": {
+            "p50Ms": 0.042699999999967986,
+            "p95Ms": 0.11270000000001801,
+            "p99Ms": 0.20409999999992579,
+            "maxMs": 1.3788999999999305
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 764.3052,
+          "submittedMs": 764.2995000000001,
+          "finalFlushMs": 0.005699999999933425,
+          "framesPerSecond": 52335.11429727287,
+          "parentCpuMs": 938,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 938,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 90329088,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.0665000000000191,
+            "p95Ms": 0.09550000000001546,
+            "p99Ms": 0.17850000000009913,
+            "maxMs": 2.518199999999979
+          },
+          "batchLatency": {
+            "p50Ms": 0.06680000000005748,
+            "p95Ms": 0.09639999999990323,
+            "p99Ms": 0.18020000000001346,
+            "maxMs": 2.5204000000001088
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 764.7272,
+          "submittedMs": 764.7156,
+          "finalFlushMs": 0.01160000000004402,
+          "framesPerSecond": 52306.23417082588,
+          "parentCpuMs": 953,
+          "rustChildCpuMs": 750,
+          "rustLifetimeCpuMs": 765.625,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1703,
+          "replyDataEvents": 40194,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 108212224,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5394432,
+              5382144,
+              5390336,
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            42.059800000000024,
+            33.1037,
+            31.003600000000006,
+            29.251899999999978
+          ],
+          "latency": {
+            "p50Ms": 0.04980000000000473,
+            "p95Ms": 0.10460000000000491,
+            "p99Ms": 0.2600999999999658,
+            "maxMs": 2.9017999999998665
+          },
+          "batchLatency": {
+            "p50Ms": 0.060199999999895226,
+            "p95Ms": 0.125,
+            "p99Ms": 0.35969999999997526,
+            "maxMs": 2.9032999999999447
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust-echo",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 759.2656999999999,
+          "submittedMs": 759.2571,
+          "finalFlushMs": 0.008599999999887586,
+          "framesPerSecond": 52682.47992764589,
+          "parentCpuMs": 937,
+          "rustChildCpuMs": 328.125,
+          "rustLifetimeCpuMs": 421.875,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1265.125,
+          "replyDataEvents": 40196,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 111308800,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5394432,
+              5394432,
+              5394432,
+              5398528
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            31.329999999999984,
+            26.929299999999984,
+            27.653500000000008,
+            32.065500000000014
+          ],
+          "latency": {
+            "p50Ms": 0.048800000000028376,
+            "p95Ms": 0.10410000000001673,
+            "p99Ms": 0.2699000000000069,
+            "maxMs": 1.0984000000000833
+          },
+          "batchLatency": {
+            "p50Ms": 0.06069999999999709,
+            "p95Ms": 0.1288000000000693,
+            "p99Ms": 0.37590000000000146,
+            "maxMs": 1.099700000000098
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 858.8479000000001,
+          "submittedMs": 858.5984,
+          "finalFlushMs": 0.2495000000001255,
+          "framesPerSecond": 46574.02084816182,
+          "parentCpuMs": 1110,
+          "rustChildCpuMs": 671.875,
+          "rustLifetimeCpuMs": 781.25,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1781.875,
+          "replyDataEvents": 40316,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 107683840,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528,
+              5398528,
+              5390336,
+              5398528
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            35.64780000000002,
+            27.358299999999986,
+            37.57549999999998,
+            36.99359999999999
+          ],
+          "latency": {
+            "p50Ms": 0.05160000000000764,
+            "p95Ms": 0.11259999999992942,
+            "p99Ms": 0.17869999999993524,
+            "maxMs": 3.294399999999996
+          },
+          "batchLatency": {
+            "p50Ms": 0.06360000000006494,
+            "p95Ms": 0.13180000000011205,
+            "p99Ms": 0.21230000000002747,
+            "maxMs": 3.2951000000000477
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust-echo",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 738.9856999999998,
+          "submittedMs": 738.9761,
+          "finalFlushMs": 0.00959999999986394,
+          "framesPerSecond": 54128.246324658256,
+          "parentCpuMs": 907,
+          "rustChildCpuMs": 515.625,
+          "rustLifetimeCpuMs": 609.375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1422.625,
+          "replyDataEvents": 40100,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 107905024,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5390336,
+              5398528,
+              5390336,
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            37.25030000000001,
+            32.356300000000005,
+            31.154300000000006,
+            29.55079999999998
+          ],
+          "latency": {
+            "p50Ms": 0.04790000000002692,
+            "p95Ms": 0.10019999999985885,
+            "p99Ms": 0.2716000000000349,
+            "maxMs": 3.4513999999999214
+          },
+          "batchLatency": {
+            "p50Ms": 0.057999999999992724,
+            "p95Ms": 0.11860000000001492,
+            "p99Ms": 0.35970000000008895,
+            "maxMs": 3.4525999999998476
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 739.2402,
+          "submittedMs": 739.2349000000002,
+          "finalFlushMs": 0.0052999999998064595,
+          "framesPerSecond": 54109.61146322941,
+          "parentCpuMs": 890,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 890,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 90488832,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.06639999999993051,
+            "p95Ms": 0.07979999999997744,
+            "p99Ms": 0.15369999999995798,
+            "maxMs": 0.8273000000001502
+          },
+          "batchLatency": {
+            "p50Ms": 0.0666999999999689,
+            "p95Ms": 0.0807999999999538,
+            "p99Ms": 0.15619999999989886,
+            "maxMs": 0.8280999999999494
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust-echo",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 719.177,
+          "submittedMs": 719.1663,
+          "finalFlushMs": 0.010700000000042564,
+          "framesPerSecond": 55619.131312597594,
+          "parentCpuMs": 845,
+          "rustChildCpuMs": 343.75,
+          "rustLifetimeCpuMs": 421.875,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1188.75,
+          "replyDataEvents": 40120,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 111431680,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528,
+              5398528,
+              5386240,
+              5394432
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            33.813199999999995,
+            27.644200000000012,
+            26.999799999999993,
+            29.22610000000003
+          ],
+          "latency": {
+            "p50Ms": 0.04670000000010077,
+            "p95Ms": 0.10120000000006257,
+            "p99Ms": 0.26120000000003074,
+            "maxMs": 1.1808000000000902
+          },
+          "batchLatency": {
+            "p50Ms": 0.056100000000014916,
+            "p95Ms": 0.12279999999998381,
+            "p99Ms": 0.36850000000004,
+            "maxMs": 1.182800000000043
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 766.7059999999999,
+          "submittedMs": 766.7,
+          "finalFlushMs": 0.005999999999858119,
+          "framesPerSecond": 52171.23643221783,
+          "parentCpuMs": 798,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 798,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 90021888,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.0702000000001135,
+            "p95Ms": 0.0764000000000351,
+            "p99Ms": 0.15150000000005548,
+            "maxMs": 1.9567000000001826
+          },
+          "batchLatency": {
+            "p50Ms": 0.0705000000000382,
+            "p95Ms": 0.07680000000004839,
+            "p99Ms": 0.15240000000005693,
+            "maxMs": 1.9574999999999818
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 10000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 748.0053,
+          "submittedMs": 747.9951000000001,
+          "finalFlushMs": 0.010199999999940701,
+          "framesPerSecond": 53475.55692452981,
+          "parentCpuMs": 812,
+          "rustChildCpuMs": 640.625,
+          "rustLifetimeCpuMs": 718.75,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 1452.625,
+          "replyDataEvents": 40343,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 111288320,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5390336,
+              5398528,
+              5394432,
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            34.10589999999999,
+            26.446200000000005,
+            32.49890000000002,
+            25.875700000000023
+          ],
+          "latency": {
+            "p50Ms": 0.04899999999997817,
+            "p95Ms": 0.10339999999996508,
+            "p99Ms": 0.2857999999999947,
+            "maxMs": 1.1311000000000604
+          },
+          "batchLatency": {
+            "p50Ms": 0.05869999999981701,
+            "p95Ms": 0.12269999999989523,
+            "p99Ms": 0.3794000000000324,
+            "maxMs": 1.1321000000000367
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "Paced batches use common 20ms deadlines without unbounded catch-up queues. No provider decode or network is modeled.",
+        "Pipeline CPU sums parent, owned Rust counter deltas and FFmpeg diagnostics; counter resolution and accounting uncertainty apply.",
+        "Echo isolates aggregate protocol/copy/pipe/scheduling costs; do not subtract independent p99s to estimate pure mix latency.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    },
+    {
+      "variant": "after",
+      "condition": "opus",
+      "scope": "offline saturated PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "4419399d269f1768440c9bf6df00fb064d67b66c102af10b59684b174af7ee0a",
+      "ffmpegVersion": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+      "config": {
+        "frames": 5000,
+        "repeats": 3,
+        "guilds": [
+          1,
+          4
+        ],
+        "warmup": 500,
+        "ffmpeg": "opus",
+        "cadence": "saturated",
+        "control": "mix"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 534.6445000000001,
+          "submittedMs": 521.4338,
+          "finalFlushMs": 13.210700000000088,
+          "framesPerSecond": 9352.008671182437,
+          "parentCpuMs": 202,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 890,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 82046976,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.022199999999998,
+            "p95Ms": 1.1089000000000624,
+            "p99Ms": 1.2773999999999432,
+            "maxMs": 33.3827
+          },
+          "batchLatency": {
+            "p50Ms": 0.022499999999922693,
+            "p95Ms": 1.1102000000000771,
+            "p99Ms": 1.2794999999999845,
+            "maxMs": 33.387300000000096
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17477632,
+              "cpuMs": 688
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 539.9413,
+          "submittedMs": 528.0841,
+          "finalFlushMs": 11.85719999999992,
+          "framesPerSecond": 9260.265884458182,
+          "parentCpuMs": 313,
+          "rustChildCpuMs": 62.5,
+          "rustLifetimeCpuMs": 78.125,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 953.5,
+          "replyDataEvents": 5056,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 85995520,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            36.232500000000016
+          ],
+          "latency": {
+            "p50Ms": 0.053699999999935244,
+            "p95Ms": 0.36029999999993834,
+            "p99Ms": 0.7880000000000109,
+            "maxMs": 34.382799999999975
+          },
+          "batchLatency": {
+            "p50Ms": 0.05410000000006221,
+            "p95Ms": 0.36380000000008295,
+            "p99Ms": 0.7890999999999622,
+            "maxMs": 34.38829999999996
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17469440,
+              "cpuMs": 578
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 533.4716,
+          "submittedMs": 520.6804000000001,
+          "finalFlushMs": 12.79119999999989,
+          "framesPerSecond": 9372.570161185713,
+          "parentCpuMs": 297,
+          "rustChildCpuMs": 46.875,
+          "rustLifetimeCpuMs": 93.75,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 890.875,
+          "replyDataEvents": 5036,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 87146496,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            28.752500000000026
+          ],
+          "latency": {
+            "p50Ms": 0.04959999999994125,
+            "p95Ms": 0.42619999999999436,
+            "p99Ms": 0.8668999999999869,
+            "maxMs": 30.1092000000001
+          },
+          "batchLatency": {
+            "p50Ms": 0.05019999999990432,
+            "p95Ms": 0.42669999999998254,
+            "p99Ms": 0.8682999999999765,
+            "maxMs": 30.120400000000018
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17489920,
+              "cpuMs": 547
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 534.9462,
+          "submittedMs": 522.65,
+          "finalFlushMs": 12.296199999999999,
+          "framesPerSecond": 9346.7343071135,
+          "parentCpuMs": 203,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 765,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 82526208,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.021299999999996544,
+            "p95Ms": 1.110400000000027,
+            "p99Ms": 1.2795999999999594,
+            "maxMs": 40.95309999999995
+          },
+          "batchLatency": {
+            "p50Ms": 0.02140000000008513,
+            "p95Ms": 1.1129000000000815,
+            "p99Ms": 1.2818999999999505,
+            "maxMs": 40.957899999999995
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17539072,
+              "cpuMs": 562
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 544.8491999999999,
+          "submittedMs": 532.9672,
+          "finalFlushMs": 11.881999999999834,
+          "framesPerSecond": 9176.851136057465,
+          "parentCpuMs": 203,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 843,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 82591744,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.021100000000046748,
+            "p95Ms": 1.1561000000000377,
+            "p99Ms": 1.3442000000000007,
+            "maxMs": 34.1943
+          },
+          "batchLatency": {
+            "p50Ms": 0.021299999999996544,
+            "p95Ms": 1.1576000000000022,
+            "p99Ms": 1.3452000000000908,
+            "maxMs": 34.20040000000006
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17473536,
+              "cpuMs": 640
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 534.4166000000001,
+          "submittedMs": 523.0159,
+          "finalFlushMs": 11.400700000000143,
+          "framesPerSecond": 9355.996800997571,
+          "parentCpuMs": 327,
+          "rustChildCpuMs": 31.25,
+          "rustLifetimeCpuMs": 62.5,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 920.25,
+          "replyDataEvents": 5039,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 86102016,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5394432
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            34.17410000000001
+          ],
+          "latency": {
+            "p50Ms": 0.04729999999995016,
+            "p95Ms": 0.5016000000000531,
+            "p99Ms": 0.8994000000000142,
+            "maxMs": 29.880700000000047
+          },
+          "batchLatency": {
+            "p50Ms": 0.047700000000077125,
+            "p95Ms": 0.5023000000001048,
+            "p99Ms": 0.9004999999999654,
+            "maxMs": 29.887000000000057
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17477632,
+              "cpuMs": 562
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 709.4773,
+          "submittedMs": 694.0603999999998,
+          "finalFlushMs": 15.416900000000169,
+          "framesPerSecond": 28189.76731179419,
+          "parentCpuMs": 657,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 3563,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 86339584,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.09760000000005675,
+            "p95Ms": 0.17079999999998563,
+            "p99Ms": 0.3856999999999289,
+            "maxMs": 36.10800000000006
+          },
+          "batchLatency": {
+            "p50Ms": 0.09989999999993415,
+            "p95Ms": 0.24420000000009168,
+            "p99Ms": 0.6121000000000549,
+            "maxMs": 36.1114
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17293312,
+              "cpuMs": 656
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17453056,
+              "cpuMs": 782
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17498112,
+              "cpuMs": 734
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17440768,
+              "cpuMs": 734
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 756.4043999999999,
+          "submittedMs": 742.7027,
+          "finalFlushMs": 13.701699999999846,
+          "framesPerSecond": 26440.88268127473,
+          "parentCpuMs": 828,
+          "rustChildCpuMs": 484.375,
+          "rustLifetimeCpuMs": 546.875,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 4484.375,
+          "replyDataEvents": 20210,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 92372992,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5390336,
+              5402624,
+              5394432,
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            34.13290000000001,
+            34.854900000000015,
+            31.9632,
+            35.545199999999966
+          ],
+          "latency": {
+            "p50Ms": 0.08940000000006876,
+            "p95Ms": 0.2013000000000602,
+            "p99Ms": 0.6295999999999822,
+            "maxMs": 33.16009999999994
+          },
+          "batchLatency": {
+            "p50Ms": 0.09709999999995489,
+            "p95Ms": 0.27359999999998763,
+            "p99Ms": 0.8985999999999876,
+            "maxMs": 33.164999999999964
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17297408,
+              "cpuMs": 719.0000000000001
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17502208,
+              "cpuMs": 780.9999999999999
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17567744,
+              "cpuMs": 907
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17522688,
+              "cpuMs": 765
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 767.0506999999999,
+          "submittedMs": 752.3146,
+          "finalFlushMs": 14.736099999999851,
+          "framesPerSecond": 26073.895767255024,
+          "parentCpuMs": 828,
+          "rustChildCpuMs": 265.625,
+          "rustLifetimeCpuMs": 375,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 3984.625,
+          "replyDataEvents": 20181,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 98242560,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5394432,
+              5386240,
+              5402624,
+              5402624
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            33.2166,
+            25.5291,
+            25.91549999999998,
+            24.963599999999985
+          ],
+          "latency": {
+            "p50Ms": 0.09120000000007167,
+            "p95Ms": 0.19110000000000582,
+            "p99Ms": 0.6788000000001375,
+            "maxMs": 36.153999999999996
+          },
+          "batchLatency": {
+            "p50Ms": 0.09829999999988104,
+            "p95Ms": 0.28880000000003747,
+            "p99Ms": 0.9157000000000153,
+            "maxMs": 36.15890000000002
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17375232,
+              "cpuMs": 641
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17469440,
+              "cpuMs": 750
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17526784,
+              "cpuMs": 782
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17428480,
+              "cpuMs": 718
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 709.8904,
+          "submittedMs": 695.3615,
+          "finalFlushMs": 14.528900000000021,
+          "framesPerSecond": 28173.36309943056,
+          "parentCpuMs": 688,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 3627,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 85966848,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.0911999999998443,
+            "p95Ms": 0.14629999999999654,
+            "p99Ms": 0.4655999999999949,
+            "maxMs": 39.37810000000002
+          },
+          "batchLatency": {
+            "p50Ms": 0.09339999999997417,
+            "p95Ms": 0.27739999999994325,
+            "p99Ms": 0.7463000000000193,
+            "maxMs": 39.38409999999999
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17313792,
+              "cpuMs": 672
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17412096,
+              "cpuMs": 782
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17596416,
+              "cpuMs": 719
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17436672,
+              "cpuMs": 766
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 679.4207000000001,
+          "submittedMs": 664.9250999999999,
+          "finalFlushMs": 14.495600000000195,
+          "framesPerSecond": 29436.842298151932,
+          "parentCpuMs": 640,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 3547,
+          "replyDataEvents": 0,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 86065152,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.09569999999996526,
+            "p95Ms": 0.14190000000007785,
+            "p99Ms": 0.34960000000000946,
+            "maxMs": 31.478999999999928
+          },
+          "batchLatency": {
+            "p50Ms": 0.09820000000001983,
+            "p95Ms": 0.19260000000008404,
+            "p99Ms": 0.5609000000000606,
+            "maxMs": 31.48230000000001
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17289216,
+              "cpuMs": 766
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17436672,
+              "cpuMs": 704
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17596416,
+              "cpuMs": 734
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17444864,
+              "cpuMs": 703
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 775.3501,
+          "submittedMs": 760.0740999999999,
+          "finalFlushMs": 15.276000000000067,
+          "framesPerSecond": 25794.799020468305,
+          "parentCpuMs": 952,
+          "rustChildCpuMs": 609.375,
+          "rustLifetimeCpuMs": 671.875,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "error": null,
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser"
+          },
+          "pipelineCpuMs": 4483.375,
+          "replyDataEvents": 20202,
+          "cadence": "saturated",
+          "scheduleLag": null,
+          "scheduledLatency": null,
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 100978688,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5390336,
+              5398528,
+              5394432,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            32.113999999999976,
+            25.9349,
+            31.482,
+            26.938199999999995
+          ],
+          "latency": {
+            "p50Ms": 0.09239999999999782,
+            "p95Ms": 0.1997999999998683,
+            "p99Ms": 0.7343000000000757,
+            "maxMs": 32.52959999999996
+          },
+          "batchLatency": {
+            "p50Ms": 0.10009999999999764,
+            "p95Ms": 0.25729999999998654,
+            "p99Ms": 0.969600000000014,
+            "maxMs": 32.53399999999999
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17326080,
+              "cpuMs": 640
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17408000,
+              "cpuMs": 766
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17465344,
+              "cpuMs": 735
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17432576,
+              "cpuMs": 781
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "Paced batches use common 20ms deadlines without unbounded catch-up queues. No provider decode or network is modeled.",
+        "Pipeline CPU sums parent, owned Rust counter deltas and FFmpeg diagnostics; counter resolution and accounting uncertainty apply.",
+        "Echo isolates aggregate protocol/copy/pipe/scheduling costs; do not subtract independent p99s to estimate pure mix latency.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    },
+    {
+      "variant": "after",
+      "condition": "paced-pcm",
+      "scope": "offline paced PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "4419399d269f1768440c9bf6df00fb064d67b66c102af10b59684b174af7ee0a",
+      "ffmpegVersion": null,
+      "config": {
+        "frames": 100,
+        "repeats": 3,
+        "guilds": [
+          4
+        ],
+        "warmup": 100,
+        "ffmpeg": "none",
+        "cadence": "paced",
+        "control": "mix"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "none",
+          "elapsedMs": 1981.5095000000001,
+          "submittedMs": 1981.5041,
+          "finalFlushMs": 0.005400000000008731,
+          "framesPerSecond": 201.86630445122768,
+          "parentCpuMs": 32,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 32,
+          "replyDataEvents": 0,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.874299999999948,
+            "p95Ms": 15.072700000000054,
+            "p99Ms": 15.637599999999793,
+            "maxMs": 15.701499999999896
+          },
+          "scheduledLatency": {
+            "p50Ms": 7.9594999999999345,
+            "p95Ms": 15.627599999999802,
+            "p99Ms": 15.85329999999999,
+            "maxMs": 16.181299999999965
+          },
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 80609280,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.21029999999996107,
+            "p95Ms": 0.33569999999997435,
+            "p99Ms": 0.5633000000000266,
+            "maxMs": 1.4682000000000244
+          },
+          "batchLatency": {
+            "p50Ms": 0.21420000000011896,
+            "p95Ms": 0.338100000000054,
+            "p99Ms": 0.5679000000000087,
+            "maxMs": 1.4704999999999018
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "none",
+          "elapsedMs": 1985.6311,
+          "submittedMs": 1985.6138999999998,
+          "finalFlushMs": 0.01720000000022992,
+          "framesPerSecond": 201.447287968042,
+          "parentCpuMs": 141,
+          "rustChildCpuMs": 62.5,
+          "rustLifetimeCpuMs": 78.125,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 203.5,
+          "replyDataEvents": 402,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.677699999999959,
+            "p95Ms": 15.076999999999998,
+            "p99Ms": 15.791799999999967,
+            "maxMs": 15.981800000000021
+          },
+          "scheduledLatency": {
+            "p50Ms": 8.191600000000108,
+            "p95Ms": 15.658599999999979,
+            "p99Ms": 16.263500000000022,
+            "maxMs": 16.76319999999987
+          },
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 87711744,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5386240,
+              5394432,
+              5394432,
+              5394432
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            36.104299999999995,
+            28.192499999999995,
+            34.47640000000001,
+            31.219600000000014
+          ],
+          "latency": {
+            "p50Ms": 0.3375999999998385,
+            "p95Ms": 0.6281000000001313,
+            "p99Ms": 0.9904999999998836,
+            "maxMs": 1.6849999999999454
+          },
+          "batchLatency": {
+            "p50Ms": 0.38610000000016953,
+            "p95Ms": 0.6900000000000546,
+            "p99Ms": 1.1160999999999603,
+            "maxMs": 1.6869999999998981
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "none",
+          "elapsedMs": 1990.216,
+          "submittedMs": 1990.1943999999999,
+          "finalFlushMs": 0.021600000000034925,
+          "framesPerSecond": 200.9832098626481,
+          "parentCpuMs": 62,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 78.125,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 62,
+          "replyDataEvents": 400,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.6884000000000015,
+            "p95Ms": 14.58030000000008,
+            "p99Ms": 15.125800000000027,
+            "maxMs": 15.691800000000057
+          },
+          "scheduledLatency": {
+            "p50Ms": 8.015300000000025,
+            "p95Ms": 14.988100000000031,
+            "p99Ms": 15.460299999999961,
+            "maxMs": 16.08010000000013
+          },
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 87638016,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5386240,
+              5386240,
+              5390336,
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            27.972499999999997,
+            27.715599999999995,
+            39.201599999999985,
+            32.61080000000001
+          ],
+          "latency": {
+            "p50Ms": 0.34120000000007167,
+            "p95Ms": 0.6716000000001259,
+            "p99Ms": 1.1284999999998035,
+            "maxMs": 1.7669999999998254
+          },
+          "batchLatency": {
+            "p50Ms": 0.3852999999999156,
+            "p95Ms": 0.8451999999999771,
+            "p99Ms": 1.1696000000001732,
+            "maxMs": 1.7778999999998177
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "none",
+          "elapsedMs": 1981.3651999999997,
+          "submittedMs": 1981.3586999999998,
+          "finalFlushMs": 0.006499999999959982,
+          "framesPerSecond": 201.8810060861067,
+          "parentCpuMs": 63,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 63,
+          "replyDataEvents": 0,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.094200000000001,
+            "p95Ms": 13.87889999999993,
+            "p99Ms": 14.18119999999999,
+            "maxMs": 15.04989999999998
+          },
+          "scheduledLatency": {
+            "p50Ms": 7.391099999999824,
+            "p95Ms": 14.100399999999809,
+            "p99Ms": 14.449899999999957,
+            "maxMs": 15.334899999999834
+          },
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 80990208,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.22640000000001237,
+            "p95Ms": 0.30999999999994543,
+            "p99Ms": 0.3306999999999789,
+            "maxMs": 0.38810000000012224
+          },
+          "batchLatency": {
+            "p50Ms": 0.22910000000001673,
+            "p95Ms": 0.31340000000000146,
+            "p99Ms": 0.33360000000016043,
+            "maxMs": 0.3908999999998741
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "none",
+          "elapsedMs": 1992.7686,
+          "submittedMs": 1992.7627,
+          "finalFlushMs": 0.0059000000001105946,
+          "framesPerSecond": 200.72576414542058,
+          "parentCpuMs": 47,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 47,
+          "replyDataEvents": 0,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 8.126099999999497,
+            "p95Ms": 14.767000000000053,
+            "p99Ms": 15.660599999999704,
+            "maxMs": 15.949399999999969
+          },
+          "scheduledLatency": {
+            "p50Ms": 8.335299999999961,
+            "p95Ms": 14.97189999999955,
+            "p99Ms": 15.768199999999524,
+            "maxMs": 16.26909999999998
+          },
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 81211392,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.2256999999999607,
+            "p95Ms": 0.31159999999999854,
+            "p99Ms": 0.35989999999992506,
+            "maxMs": 0.5685000000000855
+          },
+          "batchLatency": {
+            "p50Ms": 0.23139999999989413,
+            "p95Ms": 0.316599999999994,
+            "p99Ms": 0.36220000000002983,
+            "maxMs": 0.5729999999998654
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "none",
+          "elapsedMs": 1986.9965000000002,
+          "submittedMs": 1986.9778000000001,
+          "finalFlushMs": 0.018700000000080763,
+          "framesPerSecond": 201.30885987972297,
+          "parentCpuMs": 124,
+          "rustChildCpuMs": 46.875,
+          "rustLifetimeCpuMs": 93.75,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 170.875,
+          "replyDataEvents": 401,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.66780000000017,
+            "p95Ms": 14.332400000000234,
+            "p99Ms": 15.496100000000297,
+            "maxMs": 15.55129999999997
+          },
+          "scheduledLatency": {
+            "p50Ms": 8.019999999999982,
+            "p95Ms": 14.723300000000108,
+            "p99Ms": 15.959200000000237,
+            "maxMs": 16.207599999999957
+          },
+          "missedScheduledDeadlines": 0,
+          "parentLifetimePeakRssBytes": 87629824,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528,
+              5398528,
+              5398528,
+              5398528
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            48.047199999999975,
+            37.6232,
+            38.74339999999998,
+            27.684900000000027
+          ],
+          "latency": {
+            "p50Ms": 0.33570000000008804,
+            "p95Ms": 0.5440999999999576,
+            "p99Ms": 0.768500000000131,
+            "maxMs": 1.0498999999999796
+          },
+          "batchLatency": {
+            "p50Ms": 0.38810000000000855,
+            "p95Ms": 0.6024999999999636,
+            "p99Ms": 0.8167000000000826,
+            "maxMs": 1.0511999999998807
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "Paced batches use common 20ms deadlines without unbounded catch-up queues. No provider decode or network is modeled.",
+        "Pipeline CPU sums parent, owned Rust counter deltas and FFmpeg diagnostics; counter resolution and accounting uncertainty apply.",
+        "Echo isolates aggregate protocol/copy/pipe/scheduling costs; do not subtract independent p99s to estimate pure mix latency.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    },
+    {
+      "variant": "after",
+      "condition": "paced-opus",
+      "scope": "offline paced PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "4419399d269f1768440c9bf6df00fb064d67b66c102af10b59684b174af7ee0a",
+      "ffmpegVersion": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+      "config": {
+        "frames": 100,
+        "repeats": 3,
+        "guilds": [
+          4
+        ],
+        "warmup": 100,
+        "ffmpeg": "opus",
+        "cadence": "paced",
+        "control": "mix"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "opus",
+          "elapsedMs": 1994.6773000000003,
+          "submittedMs": 1986.5722,
+          "finalFlushMs": 8.10510000000022,
+          "framesPerSecond": 200.53369033677777,
+          "parentCpuMs": 109,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 297,
+          "replyDataEvents": 0,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.023599999999988,
+            "p95Ms": 14.28729999999996,
+            "p99Ms": 15.578300000000127,
+            "maxMs": 24.731400000000008
+          },
+          "scheduledLatency": {
+            "p50Ms": 7.2874000000001615,
+            "p95Ms": 14.608499999999935,
+            "p99Ms": 15.75689999999986,
+            "maxMs": 26.192099999999982
+          },
+          "missedScheduledDeadlines": 1,
+          "parentLifetimePeakRssBytes": 80867328,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.3109999999999218,
+            "p95Ms": 0.4770000000003165,
+            "p99Ms": 0.5643000000000029,
+            "maxMs": 1.4542999999999893
+          },
+          "batchLatency": {
+            "p50Ms": 0.3202999999999747,
+            "p95Ms": 0.48660000000018044,
+            "p99Ms": 0.5880999999999403,
+            "maxMs": 1.4570999999999685
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": [
+            {
+              "outputBytes": 51970,
+              "peakRssBytes": 17145856,
+              "cpuMs": 16
+            },
+            {
+              "outputBytes": 61849,
+              "peakRssBytes": 17137664,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 60331,
+              "peakRssBytes": 17141760,
+              "cpuMs": 78
+            },
+            {
+              "outputBytes": 58364,
+              "peakRssBytes": 17162240,
+              "cpuMs": 47
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "opus",
+          "elapsedMs": 1997.1842,
+          "submittedMs": 1987.1780999999999,
+          "finalFlushMs": 10.00610000000006,
+          "framesPerSecond": 200.28197699541184,
+          "parentCpuMs": 125,
+          "rustChildCpuMs": 15.625,
+          "rustLifetimeCpuMs": 31.25,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 624.625,
+          "replyDataEvents": 400,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.837199999999939,
+            "p95Ms": 15.079799999999977,
+            "p99Ms": 15.875,
+            "maxMs": 28.66840000000002
+          },
+          "scheduledLatency": {
+            "p50Ms": 8.267199999999775,
+            "p95Ms": 15.670100000000048,
+            "p99Ms": 16.29079999999999,
+            "maxMs": 29.33660000000009
+          },
+          "missedScheduledDeadlines": 1,
+          "parentLifetimePeakRssBytes": 86392832,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5394432,
+              5394432,
+              5398528,
+              5394432
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            34.91739999999999,
+            29.099699999999984,
+            29.877999999999986,
+            32.19260000000003
+          ],
+          "latency": {
+            "p50Ms": 0.41409999999996217,
+            "p95Ms": 0.6900000000000546,
+            "p99Ms": 1.0573000000001684,
+            "maxMs": 1.0856999999998607
+          },
+          "batchLatency": {
+            "p50Ms": 0.4236000000000786,
+            "p95Ms": 0.7050000000001546,
+            "p99Ms": 1.0643999999999778,
+            "maxMs": 1.088700000000017
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": [
+            {
+              "outputBytes": 51970,
+              "peakRssBytes": 17133568,
+              "cpuMs": 78
+            },
+            {
+              "outputBytes": 61849,
+              "peakRssBytes": 17166336,
+              "cpuMs": 93
+            },
+            {
+              "outputBytes": 60331,
+              "peakRssBytes": 17199104,
+              "cpuMs": 188
+            },
+            {
+              "outputBytes": 58364,
+              "peakRssBytes": 17166336,
+              "cpuMs": 125
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "opus",
+          "elapsedMs": 1993.8937,
+          "submittedMs": 1985.7970999999998,
+          "finalFlushMs": 8.096600000000308,
+          "framesPerSecond": 200.6125000545415,
+          "parentCpuMs": 31,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 62.5,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 62,
+          "replyDataEvents": 400,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.580799999999726,
+            "p95Ms": 14.315699999999879,
+            "p99Ms": 15.513699999999972,
+            "maxMs": 32.403099999999995
+          },
+          "scheduledLatency": {
+            "p50Ms": 7.931800000000067,
+            "p95Ms": 14.923399999999674,
+            "p99Ms": 16.07619999999997,
+            "maxMs": 33.06970000000001
+          },
+          "missedScheduledDeadlines": 1,
+          "parentLifetimePeakRssBytes": 86339584,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5386240,
+              5398528,
+              5394432,
+              5390336
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            35.56880000000001,
+            32.640299999999996,
+            33.15379999999999,
+            32.43639999999999
+          ],
+          "latency": {
+            "p50Ms": 0.4522999999999229,
+            "p95Ms": 0.686200000000099,
+            "p99Ms": 0.8134999999999764,
+            "maxMs": 1.220700000000079
+          },
+          "batchLatency": {
+            "p50Ms": 0.45890000000008513,
+            "p95Ms": 0.6970000000000027,
+            "p99Ms": 0.8234999999999673,
+            "maxMs": 1.2232000000000198
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": [
+            {
+              "outputBytes": 51970,
+              "peakRssBytes": 17125376,
+              "cpuMs": 31
+            },
+            {
+              "outputBytes": 61849,
+              "peakRssBytes": 17129472,
+              "cpuMs": 0
+            },
+            {
+              "outputBytes": 60331,
+              "peakRssBytes": 17162240,
+              "cpuMs": 0
+            },
+            {
+              "outputBytes": 58364,
+              "peakRssBytes": 17178624,
+              "cpuMs": 0
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "opus",
+          "elapsedMs": 1989.8568,
+          "submittedMs": 1981.5211999999997,
+          "finalFlushMs": 8.33560000000034,
+          "framesPerSecond": 201.01949044775483,
+          "parentCpuMs": 203,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 1032,
+          "replyDataEvents": 0,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.890999999999963,
+            "p95Ms": 14.771400000000085,
+            "p99Ms": 15.975299999999947,
+            "maxMs": 28.331500000000005
+          },
+          "scheduledLatency": {
+            "p50Ms": 8.17859999999996,
+            "p95Ms": 15.230399999999918,
+            "p99Ms": 16.371899999999982,
+            "maxMs": 29.20169999999996
+          },
+          "missedScheduledDeadlines": 1,
+          "parentLifetimePeakRssBytes": 82616320,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.32360000000005584,
+            "p95Ms": 0.4594999999999345,
+            "p99Ms": 0.5035000000000309,
+            "maxMs": 0.863800000000083
+          },
+          "batchLatency": {
+            "p50Ms": 0.332700000000159,
+            "p95Ms": 0.467200000000048,
+            "p99Ms": 0.5058999999998832,
+            "maxMs": 0.8654999999999973
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": [
+            {
+              "outputBytes": 51970,
+              "peakRssBytes": 17133568,
+              "cpuMs": 156
+            },
+            {
+              "outputBytes": 61849,
+              "peakRssBytes": 17162240,
+              "cpuMs": 266
+            },
+            {
+              "outputBytes": 60331,
+              "peakRssBytes": 17141760,
+              "cpuMs": 219
+            },
+            {
+              "outputBytes": 58364,
+              "peakRssBytes": 17129472,
+              "cpuMs": 188
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "opus",
+          "elapsedMs": 1995.4748999999997,
+          "submittedMs": 1984.8982,
+          "finalFlushMs": 10.576699999999619,
+          "framesPerSecond": 200.45353614821218,
+          "parentCpuMs": 32,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 0,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 32,
+          "replyDataEvents": 0,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 8.046899999999823,
+            "p95Ms": 15.078599999999824,
+            "p99Ms": 15.558499999999867,
+            "maxMs": 29.542599999999993
+          },
+          "scheduledLatency": {
+            "p50Ms": 8.389299999999821,
+            "p95Ms": 15.419799999999896,
+            "p99Ms": 15.934099999999944,
+            "maxMs": 30.423700000000053
+          },
+          "missedScheduledDeadlines": 1,
+          "parentLifetimePeakRssBytes": 81600512,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.31979999999998654,
+            "p95Ms": 0.45100000000002183,
+            "p99Ms": 0.5669000000002598,
+            "maxMs": 0.8750999999999749
+          },
+          "batchLatency": {
+            "p50Ms": 0.32999999999992724,
+            "p95Ms": 0.45820000000003347,
+            "p99Ms": 0.5707000000002154,
+            "maxMs": 0.8775999999999158
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": [
+            {
+              "outputBytes": 51970,
+              "peakRssBytes": 17133568,
+              "cpuMs": 0
+            },
+            {
+              "outputBytes": 61849,
+              "peakRssBytes": 17149952,
+              "cpuMs": 0
+            },
+            {
+              "outputBytes": 60331,
+              "peakRssBytes": 17145856,
+              "cpuMs": 0
+            },
+            {
+              "outputBytes": 58364,
+              "peakRssBytes": 17154048,
+              "cpuMs": 0
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 100,
+          "warmupFramesPerGuild": 100,
+          "ffmpegMode": "opus",
+          "elapsedMs": 1998.0718000000002,
+          "submittedMs": 1988.7693,
+          "finalFlushMs": 9.302500000000236,
+          "framesPerSecond": 200.19300607715897,
+          "parentCpuMs": 95,
+          "rustChildCpuMs": 0,
+          "rustLifetimeCpuMs": 15.625,
+          "rustCpuCounter": {
+            "source": "Windows Get-Process TotalProcessorTime",
+            "counterUnitMs": 0.0001,
+            "practicalPrecision": "not established; scheduler CPU accounting may be coarser",
+            "error": null
+          },
+          "pipelineCpuMs": 268,
+          "replyDataEvents": 400,
+          "cadence": "paced",
+          "scheduleLag": {
+            "p50Ms": 7.509200000000078,
+            "p95Ms": 14.460100000000011,
+            "p99Ms": 15.206099999999878,
+            "maxMs": 29.595600000000104
+          },
+          "scheduledLatency": {
+            "p50Ms": 7.954400000000078,
+            "p95Ms": 14.851900000000114,
+            "p99Ms": 15.6554000000001,
+            "maxMs": 30.219700000000103
+          },
+          "missedScheduledDeadlines": 1,
+          "parentLifetimePeakRssBytes": 86278144,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5398528,
+              5398528,
+              5398528,
+              5386240
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            35.70849999999999,
+            30.56869999999998,
+            31.370100000000008,
+            36.582100000000025
+          ],
+          "latency": {
+            "p50Ms": 0.421100000000024,
+            "p95Ms": 0.6778000000000475,
+            "p99Ms": 0.8438000000001011,
+            "maxMs": 0.8876000000000204
+          },
+          "batchLatency": {
+            "p50Ms": 0.42639999999983047,
+            "p95Ms": 0.6798999999999751,
+            "p99Ms": 0.8462000000001808,
+            "maxMs": 0.8895999999999731
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": [
+            {
+              "outputBytes": 51970,
+              "peakRssBytes": 17125376,
+              "cpuMs": 32
+            },
+            {
+              "outputBytes": 61849,
+              "peakRssBytes": 17166336,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 60331,
+              "peakRssBytes": 17158144,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 58364,
+              "peakRssBytes": 17125376,
+              "cpuMs": 47
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "Paced batches use common 20ms deadlines without unbounded catch-up queues. No provider decode or network is modeled.",
+        "Pipeline CPU sums parent, owned Rust counter deltas and FFmpeg diagnostics; counter resolution and accounting uncertainty apply.",
+        "Echo isolates aggregate protocol/copy/pipe/scheduling costs; do not subtract independent p99s to estimate pure mix latency.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    }
+  ]
+}

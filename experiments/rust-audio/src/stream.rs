@@ -112,10 +112,20 @@ fn flush_reply(writer: &mut impl Write) -> io::Result<()> {
 /// Callers must discard a partial reply if an output error terminates the worker.
 /// This blocking API does not impose a timeout on an incomplete request.
 pub fn serve(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<()> {
+    serve_inner(reader, writer, false)
+}
+
+/// Offline control condition: validate/transfer the same packets but return A unchanged.
+/// This explicit CLI mode is never selected by the normal worker parent.
+pub fn serve_echo(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<()> {
+    serve_inner(reader, writer, true)
+}
+
+fn serve_inner(reader: &mut impl Read, writer: &mut impl Write, echo: bool) -> io::Result<()> {
     let mut header = [0u8; REQUEST_HEADER_BYTES];
     let mut first = [0u8; FRAME_BYTES];
     let mut second = [0u8; FRAME_BYTES];
-    let mut response = [0u8; RESPONSE_HEADER_BYTES];
+    let mut response = [0u8; RESPONSE_HEADER_BYTES + FRAME_BYTES];
     response[..4].copy_from_slice(MAGIC);
     response[4] = PROTOCOL_VERSION;
     response[5] = MIX_RESULT;
@@ -130,10 +140,16 @@ pub fn serve(reader: &mut impl Read, writer: &mut impl Write) -> io::Result<()> 
         } else {
             None
         };
-        let mixed = mix_pcm(&first, next, request.progress, request.volume).map_err(invalid)?;
+        let mixed = if echo {
+            first
+        } else {
+            mix_pcm(&first, next, request.progress, request.volume).map_err(invalid)?
+        };
         response[8..12].copy_from_slice(&request.id);
+        response[RESPONSE_HEADER_BYTES..].copy_from_slice(&mixed);
+        // Submit one bounded packet instead of a standalone 16-byte pipe write.
+        // write_all still handles interrupted/short writes; flush precedes input.
         writer.write_all(&response)?;
-        writer.write_all(&mixed)?;
         flush_reply(writer)?;
     }
     Ok(())
@@ -180,6 +196,50 @@ mod tests {
         let mut output = Vec::new();
         serve(&mut io::empty(), &mut output).unwrap();
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn echo_control_preserves_validation_ids_and_first_frame_without_mixing() {
+        let input = request(73, true, 0.9, 0.0);
+        let mut output = Vec::new();
+        serve_echo(&mut input.as_slice(), &mut output).unwrap();
+        assert_eq!(output, reply(73, 1001));
+        let invalid_input = request(73, true, f64::NAN, 0.0);
+        assert_eq!(
+            serve_echo(&mut invalid_input.as_slice(), &mut Vec::new())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidData
+        );
+        assert!(serve_echo(&mut &input[..input.len() - 1], &mut Vec::new()).is_err());
+    }
+
+    #[test]
+    fn each_reply_is_submitted_as_one_bounded_packet_before_flush() {
+        struct PacketWriter {
+            output: Vec<u8>,
+            writes: usize,
+        }
+        impl Write for PacketWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                assert_eq!(bytes.len(), RESPONSE_HEADER_BYTES + FRAME_BYTES);
+                self.output.extend_from_slice(bytes);
+                self.writes += 1;
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut input = request(1, false, 0.0, 100.0);
+        input.extend(request(2, true, 1.0, 100.0));
+        let mut writer = PacketWriter {
+            output: Vec::new(),
+            writes: 0,
+        };
+        serve(&mut input.as_slice(), &mut writer).unwrap();
+        assert_eq!(writer.writes, 2);
+        assert_eq!(writer.output, [reply(1, 1001), reply(2, -1001)].concat());
     }
 
     #[test]

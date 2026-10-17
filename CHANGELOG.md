@@ -4,6 +4,20 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.1.5: Accessible settings tabs and consistent radio backoff
+
+2026-10-17
+
+- Room, Queue and Video settings now have separate localized tabs in browser rooms and Discord concerts, including empty rooms and fullscreen. Arrow keys, Home and End move between tabs; only the selected panel is shown. Permissions, saved device preferences and the active player are preserved.
+- An unsuccessful early radio skip in a browser room now saves the same 15 second automatic-search cooldown as Core before reporting the empty result. Playback and its clock continue, and a newer room command cannot be overwritten by the delayed response.
+
+## v2.1.4: Preserve radio exclusions when undoing queue edits
+
+2026-10-17
+
+- Undoing a room queue edit clears radio exclusions only for automatic suggestions actually restored by that undo. Previously rejected songs and alternate uploads stay excluded from radio when they are also present as explicit manual queue choices. Manual playback, queue order and the shared playback clock are preserved.
+- When a removed radio suggestion is manually added again before undo, its current manual request and requester are retained at the restored queue position, including after radio is disabled. Undo no longer silently drops that manual choice, and its radio exclusions remain in place.
+
 ## v2.1.3: Unified settings and radio recovery
 
 2026-10-17
