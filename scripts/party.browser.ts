@@ -171,16 +171,43 @@ try {
   );
   assert.equal(await page.locator(".video-settings").count(), 1, "Empty rooms need the same settings panel");
   await page.locator(".video-settings > summary").click();
+  if (process.env.SCREENSHOT_DIR) await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-empty-room.png`,fullPage:true});
+  const settings = page.locator(".video-settings");
+  const settingsTabs = settings.getByRole("tablist", {name:"Innstillinger", exact:true});
+  await settingsTabs.waitFor({timeout:5000});
+  const roomTab = settingsTabs.getByRole("tab", {name:"Rom",exact:true});
+  const queueTab = settingsTabs.getByRole("tab", {name:"Kø",exact:true});
+  const videoTab = settingsTabs.getByRole("tab", {name:"Video",exact:true});
+  assert.equal(await roomTab.getAttribute("aria-selected"), "true");
+  assert.equal(await settings.getByRole("tab").count(), 3);
+  for (const tab of [roomTab,queueTab,videoTab]) {
+    const controls=await tab.getAttribute("aria-controls");
+    assert(controls);
+    assert.equal(await page.locator(`[id="${controls}"]`).getAttribute("aria-labelledby"),await tab.getAttribute("id"));
+  }
   assert(await page.getByRole("heading", {name:"Rominnstillingar", exact:true}).isVisible());
+  assert(!(await page.getByRole("heading", {name:"Køinnstillingar", exact:true}).isVisible()));
+  assert(!(await page.getByRole("heading", {name:"Videoinnstillinger", exact:true}).isVisible()));
+  await roomTab.focus();
+  await page.keyboard.press("ArrowRight");
+  assert.equal(await queueTab.getAttribute("aria-selected"), "true");
+  assert(await queueTab.evaluate(el=>document.activeElement===el));
   assert(await page.getByRole("heading", {name:"Køinnstillingar", exact:true}).isVisible());
+  await page.keyboard.press("End");
+  assert.equal(await videoTab.getAttribute("aria-selected"), "true");
   assert(await page.getByRole("heading", {name:"Videoinnstillinger", exact:true}).isVisible());
   assert(await page.getByRole("button", {name:"Synk nå", exact:true}).isDisabled(), "Empty rooms cannot resync a missing player");
+  await page.keyboard.press("Home");
+  assert.equal(await roomTab.getAttribute("aria-selected"), "true");
+  await page.keyboard.press("ArrowLeft");
+  assert.equal(await videoTab.getAttribute("aria-selected"), "true", "Arrow navigation wraps");
+  await roomTab.click();
   await page.locator(".video-settings > summary").click();
   await page
     .getByRole("button", { name: /Legg.*Synthetic evening song/ })
     .click();
   await page.getByRole("button", { name: /Legg.*Synthetic evening song/ }).click();
-  await page.getByRole("tab", { name: "Kø" }).click();
+  await page.locator("#queue-tab").click();
   await page.getByText("Second queued song", {exact:true}).waitFor();
   const queued = page.locator(".social-track").filter({hasText:"Second queued song"});
   assert(await queued.isVisible(), "Manually queued track must be visible");
@@ -223,6 +250,7 @@ try {
     assert(visible,"Queued track must be inside the visible queue area");
   }
   await page.setViewportSize({width:390,height:844});
+  await queueTab.click();
   await page
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
     .click();
@@ -230,6 +258,7 @@ try {
     () => document.querySelector<HTMLInputElement>(".approval-choice input")?.checked,
   );
   assert(commands.some((c) => c.action === "approval" && c.enabled));
+  await roomTab.click();
   await page.getByRole("tab", { name: "Kveldar", exact: true }).click();
   await page.getByRole("button", { name: "Lagre spelekøen" }).click();
   await page.getByText("Kvelden er lagra.", { exact: true }).waitFor();
@@ -250,7 +279,7 @@ try {
   await page.getByRole("button", { name: "TV-modus", exact: true }).click();
   assert(new URL(page.url()).searchParams.get("tv") === "1");
   await page.getByAltText("QR-kode for å bli med i rommet").waitFor();
-  assert(!(await page.getByRole("tab", { name: "Kø" }).isVisible()));
+  assert(!(await page.locator("#queue-tab").isVisible()));
   await page
     .getByRole("button", { name: "Avslutt TV-modus", exact: true })
     .click();
@@ -272,7 +301,7 @@ try {
       fullPage: true,
     });
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.getByRole("tab", { name: "Kø" }).click();
+    await page.locator("#queue-tab").click();
     await page.screenshot({
       path: process.env.SCREENSHOT_DIR + "/desktop-party.png",
       fullPage: true,

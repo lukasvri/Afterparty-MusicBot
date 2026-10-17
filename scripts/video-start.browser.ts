@@ -948,17 +948,23 @@ test(`unified settings preserve playback across mobile and desktop fullscreen fo
     const sent = commands.length;
     await page.locator('.video-settings > summary').click();
     await page.getByLabel('Your nickname').fill('Synthetic guest');
+    const settingsTabs=page.locator('.settings-tabs');
+    await settingsTabs.getByRole('tab',{name:'Video',exact:true}).click();
     await page.locator('.video-settings select').selectOption('stable');
     for (const width of [360, 390, 1440]) {
       await page.setViewportSize({width,height:900});
       await page.locator('[data-fullscreen-button]').click();
       await page.locator('.stage-panel[data-immersive=true]').waitFor();
       assert.equal(await page.locator('.video-settings').count(),1);
-      assert(await page.getByRole('heading',{name:'Room settings',exact:true}).isVisible());
-      assert(await page.getByRole('heading',{name:'Queue settings',exact:true}).isVisible());
       assert(await page.getByRole('heading',{name:'Video settings',exact:true}).isVisible());
-      assert.equal(await page.getByLabel('Your nickname').inputValue(),'Synthetic guest');
       assert.equal(await page.locator('.video-settings select').inputValue(),'stable');
+      await settingsTabs.getByRole('tab',{name:'Queue',exact:true}).click();
+      assert(await page.getByRole('heading',{name:'Queue settings',exact:true}).isVisible());
+      assert(!(await page.getByRole('heading',{name:'Video settings',exact:true}).isVisible()));
+      if(process.env.SCREENSHOT_DIR) await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-queue-${width}${host?'':'-guest'}.png`});
+      await settingsTabs.getByRole('tab',{name:'Room',exact:true}).click();
+      assert(await page.getByRole('heading',{name:'Room settings',exact:true}).isVisible());
+      assert.equal(await page.getByLabel('Your nickname').inputValue(),'Synthetic guest');
       assert(await page.locator('.video-settings-body').evaluate(el => {
         const panel=el.getBoundingClientRect();
         const name=el.querySelector<HTMLInputElement>('.display-name input')!.getBoundingClientRect();
@@ -975,8 +981,9 @@ test(`unified settings preserve playback across mobile and desktop fullscreen fo
       }
       await page.locator('[data-fullscreen-close]').click();
       await page.locator('.stage-panel[data-immersive=false]').waitFor();
-      assert.equal(await page.locator('#room-settings-heading').count(),1);
+      assert.equal(await page.getByRole('heading',{name:'Room settings',exact:true}).count(),1);
       assert(await page.evaluate(() => window.__fakePlayer === window.__originalPlayer));
+      await settingsTabs.getByRole('tab',{name:'Video',exact:true}).click();
     }
     assert.equal(commands.length,sent,'Device settings and fullscreen must not publish shared playback commands');
   } finally {await browser.close();}
@@ -989,6 +996,7 @@ test("room hosts can retry an empty radio queue without restarting playback", as
     await page.waitForFunction(() => window.__fakePlayer?.state === 1);
     await page.evaluate(() => {window.__originalPlayer=window.__fakePlayer;});
     await page.locator('.video-settings > summary').click();
+    await page.locator('.settings-tabs').getByRole('tab',{name:'Queue',exact:true}).click();
     await page.getByRole('button',{name:'Retry radio',exact:true}).click();
     await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.queue-options > button')?.disabled);
     assert.deepEqual(commands.filter(command => command.action === 'radio').map(command => command.enabled),[true]);

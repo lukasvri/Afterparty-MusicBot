@@ -565,3 +565,58 @@ test("D1 radio retry cannot override a newer radio-off command", async () => {
     assert.equal(f.roomState().current?.id, seed.id);
   } finally { f.close(); }
 });
+
+test("D1 empty early next persists cooldown without restarting playback", async () => {
+  const f = fixture();
+  const now = Date.now;
+  let time = now();
+  Date.now = () => time;
+  const info = console.info;
+  const diagnostics: unknown[][] = [];
+  console.info = (...args) => diagnostics.push(args);
+  try {
+    await f.save("TESTROOM", { current: seed, queue: [], playing: true, position: 20,
+      playbackKey: "same-playback", startsAt: time - 1000 });
+    globalThis.fetch = async () => { time += 2500; return Response.json({ items: [] }); };
+    await assert.rejects(mutate(f.request, "TESTROOM", { action: "next", version: 1 }),
+      error => error instanceof Error && "status" in error && error.status === 422);
+    const saved = f.roomState();
+    assert.equal(saved.radioRetryAt, time + 15000);
+    assert.equal(saved.current?.id, seed.id);
+    assert.equal(saved.playbackKey, "same-playback");
+    assert.equal(saved.playing, true);
+    assert.equal(saved.position, 25);
+    assert.deepEqual(saved.queue, []);
+    assert.equal(f.roomRow().version, 2);
+    const lookups = diagnostics.length;
+    const room = await publicRoom(f.request, f.roomRow());
+    assert.equal(diagnostics.length, lookups, "polling during cooldown must not rerun recommendation, even from cache");
+    assert.equal(room.position, 25);
+    assert.equal(f.roomRow().version, 2);
+  } finally { Date.now = now; console.info = info; f.close(); }
+});
+
+test("D1 empty early next cannot overwrite a concurrent radio-off command", async () => {
+  const f = fixture();
+  try {
+    await f.save("TESTROOM", { current: seed, queue: [], playing: true, position: 20,
+      playbackKey: "same-playback" });
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    globalThis.fetch = async () => { entered(); await gate; return Response.json({ items: [] }); };
+    const pending = mutate(f.request, "TESTROOM", { action: "next", version: 1 });
+    const rejection = assert.rejects(pending,
+      error => error instanceof Error && "status" in error && error.status === 409);
+    await started;
+    await mutate(f.request, "TESTROOM", { action: "radio", enabled: false, version: 1 });
+    release();
+    await rejection;
+    assert.equal(f.roomState().radio, false);
+    assert.equal(f.roomState().radioRetryAt, undefined);
+    assert.equal(f.roomState().current?.id, seed.id);
+    assert.equal(f.roomState().playbackKey, "same-playback");
+    assert.deepEqual(f.roomState().queue, []);
+    assert.equal(f.roomRow().version, 2);
+  } finally { f.close(); }
+});
