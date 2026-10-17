@@ -810,10 +810,20 @@ test(`Core integration: ${source} add from idle then manager seeks forward and b
   await page.waitForFunction(()=>window.__fakePlayer.getCurrentTime()>2);
   await page.waitForTimeout(500);
   for(const seconds of [80,35]) {
+   const completed = page.waitForResponse(response => {
+    const request = response.request();
+    return new URL(response.url()).pathname === '/api/admin/control' && request.method() === 'POST' &&
+      request.postDataJSON()?.command?.seconds === seconds;
+   });
    await page.evaluate(seconds=>{const p=window.__fakePlayer;p.emit(3);p.position=seconds;p.at=performance.now();p.emit(2);},seconds);
-   await page.waitForTimeout(1800);
+   assert((await completed).ok(), 'Native seek command must be accepted by Core');
+   const deadline = Date.now() + 10000;
+   let measured = await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   while (Date.now() < deadline && (Math.abs(core.engine.snapshot().position-seconds)>=4 || Math.abs(measured-core.engine.snapshot().position)>=1)) {
+    await new Promise(resolve=>setTimeout(resolve,50));
+    measured=await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   }
    assert(Math.abs(core.engine.snapshot().position-seconds)<4, 'Native seek must reach Core instead of snapping back');
-   const measured=await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
    assert(Math.abs(measured-core.engine.snapshot().position)<1,'Browser follows Core after seek');
   }
   assert.equal(commands.filter(c=>c.action==='seek').length,2);
@@ -928,8 +938,9 @@ test(`Core integration: ${name}`, async () => {
  }
 });
 
-test("unified settings preserve playback across mobile and desktop fullscreen", async () => {
-  const {browser, page, commands} = await fixture({playing:true});
+for (const host of [true,false])
+test(`unified settings preserve playback across mobile and desktop fullscreen for ${host?'hosts':'guests'}`, async () => {
+  const {browser, page, commands} = await fixture({playing:true,host});
   try {
     await page.locator('.stage-intro button').click();
     await page.waitForFunction(() => window.__fakePlayer?.state === 1);
@@ -960,7 +971,7 @@ test("unified settings preserve playback across mobile and desktop fullscreen", 
       }), 'Fullscreen settings and nickname/TV controls must fit without overlap');
       if(process.env.SCREENSHOT_DIR) {
         await page.waitForTimeout(300); // Let the native fullscreen compositor finish its fade.
-        await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-fullscreen-${width}.png`});
+        await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-fullscreen-${width}${host?'':'-guest'}.png`});
       }
       await page.locator('[data-fullscreen-close]').click();
       await page.locator('.stage-panel[data-immersive=false]').waitFor();
