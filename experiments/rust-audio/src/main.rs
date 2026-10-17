@@ -28,8 +28,21 @@ fn main() -> ExitCode {
                 }
             }
         }
+        (Some(mode), None) if mode == "--batch-stream" => {
+            let input = io::stdin();
+            let output = io::stdout();
+            match stream::batch::serve(&mut input.lock(), &mut output.lock()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("PCM batch stream error: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         _ => {
-            eprintln!("Usage: afterparty-rust-audio --bench | --stream | --echo-stream");
+            eprintln!(
+                "Usage: afterparty-rust-audio --bench | --stream | --echo-stream | --batch-stream"
+            );
             ExitCode::from(2)
         }
     }

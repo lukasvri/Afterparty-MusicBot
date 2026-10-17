@@ -74,7 +74,7 @@ function childPeakRss(pids: number[]) {
 }
 
 /** One frame per writer, continuously drained stdout, capped diagnostics and a hard deadline. */
-function ffmpegStage(mode: string) {
+export function ffmpegStage(mode: string) {
   const child = spawn(process.env.FFMPEG_PATH ?? "ffmpeg", ["-hide_banner", "-loglevel", "info", "-benchmark", "-nostdin",
     "-probesize", "32", "-analyzeduration", "0",
     "-f", "s16le", "-ar", "48000", "-ac", "2", "-i", "pipe:0", "-vn",

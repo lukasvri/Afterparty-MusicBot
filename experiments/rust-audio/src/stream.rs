@@ -6,6 +6,8 @@
 use crate::{FRAME_BYTES, mix_pcm};
 use std::io::{self, ErrorKind, Read, Write};
 
+pub mod batch;
+
 pub const REQUEST_HEADER_BYTES: usize = 32;
 pub const RESPONSE_HEADER_BYTES: usize = 16;
 pub const PROTOCOL_VERSION: u8 = 1;
@@ -78,10 +80,7 @@ fn read_field(reader: &mut impl Read, target: &mut [u8], field: &'static str) ->
 
 // Only EOF before the first byte of a new header is a clean shutdown. Interrupted
 // system calls and short reads can occur anywhere on a pipe and are not EOF.
-fn read_header(
-    reader: &mut impl Read,
-    header: &mut [u8; REQUEST_HEADER_BYTES],
-) -> io::Result<bool> {
+fn read_header<const N: usize>(reader: &mut impl Read, header: &mut [u8; N]) -> io::Result<bool> {
     loop {
         match reader.read(&mut header[..1]) {
             Ok(0) => return Ok(false),
