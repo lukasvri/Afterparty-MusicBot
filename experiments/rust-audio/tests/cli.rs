@@ -50,6 +50,19 @@ fn empty_stream_is_a_clean_shutdown() {
 }
 
 #[test]
+fn echo_mode_is_explicit_and_returns_unmixed_pcm_with_binary_only_stdout() {
+    let mut input = identity_request();
+    input[24..32].copy_from_slice(&0f64.to_le_bytes());
+    let output = run(&["--echo-stream"], &input);
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    assert_eq!(&output.stdout[..8], b"APCM\x01\x81\x00\x00");
+    assert_eq!(&output.stdout[16..], &input[32..]);
+    let normal = run(&["--stream"], &input);
+    assert!(normal.stdout[16..].iter().all(|byte| *byte == 0));
+}
+
+#[test]
 fn invalid_or_truncated_input_has_no_reply_and_returns_failure() {
     let input = identity_request();
     for input in [b"XPCM".as_slice(), &input[..input.len() - 1]] {
@@ -71,6 +84,7 @@ fn unknown_or_extra_arguments_return_usage_without_binary_output() {
         vec!["--unknown"],
         vec!["--stream", "extra"],
         vec!["--bench", "extra"],
+        vec!["--echo-stream", "extra"],
     ] {
         let output = run(&args, &[]);
         assert_eq!(output.status.code(), Some(2));

@@ -65,7 +65,8 @@ for any future integration.
 
 ## Offline stream worker
 
-The release executable accepts exactly one mode, `--bench` or `--stream`.
+The release executable accepts exactly one mode: `--bench`, `--stream` or the
+explicit offline control `--echo-stream`.
 `--bench` retains the synthetic in-process benchmark. `--stream` reads binary
 requests from stdin and writes binary replies to stdout. Diagnostics go only
 to stderr. It does not discover Core, start FFmpeg, open a network listener or
@@ -87,7 +88,7 @@ offline tests. They do not start the bot:
 ```bash
 npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
 node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
-node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts
+node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts experiments/rust-audio/process-cpu.test.ts
 ```
 
 The harness selects the platform's release executable, including `.exe` on
@@ -185,8 +186,9 @@ This establishes an inspectable process boundary for further measurement. The
 bounded parent and repeated offline suite below now measure startup, concurrent
 synthetic guilds, tail latency and optional FFmpeg/Opus stages, and exercise
 failure recovery. They do not establish a full Discord audio improvement.
-Provider decoding, paced real-time playback, simultaneous process-tree memory,
-Rust child CPU and live Discord behavior remain outside those measurements.
+Provider decoding, simultaneous process-tree memory and live Discord behavior
+remain outside those measurements. The follow-up profiling section adds owned
+Rust process CPU counters and explicitly synthetic paced scheduling.
 Keep TypeScript as the production path until a separate adoption review.
 
 
@@ -285,7 +287,9 @@ node experiments/rust-audio/benchmark-suite.ts 5000 3 1,4 500 opus
 ```
 
 Arguments are frames **per guild**, repeat count, distinct guild counts, warmup
-frames per guild and the optional FFmpeg stage (`none`, `copy` or `opus`). Bounds
+frames per guild and the optional FFmpeg stage (`none`, `copy` or `opus`). Two
+further optional arguments select cadence (`saturated` or `paced`) and a
+PCM-only protocol control (`mix` or `echo`). Bounds
 are 100 to 100,000 frames, 1 to 10 repeats, up to four guild counts between 1 and
 16, and 1 to 1,000 warmup frames. Defaults are `1000 3 1,4,16 100 none`.
 `RUST_AUDIO_BIN` selects the actual release worker; `FFMPEG_PATH` selects a local
@@ -332,12 +336,13 @@ Interpret metrics within their explicit scope:
   mix or accepted FFmpeg stdin write. This includes event-loop waiting behind
   other guilds, but does not measure when an encoded packet or audible sample
   reaches Discord. Batch latency and batches above 20 ms are also reported.
-- These are saturated batches, not a paced 50 Hz playback simulation. A
-  scheduling turn is included on both paths; GC, OS scheduling and pipe stalls
-  remain part of observed latency. A shared development machine is noisy.
-- Parent CPU excludes Rust and FFmpeg child CPU. FFmpeg's own `-benchmark`
-  diagnostic supplies its cumulative CPU when available. Rust child CPU is not
-  measured, so a parent-only reduction cannot establish a total CPU saving.
+- Saturated batches are the default. Optional paced batches use common 20 ms
+  deadlines, with completion and scheduling-lag metrics described below. GC,
+  OS scheduling and pipe stalls remain part of observed latency. A shared
+  development machine is noisy.
+- Parent CPU excludes Rust and FFmpeg child CPU. The follow-up counters below
+  add owned Rust CPU and a pipeline CPU sum when all components are available.
+  A parent-only reduction cannot establish a total CPU saving.
 - Parent RSS is Node's process-lifetime high-water mark. Rust high-water RSS is
   read after timing using Linux `VmHWM` or Windows `PeakWorkingSet64`. FFmpeg
   reports its own maximum RSS when available. Unsupported values are null with
@@ -434,9 +439,149 @@ the PCM process boundary does not provide a consistent complete-pipeline gain.
 There were no PCM-only batches above 20 ms; each FFmpeg run had one, including
 startup effects. None of these are real-time deadline or listening results.
 
-**Recommendation: retain TypeScript in production.** These measurements support
+**Recommendation at this snapshot: retain TypeScript in production.** These measurements support
 continued offline research only if a concrete bottleneck warrants it. They do
 not establish reduced total CPU, lower simultaneous whole-tree memory, better
 provider behavior or improved Discord sound. A Rust adoption proposal would
 still need total child CPU, paced workload/host measurements and separate owner
-review rather than promotion of this experiment into `main`.
+review rather than promotion of this experiment into `main`. The follow-up below
+addresses the first two with explicit measurement limits.
+
+## Follow-up: process CPU, protocol control and paced scheduling
+
+The suite now brackets its measured region with counters for the Rust child
+PIDs it owns. Linux reads process user/system ticks from
+[`/proc/<pid>/stat`](https://www.man7.org/linux/man-pages/man5/proc_pid_stat.5.html),
+converted using `getconf CLK_TCK`. Windows reads
+[`TotalProcessorTime`](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.totalprocessortime),
+which includes user and privileged CPU. Probes run outside the latency region
+while every Rust worker is idle; their own process CPU is excluded. Both TS and
+Rust also probe the supervisor PID and discard that counter, so the control
+receives the same out-of-band helper/startup pause after warmup.
+
+`rustChildCpuMs` is the before/after aggregate for the measured workload.
+`rustLifetimeCpuMs` additionally includes worker startup and warmup up to the
+last probe. `pipelineCpuMs` adds parent CPU, measured Rust child CPU and FFmpeg's
+own benchmark CPU only when every required component is available. Missing,
+reset or incomplete counters produce null instead of a partial total. Linux
+reports its clock-tick unit, commonly 10 ms; Windows TimeSpan units are
+0.0001 ms. These are `counterUnitMs` values, not measured effective precision.
+Actual scheduler CPU accounting can be substantially coarser and its practical
+precision is not established by this harness.
+Small differences and short runs cannot support a CPU-saving claim.
+
+```bash
+# Rotate TS, Rust mixing and Rust protocol-only control in fresh processes.
+node experiments/rust-audio/benchmark-suite.ts 10000 3 1,4 500 none saturated echo
+# Same mixer-to-Opus pipeline, with owned child CPU included.
+node experiments/rust-audio/benchmark-suite.ts 5000 3 1,4 500 opus
+# Common 20ms deadlines, bounded one-frame work per guild.
+node experiments/rust-audio/benchmark-suite.ts 100 3 1,4 100 none paced
+node experiments/rust-audio/benchmark-suite.ts 100 3 1,4 100 opus paced
+```
+
+`--echo-stream` uses the same protocol-v1 parser, exact input sizes, request IDs,
+validation, first-frame copy, reply framing and flush/EOF behavior, but returns
+frame A unchanged instead of mixing samples. The normal parent still selects
+`--stream`. The suite checks echo output against A, rotates all three conditions
+across repetitions, and disallows echo with an encoder because different PCM
+would make codec comparisons invalid. This measures the aggregate transport,
+validation, copying and scheduling boundary; it does not isolate a memory-copy
+instruction cost. Do not subtract independent p99 values to infer mixer latency.
+
+Paced runs use a common deadline grid of `start + frame * 20 ms`, rather than
+sleeping 20 ms after each completion. They allow only one outstanding frame per
+guild and wait for the entire batch before issuing another. Late batches catch
+up sequentially without growing a queue. `scheduleLag` measures start lateness;
+`scheduledLatency` measures completion or accepted encoder stdin write relative
+to the scheduled frame time; `missedScheduledDeadlines` counts batches completing
+after the next deadline. Runs are capped at 2,000 frames per guild to remain
+within child/supervisor deadlines. These are synthetic scheduling/pipe metrics,
+not packet delivery, provider decoding, network or audible Discord latency.
+
+### Experimental patch notes for this follow-up
+
+- Added owned Rust child CPU counters, counter-unit metadata and explicit
+  null handling before calculating complete measured pipeline CPU.
+- Added an explicit protocol-only echo control and common-deadline 50 Hz
+  workload conditions without increasing outstanding work or buffer bounds.
+- Added Linux counter parsing, live CPU, echo parity and paced-workload
+  regression coverage. No production integration or product version change is
+  implied; notes remain experimental on `dev`.
+- Coalesced the fixed 16-byte header and 3,840-byte PCM response into one bounded
+  `write_all` submission, followed by the existing mandatory flush before input.
+  Short/interrupted writes remain supported; this does not promise a single OS
+  syscall or atomic pipe delivery. A focused regression failed on the separate
+  16-byte header submission and passed on the complete 3,856-byte packet.
+
+### Follow-up measurements and decision
+
+The [72-run record](../experiments/rust-audio/measurements/2026-10-17-cpu-protocol.json)
+compares the same final harness against preserved before/after release binaries
+on the Windows machine described above. Both binaries include the echo control;
+only the after binary coalesces replies. The
+[baseline source patch](../experiments/rust-audio/measurements/baseline-reply.patch)
+reconstructs the separate-write behavior in an isolated experimental checkout.
+It intentionally makes the new packet-submission regression fail and is not a
+production patch. Each report records its actual binary SHA-256, configuration
+and runtime metadata. Saturated reports label the counter unit consistently
+after a metadata-only rename; measured values are unchanged.
+
+There are three fresh-process repetitions per condition. PCM/echo uses 10,000
+frames per guild and 500 warmup frames; Opus uses 5,000 and 500. Before and after
+sets were captured in successive blocks of a coordinated quiet window using the
+same benchmark harness source and arguments; the Rust reply implementation
+differs as documented. TS/Rust/echo ordering rotated within each set. They were not
+randomized or interleaved across binary versions. Ranges are observed minima
+and maxima, not confidence intervals; OS scheduling, thermal state and actual
+CPU-accounting precision remain uncontrolled.
+
+| Saturated condition | TS pipeline CPU ms, after set | Rust pipeline CPU ms, before | Rust pipeline CPU ms, after |
+| --- | ---: | ---: | ---: |
+| PCM, 1 guild | 204 to 219 | 483.50 to 562.25 | 469.63 to 717.88 |
+| PCM, 4 guilds | 798 to 938 | 1483.63 to 1656.63 | 1452.63 to 1781.88 |
+| Mixer to Opus, 1 guild | 765 to 890 | 936.13 to 1016.50 | 890.88 to 953.50 |
+| Mixer to Opus, 4 guilds | 3547 to 3627 | 4017.13 to 4344.63 | 3984.63 to 4484.38 |
+
+For one-guild PCM after coalescing, Rust child CPU was 140.63 to 234.38 ms and
+parent CPU 282 to 546 ms. The protocol-only echo condition still used 374.50 to
+547.75 ms combined CPU versus TS mixing's 204 to 219 ms. This identifies a
+substantial aggregate process-boundary cost on this host; it does not isolate
+individual copies or justify subtracting independent tail percentiles.
+
+The optimization guarantees one bounded writer submission instead of two. For
+20,000 requests in the four-guild Opus condition, observed parent reply-data
+events fell from 20,817 to 20,914 before to 20,181 to 20,210 after. These are
+Node data events, not syscall counts. Elapsed ranges overlapped: 728.18 to
+784.85 ms before and 756.40 to 775.35 ms after. Total CPU ranges also overlapped,
+so no complete-pipeline CPU or elapsed-time saving is established. Keep the
+coalescing as a bounded transport simplification, without claiming a production
+speedup.
+
+The after binary also ran three 100-frame, four-guild paced repetitions per
+implementation for PCM and Opus. PCM had zero missed scheduled 20 ms batch
+deadlines in all six runs. Scheduled completion p99 was 14.45 to 15.85 ms for
+TS and 15.46 to 16.26 ms for Rust; start-lag p99 was already roughly 14 to 16 ms
+on both paths. Opus had one missed batch per run with encoder startup included;
+the report does not retain missed-frame indices, so startup is not a proved
+cause. Its scheduled p99 ranges overlapped: 15.76 to 16.37 ms for TS and 15.66
+to 16.29 ms for Rust. Short paced CPU observations varied widely and cannot
+support a CPU-saving claim. No conclusion about a different host, network,
+encoded-packet latency or audible playback follows.
+
+**Retain TypeScript in production.** The missing Rust child CPU is now measured
+within stated counter limits, and it removes the apparent parent-only saving
+in these saturated conditions on this host. The process boundary remains a substantial
+cost; coalescing does not establish a complete-pipeline improvement. Further
+research should target a demonstrated host bottleneck and collect longer paced
+observations or a lower-overhead integration boundary before proposing adoption.
+No production code, product release version, website notes or deployment changed.
+
+Follow-up validation: Rust formatting, Clippy with zero warnings, a locked
+release build, 20 library tests and five CLI tests passed. Harness typechecking,
+lint with zero warnings and all 25 TypeScript parity/lifecycle/CPU/benchmark
+tests passed, including real FFmpeg and both timeout cleanup paths. Minimum
+Rust 1.85 and Linux/Windows CI remain required; the local run used Rust 1.99.1.
+The required full `check:all` was attempted again: lint passed, then the same
+four existing POSIX `fcntl` deployment modules failed to import on Windows.
+This is not a passing full check; Linux CI must validate that suite.

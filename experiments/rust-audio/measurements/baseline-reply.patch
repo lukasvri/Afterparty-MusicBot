@@ -1,0 +1,25 @@
+diff --git a/experiments/rust-audio/src/stream.rs b/experiments/rust-audio/src/stream.rs
+index bdc78ee..01ca50c 100644
+--- a/experiments/rust-audio/src/stream.rs
++++ b/experiments/rust-audio/src/stream.rs
+@@ -125,7 +125,7 @@ fn serve_inner(reader: &mut impl Read, writer: &mut impl Write, echo: bool) -> i
+     let mut header = [0u8; REQUEST_HEADER_BYTES];
+     let mut first = [0u8; FRAME_BYTES];
+     let mut second = [0u8; FRAME_BYTES];
+-    let mut response = [0u8; RESPONSE_HEADER_BYTES + FRAME_BYTES];
++    let mut response = [0u8; RESPONSE_HEADER_BYTES];
+     response[..4].copy_from_slice(MAGIC);
+     response[4] = PROTOCOL_VERSION;
+     response[5] = MIX_RESULT;
+@@ -146,10 +146,8 @@ fn serve_inner(reader: &mut impl Read, writer: &mut impl Write, echo: bool) -> i
+             mix_pcm(&first, next, request.progress, request.volume).map_err(invalid)?
+         };
+         response[8..12].copy_from_slice(&request.id);
+-        response[RESPONSE_HEADER_BYTES..].copy_from_slice(&mixed);
+-        // Submit one bounded packet instead of a standalone 16-byte pipe write.
+-        // write_all still handles interrupted/short writes; flush precedes input.
+         writer.write_all(&response)?;
++        writer.write_all(&mixed)?;
+         flush_reply(writer)?;
+     }
+     Ok(())

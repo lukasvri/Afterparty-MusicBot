@@ -8,9 +8,10 @@ import { options, percentiles, fixture } from "./benchmark-suite.ts";
 import { BenchmarkProcessError, measurementProcess } from "./benchmark-process.ts";
 
 test("benchmark rejects unbounded, duplicate and malformed workloads", () => {
-  assert.deepEqual(options([]), { frames: 1000, repeats: 3, guilds: [1, 4, 16], warmup: 100, ffmpeg: "none" });
+  assert.deepEqual(options([]), { frames: 1000, repeats: 3, guilds: [1, 4, 16], warmup: 100, ffmpeg: "none", cadence: "saturated", control: "mix" });
   for (const args of [["NaN"], ["100", "11"], ["100", "1", "17"], ["100", "1", "1,1"],
-    ["100", "1", "1", "1001"], ["100", "1", "1", "1", "bad"], ["100", "1", "1", "1", "none", "extra"]])
+    ["100", "1", "1", "1001"], ["100", "1", "1", "1", "bad"], ["100", "1", "1", "1", "none", "extra"],
+    ["3000", "1", "1", "1", "none", "paced"], ["100", "1", "1", "1", "opus", "saturated", "echo"]])
     assert.throws(() => options(args), RangeError);
 });
 
@@ -37,8 +38,30 @@ test("fresh-process comparison executes real mixers, alternates order and bounds
     assert(run.elapsedMs > 0);
     assert(run.parentLifetimePeakRssBytes > 0);
     assert.equal(run.startupFirstReplyMs.length, run.mode === "rust" ? run.guilds : 0);
+    if (["linux", "win32"].includes(process.platform)) assert(run.pipelineCpuMs !== null && run.pipelineCpuMs >= run.parentCpuMs);
+    else assert.equal(run.pipelineCpuMs, null);
     if (process.platform === "win32" || process.platform === "linux") assert.equal(run.rustChildMemory.error, null);
   }
+});
+
+test("echo control validates the same real packets while returning unmixed A", () => {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./benchmark-suite.ts", import.meta.url)),
+    "100", "1", "1", "2", "none", "saturated", "echo"], { encoding: "utf8", timeout: 20_000, maxBuffer: 1024 * 1024, windowsHide: true });
+  assert.ifError(result.error); assert.equal(result.status, 0, result.stderr);
+  const runs = JSON.parse(result.stdout).runs;
+  assert.deepEqual(runs.map((run: { mode: string }) => run.mode), ["typescript", "rust", "rust-echo"]);
+  assert(runs[2].replyDataEvents >= 100);
+});
+
+test("paced workload reports scheduled latency and bounded common deadlines", () => {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./benchmark-suite.ts", import.meta.url)),
+    "--run", "rust", "100", "1", "4", "2", "none", "paced"], { encoding: "utf8", timeout: 15_000, maxBuffer: 16_384, windowsHide: true });
+  assert.ifError(result.error); assert.equal(result.status, 0, result.stderr);
+  const run = JSON.parse(result.stdout);
+  assert.equal(run.cadence, "paced");
+  assert(run.elapsedMs >= 1980, "100 common 20ms batches must not run as saturation");
+  assert(run.scheduleLag.p99Ms >= 0 && run.scheduledLatency.p99Ms >= run.latency.p50Ms);
+  assert(run.missedScheduledDeadlines >= 0 && run.missedScheduledDeadlines <= 100);
 });
 
 test("missing FFmpeg fails fast and cleans up every Rust worker", () => {
