@@ -4,6 +4,7 @@ import {
   radioTitle,
   radioQuery,
   rankRadio,
+  createRadioRanker,
   isRadioMusic,
   specificRadioGenre,
   sameRadioRecording,
@@ -51,17 +52,18 @@ export function playableRoomQueue(state: RoomRadioState) {
     ...(state.current ? [state.current] : []),
     ...state.queue.filter((video) => !video.radio),
   ];
-  return state.queue.filter((video) => {
+  let ranker: ReturnType<typeof createRadioRanker> | undefined;
+  return state.queue.filter((video, index) => {
     if (!video.radio) return true;
     if (state.radio === false || !seed || !video.embeddable) return false;
-    const valid = rankRadio(
-      { ...seed, entryId: seed.id },
+    ranker ??= createRadioRanker(
+      { ...seed, entryId: seed.id }, recent, state.radioExcluded ?? [],
+    );
+    const valid = ranker.rank(
       [{ ...video, entryId: video.id }],
-      recent,
-      state.radioExcluded ?? [],
       video.radioRelatedTo === seed.id,
     ).length > 0;
-    if (valid) recent.push(video);
+    if (valid && index < state.queue.length - 1) ranker.remember(video);
     return valid;
   });
 }

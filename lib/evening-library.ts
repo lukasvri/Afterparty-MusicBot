@@ -15,6 +15,18 @@ export const emptyLibrary = (): EveningLibrary => ({
   evenings: [],
   favorites: [],
 });
+/** Keep the first selected recording and its order without rescanning history. */
+export function uniqueEveningTracks(history: Video[], tracks: Video[]): Video[] {
+  const seen = new Set<string>();
+  const result: Video[] = [];
+  for (const video of [...history, ...tracks]) {
+    const id = video.id;
+    if (!/^[\w-]{11}$/.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    result.push(video);
+  }
+  return result;
+}
 export function readLibrary(raw: string | null): EveningLibrary {
   if (!raw) return emptyLibrary();
   const data = JSON.parse(raw);

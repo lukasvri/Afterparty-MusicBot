@@ -223,7 +223,10 @@ export function radioQuery(track: RadioTrack) {
   return `${genre ?? artist} audio${song ? ` -"${song}"` : ""}`;
 }
 export function songIdentity(track: RadioTrack) {
-  const title = radioTitle(track)
+  return songTitleIdentity(radioTitle(track));
+}
+function songTitleIdentity(rawTitle: string) {
+  const title = rawTitle
       .replace(/\([^)]*\)|\[[^\]]*\]/g, "")
       .replace(/\b(?:feat\.?|ft\.?)\s+.*/i, "");
   const identity = normalize(title
@@ -242,11 +245,12 @@ export function songIdentity(track: RadioTrack) {
   return identity || (/^(?:music|audio|video|remix|instrumental|acoustic)$/i.test(title.trim()) ? normalize(title) : "");
 }
 function recordingIdentity(track: RadioTrack) {
+  const title = radioTitle(track);
   return {
-    song: songIdentity(track),
+    song: songTitleIdentity(title),
     artist: normalize(radioArtist(track)),
-    title: normalize(radioTitle(track)),
-    variant: /\b(?:remix|instrumental|acoustic|remaster(?:ed)?|radio edit|extended)(?:\s+(?:version|mix|\d{4}))*\s*$/i.test(radioTitle(track)),
+    title: normalize(title),
+    variant: /\b(?:remix|instrumental|acoustic|remaster(?:ed)?|radio edit|extended)(?:\s+(?:version|mix|\d{4}))*\s*$/i.test(title),
   };
 }
 function duplicateRecording(a: ReturnType<typeof recordingIdentity>, b: ReturnType<typeof recordingIdentity>) {
@@ -297,55 +301,69 @@ export function rankRadio(
   excluded: string[],
   relatedRecording = false,
 ) {
+  return createRadioRanker(seed, recent, excluded).rank(candidates, relatedRecording);
+}
+/** One synchronous selection pass. Rebuild after a room or its history changes. */
+export function createRadioRanker(seed: Track, recent: PublicTrack[], excluded: string[]) {
   const artist = normalize(radioArtist(seed));
   const genre = radioGenre(seed);
-  if (!artist && !genre) return [];
   const ids = new Set([seed.id, ...excluded, ...recent.map((t) => t.id)]);
-  const songs = [seed, ...recent].map(recordingIdentity);
-  const recentArtists = new Map<string, number>();
-  for (const track of recent.slice(-5)) {
-    const key = normalize(radioArtist(track));
-    recentArtists.set(key, (recentArtists.get(key) ?? 0) + 1);
-  }
-  const ranked = candidates
-    .map((track, index) => {
-      const identity = recordingIdentity(track);
-      const matches =
-        Boolean(artist) && normalize(radioArtist(track)) === artist;
-      const candidateGenre = radioGenre(track);
-      const genreMatch = Boolean(genre && candidateGenre === genre);
-      const related = radioRelated(seed, track, relatedRecording);
-      const recentArtistCount = recentArtists.get(normalize(radioArtist(track))) ?? 0;
-      const valid =
-        related &&
-        isRadioMusic(track) &&
-        !track.concert &&
-        !ids.has(track.id) &&
-        !songs.some((song) => duplicateRecording(song, identity));
-      const official =
-        /\b(official audio|official music video|provided to youtube)\b/i.test(
-          track.title,
-        ) || /Topic$|VEVO$/i.test(track.artist);
-      return {
-        track,
-        score: valid
-          ? 100 +
-            (genreMatch ? 60 : 0) +
-            (official ? 10 : 0) -
-            (genreMatch && matches ? 30 : 0) -
-            recentArtistCount * 15 -
-            index
-          : -1,
-      };
-    })
-    .filter((t) => t.score >= 0)
-    .sort((a, b) => b.score - a.score)
-    .map((t) => t.track);
-  const seen: ReturnType<typeof recordingIdentity>[] = [];
-  return ranked.filter((track) => {
-    const identity = recordingIdentity(track);
-    if (seen.some((song) => duplicateRecording(song, identity))) return false;
-    seen.push(identity);
-    return true;
-  });
+  const songs = artist || genre ? [seed, ...recent].map(recordingIdentity) : [];
+  let recentTail = recent.slice(-5);
+  return {
+    remember(track: PublicTrack) {
+      ids.add(track.id);
+      songs.push(recordingIdentity(track));
+      recentTail = [...recentTail.slice(-4), track];
+    },
+    rank(candidates: Track[], relatedRecording = false) {
+      if (!artist && !genre) return [];
+      const recentArtists = new Map<string, number>();
+      for (const track of recentTail) {
+        const key = normalize(radioArtist(track));
+        recentArtists.set(key, (recentArtists.get(key) ?? 0) + 1);
+      }
+      const ranked = candidates
+        .map((track, index) => {
+          const identity = recordingIdentity(track);
+          const matches =
+            Boolean(artist) && normalize(radioArtist(track)) === artist;
+          const candidateGenre = radioGenre(track);
+          const genreMatch = Boolean(genre && candidateGenre === genre);
+          const related = radioRelated(seed, track, relatedRecording);
+          const recentArtistCount = recentArtists.get(normalize(radioArtist(track))) ?? 0;
+          const valid =
+            related &&
+            isRadioMusic(track) &&
+            !track.concert &&
+            !ids.has(track.id) &&
+            !songs.some((song) => duplicateRecording(song, identity));
+          const official =
+            /\b(official audio|official music video|provided to youtube)\b/i.test(
+              track.title,
+            ) || /Topic$|VEVO$/i.test(track.artist);
+          return {
+            track,
+            score: valid
+              ? 100 +
+                (genreMatch ? 60 : 0) +
+                (official ? 10 : 0) -
+                (genreMatch && matches ? 30 : 0) -
+                recentArtistCount * 15 -
+                index
+              : -1,
+          };
+        })
+        .filter((t) => t.score >= 0)
+        .sort((a, b) => b.score - a.score)
+        .map((t) => t.track);
+      const seen: ReturnType<typeof recordingIdentity>[] = [];
+      return ranked.filter((track) => {
+        const identity = recordingIdentity(track);
+        if (seen.some((song) => duplicateRecording(song, identity))) return false;
+        seen.push(identity);
+        return true;
+      });
+    },
+  };
 }

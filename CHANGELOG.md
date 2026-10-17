@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.1.6: Less repeated work in settings, queues and radio
+
+2026-10-17
+
+- Saved device settings reuse an observed value until a local change or another tab invalidates it. Changing a nickname or motion preference writes once, and evening libraries keep the same first recording and order with a single deduplication pass.
+- Queue requests and Discord administration with an explicitly selected server avoid an extra Core metadata request. Discord permissions and session expiry are still checked on each operation, and owner access remains limited to the configured default server.
+- Core radio queue validation prepares recording history once per selection pass and reuses title parsing. Manual choices, exclusion rules, suggestion order and the shared playback clock are preserved.
+
 ## v2.1.5: Accessible settings tabs and consistent radio backoff
 
 2026-10-17

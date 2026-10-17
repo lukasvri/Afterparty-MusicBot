@@ -51,10 +51,11 @@ const secret = () =>
 const bearer = (request: Request) =>
   (request.headers.get("authorization") ?? "").replace(/^Bearer /, "");
 export const isAdmin = async (request?: Request) => {
+  const provided = request ? bearer(request) : "";
   if (
-    request &&
+    provided &&
     env().ADMIN_BRIDGE_KEY &&
-    (await hash(bearer(request))) === (await hash(env().ADMIN_BRIDGE_KEY!))
+    (await hash(provided)) === (await hash(env().ADMIN_BRIDGE_KEY!))
   )
     return true;
   if (request && (await hasPasswordSession(request))) return true;

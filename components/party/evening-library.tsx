@@ -3,6 +3,7 @@ import { useLanguage } from "@/components/language";
 import { useState } from "react";
 import type { Video } from "@/lib/types";
 import { useEveningLibrary } from "@/hooks/use-evening-library";
+import { uniqueEveningTracks } from "@/lib/evening-library";
 export function EveningLibrary({
   tracks,
   history,
@@ -21,6 +22,7 @@ export function EveningLibrary({
   const shelf = useEveningLibrary(),
     [name, setName] = useState(t("Kvelden vår")),
     [message, setMessage] = useState("");
+  const favoriteIds = new Set(shelf.library.favorites.map(video => video.id));
   const downloadable = () => {
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(shelf.library, null, 2)], {
@@ -213,21 +215,16 @@ export function EveningLibrary({
         </div>
       ))}
       <h3>{t("Denne kvelden")}</h3>
-      {[...history, ...tracks]
-        .filter(
-          (v, i, all) =>
-            /^[\w-]{11}$/.test(v.id) &&
-            all.findIndex((x) => x.id === v.id) === i,
-        )
+      {uniqueEveningTracks(history, tracks)
         .map((v) => (
           <div className="saved-track" key={v.id}>
             <span>{v.title}</span>
             <button
               onClick={() => shelf.favorite(v)}
               aria-label={t("Favoritt ") + v.title}
-              aria-pressed={shelf.library.favorites.some((x) => x.id === v.id)}
+              aria-pressed={favoriteIds.has(v.id)}
             >
-              {shelf.library.favorites.some((x) => x.id === v.id) ? "♥" : "♡"}
+              {favoriteIds.has(v.id) ? "♥" : "♡"}
             </button>
           </div>
         ))}
