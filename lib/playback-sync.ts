@@ -1,8 +1,8 @@
 import {elapsedPlayingMs} from '../services/core/src/protocol.ts';
 import type {Room} from './types.ts';
 export function compensateDelivery(room:Room,roundTripMs:number):Room {
- const transit=Math.min(1500,Math.max(0,roundTripMs/2));
- return {...room,position:room.position+(room.playing&&!room.buffering?elapsedPlayingMs(room.serverTime,room.startsAt,transit)/1000:0),serverTime:room.serverTime+transit,...(room.syncValidForMs!==undefined?{syncValidForMs:Math.max(0,room.syncValidForMs-transit)}:{})};
+ const transit=Number.isFinite(roundTripMs)?Math.min(1500,Math.max(0,roundTripMs/2)):0;
+ return {...room,position:room.position+(room.playing&&!room.buffering?elapsedPlayingMs(room.serverTime,room.startsAt,transit)/1000:0),syncSampledAt:room.syncSampledAt??room.serverTime,serverTime:room.serverTime+transit,...(room.syncValidForMs!==undefined?{syncValidForMs:Math.max(0,room.syncValidForMs-transit)}:{})};
 }
 export function playbackTarget(room:Room,receivedAt:number,now:number,offset=0){
  const age=Math.max(0,now-receivedAt);
@@ -30,7 +30,20 @@ export function canCorrectPlayback(state:number,playing:boolean,now:number,settl
 /** Reject delayed polls/commands after a newer snapshot of the same timeline. */
 export function isOlderSnapshot(previous:Room|null, next:Room){
  return Boolean(previous && previous.code===next.code && previous.syncSource===next.syncSource && previous.syncEpoch===next.syncEpoch &&
-  (previous.version>next.version || (previous.version===next.version && previous.serverTime>next.serverTime)));
+  (previous.version>next.version || (previous.version===next.version && (previous.syncSampledAt??previous.serverTime)>(next.syncSampledAt??next.serverTime))));
+}
+export function isDuplicateSnapshot(previous:Room|null,next:Room){
+ return Boolean(previous && previous.code===next.code && previous.syncSource===next.syncSource && previous.syncEpoch===next.syncEpoch && previous.version===next.version &&
+  (previous.syncSampledAt??previous.serverTime)===(next.syncSampledAt??next.serverTime));
+}
+
+/** Polls may update permissions/presence without replacing a newer live clock. */
+export function roomPollUpdate(previous:Room|null,next:Room,liveFresh:boolean):{snapshot:Room;timeline:boolean}{
+ const sameRoom=previous?.code===next.code;
+ const keepTimeline=sameRoom && (isOlderSnapshot(previous,next) || isDuplicateSnapshot(previous,next) ||
+  (liveFresh && previous.syncSource==='live' && (next.syncSource!=='live' || next.syncEpoch!==previous.syncEpoch)));
+ if(!keepTimeline || !previous)return {snapshot:next,timeline:true};
+ return {snapshot:{...previous,viewers:next.viewers,isHost:next.isHost,isOwner:next.isOwner??previous.isOwner,isPublic:next.isPublic??previous.isPublic},timeline:false};
 }
 
 export function transportChanged(previous:Room|null,next:Room){

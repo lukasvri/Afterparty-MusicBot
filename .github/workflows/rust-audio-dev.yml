@@ -5,12 +5,18 @@ on:
     branches: [dev]
     paths:
       - 'experiments/rust-audio/**'
+      - 'services/core/src/audio.ts'
+      - 'services/core/package*.json'
+      - 'services/core/tsconfig.json'
       - '.github/workflows/rust-audio-dev.yml'
       - 'docs/RUST_DEVELOPMENT.md'
   push:
     branches: [dev]
     paths:
       - 'experiments/rust-audio/**'
+      - 'services/core/src/audio.ts'
+      - 'services/core/package*.json'
+      - 'services/core/tsconfig.json'
       - '.github/workflows/rust-audio-dev.yml'
       - 'docs/RUST_DEVELOPMENT.md'
 
@@ -19,7 +25,7 @@ permissions:
 
 jobs:
   rust-audio:
-    name: Offline Rust mixer (${{ matrix.os }}, ${{ matrix.toolchain }})
+    name: Offline Rust stream (${{ matrix.os }}, ${{ matrix.toolchain }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -43,3 +49,12 @@ jobs:
         run: cargo test --manifest-path experiments/rust-audio/Cargo.toml --locked
       - name: Build
         run: cargo build --manifest-path experiments/rust-audio/Cargo.toml --release --locked
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked TypeScript reference dependencies
+        run: npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Typecheck the offline parity harness
+        run: node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
+      - name: Cross-language PCM and pipe protocol checks
+        run: node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts

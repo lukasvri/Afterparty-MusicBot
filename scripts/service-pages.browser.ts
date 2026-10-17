@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright");
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright") as typeof import("playwright");
 const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:8787";
 assert(["localhost", "127.0.0.1"].includes(new URL(base).hostname), "Use an isolated local preview");
 const browser = await chromium.launch({
@@ -9,7 +9,7 @@ const browser = await chromium.launch({
 });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  const clientErrors = [];
+  const clientErrors: string[] = [];
   page.on("pageerror", error => clientErrors.push(error.message));
   page.on("console", message => { if(message.type() === "error" && message.text().includes("[vinext]")) clientErrors.push(message.text()); });
   await page.route("**/*", route => {
@@ -25,6 +25,7 @@ try {
   await mkdir("outputs", { recursive: true });
   for (const pathname of ["/", "/admin", "/install", "/support", "/privacy", "/terms", "/patch-notes"]) {
     const response = await page.goto(base + pathname);
+    assert(response, pathname + " returns a navigation response");
     assert.equal(response.status(), 200, pathname + " loads");
     await page.locator("h1:visible").first().waitFor();
     if (pathname === "/admin") await page.locator('a[href="/api/auth/discord"]').waitFor();

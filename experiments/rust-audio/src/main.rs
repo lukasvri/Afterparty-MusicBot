@@ -1,13 +1,36 @@
 //! Standalone offline test. No Discord connection or Core integration.
-use afterparty_rust_audio::{FRAME_BYTES, mix_pcm};
+use afterparty_rust_audio::{FRAME_BYTES, mix_pcm, stream};
 use std::hint::black_box;
+use std::io;
+use std::process::ExitCode;
 use std::time::Instant;
 
-fn main() {
-    if std::env::args().nth(1).as_deref() != Some("--bench") {
-        eprintln!("Usage: afterparty-rust-audio --bench");
-        std::process::exit(2);
+fn main() -> ExitCode {
+    let mut args = std::env::args_os().skip(1);
+    match (args.next(), args.next()) {
+        (Some(mode), None) if mode == "--bench" => {
+            bench();
+            ExitCode::SUCCESS
+        }
+        (Some(mode), None) if mode == "--stream" => {
+            let input = io::stdin();
+            let output = io::stdout();
+            match stream::serve(&mut input.lock(), &mut output.lock()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("PCM stream error: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        _ => {
+            eprintln!("Usage: afterparty-rust-audio --bench | --stream");
+            ExitCode::from(2)
+        }
     }
+}
+
+fn bench() {
     let mut first = [0u8; FRAME_BYTES];
     let mut second = [0u8; FRAME_BYTES];
     for pair in first.chunks_exact_mut(2) {

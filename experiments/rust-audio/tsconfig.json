@@ -1,0 +1,9 @@
+{
+  "extends": "../../services/core/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "typeRoots": ["../../services/core/node_modules/@types"]
+  },
+  "include": ["*.ts"],
+  "exclude": ["target", "node_modules"]
+}

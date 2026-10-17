@@ -14,6 +14,7 @@ import { Rooms } from "./rooms.ts";
 import type { Guilds, GuildSession } from "./guilds.ts";
 import type { DiscordOAuth } from "./oauth.ts";
 import { verifyTicket } from "./tickets.ts";
+import { LIVE_SNAPSHOT_INTERVAL_MS } from "./protocol.ts";
 export function equalSecret(a: string, b: string) {
   return timingSafeEqual(
     createHash("sha256").update(a).digest(),
@@ -658,7 +659,7 @@ export async function createServers(
     }
   };
   rooms.on("change", roomBroadcast);
-  const roomClock = setInterval(roomBroadcast, 200);
+  const roomClock = setInterval(roomBroadcast, LIVE_SNAPSHOT_INTERVAL_MS);
   const roomAdvance = setInterval(() => {
     void rooms.tick().catch(() => {});
   }, 500);
@@ -667,13 +668,21 @@ export async function createServers(
     { state: () => void; clock: () => void }
   >();
   const subscribe = (source: Engine, id = "") => {
-    let last = 0;
-    const state = () => broadcast(id),
+    let last = performance.now();
+    let buffering = source.loading || source.sink.buffering();
+    const state = () => {
+        last = performance.now();
+        buffering = source.loading || source.sink.buffering();
+        broadcast(id);
+      },
       clock = () => {
-        if (performance.now() - last >= 250) {
-          last = performance.now();
-          broadcast(id);
-        }
+        // Buffering pauses the shared timeline, so do not wait for the next
+        // periodic snapshot to tell clients that audible playback has stopped.
+        const nextBuffering = source.loading || source.sink.buffering();
+        if (
+          nextBuffering !== buffering ||
+          performance.now() - last >= LIVE_SNAPSHOT_INTERVAL_MS
+        ) state();
       };
     source.on("state", state);
     source.on("clock", clock);

@@ -37,6 +37,9 @@ export type RoomTimeline = {
 };
 export const ROOM_START_LEAD_MS = 1500;
 export const ROOM_LEASE_MS = 5000;
+// Clients project the timestamped timeline locally between these snapshots.
+// Control changes and buffering transitions are still sent immediately.
+export const LIVE_SNAPSHOT_INTERVAL_MS = 1000;
 export function readRoomTimeline(value: unknown): RoomTimeline | null {
   if (!value || typeof value !== "object") return null;
   const r = value as RoomTimeline;
@@ -67,7 +70,17 @@ export function readRoomTimeline(value: unknown): RoomTimeline | null {
     !Array.isArray(r.queue) ||
     r.queue.length > 50 ||
     !r.queue.every((v) => v && video(v)) ||
+    r.syncSource !== "live" ||
     typeof r.syncEpoch !== "string" ||
+    !r.syncEpoch ||
+    r.syncEpoch.length > 160 ||
+    !Number.isFinite(r.syncValidForMs) ||
+    r.syncValidForMs < 0 ||
+    r.syncValidForMs > ROOM_LEASE_MS ||
+    !Number.isFinite(r.expiresAt) ||
+    !Number.isInteger(r.viewers) ||
+    r.viewers < 0 ||
+    typeof r.isHost !== "boolean" ||
     (r.startsAt !== undefined && !Number.isFinite(r.startsAt))
   )
     return null;

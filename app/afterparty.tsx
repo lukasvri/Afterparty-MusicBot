@@ -44,7 +44,9 @@ import { useImmersiveControls } from "@/hooks/use-immersive-controls";
 import { applyAudioPreferences } from "@/lib/audio-preferences";
 import {
   canCorrectPlayback,
+  isDuplicateSnapshot,
   isOlderSnapshot,
+  roomPollUpdate,
   transportChanged,
   compensateDelivery,
   playbackTarget,
@@ -189,15 +191,23 @@ export default function Afterparty() {
     toastTimer.current = setTimeout(() => setToast(""), 4500);
   }, []);
   const accept = useCallback(
-    (next: Room) => {
+    (next: Room, updateTimeline = true) => {
       const previous = roomRef.current;
+      if (!updateTimeline) {
+        if (previous?.code === next.code) {
+          roomRef.current = next;
+          setRoom(next);
+          setOnline(true);
+        }
+        return;
+      }
       if (previous?.code === next.code)
         next = {
           ...next,
           isPublic: next.isPublic ?? previous.isPublic,
           isOwner: next.isOwner ?? previous.isOwner,
         };
-      if (isOlderSnapshot(previous, next)) return;
+      if (isOlderSnapshot(previous, next) || isDuplicateSnapshot(previous, next)) return;
       if (transportChanged(previous, next)) transportChangedRef.current = true;
       if (
         previous?.code === next.code &&
@@ -274,36 +284,35 @@ export default function Afterparty() {
   const liveFresh = realtime.fresh;
   const authorityAt = useRef(0);
   const refresh = useCallback(
-    async (code: string) => {
-      if (
-        roomRef.current?.mode === "discord" &&
-        realtime.latest.current?.roomCode === code &&
-        liveFresh.current &&
-        realtime.latest.current
-      ) {
-        accept(
-          liveRoom(
-            realtime.latest.current,
-            performance.now() - realtime.sampleAt.current,
-          ),
-        );
-        return;
-      }
+    async (code: string, signal?: AbortSignal) => {
       const generation = pollGeneration.current,
         started = performance.now();
       const next = await request<Room>(`/api/rooms/${code}`, {
         headers: headers(code),
+        ...(signal ? { signal } : {}),
       });
       if (
         mounted.current &&
         generation === pollGeneration.current &&
-        activeCode.current === code
+        activeCode.current === code &&
+        next.code === code
       ) {
         authorityAt.current = performance.now();
-        accept(compensateDelivery(next, performance.now() - started));
+        const update = roomPollUpdate(
+          roomRef.current,
+          next,
+          roomRef.current?.mode === "discord" ? liveFresh.current : roomLive.fresh.current,
+        );
+        if (update.timeline) {
+          accept(compensateDelivery(update.snapshot, performance.now() - started));
+        } else {
+          // Authority/presence can change independently of the playback sample.
+          // Retain its original local receipt time and remaining lease.
+          accept(update.snapshot, false);
+        }
       }
     },
-    [accept, liveFresh, realtime.latest, realtime.sampleAt],
+    [accept, liveFresh, roomLive.fresh],
   );
   const join = useCallback(
     async (code: string, recordHistory = true) => {
@@ -617,18 +626,23 @@ export default function Afterparty() {
       }, e => { if(mounted.current && generation === joinGeneration.current){setError(e.message);setLoadingRoom(false);} });
     }
     const pop = () => {
+      const generation = ++joinGeneration.current;
       const p = new URLSearchParams(location.search);
       setDirectoryOpen(p.get("view") === "rooms");
       setTV(p.get("tv") === "1");
       const next = p.get("room");
       if (next && next !== activeCode.current) {
+        const started = performance.now();
         void request<Room>(`/api/rooms/${next}`, { headers: headers(next) })
           .then((value) => {
+            if (!mounted.current || generation !== joinGeneration.current) return;
             pollGeneration.current++;
             activeCode.current = next;
-            accept(value);
+            accept(compensateDelivery(value, performance.now() - started));
           })
-          .catch((e) => setError(e.message));
+          .catch((e) => {
+            if (mounted.current && generation === joinGeneration.current) setError(e.message);
+          });
       } else if (!next) {
         pollGeneration.current++;
         activeCode.current = "";
@@ -710,9 +724,7 @@ export default function Afterparty() {
       if (status !== "done") throw new Error("Boten bekreftet ikke kommandoen.");
       // A cached stream sample can predate the command. Read public authority
       // directly, retaining concert filtering and rejecting older snapshots.
-      const started = performance.now(),
-        next = await request<Room>(`/api/rooms/${target.code}`, { headers: headers(target.code) });
-      if (current()) accept(compensateDelivery(next, performance.now() - started));
+      await refresh(target.code);
     } catch (error) {
       if (current()) setError((error as Error).message);
     }
@@ -763,6 +775,7 @@ export default function Afterparty() {
         sent.status === "done"
           ? { command: { status: "done" } }
           : await deliverCommand(sent);
+      if (!mounted.current || generation !== pollGeneration.current) return false;
       if (
         immediate?.command.status === "failed" ||
         immediate?.command.status === "unknown"
@@ -787,7 +800,7 @@ export default function Afterparty() {
       }
       const deadline = performance.now() + 35000;
       let confirmed = false;
-      while (mounted.current && performance.now() < deadline) {
+      while (mounted.current && generation === pollGeneration.current && performance.now() < deadline) {
         const response = await request<{
           state: DiscordState | null;
           command: { status: string; result: string } | null;
@@ -834,6 +847,7 @@ export default function Afterparty() {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
+    const guildId = room?.guildId;
     const update = async () => {
       try {
         if (
@@ -845,8 +859,8 @@ export default function Afterparty() {
         }
         const d = await request<{ state: DiscordState | null }>(
           "/api/discord" +
-            (roomRef.current?.guildId
-              ? "?guildId=" + roomRef.current.guildId
+            (guildId
+              ? "?guildId=" + guildId
               : ""),
           {
             signal: AbortSignal.any([
@@ -855,9 +869,9 @@ export default function Afterparty() {
             ]),
           },
         );
-        if (!disposed && !liveFresh.current) setDiscord(d.state);
+        if (!disposed && !liveFresh.current && (!guildId || !d.state || d.state.guildId === guildId)) setDiscord(d.state);
       } catch {
-        if (!disposed)
+        if (!disposed && !liveFresh.current)
           setDiscord((previous) =>
             previous ? { ...previous, online: false } : null,
           );
@@ -870,7 +884,7 @@ export default function Afterparty() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [liveFresh]);
+  }, [liveFresh, room?.guildId, room?.mode, realtime.live]);
   function startVideo() {
     const r = roomRef.current;
     if (!r?.current) return;
@@ -911,6 +925,7 @@ export default function Afterparty() {
     let stopped = false,
       inFlight = false;
     let timer: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
     const poll = async () => {
       if (stopped || inFlight) return;
       inFlight = true;
@@ -921,9 +936,9 @@ export default function Afterparty() {
               performance.now() - authorityAt.current > 15000
             : !liveFresh.current
         )
-          await refresh(room.code);
+          await refresh(room.code, AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]));
       } catch (e) {
-        if (!stopped) {
+        if (!stopped && !(room.mode === "discord" ? liveFresh.current : roomLive.fresh.current)) {
           setOnline(false);
           if ((e as Error).message.includes("avsluttet")) {
             setError((e as Error).message);
@@ -946,6 +961,7 @@ export default function Afterparty() {
     document.addEventListener("visibilitychange", focus);
     return () => {
       stopped = true;
+      controller.abort();
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", focus);
     };

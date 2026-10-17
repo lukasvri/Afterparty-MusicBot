@@ -1,10 +1,207 @@
-import {Engine} from './engine.ts';
-import {Commands} from './commands.ts';
-export class Publisher{
- engine:Engine;commands:Commands;url:string;key:string;running=false;dirty=false;closed=false;timer:ReturnType<typeof setInterval>;offset=0;lastWarning=0;context:Record<string,string>;
- constructor(engine:Engine,commands:Commands,url:string,key:string,context:Record<string,string>={}){this.context=context;this.engine=engine;this.commands=commands;this.url=url;this.key=key;this.timer=setInterval(()=>void this.sync(),5000);engine.on('state',this.changed);void this.sync();}
- changed=()=>{this.dirty=true;void this.sync();};
- async sync(){if(this.running||this.closed)return;this.running=true;this.dirty=false;const state=this.engine.websiteSnapshot(),events=this.engine.store.events(),results=this.engine.store.bridgeResults();try{const now=Date.now();const publicState={...state,current:state.current&&/^[\w-]{11}$/.test(state.current.id)?state.current:null,queue:state.queue.filter(t=>/^[\w-]{11}$/.test(t.id))};const response=await fetch(new URL('/api/bridge',this.url),{method:'POST',redirect:'error',headers:{Authorization:'Bearer '+this.key,'Content-Type':'application/json'},body:JSON.stringify({...this.context,state:publicState,sampledAt:now+this.offset,events:events.filter(e=>e.video.concert),results}),signal:AbortSignal.timeout(10000)});if(!response.ok)throw new Error('Publikumsbroen svarte ikke.');const data=await response.json() as {serverTime:number;commands:(Parameters<Commands["execute"]>[0] & {id:string;expiresAt:number})[]};this.offset=data.serverTime-(now+Date.now())/2;this.engine.store.acknowledge(events.map(e=>e.id));this.engine.store.acknowledgeJobs(results.map(r=>r.id));for(const job of data.commands??[]){const old=this.engine.store.job(job.id,{...job,bridge:true});if(old)continue;if(job.expiresAt<Date.now()){this.engine.store.finishJob(job.id,'failed','Kommandoen utløp før den nådde boten.');continue;}void this.commands.execute(job,job.id.startsWith('public:')?'public':'admin').then(result=>{this.engine.store.finishJob(job.id,'done',result);this.dirty=true;void this.sync();}).catch(error=>{this.engine.store.finishJob(job.id,'failed',error instanceof Error?error.message:'Kommandoen mislyktes.');this.dirty=true;void this.sync();});}}
- catch{if(Date.now()-this.lastWarning>60000){console.warn('Publikumsbroen er midlertidig utilgjengelig. Historikk og resultater beholdes lokalt.');this.lastWarning=Date.now();}}finally{this.running=false;if(this.dirty&&!this.closed)setTimeout(()=>void this.sync(),50);}}
- close(){this.closed=true;clearInterval(this.timer);this.engine.off('state',this.changed);}
+import { Engine } from "./engine.ts";
+import { Commands } from "./commands.ts";
+
+const HEARTBEAT_MS = 5000;
+const CHANGE_DELAY_MS = 50;
+const MAX_RETRY_MS = 30000;
+
+type BridgeJob = Record<string, unknown> & {
+  id: string;
+  action: string;
+  expiresAt: number;
+};
+type BridgeReply = { serverTime: number; commands: BridgeJob[] };
+
+function readReply(value: unknown): BridgeReply {
+  if (!value || typeof value !== "object") throw new Error("Ugyldig brosvar.");
+  const data = value as Partial<BridgeReply>;
+  if (
+    !Number.isFinite(data.serverTime) ||
+    !Array.isArray(data.commands) ||
+    data.commands.length > 5 ||
+    data.commands.some(
+      (job) =>
+        !job ||
+        typeof job !== "object" ||
+        typeof job.id !== "string" ||
+        !job.id ||
+        job.id.length > 160 ||
+        typeof job.action !== "string" ||
+        !Number.isFinite(job.expiresAt),
+    )
+  )
+    throw new Error("Ugyldig brosvar.");
+  return data as BridgeReply;
+}
+
+/** Durable fallback bridge. Live playback updates use Core's direct transport. */
+export class Publisher {
+  readonly engine: Engine;
+  readonly commands: Commands;
+  readonly url: string;
+  readonly key: string;
+  readonly context: Record<string, string>;
+  running = false;
+  dirty = false;
+  closed = false;
+  offset = 0;
+  lastWarning = 0;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private scheduledAt = Infinity;
+  private retryAt = 0;
+  private failures = 0;
+  private request: AbortController | null = null;
+
+  constructor(
+    engine: Engine,
+    commands: Commands,
+    url: string,
+    key: string,
+    context: Record<string, string> = {},
+  ) {
+    this.context = context;
+    this.engine = engine;
+    this.commands = commands;
+    this.url = url;
+    this.key = key;
+    engine.on("state", this.changed);
+    void this.sync();
+  }
+
+  private schedule(delay: number) {
+    if (this.closed) return;
+    const at = performance.now() + delay;
+    if (this.timer && this.scheduledAt <= at) return;
+    clearTimeout(this.timer);
+    this.scheduledAt = at;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      this.scheduledAt = Infinity;
+      void this.sync();
+    }, delay);
+  }
+
+  changed = () => {
+    this.dirty = true;
+    if (!this.running)
+      this.schedule(Math.max(CHANGE_DELAY_MS, this.retryAt - performance.now()));
+  };
+
+  async sync() {
+    if (this.running || this.closed) return;
+    const retryIn = this.retryAt - performance.now();
+    if (retryIn > 0) {
+      this.schedule(retryIn);
+      return;
+    }
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    this.scheduledAt = Infinity;
+    this.running = true;
+    this.dirty = false;
+    this.request = new AbortController();
+    try {
+      const state = this.engine.websiteSnapshot();
+      const events = this.engine.store.events();
+      const results = this.engine.store.bridgeResults();
+      const started = performance.now();
+      const publicState = {
+        ...state,
+        current:
+          state.current && /^[\w-]{11}$/.test(state.current.id)
+            ? state.current
+            : null,
+        queue: state.queue.filter((track) => /^[\w-]{11}$/.test(track.id)),
+      };
+      const response = await fetch(new URL("/api/bridge", this.url), {
+        method: "POST",
+        redirect: "error",
+        headers: {
+          Authorization: "Bearer " + this.key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...this.context,
+          state: publicState,
+          sampledAt: state.serverTime + this.offset,
+          events: events.filter((event) => event.video.concert),
+          results,
+        }),
+        signal: AbortSignal.any([
+          this.request.signal,
+          AbortSignal.timeout(10000),
+        ]),
+      });
+      if (this.closed) return;
+      if (!response.ok) throw new Error("Publikumsbroen svarte ikke.");
+      // A 200 response alone cannot acknowledge durable data or supply a clock.
+      const data = readReply(await response.json());
+      if (this.closed) return;
+      const received = performance.now();
+      const elapsed = received - started;
+      this.offset = data.serverTime + elapsed / 2 - Date.now();
+      this.engine.store.acknowledge(events.map((event) => event.id));
+      this.engine.store.acknowledgeJobs(results.map((result) => result.id));
+      this.failures = 0;
+      this.retryAt = 0;
+      for (const job of data.commands) {
+        const old = this.engine.store.job(job.id, { ...job, bridge: true });
+        if (old) continue;
+        // Job deadlines use the website's clock. Compare on that clock even
+        // when this host's wall clock differs or changes during the request.
+        const serverNow = data.serverTime + elapsed / 2 + performance.now() - received;
+        if (job.expiresAt <= serverNow) {
+          this.engine.store.finishJob(
+            job.id,
+            "failed",
+            "Kommandoen utløp før den nådde boten.",
+          );
+          this.dirty = true;
+          continue;
+        }
+        void this.commands.execute(job, job.id.startsWith("public:") ? "public" : "admin")
+          .then((result) => {
+            if (this.closed) return;
+            this.engine.store.finishJob(job.id, "done", result);
+            this.changed();
+          })
+          .catch((error: unknown) => {
+            if (this.closed) return;
+            this.engine.store.finishJob(
+              job.id,
+              "failed",
+              error instanceof Error ? error.message : "Kommandoen mislyktes.",
+            );
+            this.changed();
+          });
+      }
+    } catch {
+      if (this.closed) return;
+      this.dirty = true;
+      this.retryAt = performance.now() + Math.min(
+        MAX_RETRY_MS,
+        HEARTBEAT_MS * 2 ** Math.min(this.failures++, 3),
+      );
+      if (Date.now() - this.lastWarning > 60000) {
+        console.warn(
+          "Publikumsbroen er midlertidig utilgjengelig. Historikk og resultater beholdes lokalt.",
+        );
+        this.lastWarning = Date.now();
+      }
+    } finally {
+      this.running = false;
+      this.request = null;
+      this.schedule(Math.max(
+        this.retryAt - performance.now(),
+        this.dirty ? CHANGE_DELAY_MS : HEARTBEAT_MS,
+      ));
+    }
+  }
+
+  close() {
+    this.closed = true;
+    clearTimeout(this.timer);
+    this.request?.abort();
+    this.engine.off("state", this.changed);
+  }
 }
