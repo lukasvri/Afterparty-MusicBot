@@ -267,7 +267,11 @@ export function changeRoom(
     }
   } else if (action === "undo") {
     if (!state.undoQueue) throw new UserError("Ingen køendring å angre.");
-    const restored = state.undoQueue.filter((v) => v.id !== state.current?.id && (state.radio !== false || !v.radio));
+    // A manual re-add is the current explicit choice. Keep its metadata and
+    // manual status at the restored slot instead of resurrecting its radio copy.
+    const restored = state.undoQueue.map((saved) =>
+      state.queue.find((queued) => queued.id === saved.id && !queued.radio) ?? saved,
+    ).filter((v) => v.id !== state.current?.id && (state.radio !== false || !v.radio));
     const additions = state.queue.filter(
       (v) => !restored.some((saved) => saved.id === v.id),
     );
@@ -275,11 +279,14 @@ export function changeRoom(
       throw new UserError(
         "Køen er for full til å angre. Fjern noen låter først.",
       );
+    const restoredSuggestions = restored.filter(
+      (track) => track.radio && !state.queue.some((queued) => queued.id === track.id),
+    );
     state.queue = [...restored, ...additions];
     // Undo is an explicit request to restore these suggestions. It lifts only
     // their removal exclusions; current/history validation still applies.
-    const restoredIds = new Set(restored.map((track) => track.id));
-    const restoredSongs = new Set(restored.map(songIdentity));
+    const restoredIds = new Set(restoredSuggestions.map((track) => track.id));
+    const restoredSongs = new Set(restoredSuggestions.map(songIdentity));
     state.radioExcluded = state.radioExcluded?.filter((id) => !restoredIds.has(id));
     state.radioExcludedSongs = state.radioExcludedSongs?.filter((track) => !restoredSongs.has(songIdentity(track)));
     state.queue = playableRoomQueue(state);
