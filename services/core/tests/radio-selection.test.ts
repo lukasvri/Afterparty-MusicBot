@@ -73,6 +73,7 @@ test("HTTP 200 can yield no catalog songs; an eligible fallback still succeeds",
       { name: "Tutorial", artist: { name: "Other Artist" }, match: "0.9" },
     ] } });
   });
+  p.recommendations.topTracks = async () => [];
   try {
     assert.deepEqual(await p.recommendations.similar(named), []);
     p.search = async () => [];
@@ -86,6 +87,7 @@ test("HTTP 200 can yield no catalog songs; an eligible fallback still succeeds",
 test("catalog matches can all fail style checks before a positive fallback", async () => {
   const store = new Store(":memory:");
   const p = new Providers(store, { LASTFM_API_KEY: "synthetic" });
+  p.recommendations.topTracks = async () => [];
   const named = { ...seed, title: "Seed Artist - Seed song" };
   const matched: string[] = [];
   p.recommendations.similar = async () => [1, 2, 3].map((n) => ({

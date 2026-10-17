@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.2.0",
+    "date": "2026-10-17",
+    "title": "Radio 2.0: shared discovery and safer recovery",
+    "items": [
+      "Radio uses one shared selection pipeline for Discord, browser rooms and the website fallback. It compares bounded recommendation and search pools before selecting, preserving the original song, matching style, manual queue priority and private server boundaries.",
+      "Known played or rejected recordings are filtered before catalog matching, so duplicate results no longer consume the limited playback lookups. Sparse results can fall back to the original artist, and empty recommendation caches expire sooner so a later retry can recover.",
+      "Automatic choices still reject unsafe content, conflicting styles and repeated recordings. Structured diagnostics distinguish empty providers, rejected candidates and lookup failures without recording song titles, room identifiers or credentials. Existing playback clocks, revision checks and cooldowns remain in effect."
+    ]
+  },
+  {
     "version": "2.1.6",
     "date": "2026-10-17",
     "title": "Less repeated work in settings, queues and radio",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { radioStyleCompatible, rankRadio } from "../src/radio.ts";
-import { playableRoomQueue, roomRecommendation } from "../src/room-radio.ts";
+import { playableRoomQueue, roomRecommendation, type RoomRadioDiagnostic } from "../src/room-radio.ts";
 import type { RoomVideo } from "../src/protocol.ts";
 import type { Track } from "../src/types.ts";
 
@@ -13,6 +13,16 @@ const track = (v: RoomVideo): Track => ({ ...v, entryId: v.id, source: "youtube"
 const seed = video("lenskoroot1", "Lensko - Let's Go! | House | NCS");
 const metadata = video("lenskotag01", "Lensko - Let's Go! [Electro House]");
 const suggestion = video("nextsong001", "Another Artist - New Song [Electro House]");
+const diagnosticSummary = (value: unknown) => {
+  const result = value as RoomRadioDiagnostic;
+  assert.equal(result.version, 2);
+  assert.equal(result.catalogMatches, 0);
+  assert.equal(result.failedCatalogMatches, 0);
+  assert.equal(result.stages.catalog, "unavailable");
+  assert.equal(result.stages["artist-catalog"], "unavailable");
+  const { outcome, seedGenre, artistKnown, metadata, searches, failedSearches, candidates } = result;
+  return { outcome, seedGenre, artistKnown, metadata, searches, failedSearches, candidates };
+};
 
 test("broad house metadata can be refined by the exact recording", async () => {
   const queries: string[] = [];
@@ -108,8 +118,11 @@ test("artist fallback rejects irrelevant videos and repeated recordings after an
     async query => query.startsWith("Lensko ") ? unsafe : [],
     diagnostic => diagnostics.push(diagnostic));
   assert.equal(result, null);
-  assert.deepEqual(diagnostics, [{ outcome: "filtered", seedGenre: "electro house", artistKnown: true,
+  assert.deepEqual(diagnostics.map(diagnosticSummary), [{ outcome: "filtered", seedGenre: "electro house", artistKnown: true,
     metadata: "unchanged", searches: 2, failedSearches: 0, candidates: unsafe.length }]);
+  assert.deepEqual((diagnostics[0] as RoomRadioDiagnostic).rejected, {
+    content: 2, visibility: 1, style: 1, relationship: 1, excluded: 1, recording: 2, "catalog-match": 0,
+  });
 });
 
 test("sanitized diagnostics distinguish empty searches, provider errors and missing seed evidence", async () => {
@@ -123,7 +136,7 @@ test("sanitized diagnostics distinguish empty searches, provider errors and miss
   await roomRecommendation({ current: { ...specific, title: "Unknown song", genres: ["house"] }, queue: [] }, async () => {
     assert.fail("insufficient metadata should not trigger provider searches");
   }, diagnose);
-  assert.deepEqual(diagnostics, [
+  assert.deepEqual(diagnostics.map(diagnosticSummary), [
     { outcome: "empty", seedGenre: "electro house", artistKnown: true, metadata: "unchanged", searches: 2, failedSearches: 0, candidates: 0 },
     { outcome: "provider-error", seedGenre: "electro house", artistKnown: true, metadata: "unchanged", searches: 2, failedSearches: 2, candidates: 0 },
     { outcome: "insufficient-metadata", seedGenre: "house", artistKnown: false, metadata: "unchanged", searches: 0, failedSearches: 0, candidates: 0 },
