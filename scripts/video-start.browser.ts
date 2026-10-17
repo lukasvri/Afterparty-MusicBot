@@ -967,3 +967,18 @@ test("unified settings preserve playback across mobile and desktop fullscreen", 
     assert.equal(commands.length,sent,'Device settings and fullscreen must not publish shared playback commands');
   } finally {await browser.close();}
 });
+
+test("room hosts can retry an empty radio queue without restarting playback", async () => {
+  const {browser,page,commands} = await fixture({playing:true});
+  try {
+    await page.locator('.stage-intro button').click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.evaluate(() => {window.__originalPlayer=window.__fakePlayer;});
+    await page.locator('.video-settings > summary').click();
+    await page.getByRole('button',{name:'Retry radio',exact:true}).click();
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.queue-options > button')?.disabled);
+    assert.deepEqual(commands.filter(command => command.action === 'radio').map(command => command.enabled),[true]);
+    assert.equal(commands.filter(command => ['play','pause','seek','next'].includes(command.action)).length,0);
+    assert(await page.evaluate(() => window.__fakePlayer===window.__originalPlayer && window.__fakePlayer.state===1));
+  } finally {await browser.close();}
+});
