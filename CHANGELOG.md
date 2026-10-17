@@ -4,6 +4,12 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.1.4: Preserve radio exclusions when undoing queue edits
+
+2026-10-17
+
+- Undoing a room queue edit clears radio exclusions only for automatic suggestions actually restored by that undo. Previously rejected songs and alternate uploads stay excluded from radio when they are also present as explicit manual queue choices. Manual playback, queue order and the shared playback clock are preserved.
+
 ## v2.1.3: Unified settings and radio recovery
 
 2026-10-17

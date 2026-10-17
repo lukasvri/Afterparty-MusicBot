@@ -1,5 +1,6 @@
 // Synthetic UI workflows. Run only against a local production preview.
 import assert from "node:assert/strict";
+import releases from "../lib/releases.json" with { type: "json" };
 import type { Room, Video } from "../lib/types.ts";
 type RoomRequest = { action?: string; enabled?: boolean; actorHash?: string; isPublic?: boolean };
 const { chromium } = await import(
@@ -137,7 +138,7 @@ try {
   await page.locator(".motion-toggle").click();
   assert((await sceneAnimations()) > 0, "The site's motion control must restore stage animation");
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Unified settings and radio recovery" }).waitFor();
+  await page.getByRole("heading", { name: releases[0].title }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });

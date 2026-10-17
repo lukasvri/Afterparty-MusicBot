@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.1.4",
+    "date": "2026-10-17",
+    "title": "Preserve radio exclusions when undoing queue edits",
+    "items": [
+      "Undoing a room queue edit clears radio exclusions only for automatic suggestions actually restored by that undo. Previously rejected songs and alternate uploads stay excluded from radio when they are also present as explicit manual queue choices. Manual playback, queue order and the shared playback clock are preserved."
+    ]
+  },
+  {
     "version": "2.1.3",
     "date": "2026-10-17",
     "title": "Unified settings and radio recovery",
