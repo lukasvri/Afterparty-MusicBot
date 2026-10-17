@@ -1,6 +1,6 @@
 import {
   radioArtist,
-  radioGenre,
+  radioStyleCompatible,
   radioTitle,
   radioQuery,
   rankRadio,
@@ -8,6 +8,7 @@ import {
   specificRadioGenre,
   sameRadioRecording,
   RADIO_HISTORY_LIMIT,
+  radioGenre,
 } from "./radio.ts";
 import type { RoomVideo } from "./protocol.ts";
 
@@ -20,6 +21,15 @@ export type RoomRadioState = {
   history?: RoomVideo[];
   radioExcluded?: string[];
   radioExcludedSongs?: RoomVideo[];
+};
+export type RoomRadioDiagnostic = {
+  outcome: "selected" | "empty" | "filtered" | "provider-error" | "insufficient-metadata";
+  seedGenre: string | null;
+  artistKnown: boolean;
+  metadata: "unchanged" | "refined" | "unavailable";
+  searches: number;
+  failedSearches: number;
+  candidates: number;
 };
 export function roomRadioSeed(state: RoomRadioState) {
   if (state.current?.radio === false) return state.current;
@@ -58,6 +68,8 @@ export function playableRoomQueue(state: RoomRadioState) {
 export async function roomRecommendation(
   state: RoomRadioState,
   search: (query: string) => Promise<RoomVideo[]>,
+  diagnose: (result: RoomRadioDiagnostic) => void = (result) =>
+    console.info("room-radio", JSON.stringify(result)),
 ): Promise<RoomVideo | null> {
   let seed = roomRadioSeed(state);
   if (
@@ -69,47 +81,62 @@ export async function roomRecommendation(
   )
     return null;
   const artist = radioArtist(seed);
-  let genre = radioGenre(seed);
-  // An untagged original may have a genre-tagged upload of the same recording.
+  let metadata: RoomRadioDiagnostic["metadata"] = "unchanged";
+  // Missing or broad metadata can be refined by a specific label on an upload
+  // of the same recording. A broad label alone never admits another artist.
   // Only use that label after matching both artist and song, never search rank alone.
-  if (!genre && artist) {
+  if (!specificRadioGenre(seed) && artist) {
     try {
-      const metadata = await search(
+      const metadataCandidates = await search(
         `${artist} "${radioTitle(seed).replace(/"/g, "")}"`,
       );
-      const tagged = metadata.find(
+      const tagged = metadataCandidates.find(
         (candidate) =>
           isRadioMusic(candidate) &&
           candidate.embeddable &&
-          radioGenre(candidate) &&
+          specificRadioGenre(candidate) &&
+          radioStyleCompatible(seed!, candidate) &&
           sameRadioRecording(seed!, candidate),
       );
       if (tagged) {
-        genre = radioGenre(tagged);
         seed = { ...seed, title: tagged.title, genres: tagged.genres };
+        metadata = "refined";
       }
     } catch {
+      metadata = "unavailable";
       /* retain conservative matching when metadata lookup is unavailable */
     }
   }
-  if (!artist && !specificRadioGenre(seed)) return null;
+  if (!artist && !specificRadioGenre(seed)) {
+    diagnose({ outcome: "insufficient-metadata", seedGenre: radioGenre(seed), artistKnown: false,
+      metadata, searches: 0, failedSearches: 0, candidates: 0 });
+    return null;
+  }
   const track = (video: RoomVideo) => ({
     ...video,
     entryId: video.id,
     source: "youtube" as const,
   });
-  // Search the explicit genre across artists. Keep the same relevance constraint
-  // on the retry; never accept an unrelated result just to keep playing.
+  // Try genre discovery first, then the original artist if known. Repeating
+  // the same genre-only search cannot recover a sparse genre result. Both
+  // paths still enforce the same content, history and relevance constraints.
   const queries = [
     radioQuery(seed),
-    `${specificRadioGenre(seed) ?? artist} music audio`,
+    `${artist || specificRadioGenre(seed)} music audio`,
   ];
   let failure: unknown;
   let succeeded = false;
+  let searches = 0, failedSearches = 0, candidatesSeen = 0;
+  const report = (outcome: RoomRadioDiagnostic["outcome"]) => diagnose({
+    outcome, seedGenre: radioGenre(seed!), artistKnown: Boolean(artist), metadata,
+    searches, failedSearches, candidates: candidatesSeen,
+  });
   for (const query of queries) {
+    searches++;
     try {
       const candidates = await search(query);
       succeeded = true;
+      candidatesSeen += candidates.length;
       const next = rankRadio(
         track(seed),
         candidates.filter((video) => video.embeddable).map(track),
@@ -121,7 +148,8 @@ export async function roomRecommendation(
         ],
         state.radioExcluded ?? [],
       )[0];
-      if (next)
+      if (next) {
+        report("selected");
         return {
           id: next.id,
           title: next.title,
@@ -134,11 +162,17 @@ export async function roomRecommendation(
           live: next.live,
           embeddable: next.embeddable,
         };
+      }
     } catch (error) {
       failure = error;
+      failedSearches++;
     }
   }
-  if (!succeeded && failure) throw failure;
+  if (!succeeded && failure) {
+    report("provider-error");
+    throw failure;
+  }
+  report(candidatesSeen ? "filtered" : "empty");
   return null;
 }
 export function roomRadioHistory(state: RoomRadioState) {

@@ -49,12 +49,15 @@ These commands install the locked website and Core dependency trees, run deploym
 
 Keep the change focused, update the relevant guide and describe the resulting behavior. Public documentation is English. Use TypeScript for new application code and first-party Node tooling; see [TypeScript conventions](docs/TYPESCRIPT.md).
 
-Report the checks you actually ran and anything you could not verify. For playback UI changes, add the relevant local Chromium checks described in the [release review](docs/RELEASE_REVIEW.md#verification). For documentation, check local links, image paths and the rendered layout. `npm run lint` currently has existing failures; report them honestly and do not disable rules to hide them.
+Report the checks you actually ran and anything you could not verify. For playback UI changes, add the relevant local Chromium checks described in the [release review](docs/RELEASE_REVIEW.md#verification). For documentation, check local links, image paths and the rendered layout. Run lint with zero warnings for code changes; report failures honestly and do not disable rules to hide them.
 
-Follow the [release policy](docs/RELEASING.md) when preparing a product release. `CHANGELOG.md` is generated from the shared release sources; do not edit it by hand or renumber historical entries. Documentation cleanup alone does not require publishing a release.
+Include and update release/patch notes for every code or user-facing change in the same PR, following [notes for every change](docs/RELEASING.md#notes-for-every-change). Use the existing shared release source and verify relevant website patch notes. `CHANGELOG.md` is generated; do not edit it by hand or renumber historical entries. Internal documentation-only changes record their impact in the PR without a product release. Isolated Rust experiments targeting `dev` carry experimental notes in their PR until separately approved for product adoption.
 
 ## Submit the pull request
 
 Describe the problem, the resulting behavior and the validation. Include before/after images for visible changes and call out remaining uncertainty. Submit cloud work on a separate branch as a draft for review. A PR does not deploy the website or restart Core.
+
+State the release-note source, website relevance and version decision in the PR.
+Require owner approval before merging, enabling auto-merge, publishing or deploying.
 
 Contributions are submitted under the project's MIT license. Preserve third-party notices. Never commit `.env`, `.dev.vars`, database files, backups, private logs or deployment-specific hosting IDs.

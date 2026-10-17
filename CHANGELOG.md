@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.1.3: Unified settings and radio recovery
+
+2026-10-17
+
+- Room, Queue and Video controls share one settings panel in browser rooms and Discord concerts, including fullscreen. Mobile name and TV controls fit within the viewport.
+- Radio can refine broad House metadata from a validated upload of the same recording and use a bounded original-artist fallback when a genre search is sparse. Unrelated videos, conflicting styles, non-music results and repeated recordings remain excluded.
+- Hosts can retry radio while the current track keeps playing. Empty retries report that no suitable track was found, preserve the shared playback clock and apply the same 15 second automatic-search cooldown in Core and the website fallback.
+
 ## v2.1.2: Discord video seeking and release readiness
 
 2026-10-16

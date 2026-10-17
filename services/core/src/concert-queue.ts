@@ -167,7 +167,7 @@ export class ConcertQueue {
       );
       const desired = [...old, ...additions];
       if (
-        e.queue.filter((t) => !t.concert).length + desired.length >
+        e.queue.filter((t) => !t.concert).length + desired.length + s.requests.length >
         e.settings.playlistLimit
       )
         throw new UserError("Køen er full.");

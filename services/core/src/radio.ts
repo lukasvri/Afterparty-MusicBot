@@ -23,7 +23,15 @@ export function canPlayRadioTrack(seed: Track, track: Track) {
 export function radioStyleCompatible(seed: RadioTrack, track: RadioTrack) {
   const genre = radioGenre(seed),
     candidate = radioGenre(track);
-  return !genre || !candidate || genre === candidate;
+  // A broad House label is incomplete, not evidence against a named House
+  // subgenre. This only removes a contradiction; radioRelated still requires
+  // the same artist, the same specific genre or a vetted recording relation.
+  // Two different specific subgenres remain incompatible.
+  return (
+    !genre || !candidate || genre === candidate ||
+    (genre === "house" && candidate.endsWith(" house")) ||
+    (candidate === "house" && genre.endsWith(" house"))
+  );
 }
 /** Missing category data is unknown; an explicit non-music category is negative evidence. */
 export function metadataMusic(category: unknown, categories?: unknown): boolean | undefined {

@@ -493,7 +493,7 @@ test("server-owned room progression loads the next track without a browser next 
       commands.filter((command) => command.action === "next").length,
       0,
     );
-    await page.locator(".room-options > summary").click();
+    await page.locator(".video-settings > summary").click();
     await page.getByRole("button", { name: "Radio on", exact: true }).click();
     await page
       .getByRole("button", { name: "Radio off", exact: true })
@@ -810,10 +810,20 @@ test(`Core integration: ${source} add from idle then manager seeks forward and b
   await page.waitForFunction(()=>window.__fakePlayer.getCurrentTime()>2);
   await page.waitForTimeout(500);
   for(const seconds of [80,35]) {
+   const completed = page.waitForResponse(response => {
+    const request = response.request();
+    return new URL(response.url()).pathname === '/api/admin/control' && request.method() === 'POST' &&
+      request.postDataJSON()?.command?.seconds === seconds;
+   });
    await page.evaluate(seconds=>{const p=window.__fakePlayer;p.emit(3);p.position=seconds;p.at=performance.now();p.emit(2);},seconds);
-   await page.waitForTimeout(1800);
+   assert((await completed).ok(), 'Native seek command must be accepted by Core');
+   const deadline = Date.now() + 10000;
+   let measured = await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   while (Date.now() < deadline && (Math.abs(core.engine.snapshot().position-seconds)>=4 || Math.abs(measured-core.engine.snapshot().position)>=1)) {
+    await new Promise(resolve=>setTimeout(resolve,50));
+    measured=await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   }
    assert(Math.abs(core.engine.snapshot().position-seconds)<4, 'Native seek must reach Core instead of snapping back');
-   const measured=await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
    assert(Math.abs(measured-core.engine.snapshot().position)<1,'Browser follows Core after seek');
   }
   assert.equal(commands.filter(c=>c.action==='seek').length,2);
@@ -926,4 +936,63 @@ test(`Core integration: ${name}`, async () => {
    }
   } finally { await core.close(); }
  }
+});
+
+for (const host of [true,false])
+test(`unified settings preserve playback across mobile and desktop fullscreen for ${host?'hosts':'guests'}`, async () => {
+  const {browser, page, commands} = await fixture({playing:true,host});
+  try {
+    await page.locator('.stage-intro button').click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.evaluate(() => {window.__originalPlayer = window.__fakePlayer;});
+    const sent = commands.length;
+    await page.locator('.video-settings > summary').click();
+    await page.getByLabel('Your nickname').fill('Synthetic guest');
+    await page.locator('.video-settings select').selectOption('stable');
+    for (const width of [360, 390, 1440]) {
+      await page.setViewportSize({width,height:900});
+      await page.locator('[data-fullscreen-button]').click();
+      await page.locator('.stage-panel[data-immersive=true]').waitFor();
+      assert.equal(await page.locator('.video-settings').count(),1);
+      assert(await page.getByRole('heading',{name:'Room settings',exact:true}).isVisible());
+      assert(await page.getByRole('heading',{name:'Queue settings',exact:true}).isVisible());
+      assert(await page.getByRole('heading',{name:'Video settings',exact:true}).isVisible());
+      assert.equal(await page.getByLabel('Your nickname').inputValue(),'Synthetic guest');
+      assert.equal(await page.locator('.video-settings select').inputValue(),'stable');
+      assert(await page.locator('.video-settings-body').evaluate(el => {
+        const panel=el.getBoundingClientRect();
+        const name=el.querySelector<HTMLInputElement>('.display-name input')!.getBoundingClientRect();
+        const tv=el.querySelector('.tv-mode-button')!.getBoundingClientRect();
+        const controls=Array.from(el.querySelectorAll('.party-tools > button,.party-tools > label')).map(control=>control.getBoundingClientRect());
+        const controlsFit=controls.every((control,index)=>control.left>=panel.left && control.right<=panel.right &&
+          controls.slice(index+1).every(other=>!(control.left<other.right && control.right>other.left && control.top<other.bottom && control.bottom>other.top)));
+        return controlsFit && panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= innerHeight &&
+          !(name.left < tv.right && name.right > tv.left && name.top < tv.bottom && name.bottom > tv.top);
+      }), 'Fullscreen settings and nickname/TV controls must fit without overlap');
+      if(process.env.SCREENSHOT_DIR) {
+        await page.waitForTimeout(300); // Let the native fullscreen compositor finish its fade.
+        await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-fullscreen-${width}${host?'':'-guest'}.png`});
+      }
+      await page.locator('[data-fullscreen-close]').click();
+      await page.locator('.stage-panel[data-immersive=false]').waitFor();
+      assert.equal(await page.locator('#room-settings-heading').count(),1);
+      assert(await page.evaluate(() => window.__fakePlayer === window.__originalPlayer));
+    }
+    assert.equal(commands.length,sent,'Device settings and fullscreen must not publish shared playback commands');
+  } finally {await browser.close();}
+});
+
+test("room hosts can retry an empty radio queue without restarting playback", async () => {
+  const {browser,page,commands} = await fixture({playing:true});
+  try {
+    await page.locator('.stage-intro button').click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.evaluate(() => {window.__originalPlayer=window.__fakePlayer;});
+    await page.locator('.video-settings > summary').click();
+    await page.getByRole('button',{name:'Retry radio',exact:true}).click();
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.queue-options > button')?.disabled);
+    assert.deepEqual(commands.filter(command => command.action === 'radio').map(command => command.enabled),[true]);
+    assert.equal(commands.filter(command => ['play','pause','seek','next'].includes(command.action)).length,0);
+    assert(await page.evaluate(() => window.__fakePlayer===window.__originalPlayer && window.__fakePlayer.state===1));
+  } finally {await browser.close();}
 });

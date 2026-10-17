@@ -1424,7 +1424,7 @@ export default function Afterparty() {
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
   }, []);
-  const playerSettings = current && (
+  const playerSettings = room && (
     <PlayerSettings
       compact={fullscreenActive}
       open={settingsOpen}
@@ -1432,9 +1432,72 @@ export default function Afterparty() {
       mode={syncMode}
       onMode={changeSyncMode}
       quality={t(quality)}
-      enabled={consent}
+      enabled={Boolean(current) && consent}
       onRetry={reloadPlayer}
       onSync={() => syncRef.current(true)}
+      roomSettings={<>
+              <div className="party-tools">
+                {room?.isHost && !discordMode && (
+                  <button
+                    className="button subtle room-radio-control"
+                    aria-pressed={room.radio !== false}
+                    disabled={pending}
+                    onClick={() =>
+                      void action("radio", { enabled: room.radio === false })
+                    }
+                  >
+                    <Radio size={16} />
+                    {room.radio === false ? t("Radio av") : t("Radio på")}
+                  </button>
+                )}
+                {room?.isOwner && !discordMode && (
+                  <label className="room-visibility">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(room.isPublic)}
+                      disabled={pending}
+                      onChange={(e) =>
+                        void action("visibility", {
+                          isPublic: e.target.checked,
+                        })
+                      }
+                    />
+                    {t("Vis i Åpne rom")}
+                  </label>
+                )}
+
+                <label className="display-name">
+                  {t("Kallenamnet ditt")}
+                  <input
+                    maxLength={32}
+                    value={displayName}
+                    placeholder={t("Gjest")}
+                    onChange={(e) => {
+                      setDisplayName(e.target.value);
+                      storage.set("afterparty-display-name", e.target.value);
+                    }}
+                  />
+                </label>
+                <button className="button subtle tv-mode-button" onClick={toggleTV}>
+                  {tv ? t("Avslutt TV-modus") : t("TV-modus")}
+                </button>
+              </div>
+              {discordMode && !concertQueue.data?.canManage && (
+                <p>
+                  {t("Logg inn med Discord for å administrere denne serveren.")}{" "}
+                  <a href="/api/auth/discord">Discord</a>
+                </p>
+              )}
+      </>}
+      queueSettings={
+              queueRoom && (!discordMode || concertQueue.data) && (
+                <QueueSettings
+                  room={queueRoom}
+                  busy={discordMode ? concertQueue.busy : pending}
+                  onAction={queueAction}
+                />
+              )
+      }
     >
       {discordMode && (
         <div className="sync-offset-tools">
@@ -1569,70 +1632,6 @@ export default function Afterparty() {
               </button>
             </div>
           </section>
-          {!directoryOpen && room && (
-            <details className="room-options">
-              <summary>{t("Rominnstillingar")}</summary>
-              <div className="party-tools">
-                {room?.isHost && !discordMode && (
-                  <button
-                    className="button subtle"
-                    aria-pressed={room.radio !== false}
-                    disabled={pending}
-                    onClick={() =>
-                      void action("radio", { enabled: room.radio === false })
-                    }
-                  >
-                    <Radio size={16} />
-                    {room.radio === false ? t("Radio av") : t("Radio på")}
-                  </button>
-                )}
-                {room?.isOwner && !discordMode && (
-                  <label className="room-visibility">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(room.isPublic)}
-                      disabled={pending}
-                      onChange={(e) =>
-                        void action("visibility", {
-                          isPublic: e.target.checked,
-                        })
-                      }
-                    />
-                    {t("Vis i Åpne rom")}
-                  </label>
-                )}
-
-                <label>
-                  {t("Kallenamnet ditt")}
-                  <input
-                    maxLength={32}
-                    value={displayName}
-                    placeholder={t("Gjest")}
-                    onChange={(e) => {
-                      setDisplayName(e.target.value);
-                      storage.set("afterparty-display-name", e.target.value);
-                    }}
-                  />
-                </label>
-                <button className="button subtle" onClick={toggleTV}>
-                  {tv ? t("Avslutt TV-modus") : t("TV-modus")}
-                </button>
-              </div>
-              {queueRoom && (!discordMode || concertQueue.data) && (
-                <QueueSettings
-                  room={queueRoom}
-                  busy={discordMode ? concertQueue.busy : pending}
-                  onAction={queueAction}
-                />
-              )}
-              {discordMode && !concertQueue.data?.canManage && (
-                <p>
-                  {t("Logg inn med Discord for å administrere denne serveren.")}{" "}
-                  <a href="/api/auth/discord">Discord</a>
-                </p>
-              )}
-            </details>
-          )}
           {(sharing || tv) && room && (
             <RoomSharing
               room={room}
