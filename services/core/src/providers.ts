@@ -1,5 +1,5 @@
 import type {YouTubeResponses, ExtractedMedia} from "./external-types.ts";
-import { metadataGenres } from "./radio.ts";
+import { metadataGenres, metadataMusic, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
 import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
@@ -22,7 +22,7 @@ import {
   canPlayRadioTrack,
 } from "./radio.ts";
 import { Store } from "./store.ts";
-import { UserError, type Track } from "./types.ts";
+import { UserError, publicTrack, type Track } from "./types.ts";
 export function youtubeId(query: string) {
   if (/^[\w-]{11}$/.test(query)) return query;
   try {
@@ -88,7 +88,7 @@ export class Providers {
       missing: string[] = [];
     for (const id of ids) {
       const cached = this.store.get<{ at: number; track: Track } | null>(
-        "metadata:v2:" + id,
+        "metadata:v3:" + id,
         null,
       );
       if (cached && Date.now() - cached.at < 86400000)
@@ -97,7 +97,7 @@ export class Providers {
     }
     const remember = (track: Track) => {
       found.set(track.id, track);
-      this.store.set("metadata:v2:" + track.id, { at: Date.now(), track });
+      this.store.set("metadata:v3:" + track.id, { at: Date.now(), track });
     };
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
@@ -113,6 +113,7 @@ export class Providers {
           remember({
             id: v.id,
             genres: metadataGenres(v.snippet.description, v.snippet.tags),
+            music: metadataMusic(v.snippet.categoryId),
             title: decode(v.snippet.title),
             artist: decode(v.snippet.channelTitle),
             image: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
@@ -141,6 +142,7 @@ export class Providers {
             remember({
               id,
               genres: metadataGenres(v.description, v.tags),
+              music: metadataMusic(undefined, v.categories),
               title: v.title ?? "YouTube",
               artist: v.artist ?? v.uploader ?? "YouTube",
               image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
@@ -149,6 +151,7 @@ export class Providers {
               embeddable: v.playable_in_embed === true,
               source: "youtube",
               entryId: randomUUID(),
+              ...(v.artist && v.track ? { catalog: { artist: v.artist, title: v.track, duration: Number(v.duration) || 0 } } : {}),
             });
           } catch (error) {
             if (!skipUnavailable) throw error;
@@ -163,7 +166,7 @@ export class Providers {
   }
   async search(query: string, count = 8, musicOnly = false): Promise<Track[]> {
     const key =
-        "search:v3:" +
+        "search:v4:" +
         JSON.stringify([
           query.trim().normalize("NFKC").toLowerCase(),
           count,
@@ -384,9 +387,28 @@ export class Providers {
     this.store.set(key, { at: Date.now(), track });
     return track;
   }
+  rememberRadioTrack(track: Track) {
+    const history = this.store.get<RadioTrack[]>("radio-history", []);
+    this.store.set("radio-history", [
+      ...history.filter((item) => item.id !== track.id),
+      { ...publicTrack(track)!, ...(track.catalog ? { catalog: track.catalog } : {}) },
+    ].slice(-RADIO_HISTORY_LIMIT));
+  }
+  radioHistory(): RadioTrack[] {
+    const skipped = this.store.get<{ track: RadioTrack; at: number }[]>("radio-skipped-tracks", []);
+    const recorded = this.store.history(RADIO_HISTORY_LIMIT).reverse();
+    const canonical = this.store.get<RadioTrack[]>("radio-history", []);
+    const identities = new Map(canonical.map((track) => [track.id, track]));
+    const recordedIds = new Set(recorded.map((item) => item.video.id));
+    return [
+      ...canonical.filter((track) => !recordedIds.has(track.id)).map((track) => ({ track, at: 0 })),
+      ...recorded.map((item) => ({ track: identities.get(item.video.id) ?? item.video, at: item.at })),
+      ...skipped.filter((item) => Date.now() - item.at < 7 * 86400000),
+    ].sort((a, b) => a.at - b.at).map((item) => item.track);
+  }
   async radio(seed: Track, excluded: string[]) {
-    if (seed.live) return null;
-    const recent = this.store.history(50).map((h) => h.video),
+    if (seed.live || seed.music === false) return null;
+    const recent = this.radioHistory(),
       skipped = this.store.get<Record<string, number>>("radio-skips", {});
     const banned = new Set([
       ...excluded,
@@ -419,7 +441,7 @@ export class Providers {
               !recentSongs.has(songIdentity(next))
             ) {
               this.recommendationStatus = "lastfm";
-              return next;
+              return { ...next, radioRelatedTo: seed.id };
             }
           } catch {}
         }

@@ -5,6 +5,7 @@ import { Providers } from "../src/providers.ts";
 import { Engine } from "../src/engine.ts";
 import { Commands } from "../src/commands.ts";
 import type { Sink } from "../src/audio.ts";
+import type { Track } from "../src/types.ts";
 const track = (entryId: string, concert = true) => ({
   id: entryId.padEnd(11, "0"),
   entryId,
@@ -45,6 +46,39 @@ function setup() {
       store.close();
     },
   };
+}
+for (const withAddition of [false, true]) {
+  test(`concert undo counts pending requests${withAddition ? " and new queued tracks" : ""} toward capacity`, async () => {
+    const a = setup(), b = setup();
+    clearInterval(a.e.timer);
+    clearInterval(b.e.timer);
+    try {
+      a.e.settings.playlistLimit = withAddition ? 5 : 4;
+      const act = (action: string, extra = {}) =>
+        a.q.apply({ action, revision: a.q.revision(), ...extra }, true);
+      const other = { saved: b.q.read(), queue: [...b.e.queue], revision: b.q.revision() };
+      await act("approval", { enabled: true });
+      await act("clear");
+      if (withAddition) a.e.enqueue([track("added")]);
+      assert(a.q.request([track("request1"), track("request2")]));
+      const revision = a.q.revision();
+      const saved = a.q.read();
+      const queue = [...a.e.queue];
+      const persisted = a.e.store.get<Track[]>("queue", []);
+      await assert.rejects(act("undo"), /Køen er full/);
+      assert.equal(a.q.revision(), revision);
+      assert.deepEqual(a.q.read(), saved, "Rejected undo retains requests and undo state");
+      assert.deepEqual(a.e.queue, queue);
+      assert.deepEqual(a.e.store.get<Track[]>("queue", []), persisted);
+      await act("reject", { videoId: "request2" });
+      await act("undo");
+      assert.deepEqual(a.e.queue.map(t => t.entryId), ["one", "private", "two", ...(withAddition ? ["added"] : [])]);
+      assert.deepEqual(a.q.read().requests.map(t => t.entryId), ["request1"]);
+      assert.equal(a.e.queue.length + a.q.read().requests.length, a.e.settings.playlistLimit);
+      assert.equal(a.q.read().undo, undefined);
+      assert.deepEqual({ saved: b.q.read(), queue: b.e.queue, revision: b.q.revision() }, other, "Undo remains isolated to its server");
+    } finally { a.close(); b.close(); }
+  });
 }
 test("concert queue revisions, moderation and undo preserve private music and server isolation", async () => {
   const a = setup(),
@@ -220,5 +254,89 @@ test('duplicate protection stays within visibility scopes, including batches and
     const request = track('pending');
     assert(a.q.request([request, { ...request, entryId: 'duplicate-pending' }]));
     assert.equal(a.q.read().requests.length, 1);
+  } finally { a.close(); }
+});
+
+for (const action of ["remove", "clear"] as const) {
+  test(`concert ${action} replaces a rejected radio suggestion without repeating another upload`, async () => {
+    const a = setup();
+    clearInterval(a.e.timer);
+    const original = { ...track("seed"), title: "Artist - Original" };
+    const suggested = { ...track("suggested", false), title: "Artist - Suggested" };
+    const alternate = { ...track("alternate", false), title: "Artist - Suggested (Remastered Audio)" };
+    const replacement = { ...track("replacement", false), title: "Artist - Replacement" };
+    let searches = 0;
+    a.e.current = original;
+    a.e.queue = [];
+    a.e.providers.search = async () => ++searches === 1 ? [suggested] : [alternate, replacement];
+    try {
+      await a.e.ensureRadio();
+      assert.equal(a.e.queue[0]?.id, suggested.id);
+      assert.equal(a.e.radioRetryAt, Infinity);
+      const revision = a.q.revision();
+      await a.q.apply({ action, videoId: suggested.entryId, revision }, true);
+      assert.equal(a.e.current, original, "Removing a suggestion preserves current playback");
+      assert.equal(a.e.radioRetryAt, 0, "The cleared recommendation must allow another lookup");
+      assert(a.e.store.get<Record<string, number>>("radio-skips", {})[suggested.id]);
+      const persisted = new Providers(a.e.store, {});
+      assert(persisted.radioHistory().some((track) => track.id === suggested.id));
+      await assert.rejects(a.q.apply({ action, videoId: suggested.entryId, revision }, true), /endret/);
+      await a.e.ensureRadio();
+      assert.equal(searches, 2);
+      assert.deepEqual(a.e.queue.map((track) => track.id), [replacement.id]);
+      assert.deepEqual(a.e.store.get<Track[]>("queue", []).map((track) => track.id), [replacement.id]);
+    } finally { a.close(); }
+  });
+}
+
+test("concert undo restores only the selected rejection and preserves private queue entries", async () => {
+  const a = setup(), b = setup();
+  clearInterval(a.e.timer);
+  const selected = { ...track("selected"), title: "Artist - Selected", radio: true };
+  const kept = { ...track("kept"), title: "Artist - Kept", radio: true };
+  const privateTrack = { ...track("private", false), radio: true };
+  const rejected = { ...track("rejected"), title: "Artist - Rejected", radio: true };
+  a.e.current = { ...track("seed"), title: "Artist - Original" };
+  a.e.queue = [selected, privateTrack, kept, track("manual")];
+  try {
+    a.e.rejectRadio([rejected]);
+    const act = (action: string, extra = {}) =>
+      a.q.apply({ action, revision: a.q.revision(), ...extra }, true);
+    await assert.rejects(a.q.apply({ action: "remove", videoId: selected.entryId, revision: a.q.revision() }, false), /administratortilgang/);
+    await act("remove", { videoId: selected.entryId });
+    assert.deepEqual(a.e.queue.map((track) => track.entryId), ["private", "kept", "manual"]);
+    assert.deepEqual(Object.keys(a.e.store.get("radio-skips", {})).sort(), [rejected.id, selected.id].sort());
+    await act("undo");
+    assert.deepEqual(a.e.queue.map((track) => track.entryId), ["selected", "private", "kept", "manual"]);
+    assert.equal(a.e.queue[0].entryId, selected.entryId, "Undo keeps the selected queue identity");
+    assert.equal(a.e.queue[1], privateTrack, "Concert editing does not replace a private track");
+    assert.deepEqual(Object.keys(a.e.store.get("radio-skips", {})), [rejected.id]);
+    assert.deepEqual(a.e.store.get<{track: Track}[]>("radio-skipped-tracks", []).map((entry) => entry.track.id), [rejected.id]);
+    assert.deepEqual(b.e.store.get("radio-skips", {}), {}, "Rejections stay in the selected server");
+    assert(!JSON.stringify(a.q.snapshot()).includes(privateTrack.id));
+    assert(!JSON.stringify(a.q.snapshot()).includes(rejected.id));
+    await act("clear");
+    assert.deepEqual(a.e.queue.map((track) => track.entryId), ["private"]);
+    assert(!a.e.store.get<Record<string, number>>("radio-skips", {})[privateTrack.id]);
+    await act("undo");
+    assert.deepEqual(a.e.queue.map((track) => track.entryId), ["selected", "private", "kept", "manual"]);
+    assert.deepEqual(Object.keys(a.e.store.get("radio-skips", {})), [rejected.id]);
+  } finally { a.close(); b.close(); }
+});
+
+test("concert move and undo preserve rejection history for entries that were never removed", async () => {
+  const a = setup();
+  clearInterval(a.e.timer);
+  const selected = { ...track("selected"), title: "Artist - Selected", radio: true };
+  a.e.queue = [selected, track("manual")];
+  try {
+    a.e.rejectRadio([selected]);
+    const before = a.e.store.get("radio-skips", {});
+    const generation = a.e.radioGeneration;
+    await a.q.apply({ action: "move", videoId: selected.entryId, to: 1, revision: a.q.revision() }, true);
+    await a.q.apply({ action: "undo", revision: a.q.revision() }, true);
+    assert.deepEqual(a.e.queue.map((track) => track.entryId), ["selected", "manual"]);
+    assert.deepEqual(a.e.store.get("radio-skips", {}), before);
+    assert.equal(a.e.radioGeneration, generation);
   } finally { a.close(); }
 });

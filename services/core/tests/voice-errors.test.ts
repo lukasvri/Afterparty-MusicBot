@@ -5,6 +5,7 @@ import { VoiceConnectionStatus } from '@discordjs/voice';
 import { DiscordBot } from '../src/discord.ts';
 import { AudioDiagnostics } from '../src/audio-diagnostics.ts';
 import { UserError } from '../src/types.ts';
+import { deferred } from './deferred.ts';
 
 function fixture() {
     let changes = 0;
@@ -106,4 +107,89 @@ test('unexpected restoration errors still fail startup instead of hiding corrupt
     }) } };
     t.bot.join = async () => { throw new Error('Unexpected failure'); };
     await assert.rejects(t.bot.restore(guild as never), /Unexpected failure/);
+});
+
+test('simultaneous requests share one voice handshake and keep admission reserved until completion', async () => {
+    const t = fixture(), ready = deferred<void>();
+    let admissions = 0, connections = 0;
+    t.bot.admitVoice = () => { admissions++; };
+    t.bot.connectVoice = async () => { connections++; await ready.promise; };
+    const channel = { id: 'synthetic-channel' };
+    const first = t.bot.join(channel as never), second = t.bot.join(channel as never);
+    assert.equal(t.bot.joining, true);
+    assert.equal(admissions, 1);
+    assert.equal(connections, 1);
+    ready.resolve();
+    await Promise.all([first, second]);
+    assert.equal(t.bot.joining, false);
+});
+
+test('a replacement handshake stays pending even while the previous engine connection flag is true', async () => {
+    const t = fixture(), ready = deferred<void>();
+    t.engine.connected = true;
+    t.bot.connection = { joinConfig: { channelId: 'previous-channel' } } as never;
+    let connections = 0, secondResolved = false;
+    t.bot.connectVoice = async channel => {
+        connections++;
+        t.bot.connection = { joinConfig: { channelId: channel.id } } as never;
+        await ready.promise;
+    };
+    const channel = { id: 'replacement-channel' };
+    const first = t.bot.join(channel as never);
+    const second = t.bot.join(channel as never).then(() => { secondResolved = true; });
+    try {
+        await Promise.resolve();
+        assert.equal(secondResolved, false);
+        assert.equal(connections, 1);
+        assert.equal(t.bot.joining, true);
+    } finally {
+        ready.resolve();
+        await Promise.all([first, second]);
+    }
+    assert.equal(secondResolved, true);
+    assert.equal(t.bot.joining, false);
+});
+
+test('a concurrent request for another voice channel cannot replace a pending handshake', async () => {
+    const t = fixture(), ready = deferred<void>();
+    let connections = 0;
+    t.bot.connectVoice = async () => { connections++; await ready.promise; };
+    const first = t.bot.join({ id: 'one-channel' } as never);
+    await assert.rejects(t.bot.join({ id: 'another-channel' } as never), UserError);
+    assert.equal(connections, 1);
+    ready.resolve();
+    await first;
+});
+
+test('failed shared joins release admission and a later request can retry', async () => {
+    const t = fixture(), ready = deferred<void>();
+    let connections = 0;
+    t.bot.connectVoice = async () => { connections++; if (connections === 1) await ready.promise; };
+    const first = t.bot.join({ id: 'synthetic-channel' } as never);
+    const second = t.bot.join({ id: 'synthetic-channel' } as never);
+    const settled = Promise.all([assert.rejects(first, UserError), assert.rejects(second, UserError)]);
+    ready.reject(new UserError('Voice unavailable'));
+    await settled;
+    assert.equal(t.bot.joining, false);
+    await t.bot.join({ id: 'synthetic-channel' } as never);
+    assert.equal(connections, 2);
+});
+
+test('completion of a disconnected handshake cannot release a newer voice admission', async () => {
+    const t = fixture(), old = deferred<void>(), current = deferred<void>();
+    let connections = 0;
+    Object.assign(t.engine, { setConnection: () => {} });
+    t.bot.talking = new Set();
+    t.bot.connectVoice = async () => { await (++connections === 1 ? old.promise : current.promise); };
+    const previous = t.bot.join({ id: 'synthetic-channel' } as never);
+    t.bot.disconnect();
+    const next = t.bot.join({ id: 'synthetic-channel' } as never);
+    const failed = assert.rejects(previous, UserError);
+    old.reject(new UserError('Voice interrupted'));
+    await failed;
+    assert.equal(t.bot.joining, true);
+    current.resolve();
+    await next;
+    assert.equal(t.bot.joining, false);
+    assert.equal(connections, 2);
 });

@@ -56,5 +56,5 @@ jobs:
         run: npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Typecheck the offline parity harness
         run: node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
-      - name: Cross-language PCM and pipe protocol checks
-        run: node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts
+      - name: Cross-language PCM, pipe protocol and process lifecycle checks
+        run: node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts

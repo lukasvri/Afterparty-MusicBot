@@ -493,7 +493,7 @@ test("server-owned room progression loads the next track without a browser next 
       commands.filter((command) => command.action === "next").length,
       0,
     );
-    await page.locator(".room-options > summary").click();
+    await page.locator(".video-settings > summary").click();
     await page.getByRole("button", { name: "Radio on", exact: true }).click();
     await page
       .getByRole("button", { name: "Radio off", exact: true })
@@ -810,13 +810,189 @@ test(`Core integration: ${source} add from idle then manager seeks forward and b
   await page.waitForFunction(()=>window.__fakePlayer.getCurrentTime()>2);
   await page.waitForTimeout(500);
   for(const seconds of [80,35]) {
+   const completed = page.waitForResponse(response => {
+    const request = response.request();
+    return new URL(response.url()).pathname === '/api/admin/control' && request.method() === 'POST' &&
+      request.postDataJSON()?.command?.seconds === seconds;
+   });
    await page.evaluate(seconds=>{const p=window.__fakePlayer;p.emit(3);p.position=seconds;p.at=performance.now();p.emit(2);},seconds);
-   await page.waitForTimeout(1800);
+   assert((await completed).ok(), 'Native seek command must be accepted by Core');
+   const deadline = Date.now() + 10000;
+   let measured = await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   while (Date.now() < deadline && (Math.abs(core.engine.snapshot().position-seconds)>=4 || Math.abs(measured-core.engine.snapshot().position)>=1)) {
+    await new Promise(resolve=>setTimeout(resolve,50));
+    measured=await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   }
    assert(Math.abs(core.engine.snapshot().position-seconds)<4, 'Native seek must reach Core instead of snapping back');
-   const measured=await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
    assert(Math.abs(measured-core.engine.snapshot().position)<1,'Browser follows Core after seek');
   }
   assert.equal(commands.filter(c=>c.action==='seek').length,2);
   await core.verifyPermissions();
  } finally { if(f) await f.browser.close(); await core.close(); }
+});
+
+for (const [outcome, name] of [
+ ['success', 'the latest native seek survives an earlier Discord command in flight'],
+ ['leave', 'leaving a room discards a native seek queued behind an earlier command'],
+ ['failure', 'a failed native seek discards queued input and keeps its error visible'],
+] as const)
+test(`Core integration: ${name}`, async () => {
+ const {concertCore} = await import('./concert-core-fixture.ts');
+ const core = await concertCore();
+ const release = Promise.withResolvers<void>();
+ let f: Awaited<ReturnType<typeof fixture>> | undefined;
+ try {
+  f = await fixture({discord:true,core});
+  const {page,commands} = f, errors: string[] = [], sent: number[] = [];
+  page.setDefaultTimeout(6000);
+  page.on('pageerror', error => errors.push(error.message));
+  await core.addDiscord();
+  await page.locator('.stage-intro button').filter({hasText:/Start video/}).click();
+  await page.waitForFunction(()=>window.__fakePlayer?.state===1);
+  await page.waitForTimeout(1600);
+  assert(core.engine.loading, 'Core must still be preparing the initial track');
+  core.release();
+  await page.waitForFunction(()=>window.__fakePlayer.getCurrentTime()>2);
+  await page.waitForTimeout(500);
+  if(outcome==='failure') {
+   const seek = core.engine.seek.bind(core.engine);
+   core.engine.seek = async seconds=>{
+    if(seconds===80) throw new Error('Synthetic first seek failure');
+    await seek(seconds);
+   };
+  }
+  await page.route('**/api/admin/control', async route => {
+   if(route.request().method()==='POST') {
+    const input = route.request().postDataJSON() as {command: BrowserCommand};
+    assert.equal(input.command.action,'seek');
+    assert.equal(typeof input.command.seconds,'number');
+    sent.push(input.command.seconds!);
+    if(sent.length===1) await release.promise;
+   }
+   await route.fallback();
+  });
+  const scrub = (seconds: number) => page.evaluate(seconds=>{
+   const p=window.__fakePlayer;p.emit(3);p.position=seconds;p.at=performance.now();p.emit(2);
+  },seconds);
+  const firstRequest = page.waitForRequest(request=>new URL(request.url()).pathname==='/api/admin/control' && request.method()==='POST');
+  await scrub(80);
+  await firstRequest;
+  await scrub(35);
+  // Keep the first request blocked across several 100 ms sync samples so the
+  // second scrub must survive the pending command and its later refresh.
+  await page.waitForTimeout(350);
+  assert.deepEqual(sent,[80],'The second command must wait for the first');
+  assert.equal(commands.length,0,'The held request must not reach Core yet');
+  assert.equal(await page.evaluate(()=>window.__fakePlayer.getCurrentTime()),35);
+  const jobResponse = (seconds: number, status: string) => page.waitForResponse(async response=>{
+   if(new URL(response.url()).pathname!=='/api/admin/control' || response.request().method()!=='GET') return false;
+   const result = await response.json() as {commands?: Array<{status: string; payload?: BrowserCommand}>};
+   return Boolean(result.commands?.some(job=>job.status===status && job.payload?.action==='seek' && job.payload.seconds===seconds));
+  });
+  if(outcome==='success') {
+   const acknowledged = jobResponse(35,'done');
+   release.resolve();
+   await acknowledged;
+   await page.waitForFunction(()=>window.__fakePlayer.state===1 && window.__fakePlayer.getCurrentTime()>=35 && window.__fakePlayer.getCurrentTime()<39);
+   const current = core.engine.snapshot(), measured = await page.evaluate(()=>window.__fakePlayer.getCurrentTime());
+   assert(Math.abs(current.position-35)<4,'Core must retain the latest native scrub');
+   assert(Math.abs(measured-current.position)<1,'The iframe must follow the latest Core seek');
+   assert.deepEqual(sent,[80,35],'Native commands must remain ordered and singular');
+  } else if(outcome==='leave') {
+   await page.evaluate(()=>{
+    history.pushState(null,'','/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+   });
+   await page.getByRole('heading',{name:'Afterparty',exact:true}).waitFor();
+   const firstResponse = page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/control' && response.request().method()==='POST');
+   release.resolve();
+   await firstResponse;
+   // Let the first completion and several sync samples run after navigation.
+   await page.waitForTimeout(700);
+   assert.deepEqual(sent,[80],'A retired room must not replay deferred seeking');
+   assert.equal(new URL(page.url()).searchParams.get('room'),null);
+   await page.getByRole('heading',{name:'Afterparty',exact:true}).waitFor();
+   assert(core.engine.snapshot().position>=80,'Only the already-sent seek may finish after leaving');
+  } else {
+   const failed = jobResponse(80,'failed');
+   release.resolve();
+   await failed;
+   await page.getByRole('alert').filter({hasText:'Synthetic first seek failure'}).waitFor();
+   await page.waitForTimeout(350);
+   assert.deepEqual(sent,[80],'A failed command must not silently replay deferred seeking');
+   assert(core.engine.snapshot().position<35,'The failed first seek must preserve the previous Core timeline');
+  }
+  const expected = outcome==='success' ? [['seek',80],['seek',35]] : [['seek',80]];
+  assert.deepEqual(commands.map(command=>[command.action,command.seconds]),expected,'Native seeking must not send other transport commands');
+  assert.deepEqual(await page.evaluate(()=>window.__videoCalls),[core.video.id],'Queued seeking must preserve the existing iframe load');
+  assert.equal(core.engine.snapshot().playing,true);
+  assert.deepEqual(errors,[]);
+ } finally {
+  release.resolve();
+  try {
+   if(f) {
+    try { await f.page.unrouteAll({behavior:'wait'}); }
+    finally { await f.browser.close(); }
+   }
+  } finally { await core.close(); }
+ }
+});
+
+for (const host of [true,false])
+test(`unified settings preserve playback across mobile and desktop fullscreen for ${host?'hosts':'guests'}`, async () => {
+  const {browser, page, commands} = await fixture({playing:true,host});
+  try {
+    await page.locator('.stage-intro button').click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.evaluate(() => {window.__originalPlayer = window.__fakePlayer;});
+    const sent = commands.length;
+    await page.locator('.video-settings > summary').click();
+    await page.getByLabel('Your nickname').fill('Synthetic guest');
+    await page.locator('.video-settings select').selectOption('stable');
+    for (const width of [360, 390, 1440]) {
+      await page.setViewportSize({width,height:900});
+      await page.locator('[data-fullscreen-button]').click();
+      await page.locator('.stage-panel[data-immersive=true]').waitFor();
+      assert.equal(await page.locator('.video-settings').count(),1);
+      assert(await page.getByRole('heading',{name:'Room settings',exact:true}).isVisible());
+      assert(await page.getByRole('heading',{name:'Queue settings',exact:true}).isVisible());
+      assert(await page.getByRole('heading',{name:'Video settings',exact:true}).isVisible());
+      assert.equal(await page.getByLabel('Your nickname').inputValue(),'Synthetic guest');
+      assert.equal(await page.locator('.video-settings select').inputValue(),'stable');
+      assert(await page.locator('.video-settings-body').evaluate(el => {
+        const panel=el.getBoundingClientRect();
+        const name=el.querySelector<HTMLInputElement>('.display-name input')!.getBoundingClientRect();
+        const tv=el.querySelector('.tv-mode-button')!.getBoundingClientRect();
+        const controls=Array.from(el.querySelectorAll('.party-tools > button,.party-tools > label')).map(control=>control.getBoundingClientRect());
+        const controlsFit=controls.every((control,index)=>control.left>=panel.left && control.right<=panel.right &&
+          controls.slice(index+1).every(other=>!(control.left<other.right && control.right>other.left && control.top<other.bottom && control.bottom>other.top)));
+        return controlsFit && panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= innerHeight &&
+          !(name.left < tv.right && name.right > tv.left && name.top < tv.bottom && name.bottom > tv.top);
+      }), 'Fullscreen settings and nickname/TV controls must fit without overlap');
+      if(process.env.SCREENSHOT_DIR) {
+        await page.waitForTimeout(300); // Let the native fullscreen compositor finish its fade.
+        await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-fullscreen-${width}${host?'':'-guest'}.png`});
+      }
+      await page.locator('[data-fullscreen-close]').click();
+      await page.locator('.stage-panel[data-immersive=false]').waitFor();
+      assert.equal(await page.locator('#room-settings-heading').count(),1);
+      assert(await page.evaluate(() => window.__fakePlayer === window.__originalPlayer));
+    }
+    assert.equal(commands.length,sent,'Device settings and fullscreen must not publish shared playback commands');
+  } finally {await browser.close();}
+});
+
+test("room hosts can retry an empty radio queue without restarting playback", async () => {
+  const {browser,page,commands} = await fixture({playing:true});
+  try {
+    await page.locator('.stage-intro button').click();
+    await page.waitForFunction(() => window.__fakePlayer?.state === 1);
+    await page.evaluate(() => {window.__originalPlayer=window.__fakePlayer;});
+    await page.locator('.video-settings > summary').click();
+    await page.getByRole('button',{name:'Retry radio',exact:true}).click();
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.queue-options > button')?.disabled);
+    assert.deepEqual(commands.filter(command => command.action === 'radio').map(command => command.enabled),[true]);
+    assert.equal(commands.filter(command => ['play','pause','seek','next'].includes(command.action)).length,0);
+    assert(await page.evaluate(() => window.__fakePlayer===window.__originalPlayer && window.__fakePlayer.state===1));
+  } finally {await browser.close();}
 });

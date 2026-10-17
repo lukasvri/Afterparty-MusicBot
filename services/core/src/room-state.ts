@@ -1,6 +1,7 @@
 import { UserError } from "./types.ts";
 import type { RoomVideo } from "./protocol.ts";
-import { roomRadioSeed, playableRoomQueue } from "./room-radio.ts";
+import { roomRadioSeed, playableRoomQueue, roomRadioHistory } from "./room-radio.ts";
+import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
 
 /** Durable room state, shared by Core and the Worker fallback. Never publish vote identities. */
 export type RoomPlayback = {
@@ -21,20 +22,27 @@ export type RoomPlayback = {
   undoQueue?: RoomVideo[];
   radioRetryAt?: number;
   radioExcluded?: string[];
+  radioExcludedSongs?: RoomVideo[];
 };
 export const guestActions = new Set(["add", "vote", "skip-vote"]);
+function publicVideo(video: RoomVideo): RoomVideo {
+  if (video.radioRelatedTo === undefined) return video;
+  const visible = { ...video };
+  delete visible.radioRelatedTo;
+  return visible;
+}
 export function publicPlayback(state: RoomPlayback) {
   return {
-    current: state.current,
-    queue: playableRoomQueue(state),
+    current: state.current ? publicVideo(state.current) : null,
+    queue: playableRoomQueue(state).map(publicVideo),
     playing: state.playing,
     position: state.position,
     startsAt: state.startsAt,
     playbackKey: state.playbackKey,
     radio: state.radio,
     approvalRequired: state.approvalRequired ?? false,
-    requests: state.requests ?? [],
-    history: state.history ?? [],
+    requests: (state.requests ?? []).map(publicVideo),
+    history: (state.history ?? []).map(publicVideo),
     voteCounts: Object.fromEntries(
       Object.entries(state.votes ?? {}).map(([id, voters]) => [
         id,
@@ -71,7 +79,7 @@ export function needsRecommendation(
   const actor = String(input.participantHash ?? "");
   return (
     input.action === "next" || input.action === "radio-prefetch" ||
-    (input.action === "radio" && input.enabled === true && !state.current) ||
+    (input.action === "radio" && input.enabled === true) ||
     Boolean(
       input.action === "skip-vote" &&
       state.current &&
@@ -122,10 +130,7 @@ export function changeRoom(
   const advance = () => {
     if (state.current)
       state.history = [...(state.history ?? []), state.current].slice(-100);
-    state.radioHistory = [
-      ...(state.radioHistory ?? []),
-      ...(state.current ? [state.current] : []),
-    ].slice(-20);
+    state.radioHistory = roomRadioHistory(state);
     state.current = state.queue.shift() ?? recommended;
     if (state.current && !state.current.radio && state.current !== recommended)
       state.radioSeed = structuredClone(state.current);
@@ -212,7 +217,13 @@ export function changeRoom(
     if (action === "radio") {
       state.radio = input.enabled;
       if (!input.enabled) state.queue = state.queue.filter(track => !track.radio);
-      if (input.enabled && !state.current && recommended) advance();
+      if (input.enabled) {
+        if (!state.current && recommended) advance();
+        else if (!state.queue.length) {
+          if (recommended) state.queue.push({ ...recommended, radio: true });
+          state.radioRetryAt = Number(input.now ?? 0) + 15000;
+        }
+      }
     }
     else state.approvalRequired = input.enabled;
   } else if (action === "approve" || action === "reject") {
@@ -234,12 +245,18 @@ export function changeRoom(
     }
   } else if (action === "remove" || action === "clear" || action === "move") {
     state.undoQueue = [...state.queue];
+    const excludeRadio = (videos: RoomVideo[]) => {
+      const rejected = videos.filter((track) => track.radio);
+      if (!rejected.length) return;
+      state.radioExcluded = [...(state.radioExcluded ?? []), ...rejected.map((track) => track.id)].slice(-RADIO_HISTORY_LIMIT);
+      state.radioExcludedSongs = [...(state.radioExcludedSongs ?? []), ...rejected].slice(-RADIO_HISTORY_LIMIT);
+    };
     if (action === "clear") {
-      state.radioExcluded = [...(state.radioExcluded ?? []), ...state.queue.filter(track => track.radio).map(track => track.id)].slice(-50);
+      excludeRadio(state.queue);
       state.queue = [];
     } else if (action === "remove") {
       const [removed] = state.queue.splice(index(state.queue), 1);
-      if (removed.radio) state.radioExcluded = [...(state.radioExcluded ?? []), removed.id].slice(-50);
+      excludeRadio([removed]);
     }
     else {
       const from = index(state.queue),
@@ -258,7 +275,17 @@ export function changeRoom(
       throw new UserError(
         "Køen er for full til å angre. Fjern noen låter først.",
       );
+    const restoredSuggestions = restored.filter(
+      (track) => track.radio && !state.queue.some((queued) => queued.id === track.id),
+    );
     state.queue = [...restored, ...additions];
+    // Undo is an explicit request to restore these suggestions. It lifts only
+    // their removal exclusions; current/history validation still applies.
+    const restoredIds = new Set(restoredSuggestions.map((track) => track.id));
+    const restoredSongs = new Set(restoredSuggestions.map(songIdentity));
+    state.radioExcluded = state.radioExcluded?.filter((id) => !restoredIds.has(id));
+    state.radioExcludedSongs = state.radioExcludedSongs?.filter((track) => !restoredSongs.has(songIdentity(track)));
+    state.queue = playableRoomQueue(state);
     delete state.undoQueue;
     delete state.radioRetryAt;
   } else if (action === "vote" || action === "skip-vote") {

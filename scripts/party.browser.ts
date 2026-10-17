@@ -95,17 +95,27 @@ try {
   });
   const page = await context.newPage();
   await page.goto(base);
-  for (const width of [390, 1440, 2560]) {
+  for (const width of [360, 390, 768, 1440, 2560]) {
     await page.setViewportSize({ width, height: width === 2560 ? 1440 : 900 });
     await page.getByRole("heading", { name: "Afterparty", exact:true }).waitFor();
     const geometry = await page.locator(".welcome-art").evaluate(el => {
       const frame = el.getBoundingClientRect();
       const head = el.querySelector(".performer-head")!.getBoundingClientRect();
       const rig = el.querySelector(".stage-truss")!.getBoundingClientRect();
+      const booth = el.querySelector(".dj-booth")!.getBoundingClientRect();
+      const speakers = el.querySelector(".speaker-stacks")!.getBoundingClientRect();
       return { contained: head.top >= frame.top && head.bottom <= frame.bottom && head.left >= frame.left && head.right <= frame.right && rig.top >= frame.top,
+        stageContained: booth.bottom <= frame.bottom && speakers.left >= frame.left && speakers.right <= frame.right,
+        centred: Math.abs((booth.left + booth.right) / 2 - (frame.left + frame.right) / 2) < frame.width * .01,
+        headScale: head.height / frame.height,
+        artworkCentred: Math.abs((frame.left + frame.right) / 2 - innerWidth / 2) < 2,
         overflow: document.documentElement.scrollWidth > innerWidth };
     });
     assert(geometry.contained, "DJ head and lighting rig must remain inside the welcome scene");
+    assert(geometry.stageContained, "The console and both speakers must fit the welcome scene");
+    assert(geometry.centred, "The DJ console must be centred within the welcome artwork");
+    assert(geometry.headScale > .12, "The DJ must remain legible in the responsive welcome artwork");
+    if (width <= 950) assert(geometry.artworkCentred, "Tablet and mobile artwork must be centred on the page");
     assert(!geometry.overflow, "Welcome page must fit the viewport");
     if(width===2560){
       const content=await page.locator('.content').boundingBox();
@@ -115,14 +125,29 @@ try {
     }
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
   }
+  const sceneAnimations = () => page.locator(".welcome-art").evaluate(el =>
+    el.getAnimations({subtree: true}).filter(animation => animation.playState === "running").length,
+  );
+  await page.emulateMedia({reducedMotion: "reduce"});
+  assert.equal(await sceneAnimations(), 0, "The complete stage must respect reduced motion");
+  await page.emulateMedia({reducedMotion: "no-preference"});
+  assert((await sceneAnimations()) > 0, "Stage animation must resume when reduced motion is off");
+  await page.locator(".motion-toggle").click();
+  assert.equal(await sceneAnimations(), 0, "The site's motion control must stop all stage animation");
+  await page.locator(".motion-toggle").click();
+  assert((await sceneAnimations()) > 0, "The site's motion control must restore stage animation");
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Discord video seeking and release readiness" }).waitFor();
+  await page.getByRole("heading", { name: "Unified settings and radio recovery" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Spel i nettlesaren" }).click();
   const dialog = page.getByRole("dialog", { name: "Start kvelden" });
   await dialog.waitFor();
+  assert(await dialog.getByLabel("Namn på kvelden").evaluate(el => {
+    const frame = el.getBoundingClientRect();
+    return document.elementFromPoint(frame.left + frame.width / 2, frame.top + frame.height / 2) === el;
+  }), "The room dialog must receive input above decorative scene layers");
   assert(
     await dialog
       .getByRole("radio", { name: "Berre dei med lenkja" })
@@ -143,6 +168,13 @@ try {
       return r.top >= 0 && r.bottom < innerHeight;
     }),
   );
+  assert.equal(await page.locator(".video-settings").count(), 1, "Empty rooms need the same settings panel");
+  await page.locator(".video-settings > summary").click();
+  assert(await page.getByRole("heading", {name:"Rominnstillingar", exact:true}).isVisible());
+  assert(await page.getByRole("heading", {name:"Køinnstillingar", exact:true}).isVisible());
+  assert(await page.getByRole("heading", {name:"Videoinnstillinger", exact:true}).isVisible());
+  assert(await page.getByRole("button", {name:"Synk nå", exact:true}).isDisabled(), "Empty rooms cannot resync a missing player");
+  await page.locator(".video-settings > summary").click();
   await page
     .getByRole("button", { name: /Legg.*Synthetic evening song/ })
     .click();
@@ -153,7 +185,25 @@ try {
   assert(await queued.isVisible(), "Manually queued track must be visible");
   assert.equal(await page.locator("#queue-tab .tab-count").innerText(), "1");
 
-  await page.locator(".room-options > summary").click();
+  await page.locator(".video-settings > summary").click();
+  assert.equal(await page.locator(".video-settings").count(), 1, "Room, queue and video share one panel");
+  assert.equal(await page.locator(".video-settings details").count(), 0, "Settings sections must not require nested disclosure controls");
+  for (const width of [360, 390, 1440]) {
+    await page.setViewportSize({width, height:900});
+    const geometry = await page.locator(".party-tools").evaluate(el => {
+      const name = el.querySelector<HTMLInputElement>(".display-name input")!.getBoundingClientRect();
+      const tv = el.querySelector(".tv-mode-button")!.getBoundingClientRect();
+      const panel = el.closest(".video-settings")!.getBoundingClientRect();
+      return { overlap: name.left < tv.right && name.right > tv.left && name.top < tv.bottom && name.bottom > tv.top,
+        contained: name.left >= panel.left && name.right <= panel.right && tv.left >= panel.left && tv.right <= panel.right,
+        overflow: document.documentElement.scrollWidth > innerWidth };
+    });
+    assert(!geometry.overlap, "The nickname field and TV button must not overlap");
+    assert(geometry.contained, "Settings controls must fit inside their panel");
+    assert(!geometry.overflow, "Open settings must fit the viewport");
+    if (process.env.SCREENSHOT_DIR) await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-${width}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:390,height:844});
   const radio = page.getByRole("button", {name:"Radio på",exact:true});
   assert(await radio.isVisible(), "Radio must be available in room settings");
   await radio.click();
@@ -172,7 +222,6 @@ try {
     assert(visible,"Queued track must be inside the visible queue area");
   }
   await page.setViewportSize({width:390,height:844});
-  await page.locator(".room-options .queue-options summary").click();
   await page
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
     .click();

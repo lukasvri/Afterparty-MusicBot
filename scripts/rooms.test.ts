@@ -274,6 +274,40 @@ test("D1 radio uses and persists its original choice after an automatic transiti
     assert.equal(saved.radioHistory?.[0].id,changed.id);
   } finally { f.close(); }
 });
+test("D1 radio refreshes old search metadata and excludes explicit non-music categories", async () => {
+  const f = fixture();
+  const bad = { ...next, id: "wrong000001", title: "Another Artist - A day in Paris | Future House" };
+  try {
+    await f.save();
+    const query = 'future house audio -"Feel Good"';
+    const oldVideos = [bad, next];
+    for (const key of [`search:${query.toLowerCase()}`, `videos:${bad.id},${next.id}`]) {
+      f.sqlite.prepare("INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)")
+        .run(key, JSON.stringify(oldVideos), Date.now() + 3600000);
+    }
+    const stages: string[] = [];
+    globalThis.fetch = async (target) => {
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search")) {
+        stages.push("search");
+        return Response.json({ items: oldVideos.map((video) => ({ id: { videoId: video.id } })) });
+      }
+      stages.push("metadata");
+      return Response.json({ items: oldVideos.map((video) => ({
+        id: video.id,
+        snippet: { title: video.title, channelTitle: video.artist, categoryId: video.id === bad.id ? "22" : "10" },
+        contentDetails: { duration: "PT3M20S" }, status: { embeddable: true },
+      })) });
+    };
+    const { room } = await mutate(f.request, "TESTROOM", { action: "radio-prefetch", version: 1 });
+    assert.deepEqual(stages, ["search", "metadata"]);
+    assert.deepEqual(room.queue.map((video) => video.id), [next.id]);
+    assert.equal(room.queue[0].music, true);
+    assert(!JSON.stringify(room).includes("radioRelatedTo"));
+    assert.equal(f.roomState().queue[0].music, true);
+  } finally { f.close(); }
+});
 test("D1 starts the recommended video clock after its metadata lookup completes", async () => {
   const f = fixture(),
     now = Date.now;
@@ -464,4 +498,70 @@ test('D1 persists removal of consumed undo and old radio retry state', async () 
   assert.deepEqual(saved.queue,[]);
   assert.deepEqual(saved.cohostHashes,['synthetic-cohost']);
  } finally {f.close();}
+});
+
+test("D1 current-track radio retry preserves playback and sets a future cooldown", async () => {
+  const f = fixture();
+  const now = Date.now;
+  let time = now();
+  Date.now = () => time;
+  try {
+    await f.save("TESTROOM", { current: seed, queue: [], playing: true, position: 20,
+      playbackKey: "same-playback", startsAt: time - 1000 });
+    const fetchMetadata = globalThis.fetch;
+    globalThis.fetch = async target => { time += 2500; return fetchMetadata(target); };
+    const { room } = await mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 });
+    assert.equal(room.current?.id, seed.id);
+    assert.equal(room.playbackKey, "same-playback");
+    assert.equal(room.playing, true);
+    assert.equal(room.position, 25);
+    assert.deepEqual(room.queue.map(video => video.id), [next.id]);
+    assert.equal(f.roomState().radioRetryAt, time + 15000);
+  } finally { Date.now = now; f.close(); }
+});
+
+test("D1 empty radio retry reports failure while retaining the current clock and cooldown", async () => {
+  const f = fixture();
+  const now = Date.now;
+  const time = now();
+  Date.now = () => time;
+  try {
+    await f.save("TESTROOM", { current: seed, queue: [], playing: true, position: 20, playbackKey: "same-playback" });
+    globalThis.fetch = async () => Response.json({ items: [] });
+    await assert.rejects(mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 }),
+      error => error instanceof Error && "status" in error && error.status === 422 && /Prøv radio igjen/.test(error.message));
+    const saved = f.roomState();
+    assert.equal(saved.current?.id, seed.id);
+    assert.equal(saved.playbackKey, "same-playback");
+    assert.equal(saved.position, 20);
+    assert.equal(saved.playing, true);
+    assert.equal(saved.radioRetryAt, time + 15000);
+    assert.equal(f.roomRow().version, 2);
+    globalThis.fetch = async () => { assert.fail("cooldown should suppress automatic search"); };
+    await publicRoom(f.request, f.roomRow());
+  } finally { Date.now = now; f.close(); }
+});
+
+test("D1 radio retry cannot override a newer radio-off command", async () => {
+  const f = fixture();
+  try {
+    await f.save("TESTROOM", { current: seed, queue: [], playing: true, position: 20 });
+    await assert.rejects(mutate(new Request(f.request.url), "TESTROOM", { action: "radio", enabled: true, version: 1 }),
+      error => error instanceof Error && "status" in error && error.status === 403);
+    assert.equal(f.calls(), 0);
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const fetchMetadata = globalThis.fetch;
+    globalThis.fetch = async target => { entered(); await gate; return fetchMetadata(target); };
+    const pending = mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 });
+    const rejection = assert.rejects(pending, error => error instanceof Error && "status" in error && error.status === 409);
+    await started;
+    await mutate(f.request, "TESTROOM", { action: "radio", enabled: false, version: 1 });
+    release();
+    await rejection;
+    assert.equal(f.roomState().radio, false);
+    assert.deepEqual(f.roomState().queue, []);
+    assert.equal(f.roomState().current?.id, seed.id);
+  } finally { f.close(); }
 });

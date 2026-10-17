@@ -29,3 +29,24 @@ test('a load landing is acknowledged while Core buffering or permissions delay s
  assert.equal(t.observe(35,2800,3),null);
  assert.equal(t.observe(35,2900,2),35);
 });
+test('discarding user observations preserves a programmatic seek still awaiting its landing',()=>{
+ const t=new NativeSeekTracker();
+ t.observe(10,0,1);t.write(80);
+ t.resetObservation();
+ assert.equal(t.observe(10,5000,3),null);
+ assert.equal(t.observe(80,10000,1),null);
+ assert.equal(t.observe(35,10100,3),null);
+ assert.equal(t.observe(35,10200,2),35);
+});
+test('discarding a pending user scrub requires a new discontinuity before another shared seek',()=>{
+ const t=new NativeSeekTracker();
+ t.observe(10,0,1);
+ t.observe(80,100,3);
+ assert.equal(t.pending,true);
+ t.resetObservation();
+ assert.equal(t.pending,false);
+ assert.equal(t.observe(35,200,2),null);
+ assert.equal(t.observe(35,300,2),null);
+ assert.equal(t.observe(20,400,3),null);
+ assert.equal(t.observe(20,500,2),20);
+});

@@ -8,8 +8,11 @@ export type RoomVideo = {
   live: boolean;
   embeddable: boolean;
   genres?: string[];
+  music?: boolean;
   requestedBy?: string;
   radio?: boolean;
+  /** Private room recommendation proof; removed from publicPlayback snapshots. */
+  radioRelatedTo?: string;
 };
 export type RoomTimeline = {
   code: string;
@@ -53,6 +56,7 @@ export function readRoomTimeline(value: unknown): RoomTimeline | null {
       typeof v.image === "string" &&
       Number.isFinite(v.duration) &&
       v.duration >= 0 &&
+      (v.music === undefined || typeof v.music === "boolean") &&
       typeof v.live === "boolean",
     );
   if (
