@@ -1,6 +1,6 @@
 import {
   radioArtist,
-  radioGenre,
+  radioStyleCompatible,
   radioTitle,
   radioQuery,
   rankRadio,
@@ -69,10 +69,10 @@ export async function roomRecommendation(
   )
     return null;
   const artist = radioArtist(seed);
-  let genre = radioGenre(seed);
-  // An untagged original may have a genre-tagged upload of the same recording.
+  // Missing or broad metadata can be refined by a specific label on an upload
+  // of the same recording. A broad label alone never admits another artist.
   // Only use that label after matching both artist and song, never search rank alone.
-  if (!genre && artist) {
+  if (!specificRadioGenre(seed) && artist) {
     try {
       const metadata = await search(
         `${artist} "${radioTitle(seed).replace(/"/g, "")}"`,
@@ -81,11 +81,11 @@ export async function roomRecommendation(
         (candidate) =>
           isRadioMusic(candidate) &&
           candidate.embeddable &&
-          radioGenre(candidate) &&
+          specificRadioGenre(candidate) &&
+          radioStyleCompatible(seed!, candidate) &&
           sameRadioRecording(seed!, candidate),
       );
       if (tagged) {
-        genre = radioGenre(tagged);
         seed = { ...seed, title: tagged.title, genres: tagged.genres };
       }
     } catch {
@@ -98,11 +98,12 @@ export async function roomRecommendation(
     entryId: video.id,
     source: "youtube" as const,
   });
-  // Search the explicit genre across artists. Keep the same relevance constraint
-  // on the retry; never accept an unrelated result just to keep playing.
+  // Try genre discovery first, then the original artist if known. Repeating
+  // the same genre-only search cannot recover a sparse genre result. Both
+  // paths still enforce the same content, history and relevance constraints.
   const queries = [
     radioQuery(seed),
-    `${specificRadioGenre(seed) ?? artist} music audio`,
+    `${artist || specificRadioGenre(seed)} music audio`,
   ];
   let failure: unknown;
   let succeeded = false;
