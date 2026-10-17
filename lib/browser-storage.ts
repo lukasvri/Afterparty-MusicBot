@@ -19,29 +19,49 @@ export function readBrowserValue(
   return previous;
 }
 const memory = new Map<string, string>();
-const listeners = new Map<string, Set<() => void>>();
+// Only observed keys use the snapshot cache, including missing preferences.
+// Unobserved keys retain the existing storage and in-memory fallback behavior.
+const snapshots = new Map<string, string | null>();
+const subscriptions = new Map<string, {
+  listeners: Set<() => void>;
+  changed: (event: StorageEvent) => void;
+}>();
 export const browserStorage = {
   subscribe(key: string, listener: () => void) {
-    const subscribers = listeners.get(key) ?? new Set<() => void>();
-    listeners.set(key, subscribers);
-    subscribers.add(listener);
-    const changed = (event: StorageEvent) => {
-      if (event.key === null || event.key === key || event.key === key.replace(/^afterparty-/, 'muse-')) {
-        memory.delete(key);
-        listener();
-      }
-    };
-    window.addEventListener('storage', changed);
+    let subscription = subscriptions.get(key);
+    if (!subscription) {
+      const listeners = new Set<() => void>();
+      const changed = (event: StorageEvent) => {
+        if (event.key === null || event.key === key || event.key === key.replace(/^afterparty-/, 'muse-')) {
+          memory.delete(key);
+          snapshots.delete(key);
+          listeners.forEach(notify => notify());
+        }
+      };
+      subscription = {listeners, changed};
+      subscriptions.set(key, subscription);
+      window.addEventListener('storage', changed);
+    }
+    subscription.listeners.add(listener);
+    let subscribed = true;
     return () => {
-      subscribers.delete(listener);
-      if (!subscribers.size) listeners.delete(key);
-      window.removeEventListener('storage', changed);
+      if (!subscribed) return;
+      subscribed = false;
+      subscription.listeners.delete(listener);
+      if (!subscription.listeners.size) {
+        subscriptions.delete(key);
+        snapshots.delete(key);
+        window.removeEventListener('storage', subscription.changed);
+      }
     };
   },
   get(key: string) {
     if (memory.has(key)) return memory.get(key)!;
+    if (snapshots.has(key)) return snapshots.get(key)!;
     try {
-      return readBrowserValue(localStorage, key);
+      const value = readBrowserValue(localStorage, key);
+      if (subscriptions.has(key)) snapshots.set(key, value);
+      return value;
     } catch {
       return null;
     }
@@ -54,7 +74,7 @@ export const browserStorage = {
     } catch {
       saved = false;
     }
-    listeners.get(key)?.forEach(listener => listener());
+    subscriptions.get(key)?.listeners.forEach(listener => listener());
     return saved;
   },
 };

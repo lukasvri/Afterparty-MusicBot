@@ -39,6 +39,7 @@ declare global {
     __transportCalls: string[];
     __fakePlayer: FixturePlayer;
     __originalPlayer: FixturePlayer;
+    __preferenceWrites: Record<string, number>;
   }
 }
 type FixtureOptions = {
@@ -946,8 +947,19 @@ test(`unified settings preserve playback across mobile and desktop fullscreen fo
     await page.waitForFunction(() => window.__fakePlayer?.state === 1);
     await page.evaluate(() => {window.__originalPlayer = window.__fakePlayer;});
     const sent = commands.length;
+    await page.evaluate(() => {
+      window.__preferenceWrites = {};
+      const write = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        window.__preferenceWrites[key] = (window.__preferenceWrites[key] ?? 0) + 1;
+        write.call(this, key, value);
+      };
+    });
+    await page.locator('.motion-toggle').click();
     await page.locator('.video-settings > summary').click();
     await page.getByLabel('Your nickname').fill('Synthetic guest');
+    assert.equal(await page.evaluate(() => window.__preferenceWrites['afterparty-motion']),1);
+    assert.equal(await page.evaluate(() => window.__preferenceWrites['afterparty-display-name']),1);
     const settingsTabs=page.locator('.settings-tabs');
     await settingsTabs.getByRole('tab',{name:'Video',exact:true}).click();
     await page.locator('.video-settings select').selectOption('stable');

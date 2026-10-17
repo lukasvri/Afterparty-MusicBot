@@ -176,3 +176,72 @@ test("blocked storage still notifies subscribers and cross-tab clearing invalida
     else Reflect.deleteProperty(globalThis, "localStorage");
   }
 });
+
+test("observed browser snapshots avoid repeated storage reads and share event invalidation", async () => {
+  const { browserStorage } = await import("../lib/browser-storage.ts");
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const events = new EventTarget();
+  const key = "afterparty-counted-snapshot", missing = key + "-missing";
+  const values = new Map([[key, "saved"]]);
+  let reads = 0, notifications = 0;
+  Object.defineProperty(globalThis, "window", {configurable:true, value:events});
+  Object.defineProperty(globalThis, "localStorage", {configurable:true, value:{
+    getItem:(name:string)=>{reads++;return values.get(name)??null;},
+    setItem:(name:string,value:string)=>values.set(name,value),
+  }});
+  const notify = () => { notifications++; browserStorage.get(key); };
+  const unsubscribe = browserStorage.subscribe(key, notify);
+  const unsubscribeOther = browserStorage.subscribe(key, () => notify());
+  const unsubscribeMissing = browserStorage.subscribe(missing, () => {});
+  try {
+    for(let i=0;i<100;i++) assert.equal(browserStorage.get(key), "saved");
+    assert.equal(reads, 1, "100 unchanged observed reads need one storage read");
+    reads = 0;
+    for(let i=0;i<100;i++) assert.equal(browserStorage.get(missing), null);
+    assert.equal(reads, 2, "A missing preference checks current and legacy storage once");
+    values.set(key, "another-tab");
+    const changed = new Event("storage");
+    Object.defineProperty(changed, "key", {value:key});
+    reads = 0;
+    events.dispatchEvent(changed);
+    assert.equal(reads, 1, "All observers share the invalidated snapshot");
+    assert.equal(notifications, 2);
+    assert.equal(browserStorage.get(key), "another-tab");
+    browserStorage.set(key, "same-page");
+    assert.equal(browserStorage.get(key), "same-page");
+    assert.equal(notifications, 4);
+    unsubscribe(); unsubscribeOther(); unsubscribeMissing();
+    values.set(missing, "saved-after-unsubscribe");
+    assert.equal(browserStorage.get(missing), "saved-after-unsubscribe", "Unobserved reads must not retain snapshots");
+    reads = 0;
+    const credential = "afterparty-host:UNOBSERV";
+    values.set(credential, "first");
+    assert.equal(browserStorage.get(credential), "first");
+    values.set(credential, "second");
+    assert.equal(browserStorage.get(credential), "second");
+    assert.equal(reads, 2, "Unobserved credentials continue to read actual storage");
+  } finally {
+    unsubscribe(); unsubscribeOther(); unsubscribeMissing();
+    if(originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if(originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
+
+test("evening tracks preserve first occurrence and order with one ID read per input", async () => {
+  const { uniqueEveningTracks } = await import("../lib/evening-library.ts");
+  type Video = import("../lib/types.ts").Video;
+  let reads = 0;
+  const videos = Array.from({length:151}, (_,i) => ({
+    get id(){reads++;return String(i).padStart(11,"0");},
+  }) as Video);
+  assert.deepEqual(uniqueEveningTracks(videos.slice(0,100),videos.slice(100)), videos);
+  assert.equal(reads, 151, "Deduplication must scan each input ID once");
+  const first = {id:"abcdefghijk",title:"First selection"} as Video;
+  const other = {id:"lmnopqrstuv",title:"Other selection"} as Video;
+  const duplicate = {...first,title:"Later metadata"};
+  const invalid = {id:"not a valid YouTube ID"} as Video;
+  assert.deepEqual(uniqueEveningTracks([first,invalid,other],[duplicate,other]),[first,other]);
+});
