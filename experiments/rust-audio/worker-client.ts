@@ -27,7 +27,7 @@ export class RustAudioWorker {
     this.timeoutMs = options.timeoutMs ?? 1000;
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0 || this.timeoutMs > 60_000)
       throw new RangeError("timeoutMs must be between 0 and 60000");
-    this.child = spawn(options.executable ?? defaultExecutable, options.args ?? ["--stream"], {
+    this.child = spawn(options.executable ?? process.env.RUST_AUDIO_BIN ?? defaultExecutable, options.args ?? ["--stream"], {
       stdio: ["pipe", "pipe", "pipe"], windowsHide: true,
     });
     this.closed = new Promise((resolve) => this.child.once("close", (code, signal) => {

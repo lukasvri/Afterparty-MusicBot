@@ -212,6 +212,14 @@ automatic replay, process restart or production fallback. The Rust worker spawns
 no descendants. This parent terminates only its direct child, and is not a
 process-tree supervisor for FFmpeg or any future subprocess pipeline.
 
+The parent selects an explicit `executable` option first, then `RUST_AUDIO_BIN`,
+then the platform-specific release artifact. The parity harness, lifecycle suite
+and benchmark therefore all support an alternate local build through
+`RUST_AUDIO_BIN`; an explicit executable still controls synthetic test children.
+Isolated process tests verify precedence without changing the test runner's
+environment. This is an offline experiment fix and does not change the product
+version or the production website's patch notes.
+
 The lifecycle tests run both real Rust parity requests and synthetic child
 processes that hang, ignore EOF, crash, truncate replies, flood output or send
 invalid headers/IDs. They verify that rejected requests have reaped the child,

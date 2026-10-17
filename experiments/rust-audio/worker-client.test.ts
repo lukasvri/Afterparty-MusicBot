@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { spawnSync } from "node:child_process";
 import { mixPcm } from "../../services/core/src/audio.ts";
 import { FRAME_BYTES, RustAudioWorker } from "./worker-client.ts";
 
@@ -7,6 +8,45 @@ const input = { a: Buffer.alloc(FRAME_BYTES, 15), b: Buffer.alloc(FRAME_BYTES, 2
 function fake(script: string, timeoutMs = 1000) {
   return new RustAudioWorker({ executable: process.execPath, args: ["-e", script], timeoutMs });
 }
+
+test("executable selection honors explicit options before RUST_AUDIO_BIN", () => {
+  // Keep environment overrides inside isolated runners, away from other tests.
+  const clientUrl = new URL("./worker-client.ts", import.meta.url).href;
+  const spy = `
+    let request = Buffer.alloc(0);
+    process.stdin.on('data', chunk => {
+      request = Buffer.concat([request, chunk]);
+      if (request.length < 3872) return;
+      const reply = Buffer.alloc(3856, 23);
+      reply.write('APCM'); reply[4] = 1; reply[5] = 129;
+      reply[6] = 0; reply[7] = 0;
+      reply.writeUInt32LE(request.readUInt32LE(8), 8);
+      reply.writeUInt32LE(3840, 12);
+      process.stdout.write(reply);
+    });
+  `;
+  for (const explicit of [false, true]) {
+    const options = { ...(explicit ? { executable: process.execPath } : {}), args: ["-e", spy] };
+    const runner = `
+      import assert from 'node:assert/strict';
+      import { RustAudioWorker, FRAME_BYTES } from ${JSON.stringify(clientUrl)};
+      const worker = new RustAudioWorker(${JSON.stringify(options)});
+      try {
+        assert.deepEqual(await worker.mix({ a: Buffer.alloc(FRAME_BYTES), b: null, progress: 0, volume: 100 }),
+          Buffer.alloc(FRAME_BYTES, 23));
+      } finally { await worker.close(); }
+      assert(worker.isClosed);
+    `;
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", runner], {
+      env: { ...process.env, RUST_AUDIO_BIN: explicit ? "/afterparty-deliberately-missing-env-worker" : process.execPath },
+      timeout: 10_000, maxBuffer: 4096, windowsHide: true,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.signal, null);
+    assert.equal(result.status, 0, `Selection with explicit=${explicit}: ${result.stderr.toString()}`);
+    assert.equal(result.stdout.length, 0);
+  }
+});
 
 test("persistent real Rust process matches Core and closes all pipes", async () => {
   const worker = new RustAudioWorker();
