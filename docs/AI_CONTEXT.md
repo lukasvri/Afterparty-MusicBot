@@ -2,7 +2,7 @@
 
 [Documentation](README.md) · [AI workflow](AI_WORKFLOW.md) · [Architecture](ARCHITECTURE.md) · [Branding](BRANDING.md)
 
-This is a **small, durable decision record** for assistants working on Afterparty. It was checked against the repository on **16 October 2026**. Refresh `main`, related PRs and the specific source files before making claims about current implementation. This is not a live deployment dashboard or an exhaustive description of the code.
+This is a **small, durable decision record** for assistants working on Afterparty. It was checked against the repository on **17 October 2026**. Refresh `main`, related PRs and the specific source files before making claims about current implementation. This is not a live deployment dashboard or an exhaustive description of the code.
 
 ## Product and identity
 
@@ -41,12 +41,15 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - [Cloud development](CLOUD_DEVELOPMENT.md): fresh checkout, setup, checks and safe local release process.
 - [Contributing](../CONTRIBUTING.md): module map and review standards.
 - [Changelog](../CHANGELOG.md): generated release notes, **not** proof of deployment.
+- [Release policy](RELEASING.md#notes-for-every-change): notes required in each code or user-facing PR, the shared release source, website checks and documentation/experiment handling.
 - [AI collaboration](AI_WORKFLOW.md): using Dot, Chat, Work and Codex without losing the handoff.
 
 ## AI coordination
 
 - The personal dot is the proposed ongoing coordinator for planning and follow-up, not an authority for unreviewed code merges or live deployment.
 - Chat provides interactive decisions, Work handles broader multi-step research and app work, and Codex implements and validates repository changes.
+- Use supported subagents/delegation for independent work when parallel execution helps. Tool availability and permissions, not a Chat model name or Pro selection, determine whether delegation is possible. The lead reviews the combined result; see [delegation controls](AI_WORKFLOW.md#delegation-controls).
+- GitHub holds canonical source, issues, PRs, checks and release records. Keep code, user-facing notes and validation together in the PR, following the [release policy](RELEASING.md#notes-for-every-change). Merging, auto-merge, publication and deployment require owner approval; cloud work stops at review material.
 - All tools should verify current source and PRs before claiming a feature exists or that a production change has gone live. See [AI collaboration](AI_WORKFLOW.md) for Dot setup, permissions and delegated tasks.
 
 ## Active work and uncertainties

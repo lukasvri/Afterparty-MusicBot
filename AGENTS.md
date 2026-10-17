@@ -30,6 +30,33 @@ documentation in English. Do not use em dashes.
 - Use synthetic credentials and isolated temporary data in tests. Automated
   audio tests do not establish what a person hears in a Discord voice channel.
 
+## Delegation and review
+
+- Use subagents or delegation when the active tool supports it and independent
+  work benefits from parallel execution, such as source inspection and review.
+  Give each agent a bounded task, source ref and acceptance criteria. Assign
+  non-overlapping writes or separate worktrees; review the combined result.
+- Check actual tool availability and permissions first. Chat model selection,
+  including Pro, does not by itself provide subagent tools. If delegation is
+  unavailable or would add unnecessary coordination, work sequentially and
+  report the limitation or reason. Never claim that an agent or check ran unless it did.
+- The lead agent owns integration, validation and the final report. Delegation
+  does not grant merge, publishing, deployment or production access.
+
+## Release notes and pull requests
+
+- Every code or user-facing change must include written release/patch notes in
+  the same PR and keep them current as scope changes. Follow the canonical
+  [release policy](docs/RELEASING.md#notes-for-every-change), including its rules
+  for internal documentation and isolated Rust experiments.
+- Use `lib/releases.json` for product notes and generate `CHANGELOG.md`; preserve
+  historical entries. Verify relevant notes reach the website's `/patch-notes`
+  and latest-release link. Do not create a competing changelog.
+- Follow [branch strategy](CONTRIBUTING.md#branch-strategy): focused branches
+  from refreshed `main` target `main`; isolated Rust branches target `dev`.
+  Open a draft PR with actual checks, notes and limitations. Owner approval is
+  required before merging, enabling auto-merge, publishing or deploying.
+
 ## Local production boundary
 
 - Never commit or upload credentials, `.env`, `.dev.vars`, databases, backups,
