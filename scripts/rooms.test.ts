@@ -1,13 +1,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import { registerHooks, stripTypeScriptTypes } from "node:module";
 import { readFileSync, readdirSync } from "node:fs";
+import type { RoomState } from "../lib/types.ts";
 
 // Exercise the actual Worker handlers and SQL using only an in-memory D1 adapter.
-const syntheticEnv = {};
-globalThis.__roomTestEnv = syntheticEnv;
-const moduleUrl = (source) =>
+type FixtureEnvironment = {
+  DB?: {
+    prepare(sql: string): {
+      bind(...args: SQLInputValue[]): {
+        first(): Promise<Record<string, SQLOutputValue> | null>;
+        run(): Promise<{ meta: { changes: number } }>;
+      };
+    };
+  };
+  YOUTUBE_API_KEY?: string;
+};
+const syntheticEnv: FixtureEnvironment = {};
+const globals = globalThis as typeof globalThis & { __roomTestEnv: FixtureEnvironment };
+globals.__roomTestEnv = syntheticEnv;
+const moduleUrl = (source: string) =>
   "data:text/javascript," + encodeURIComponent(source);
 const hooks = registerHooks({
   resolve(specifier, context, next) {
@@ -53,8 +66,13 @@ const hooks = registerHooks({
     return next(url, context);
   },
 });
-const { mutate, hash, publicRoom } = await import("../lib/server.ts");
+const { mutate: mutateHandler, hash, publicRoom } = await import("../lib/server.ts");
 hooks.deregister();
+const mutate = async (...args: Parameters<typeof mutateHandler>) => {
+  const result = await mutateHandler(...args);
+  assert(result.room, "The tested room mutation must return the resulting room");
+  return { ...result, room: result.room };
+};
 const seed = {
   id: "seed1234567",
   title: "Syn Cole - Feel Good | Future House | NCS - Copyright Free",
@@ -99,7 +117,7 @@ function fixture() {
   });
   const save = async (
     code = "TESTROOM",
-    state = { current: seed, queue: [], playing: true, position: 199 },
+    state: RoomState = { current: seed, queue: [], playing: true, position: 199 },
   ) =>
     sqlite
       .prepare(
@@ -116,7 +134,7 @@ function fixture() {
   const originalFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async (target) => {
-    const url = new URL(target);
+    const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
     assert.equal(url.origin, "https://www.googleapis.com");
     calls++;
     if (url.pathname.endsWith("/search"))
@@ -132,10 +150,24 @@ function fixture() {
       ],
     });
   };
+  const roomRow = (code = "TESTROOM"): Parameters<typeof publicRoom>[1] => {
+    const value = sqlite.prepare("SELECT * FROM rooms WHERE code=?").get(code);
+    assert(value);
+    const { name, owner_hash, state, version, updated_at, expires_at } = value;
+    assert(typeof name === "string" && typeof owner_hash === "string" && typeof state === "string");
+    assert(typeof version === "number" && typeof updated_at === "number" && typeof expires_at === "number");
+    return {
+      code, name, owner_hash, state, version, updated_at, expires_at,
+      ...(typeof value.guild_id === "string" ? { guild_id: value.guild_id } : {}),
+      ...(typeof value.is_public === "number" ? { is_public: value.is_public } : {}),
+    };
+  };
   return {
     sqlite,
     request,
     save,
+    roomRow,
+    roomState: (code = "TESTROOM") => JSON.parse(roomRow(code).state) as RoomState,
     calls: () => calls,
     close() {
       globalThis.fetch = originalFetch;
@@ -158,10 +190,8 @@ test("D1 own-room radio advances the queue, keeps manual priority and hides its 
     assert.equal(room.radio, true);
     assert.equal(room.version, 2);
     assert(!("radioHistory" in room));
-    const saved = JSON.parse(
-      f.sqlite.prepare("SELECT state FROM rooms").get().state,
-    );
-    assert.equal(saved.radioHistory[0].id, seed.id);
+    const saved = f.roomState();
+    assert.equal(saved.radioHistory?.[0].id, seed.id);
     await f.save("MANUAL01", {
       current: seed,
       queue: [next],
@@ -171,7 +201,7 @@ test("D1 own-room radio advances the queue, keeps manual priority and hides its 
     const calls = f.calls();
     assert.equal(
       (await mutate(f.request, "MANUAL01", { action: "next", version: 1 })).room
-        .current.id,
+        .current?.id,
       next.id,
     );
     assert.equal(f.calls(), calls);
@@ -179,7 +209,7 @@ test("D1 own-room radio advances the queue, keeps manual priority and hides its 
     const offline = await publicRoom(
       f.request,
       {
-        ...f.sqlite.prepare("SELECT * FROM rooms WHERE code=?").get("DISCORD1"),
+        ...f.roomRow("DISCORD1"),
         updated_at: Date.now() - 20000,
       },
       false,
@@ -198,14 +228,14 @@ test("D1 own-room radio rejects guests and a result arriving after a pause", asy
         action: "next",
         version: 1,
       }),
-      (error) => error.status === 403,
+      (error: unknown) => error instanceof Error && "status" in error && error.status === 403,
     );
     assert.equal(f.calls(), 0);
-    let release, entered;
-    const gate = new Promise((resolve) => {
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>((resolve) => {
         release = resolve;
       }),
-      started = new Promise((resolve) => {
+      started = new Promise<void>((resolve) => {
         entered = resolve;
       }),
       fetchMetadata = globalThis.fetch;
@@ -221,11 +251,9 @@ test("D1 own-room radio rejects guests and a result arriving after a pause", asy
     await started;
     await mutate(f.request, "TESTROOM", { action: "pause", version: 1 });
     release();
-    await assert.rejects(pending, (error) => error.status === 409);
-    const saved = JSON.parse(
-      f.sqlite.prepare("SELECT state FROM rooms").get().state,
-    );
-    assert.equal(saved.current.id, seed.id);
+    await assert.rejects(pending, (error: unknown) => error instanceof Error && "status" in error && error.status === 409);
+    const saved = f.roomState();
+    assert.equal(saved.current?.id, seed.id);
     assert.equal(saved.playing, false);
   } finally {
     f.close();
@@ -241,9 +269,9 @@ test("D1 radio uses and persists its original choice after an automatic transiti
     assert.equal(room.current?.id,next.id);
     assert.equal(room.current?.radio,true);
     assert(!("radioSeed" in room));
-    const saved=JSON.parse(f.sqlite.prepare("SELECT state FROM rooms").get().state);
-    assert.equal(saved.radioSeed.id,seed.id);
-    assert.equal(saved.radioHistory[0].id,changed.id);
+    const saved=f.roomState();
+    assert.equal(saved.radioSeed?.id,seed.id);
+    assert.equal(saved.radioHistory?.[0].id,changed.id);
   } finally { f.close(); }
 });
 test("D1 starts the recommended video clock after its metadata lookup completes", async () => {
@@ -262,7 +290,7 @@ test("D1 starts the recommended video clock after its metadata lookup completes"
       action: "next",
       version: 1,
     });
-    assert.equal(room.current.id, next.id);
+    assert.equal(room.current?.id, next.id);
     assert.equal(room.position, 0);
   } finally {
     Date.now = now;
@@ -287,7 +315,7 @@ test("D1 direct playback starts at zero after slow metadata, including replay of
       videoId: next.id,
       version: 1,
     });
-    assert.equal(room.current.id, next.id);
+    assert.equal(room.current?.id, next.id);
     assert.equal(room.position, 0);
     assert.equal(room.playing, true);
     time += 5000;
@@ -325,7 +353,7 @@ test("D1 a slow queue addition preserves the clock of the video already playing"
       videoId: next.id,
       version: 1,
     });
-    assert.equal(room.current.id, seed.id);
+    assert.equal(room.current?.id, seed.id);
     assert.equal(room.position, 22.5);
     assert.equal(room.queue[0].id, next.id);
   } finally {
@@ -344,7 +372,7 @@ test("cohost invitations are single-use, revocable and cannot grant another room
     });
     await assert.rejects(
       mutate(guest, "TESTROOM", { action: "invite" }),
-      (e) => e.status === 403,
+      (e: unknown) => e instanceof Error && "status" in e && e.status === 403,
     );
     const invitation = await mutate(f.request, "TESTROOM", {
       action: "invite",
@@ -354,7 +382,7 @@ test("cohost invitations are single-use, revocable and cannot grant another room
         action: "claim-host",
         token: invitation.token,
       }),
-      (e) => e.status === 403,
+      (e: unknown) => e instanceof Error && "status" in e && e.status === 403,
     );
     const grant = await mutate(guest, "TESTROOM", {
       action: "claim-host",
@@ -366,14 +394,12 @@ test("cohost invitations are single-use, revocable and cannot grant another room
         action: "claim-host",
         token: invitation.token,
       }),
-      (e) => e.status === 403,
+      (e: unknown) => e instanceof Error && "status" in e && e.status === 403,
     );
     const cohost = new Request(f.request.url, {
       headers: { authorization: "Bearer " + grant.token },
     });
-    let value = f.sqlite
-      .prepare("SELECT * FROM rooms WHERE code=?")
-      .get("TESTROOM");
+    let value = f.roomRow();
     const visible = await publicRoom(cohost, value, false);
     assert.equal(visible.isHost, true);
     assert.equal(visible.isOwner, false);
@@ -385,15 +411,13 @@ test("cohost invitations are single-use, revocable and cannot grant another room
     });
     await assert.rejects(
       mutate(cohost, "TESTROOM", { action: "transfer-invite" }),
-      (e) => e.status === 403,
+      (e: unknown) => e instanceof Error && "status" in e && e.status === 403,
     );
     await mutate(f.request, "TESTROOM", { action: "revoke-hosts" });
-    value = f.sqlite
-      .prepare("SELECT * FROM rooms WHERE code=?")
-      .get("TESTROOM");
+    value = f.roomRow();
     await assert.rejects(
       mutate(cohost, "TESTROOM", { action: "play", version: value.version }),
-      (e) => e.status === 403,
+      (e: unknown) => e instanceof Error && "status" in e && e.status === 403,
     );
   } finally {
     f.close();
@@ -413,7 +437,7 @@ test("ownership transfer removes previous grants but keeps the stable Core autho
     const request = new Request(f.request.url, {
       headers: { authorization: "Bearer " + grant.token },
     });
-    const value = f.sqlite.prepare("SELECT * FROM rooms").get();
+    const value = f.roomRow();
     assert.equal((await publicRoom(request, value, false)).isOwner, true);
     assert.equal((await publicRoom(f.request, value, false)).isHost, false);
     assert.equal(
@@ -422,7 +446,7 @@ test("ownership transfer removes previous grants but keeps the stable Core autho
     );
     await assert.rejects(
       mutate(f.request, "TESTROOM", { action: "invite" }),
-      (e) => e.status === 403,
+      (e: unknown) => e instanceof Error && "status" in e && e.status === 403,
     );
   } finally {
     f.close();
@@ -434,7 +458,7 @@ test('D1 persists removal of consumed undo and old radio retry state', async () 
  try {
   await f.save('TESTROOM',{current:seed,queue:[next],playing:false,position:20,undoQueue:[next],radioRetryAt:Date.now()+60000,cohostHashes:['synthetic-cohost']});
   await mutate(f.request,'TESTROOM',{action:'play-video',videoId:next.id,version:1});
-  const saved=JSON.parse(f.sqlite.prepare('SELECT state FROM rooms WHERE code=?').get('TESTROOM').state);
+  const saved=f.roomState();
   assert.equal(saved.undoQueue,undefined);
   assert.equal(saved.radioRetryAt,undefined);
   assert.deepEqual(saved.queue,[]);

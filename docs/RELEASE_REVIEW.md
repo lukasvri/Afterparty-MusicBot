@@ -47,6 +47,10 @@ The local production preview also passes `party.browser.mjs`,
 Chromium and synthetic API/player fixtures. These cover mobile layout, private
 setup, search/add, moderation, clear/undo, favorites, QR sharing, TV mode,
 autoplay recovery, radio progression, stale revisions and stable playback.
+
+The recorded results above used the JavaScript fixture paths at the time of this
+review. The current executable paths end in `.ts`; see the
+[TypeScript conventions](TYPESCRIPT.md) and [current validation guide](FINAL_RELEASE_CHECK.md).
 Desktop and mobile previews load the font locally without Google Fonts requests.
 The video fixture uses the same default port as `npm run start` and closes its
 browser if setup fails.

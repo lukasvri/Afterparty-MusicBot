@@ -1,9 +1,64 @@
 // Run against a local preview only. Playwright can be supplied via PLAYWRIGHT_MODULE.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import type { Room, Video } from "../lib/types.ts";
+import type { Player } from "../lib/youtube-player.ts";
+import type { concertCore } from "./concert-core-fixture.ts";
+
+type BrowserCommand = {
+  action: string;
+  position?: number;
+  seconds?: number;
+  version?: number;
+  enabled?: boolean;
+  queueRevision?: string;
+};
+type PlayerOptions = {
+  events: {
+    onReady: () => void;
+    onStateChange: (event: { data: number }) => void;
+    onAutoplayBlocked: () => void;
+    onPlaybackQualityChange: (event: { data: string }) => void;
+  };
+};
+type FixturePlayer = Player & {
+  options: PlayerOptions;
+  position: number;
+  state: number;
+  volume: number;
+  muted: boolean;
+  at: number;
+  emit: (state: number) => void;
+};
+declare global {
+  interface Window {
+    __streams: Array<EventTarget & { url: string; closed: boolean }>;
+    __blockAudio: boolean;
+    __jitter: boolean;
+    __videoCalls: string[];
+    __transportCalls: string[];
+    __fakePlayer: FixturePlayer;
+    __originalPlayer: FixturePlayer;
+  }
+}
+type FixtureOptions = {
+  playing?: boolean;
+  blocked?: boolean;
+  host?: boolean;
+  nextGate?: Promise<void> | null;
+  nextFails?: boolean;
+  previousStorage?: boolean;
+  jitter?: boolean;
+  streaming?: boolean;
+  staleNext?: string;
+  discord?: boolean;
+  seekDelay?: number;
+  seekFails?: boolean;
+  core?: Awaited<ReturnType<typeof concertCore>> | null;
+};
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ?? "playwright"
-);
+) as typeof import("playwright");
 const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:8787";
 assert(
   ["127.0.0.1", "localhost"].includes(new URL(base).hostname),
@@ -24,7 +79,7 @@ async function fixture({
   seekDelay = 0,
   seekFails = false,
   core = null,
-} = {}) {
+}: FixtureOptions = {}) {
   const browser = await chromium.launch({
     headless: true,
     ...(process.env.CHROMIUM_PATH
@@ -35,8 +90,8 @@ async function fixture({
   const page = await browser.newPage({
       viewport: { width: 1500, height: 1000 },
     }),
-    commands = [];
-  const video = (id) => ({
+    commands: BrowserCommand[] = [];
+  const video = (id: string): Video => ({
     id,
     title: "Synthetic " + id,
     artist: "Synthetic artist",
@@ -45,12 +100,12 @@ async function fixture({
     live: false,
     embeddable: true,
   });
-  let current = video("seed1234567"),
-    version = 1,
+  let current: Video | null = video("seed1234567");
+  let version = 1,
     radio = true;
   let anchor = Date.now(),
     position = 20;
-  const room = () => ({
+  const room = (): Room => ({
     code: "TESTROOM",
     name: "Synthetic own room",
     current,
@@ -65,7 +120,7 @@ async function fixture({
     ...(discord ? { mode: "discord", guildId: "123456789012345678", playbackKey: "synthetic-playback" } : {}),
     expiresAt: Date.now() + 60000,
   });
-  let seekJob = null;
+  let seekJob: { id: string; status: string; seconds: number; readyAt: number } | null = null;
   const finishSeek = () => {
     if (!seekJob || Date.now() < seekJob.readyAt || seekJob.status !== "processing") return;
     seekJob.status = seekFails ? "failed" : "done";
@@ -87,10 +142,12 @@ async function fixture({
       localStorage.setItem(prefix + "visitor", "synthetic-visitor");
       if(streaming){
         window.__streams = [];
-        window.EventSource = class extends EventTarget {
-          constructor(url){super();this.url=url;this.closed=false;window.__streams.push(this);queueMicrotask(()=>this.dispatchEvent(new Event('open')));}
+        Object.assign(window, { EventSource: class extends EventTarget {
+          url: string;
+          closed: boolean;
+          constructor(url: string){super();this.url=url;this.closed=false;window.__streams.push(this);queueMicrotask(()=>this.dispatchEvent(new Event('open')));}
           close(){this.closed=true;}
-        };
+        }});
       }
       window.__blockAudio = blocked;
       window.__jitter = jitter;
@@ -98,28 +155,34 @@ async function fixture({
       window.__transportCalls = [];
       window.YT = {
         Player: class {
-          constructor(_target, options) {
-            this.options = options;
+          options: PlayerOptions;
+          state: number;
+          position: number;
+          volume: number;
+          muted: boolean;
+          at: number;
+          constructor(_target: HTMLElement, options: Record<string, unknown>) {
+            this.options = options as PlayerOptions;
             this.state = 5;
             this.position = 0;
             this.volume = 77;
             this.muted = false;
             this.at = performance.now();
             window.__fakePlayer = this;
-            queueMicrotask(() => options.events.onReady());
+            queueMicrotask(() => this.options.events.onReady());
           }
-          emit(state) {
+          emit(state: number) {
             if (this.state === 1) this.position = this.getCurrentTime();
             this.state = state;
             this.at = performance.now();
             this.options.events.onStateChange({ data: state });
           }
-          loadVideoById(value) {
+          loadVideoById(value: { videoId: string; startSeconds: number }) {
             window.__videoCalls.push(value.videoId);
             this.position = value.startSeconds;
             this.playVideo();
           }
-          cueVideoById(value) {
+          cueVideoById(value: { videoId: string; startSeconds: number }) {
             window.__videoCalls.push(value.videoId);
             this.position = value.startSeconds;
             this.emit(5);
@@ -144,7 +207,7 @@ async function fixture({
           getPlayerState() {
             return this.state;
           }
-          setVolume(value) {
+          setVolume(value: number) {
             this.volume = value;
           }
           getVolume() {
@@ -159,7 +222,7 @@ async function fixture({
           isMuted() {
             return this.muted;
           }
-          seekTo(value) {
+          seekTo(value: number) {
             window.__transportCalls.push("seek");
             this.position = value;
             this.at = performance.now();
@@ -187,7 +250,7 @@ async function fixture({
         "Bearer synthetic-host-token",
       );
       if (route.request().method() === "POST") {
-        const command = route.request().postDataJSON();
+        const command: BrowserCommand = route.request().postDataJSON();
         commands.push(command);
         if (command.action === "next" && staleNext) {
           if (staleNext === "new-track") current = video("newtrack123");
@@ -204,10 +267,16 @@ async function fixture({
           assert.equal(command.version, version);
           position = room().position;
           anchor = Date.now();
-          if (command.action === "seek") position = command.position;
+          if (command.action === "seek") {
+            assert.equal(typeof command.position, "number");
+            position = command.position!;
+          }
           if (command.action === "play") playing = true;
           if (command.action === "pause") playing = false;
-          if (command.action === "radio") radio = command.enabled;
+          if (command.action === "radio") {
+            assert.equal(typeof command.enabled, "boolean");
+            radio = command.enabled!;
+          }
           if (command.action === "next") {
             if (nextGate) await nextGate;
             if (nextFails)
@@ -232,7 +301,7 @@ async function fixture({
     else if (url.pathname === "/api/admin/control" && discord) {
       assert(host, "Guests must never attempt privileged seeking");
       if (route.request().method() === "POST") {
-        const input = route.request().postDataJSON();
+        const input: { guildId: string; operation: string; commandId: string; command: BrowserCommand & { seconds: number } } = route.request().postDataJSON();
         assert.equal(input.guildId, "123456789012345678");
         assert.equal(input.operation, "command");
         assert.equal(input.command.action, "seek");
@@ -377,7 +446,7 @@ test("blocked audible startup falls back to muted video without changing saved a
     assert.equal(
       (
         await page.evaluate(() =>
-          JSON.parse(localStorage.getItem("afterparty-audio")),
+          JSON.parse(localStorage.getItem("afterparty-audio") ?? "{}") as { muted: boolean },
         )
       ).muted,
       false,
@@ -439,8 +508,8 @@ test("server-owned room progression loads the next track without a browser next 
 });
 for (const nextFails of [false, true])
   test(`browser holds the ended video while the server resolves radio${nextFails ? " failure" : ""}`, async () => {
-    let release;
-    const nextGate = new Promise((resolve) => {
+    let release = () => {};
+    const nextGate = new Promise<void>((resolve) => {
       release = resolve;
     });
     const { browser, page, commands, advance } = await fixture({
@@ -517,7 +586,7 @@ test("fresh Afterparty storage works without any old browser keys", async () => 
     );
     assert.equal(
       await f.page.evaluate(
-        () => JSON.parse(localStorage.getItem("afterparty-audio")).level,
+        () => (JSON.parse(localStorage.getItem("afterparty-audio") ?? "{}") as { level: number }).level,
       ),
       77,
     );
@@ -581,7 +650,7 @@ test("one host stays live without repeated seeks or publishing buffering as a ro
       "native YouTube scrubbing publishes exactly one seek",
     );
     assert(
-      Math.abs(commands.find((c) => c.action === "seek").position - 80) < 2,
+      Math.abs(commands.find((c) => c.action === "seek")!.position! - 80) < 2,
     );
   } finally {
     await browser.close();
@@ -680,10 +749,10 @@ test("audio preferences update without replacing the player and survive mute and
     const before = commands.length;
     await page.evaluate(() => window.__fakePlayer.setVolume(23));
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('afterparty-audio') ?? '{}').level === 23);
-    await page.evaluate(() => document.activeElement?.blur());
+    await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
     await page.keyboard.press('m');
     await page.waitForFunction(() => window.__fakePlayer.muted);
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('afterparty-audio')).level),23);
+    assert.equal(await page.evaluate(() => (JSON.parse(localStorage.getItem('afterparty-audio') ?? '{}') as { level: number }).level),23);
     await page.keyboard.press('m');
     await page.waitForFunction(() => !window.__fakePlayer.muted);
     await page.evaluate(() => {
@@ -699,13 +768,14 @@ test("audio preferences update without replacing the player and survive mute and
 test("live room callbacks accept new timelines after rendering without reconnecting", async () => {
   const {browser, page} = await fixture({playing:true,streaming:true});
   try {
-    const errors = [];
+    const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.locator('.stage-intro button').filter({hasText:/Start video/}).click();
     await page.waitForFunction(() => window.__fakePlayer?.state === 1);
     await page.getByRole('button',{name:'Bokmål',exact:true}).click();
     await page.evaluate(() => {
       const source = window.__streams.find(stream => stream.url.includes('room=TESTROOM'));
+      if (!source) throw new Error('Expected the synthetic room stream');
       source.dispatchEvent(new MessageEvent('message',{data:JSON.stringify({type:'room',room:{
         code:'TESTROOM',name:'Synthetic own room',current:{id:'next1234567',title:'Fresh live title',artist:'Synthetic artist',image:'',duration:200,live:false,embeddable:true},queue:[],playing:true,position:45,version:2,serverTime:Date.now(),viewers:1,isHost:true,expiresAt:Date.now()+60000,syncSource:'live',syncEpoch:'synthetic-stream',syncValidForMs:5000,
       }})}));
@@ -719,9 +789,9 @@ test("live room callbacks accept new timelines after rendering without reconnect
 
 for (const source of ['website', 'discord'])
 test(`Core integration: ${source} add from idle then manager seeks forward and backward`, async () => {
- const {concertCore} = await import('./concert-core-fixture.mjs');
+ const {concertCore} = await import('./concert-core-fixture.ts');
  const core = await concertCore();
- let f;
+ let f: Awaited<ReturnType<typeof fixture>> | undefined;
  try {
   f = await fixture({discord:true,core});
   const {page,commands} = f;

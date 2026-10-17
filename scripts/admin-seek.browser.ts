@@ -1,13 +1,16 @@
 // Exercise the real admin slider with synthetic API state and a monotonic clock.
 // Run against a local preview with PLAYWRIGHT_MODULE and CHROMIUM_PATH if needed.
 import assert from 'node:assert/strict';
-const {chromium} = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright');
+type SeekCommand = { action: 'seek'; seconds: number };
+type TransportCommand = SeekCommand | { action: 'resume' | 'pause' };
+declare global { interface Window { seekClockOffset: number } }
+const {chromium} = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright') as typeof import('playwright');
 const base = process.env.PREVIEW_URL ?? 'http://127.0.0.1:8787';
 assert(['localhost','127.0.0.1'].includes(new URL(base).hostname));
 const browser = await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
 try {
  const page = await browser.newPage();
- const errors = [], commands = [];
+ const errors: string[] = [], commands: TransportCommand[] = [];
  page.on('pageerror', e => errors.push(e.message));
  await page.addInitScript(() => {
   localStorage.setItem('gutta-language','en');
@@ -21,11 +24,11 @@ try {
   const url = new URL(route.request().url());
   if(url.origin !== base) return route.abort();
   if(!url.pathname.startsWith('/api/')) return route.continue();
-  let data = {};
+  let data: unknown = {};
   if(url.pathname === '/api/admin/guilds') data = {authenticated:true,globalAdmin:true,guilds:[guild]};
   else if(url.pathname === '/api/admin/control') {
    if(route.request().method() === 'POST') {
-    const input = route.request().postDataJSON();
+    const input: { guildId: string; operation: string; command: TransportCommand & { queueRevision: number } } = route.request().postDataJSON();
     assert.equal(input.guildId,guild.id);
     assert.equal(input.operation,'command');
     assert.equal(input.command.queueRevision,7);
@@ -52,10 +55,10 @@ try {
   assert.equal(commands.filter(c=>c.action==='seek').length,cycle,'Clock updates must not publish seeks');
   await slider.focus();
   await slider.press('ArrowRight');
-  await page.waitForFunction(() => !document.querySelector('.admin-seek input').disabled);
+  await page.waitForFunction(() => !document.querySelector<HTMLInputElement>('.admin-seek input')!.disabled);
   const seeks = commands.filter(c=>c.action==='seek');
   assert.equal(seeks.length,cycle+1);
-  assert(seeks.at(-1).seconds >= 31 && seeks.at(-1).seconds < 35,'Keyboard seek uses the fresh playback sample');
+  assert(seeks.at(-1)!.seconds >= 31 && seeks.at(-1)!.seconds < 35,'Keyboard seek uses the fresh playback sample');
   await page.getByRole('button',{name:'Pause',exact:true}).click();
   await page.getByRole('button',{name:'Resume',exact:true}).waitFor();
  }
@@ -67,11 +70,11 @@ try {
  await page.waitForTimeout(600);
  assert.equal(Number(await slider.inputValue()),75);
  await slider.dispatchEvent('pointerup');
- await page.waitForFunction(() => !document.querySelector('.admin-seek input').disabled);
- assert.equal(commands.filter(c=>c.action==='seek').at(-1).seconds,75);
+ await page.waitForFunction(() => !document.querySelector<HTMLInputElement>('.admin-seek input')!.disabled);
+ assert.equal(commands.filter(c=>c.action==='seek').at(-1)!.seconds,75);
  state.position = 100;
  await page.waitForFunction(() => {
-  const value = Number(document.querySelector('.admin-seek input').value);
+  const value = Number(document.querySelector<HTMLInputElement>('.admin-seek input')!.value);
   return value >= 100 && value < 104;
  });
  // Replacing the track must discard an unfinished edit even at the same position.
@@ -79,7 +82,7 @@ try {
  await slider.fill('75');
  state.current = {...state.current,id:'synthetic02',title:'Replacement fixture'};
  await page.waitForFunction(() => {
-  const value = Number(document.querySelector('.admin-seek input').value);
+  const value = Number(document.querySelector<HTMLInputElement>('.admin-seek input')!.value);
   return value >= 100 && value < 104;
  });
  await slider.dispatchEvent('pointerup');

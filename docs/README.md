@@ -48,6 +48,7 @@ These are dated reviews of specific changes, not a live checklist of production 
 
 | Record | Context |
 | --- | --- |
+| [Synchronization and runtime review](SYNC_RUNTIME_REVIEW.md) | Source freshness, live/fallback ordering, transport cost and the TypeScript/Rust assessment |
 | [Final source release check](FINAL_RELEASE_CHECK.md) | Current source gates, presentation cleanup and remaining host validation |
 | [Release review](RELEASE_REVIEW.md) | Playback, query and search optimization; ap identity; validation limits |
 | [Core reliability validation](../services/core/docs/reliability-validation.md) | Audio cancellation, race recovery and bridge query measurement |

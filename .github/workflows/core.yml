@@ -29,6 +29,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Install locked Core dependencies for typed integration fixtures
+        run: npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Lint, typecheck, browser behavior tests and production build
         run: |
           npm run lint

@@ -1,4 +1,6 @@
 //! Isolated PCM mixing prototype. No Discord or production access.
+pub mod stream;
+
 pub const FRAME_BYTES: usize = 3840;
 
 /// Mix one 20 ms, 48 kHz stereo, 16-bit signed little-endian PCM frame.

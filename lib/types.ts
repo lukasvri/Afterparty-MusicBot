@@ -46,6 +46,8 @@ export type Room = {
   position: number;
   version: number;
   serverTime: number;
+  /** Original server sample time before client transit compensation. */
+  syncSampledAt?: number;
   viewers: number;
   isHost: boolean;
   expiresAt: number;
