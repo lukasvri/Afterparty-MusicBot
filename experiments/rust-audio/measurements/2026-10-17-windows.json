@@ -1,0 +1,2086 @@
+{
+  "observedDate": "2026-10-17",
+  "sourceBase": "85431a99dd2e9eb7875eceab40458498e0044575",
+  "rustTarget": "x86_64-pc-windows-gnu",
+  "rustBuild": "cargo build --release --locked",
+  "environment": "Shared Windows development laptop; no production service started; other task checks paused during capture; OS scheduling and thermal state uncontrolled.",
+  "reports": [
+    {
+      "stage": "mix",
+      "scope": "offline saturated PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "d1321565523b1d9133a9106ff4f50edfc5718f371e9a3a22f8d15875412b3aac",
+      "ffmpegVersion": null,
+      "config": {
+        "frames": 5000,
+        "repeats": 3,
+        "guilds": [
+          1,
+          4,
+          16
+        ],
+        "warmup": 500,
+        "ffmpeg": "none"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 103.4493,
+          "submittedMs": 103.43990000000002,
+          "finalFlushMs": 0.009399999999970987,
+          "framesPerSecond": 48332.85483807044,
+          "parentCpuMs": 94,
+          "parentLifetimePeakRssBytes": 84803584,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.017699999999990723,
+            "p95Ms": 0.02410000000000423,
+            "p99Ms": 0.03660000000002128,
+            "maxMs": 0.31980000000001496
+          },
+          "batchLatency": {
+            "p50Ms": 0.017800000000022465,
+            "p95Ms": 0.024299999999982447,
+            "p99Ms": 0.03690000000000282,
+            "maxMs": 0.32150000000001455
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 231.14919999999998,
+          "submittedMs": 231.1439,
+          "finalFlushMs": 0.00529999999997699,
+          "framesPerSecond": 21631.05042111329,
+          "parentCpuMs": 156,
+          "parentLifetimePeakRssBytes": 90042368,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            36.62450000000001
+          ],
+          "latency": {
+            "p50Ms": 0.03300000000001546,
+            "p95Ms": 0.08109999999999218,
+            "p99Ms": 0.1605000000000132,
+            "maxMs": 0.5918000000000063
+          },
+          "batchLatency": {
+            "p50Ms": 0.0333999999999719,
+            "p95Ms": 0.08189999999996189,
+            "p99Ms": 0.16169999999999618,
+            "maxMs": 0.5929999999999893
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 234.03379999999999,
+          "submittedMs": 234.02320000000003,
+          "finalFlushMs": 0.01059999999995398,
+          "framesPerSecond": 21364.43539352008,
+          "parentCpuMs": 188,
+          "parentLifetimePeakRssBytes": 90144768,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            31.106499999999983
+          ],
+          "latency": {
+            "p50Ms": 0.03429999999997335,
+            "p95Ms": 0.08039999999999736,
+            "p99Ms": 0.16070000000001983,
+            "maxMs": 0.569500000000005
+          },
+          "batchLatency": {
+            "p50Ms": 0.03449999999997999,
+            "p95Ms": 0.08109999999999218,
+            "p99Ms": 0.161200000000008,
+            "maxMs": 0.5704000000000065
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 104.41449999999998,
+          "submittedMs": 104.4033,
+          "finalFlushMs": 0.011199999999973898,
+          "framesPerSecond": 47886.069463532374,
+          "parentCpuMs": 110,
+          "parentLifetimePeakRssBytes": 84930560,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.017699999999990723,
+            "p95Ms": 0.02359999999998763,
+            "p99Ms": 0.035900000000026466,
+            "maxMs": 0.4405999999999892
+          },
+          "batchLatency": {
+            "p50Ms": 0.017899999999997362,
+            "p95Ms": 0.02389999999999759,
+            "p99Ms": 0.03710000000000946,
+            "maxMs": 0.4416999999999973
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 123.65189999999998,
+          "submittedMs": 123.6403,
+          "finalFlushMs": 0.011599999999987176,
+          "framesPerSecond": 40436.095199507654,
+          "parentCpuMs": 125,
+          "parentLifetimePeakRssBytes": 85000192,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.017899999999997362,
+            "p95Ms": 0.04670000000001551,
+            "p99Ms": 0.052800000000019054,
+            "maxMs": 0.26650000000000773
+          },
+          "batchLatency": {
+            "p50Ms": 0.018000000000000682,
+            "p95Ms": 0.04719999999997526,
+            "p99Ms": 0.05360000000001719,
+            "maxMs": 0.26949999999999363
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 234.4749,
+          "submittedMs": 234.4678,
+          "finalFlushMs": 0.0070999999999799,
+          "framesPerSecond": 21324.244087533465,
+          "parentCpuMs": 234,
+          "parentLifetimePeakRssBytes": 91246592,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            30.10130000000001
+          ],
+          "latency": {
+            "p50Ms": 0.03370000000001028,
+            "p95Ms": 0.08299999999996999,
+            "p99Ms": 0.16569999999995844,
+            "maxMs": 0.8406999999999982
+          },
+          "batchLatency": {
+            "p50Ms": 0.034099999999995134,
+            "p95Ms": 0.08390000000002829,
+            "p99Ms": 0.16689999999999827,
+            "maxMs": 0.8419000000000096
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 372.7233,
+          "submittedMs": 372.71209999999996,
+          "finalFlushMs": 0.011200000000030741,
+          "framesPerSecond": 53659.108512937084,
+          "parentCpuMs": 391,
+          "parentLifetimePeakRssBytes": 91803648,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.0665000000000191,
+            "p95Ms": 0.0958999999999719,
+            "p99Ms": 0.1751000000000431,
+            "maxMs": 0.4895999999999958
+          },
+          "batchLatency": {
+            "p50Ms": 0.06689999999997553,
+            "p95Ms": 0.09640000000001692,
+            "p99Ms": 0.17619999999999436,
+            "maxMs": 0.49249999999995
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 406.4302,
+          "submittedMs": 406.4222,
+          "finalFlushMs": 0.008000000000038199,
+          "framesPerSecond": 49208.94165837085,
+          "parentCpuMs": 453,
+          "parentLifetimePeakRssBytes": 95047680,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952,
+              5373952,
+              5378048,
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            31.35130000000001,
+            24.9718,
+            29.697900000000004,
+            26.56620000000001
+          ],
+          "latency": {
+            "p50Ms": 0.051400000000057844,
+            "p95Ms": 0.11430000000001428,
+            "p99Ms": 0.2989000000000033,
+            "maxMs": 1.814799999999991
+          },
+          "batchLatency": {
+            "p50Ms": 0.06310000000001992,
+            "p95Ms": 0.13650000000001228,
+            "p99Ms": 0.4216999999999871,
+            "maxMs": 1.8163000000000693
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 487.73380000000003,
+          "submittedMs": 487.7204,
+          "finalFlushMs": 0.01340000000004693,
+          "framesPerSecond": 41005.974980614425,
+          "parentCpuMs": 485,
+          "parentLifetimePeakRssBytes": 94937088,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5369856,
+              5378048,
+              5378048,
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            29.630199999999974,
+            25.074099999999987,
+            26.144800000000004,
+            27.832299999999975
+          ],
+          "latency": {
+            "p50Ms": 0.061599999999998545,
+            "p95Ms": 0.13510000000002265,
+            "p99Ms": 0.3182000000000471,
+            "maxMs": 1.034400000000005
+          },
+          "batchLatency": {
+            "p50Ms": 0.08039999999999736,
+            "p95Ms": 0.158299999999997,
+            "p99Ms": 0.4523999999998978,
+            "maxMs": 1.0354000000000383
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 390.047,
+          "submittedMs": 390.03520000000003,
+          "finalFlushMs": 0.011799999999993815,
+          "framesPerSecond": 51275.87188210651,
+          "parentCpuMs": 453,
+          "parentLifetimePeakRssBytes": 91865088,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.06639999999998736,
+            "p95Ms": 0.141399999999976,
+            "p99Ms": 0.19070000000004939,
+            "maxMs": 0.6650999999999954
+          },
+          "batchLatency": {
+            "p50Ms": 0.06670000000002574,
+            "p95Ms": 0.14249999999998408,
+            "p99Ms": 0.19220000000001392,
+            "maxMs": 0.6658999999999651
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 398.2269,
+          "submittedMs": 398.2219,
+          "finalFlushMs": 0.0049999999999954525,
+          "framesPerSecond": 50222.624338034424,
+          "parentCpuMs": 407,
+          "parentLifetimePeakRssBytes": 91193344,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.07040000000000646,
+            "p95Ms": 0.11189999999999145,
+            "p99Ms": 0.17279999999999518,
+            "maxMs": 0.8311999999999671
+          },
+          "batchLatency": {
+            "p50Ms": 0.07080000000001974,
+            "p95Ms": 0.11270000000001801,
+            "p99Ms": 0.17379999999997153,
+            "maxMs": 0.8335999999999331
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 439.3927,
+          "submittedMs": 439.38159999999993,
+          "finalFlushMs": 0.011100000000055843,
+          "framesPerSecond": 45517.36976968439,
+          "parentCpuMs": 453,
+          "parentLifetimePeakRssBytes": 95645696,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5378048,
+              5373952,
+              5373952,
+              5369856
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            32.7003,
+            28.121700000000004,
+            26.574799999999982,
+            31.836399999999998
+          ],
+          "latency": {
+            "p50Ms": 0.05639999999999645,
+            "p95Ms": 0.11760000000003856,
+            "p99Ms": 0.2980999999999767,
+            "maxMs": 0.9897999999999456
+          },
+          "batchLatency": {
+            "p50Ms": 0.07010000000002492,
+            "p95Ms": 0.13990000000001146,
+            "p99Ms": 0.43710000000004356,
+            "maxMs": 0.9901999999999589
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 16,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 1555.9497999999999,
+          "submittedMs": 1555.9342,
+          "finalFlushMs": 0.015599999999949432,
+          "framesPerSecond": 51415.5405270787,
+          "parentCpuMs": 1531,
+          "parentLifetimePeakRssBytes": 99172352,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.2819999999999254,
+            "p95Ms": 0.44010000000002947,
+            "p99Ms": 0.7595000000000027,
+            "maxMs": 1.258100000000013
+          },
+          "batchLatency": {
+            "p50Ms": 0.28280000000006567,
+            "p95Ms": 0.442100000000039,
+            "p99Ms": 0.7617000000000189,
+            "maxMs": 1.2609999999999673
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 16,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 1440.2175000000002,
+          "submittedMs": 1440.2018000000003,
+          "finalFlushMs": 0.01569999999992433,
+          "framesPerSecond": 55547.16561908183,
+          "parentCpuMs": 1827,
+          "parentLifetimePeakRssBytes": 151179264,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5369856,
+              5373952,
+              5373952,
+              5373952,
+              5373952,
+              5378048,
+              5382144,
+              5378048,
+              5378048,
+              5382144,
+              5386240,
+              5382144,
+              5390336,
+              5373952,
+              5382144,
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            29.655900000000003,
+            24.89519999999999,
+            24.691699999999997,
+            26.840599999999995,
+            26.116700000000037,
+            29.750200000000007,
+            33.4119,
+            30.524,
+            32.47539999999998,
+            25.48599999999999,
+            27.911999999999978,
+            31.940200000000004,
+            31.408999999999992,
+            28.629599999999982,
+            32.97659999999996,
+            29.96130000000005
+          ],
+          "latency": {
+            "p50Ms": 0.183699999999817,
+            "p95Ms": 0.3031999999998334,
+            "p99Ms": 1.0172999999999774,
+            "maxMs": 6.007100000000037
+          },
+          "batchLatency": {
+            "p50Ms": 0.23559999999997672,
+            "p95Ms": 0.36360000000013315,
+            "p99Ms": 1.1588999999999032,
+            "maxMs": 6.00870000000009
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 16,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 1491.129,
+          "submittedMs": 1491.1167,
+          "finalFlushMs": 0.012299999999868305,
+          "framesPerSecond": 53650.623118455886,
+          "parentCpuMs": 1905,
+          "parentLifetimePeakRssBytes": 151461888,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952,
+              5373952,
+              5373952,
+              5373952,
+              5373952,
+              5373952,
+              5378048,
+              5386240,
+              5373952,
+              5369856,
+              5373952,
+              5378048,
+              5369856,
+              5373952,
+              5382144,
+              5369856
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            30.014199999999988,
+            26.560400000000016,
+            25.164600000000007,
+            33.402600000000035,
+            30.589,
+            33.09820000000002,
+            32.27320000000003,
+            32.254099999999994,
+            36.27619999999996,
+            33.73410000000001,
+            39.24939999999998,
+            38.447,
+            37.188499999999976,
+            40.575000000000045,
+            45.850700000000074,
+            39.307500000000005
+          ],
+          "latency": {
+            "p50Ms": 0.1954000000000633,
+            "p95Ms": 0.3181000000001859,
+            "p99Ms": 1.1041000000000167,
+            "maxMs": 5.802699999999959
+          },
+          "batchLatency": {
+            "p50Ms": 0.24759999999992033,
+            "p95Ms": 0.37190000000009604,
+            "p99Ms": 1.2606000000000677,
+            "maxMs": 5.803699999999935
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 16,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 1574.5614999999998,
+          "submittedMs": 1574.5468,
+          "finalFlushMs": 0.014699999999720603,
+          "framesPerSecond": 50807.796329327255,
+          "parentCpuMs": 1610,
+          "parentLifetimePeakRssBytes": 99569664,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.28290000000004056,
+            "p95Ms": 0.4956999999999425,
+            "p99Ms": 0.7683999999999287,
+            "maxMs": 1.4699999999998
+          },
+          "batchLatency": {
+            "p50Ms": 0.28369999999995343,
+            "p95Ms": 0.4978999999999587,
+            "p99Ms": 0.7701999999999316,
+            "maxMs": 1.4724999999998545
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 16,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 1593.2658000000001,
+          "submittedMs": 1593.2485,
+          "finalFlushMs": 0.017300000000204818,
+          "framesPerSecond": 50211.333225127906,
+          "parentCpuMs": 1640,
+          "parentLifetimePeakRssBytes": 99360768,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.282799999999952,
+            "p95Ms": 0.5153000000000247,
+            "p99Ms": 0.7734000000000378,
+            "maxMs": 2.0183999999999287
+          },
+          "batchLatency": {
+            "p50Ms": 0.28359999999997854,
+            "p95Ms": 0.5169999999998254,
+            "p99Ms": 0.7757999999998901,
+            "maxMs": 2.021299999999883
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 16,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "none",
+          "elapsedMs": 1505.5235000000002,
+          "submittedMs": 1505.5078000000003,
+          "finalFlushMs": 0.01569999999992433,
+          "framesPerSecond": 53137.66274654629,
+          "parentCpuMs": 1829,
+          "parentLifetimePeakRssBytes": 150548480,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5369856,
+              5373952,
+              5369856,
+              5369856,
+              5369856,
+              5373952,
+              5373952,
+              5373952,
+              5373952,
+              5369856,
+              5373952,
+              5382144,
+              5373952,
+              5369856,
+              5365760,
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            32.74419999999998,
+            24.882900000000006,
+            25.745000000000005,
+            26.149699999999996,
+            29.39050000000003,
+            30.07329999999996,
+            30.353700000000003,
+            30.513199999999983,
+            29.870600000000024,
+            31.984899999999982,
+            30.547499999999957,
+            37.289199999999994,
+            39.6721,
+            29.75249999999994,
+            34.680999999999926,
+            42.623699999999985
+          ],
+          "latency": {
+            "p50Ms": 0.19650000000001455,
+            "p95Ms": 0.3180999999999585,
+            "p99Ms": 1.119799999999941,
+            "maxMs": 6.7232000000001335
+          },
+          "batchLatency": {
+            "p50Ms": 0.2479000000000724,
+            "p95Ms": 0.37409999999999854,
+            "p99Ms": 1.2760000000000673,
+            "maxMs": 6.72420000000011
+          },
+          "batchesOver20Ms": 0,
+          "ffmpeg": []
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "20ms overruns describe saturation, not paced playback. No codec provider decode or network is modeled.",
+        "Parent CPU excludes Rust/FFmpeg. FFmpeg reports its own CPU; Rust child CPU is unavailable here.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    },
+    {
+      "stage": "copy",
+      "scope": "offline saturated PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "d1321565523b1d9133a9106ff4f50edfc5718f371e9a3a22f8d15875412b3aac",
+      "ffmpegVersion": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+      "config": {
+        "frames": 5000,
+        "repeats": 3,
+        "guilds": [
+          1,
+          4
+        ],
+        "warmup": 500,
+        "ffmpeg": "copy"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 210.9622,
+          "submittedMs": 206.1696,
+          "finalFlushMs": 4.792599999999993,
+          "framesPerSecond": 23700.928412767782,
+          "parentCpuMs": 188,
+          "parentLifetimePeakRssBytes": 85278720,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.021099999999989905,
+            "p95Ms": 0.056100000000014916,
+            "p99Ms": 0.1027000000000271,
+            "maxMs": 39.15029999999999
+          },
+          "batchLatency": {
+            "p50Ms": 0.021299999999996544,
+            "p95Ms": 0.05659999999997467,
+            "p99Ms": 0.10370000000000346,
+            "maxMs": 39.156199999999984
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16097280,
+              "cpuMs": 47
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 343.4356,
+          "submittedMs": 338.68000000000006,
+          "finalFlushMs": 4.7555999999999585,
+          "framesPerSecond": 14558.770261440572,
+          "parentCpuMs": 250,
+          "parentLifetimePeakRssBytes": 87552000,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            38.63209999999998
+          ],
+          "latency": {
+            "p50Ms": 0.04809999999997672,
+            "p95Ms": 0.10739999999998417,
+            "p99Ms": 0.19929999999999382,
+            "maxMs": 30.192499999999995
+          },
+          "batchLatency": {
+            "p50Ms": 0.04860000000002174,
+            "p95Ms": 0.10839999999996053,
+            "p99Ms": 0.2008999999999901,
+            "maxMs": 30.198300000000017
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16097280,
+              "cpuMs": 16
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 306.41360000000003,
+          "submittedMs": 301.8303,
+          "finalFlushMs": 4.583300000000008,
+          "framesPerSecond": 16317.813569632675,
+          "parentCpuMs": 140,
+          "parentLifetimePeakRssBytes": 87314432,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5369856
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            29.659700000000015
+          ],
+          "latency": {
+            "p50Ms": 0.03859999999997399,
+            "p95Ms": 0.09749999999996817,
+            "p99Ms": 0.20350000000001955,
+            "maxMs": 30.962800000000016
+          },
+          "batchLatency": {
+            "p50Ms": 0.03890000000001237,
+            "p95Ms": 0.09850000000000136,
+            "p99Ms": 0.20600000000001728,
+            "maxMs": 30.96999999999997
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16101376,
+              "cpuMs": 47
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 189.0295,
+          "submittedMs": 183.8253,
+          "finalFlushMs": 5.204200000000014,
+          "framesPerSecond": 26450.89787572839,
+          "parentCpuMs": 156,
+          "parentLifetimePeakRssBytes": 85229568,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.021099999999989905,
+            "p95Ms": 0.048499999999989996,
+            "p99Ms": 0.07070000000004484,
+            "maxMs": 32.7158
+          },
+          "batchLatency": {
+            "p50Ms": 0.021299999999996544,
+            "p95Ms": 0.048799999999999955,
+            "p99Ms": 0.07139999999998281,
+            "maxMs": 32.72059999999999
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16113664,
+              "cpuMs": 63
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 198.6712,
+          "submittedMs": 193.0657,
+          "finalFlushMs": 5.605500000000006,
+          "framesPerSecond": 25167.210949548804,
+          "parentCpuMs": 171,
+          "parentLifetimePeakRssBytes": 84467712,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.021299999999996544,
+            "p95Ms": 0.050700000000006185,
+            "p99Ms": 0.08320000000000505,
+            "maxMs": 34.0196
+          },
+          "batchLatency": {
+            "p50Ms": 0.021500000000003183,
+            "p95Ms": 0.050900000000012824,
+            "p99Ms": 0.08430000000004156,
+            "maxMs": 34.024099999999976
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16093184,
+              "cpuMs": 62
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 315.06229999999994,
+          "submittedMs": 310.1608,
+          "finalFlushMs": 4.901499999999942,
+          "framesPerSecond": 15869.877163976778,
+          "parentCpuMs": 297,
+          "parentLifetimePeakRssBytes": 87654400,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5369856
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            35.81790000000001
+          ],
+          "latency": {
+            "p50Ms": 0.04169999999999163,
+            "p95Ms": 0.09750000000002501,
+            "p99Ms": 0.20940000000001646,
+            "maxMs": 29.123699999999985
+          },
+          "batchLatency": {
+            "p50Ms": 0.04200000000003001,
+            "p95Ms": 0.098700000000008,
+            "p99Ms": 0.21020000000004302,
+            "maxMs": 29.132799999999975
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16080896,
+              "cpuMs": 62
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 602.2691,
+          "submittedMs": 596.603,
+          "finalFlushMs": 5.666100000000029,
+          "framesPerSecond": 33207.74716816785,
+          "parentCpuMs": 625,
+          "parentLifetimePeakRssBytes": 90976256,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.08140000000003056,
+            "p95Ms": 0.17259999999998854,
+            "p99Ms": 0.2635999999999967,
+            "maxMs": 31.531200000000013
+          },
+          "batchLatency": {
+            "p50Ms": 0.08240000000000691,
+            "p95Ms": 0.17449999999996635,
+            "p99Ms": 0.280399999999986,
+            "maxMs": 31.535799999999995
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16117760,
+              "cpuMs": 62
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16105472,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16105472,
+              "cpuMs": 62
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16089088,
+              "cpuMs": 32
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 613.3883000000001,
+          "submittedMs": 607.4304999999999,
+          "finalFlushMs": 5.957800000000134,
+          "framesPerSecond": 32605.773536925954,
+          "parentCpuMs": 751,
+          "parentLifetimePeakRssBytes": 93560832,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952,
+              5378048,
+              5386240,
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            29.471100000000007,
+            24.951400000000007,
+            26.946600000000018,
+            26.09899999999999
+          ],
+          "latency": {
+            "p50Ms": 0.07999999999998408,
+            "p95Ms": 0.1656999999999016,
+            "p99Ms": 0.5016000000000531,
+            "maxMs": 32.378600000000006
+          },
+          "batchLatency": {
+            "p50Ms": 0.088799999999992,
+            "p95Ms": 0.18009999999992488,
+            "p99Ms": 0.527499999999975,
+            "maxMs": 32.38489999999996
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16093184,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16089088,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16101376,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16109568,
+              "cpuMs": 32
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 678.7061,
+          "submittedMs": 672.2863,
+          "finalFlushMs": 6.419800000000009,
+          "framesPerSecond": 29467.835930751175,
+          "parentCpuMs": 797,
+          "parentLifetimePeakRssBytes": 92487680,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952,
+              5369856,
+              5373952,
+              5369856
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            31.476699999999994,
+            26.392500000000013,
+            26.464200000000005,
+            26.9872
+          ],
+          "latency": {
+            "p50Ms": 0.09110000000009677,
+            "p95Ms": 0.18470000000002074,
+            "p99Ms": 0.5457999999999856,
+            "maxMs": 31.931100000000015
+          },
+          "batchLatency": {
+            "p50Ms": 0.09919999999999618,
+            "p95Ms": 0.19680000000005293,
+            "p99Ms": 0.5718999999999141,
+            "maxMs": 31.938600000000008
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16101376,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16101376,
+              "cpuMs": 16
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16109568,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16125952,
+              "cpuMs": 31
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 617.6443,
+          "submittedMs": 610.0625,
+          "finalFlushMs": 7.581800000000044,
+          "framesPerSecond": 32381.09701651905,
+          "parentCpuMs": 593,
+          "parentLifetimePeakRssBytes": 89612288,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.08280000000002019,
+            "p95Ms": 0.18080000000009022,
+            "p99Ms": 0.27769999999998163,
+            "maxMs": 37.146300000000025
+          },
+          "batchLatency": {
+            "p50Ms": 0.08389999999997144,
+            "p95Ms": 0.18240000000002965,
+            "p99Ms": 0.2839000000000169,
+            "maxMs": 37.15209999999999
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16097280,
+              "cpuMs": 32
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16125952,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16093184,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16105472,
+              "cpuMs": 31
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 591.6886999999999,
+          "submittedMs": 585.7637,
+          "finalFlushMs": 5.9249999999999545,
+          "framesPerSecond": 33801.55815042606,
+          "parentCpuMs": 594,
+          "parentLifetimePeakRssBytes": 89636864,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.07820000000003802,
+            "p95Ms": 0.17250000000001364,
+            "p99Ms": 0.2647000000000048,
+            "maxMs": 35.19160000000002
+          },
+          "batchLatency": {
+            "p50Ms": 0.07929999999998927,
+            "p95Ms": 0.1750000000000682,
+            "p99Ms": 0.27539999999999054,
+            "maxMs": 35.19809999999998
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16097280,
+              "cpuMs": 0
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16105472,
+              "cpuMs": 16
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16097280,
+              "cpuMs": 0
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16097280,
+              "cpuMs": 16
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "copy",
+          "elapsedMs": 583.6415999999999,
+          "submittedMs": 578.4551,
+          "finalFlushMs": 5.18649999999991,
+          "framesPerSecond": 34267.60532491173,
+          "parentCpuMs": 703,
+          "parentLifetimePeakRssBytes": 92860416,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952,
+              5373952,
+              5373952,
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            34.074100000000016,
+            29.248099999999994,
+            25.62220000000002,
+            28.852599999999995
+          ],
+          "latency": {
+            "p50Ms": 0.07580000000001519,
+            "p95Ms": 0.15149999999999864,
+            "p99Ms": 0.4878999999999678,
+            "maxMs": 31.12289999999996
+          },
+          "batchLatency": {
+            "p50Ms": 0.08410000000003492,
+            "p95Ms": 0.16620000000000346,
+            "p99Ms": 0.5089000000000397,
+            "maxMs": 31.13059999999996
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16089088,
+              "cpuMs": 47
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16101376,
+              "cpuMs": 32
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16105472,
+              "cpuMs": 63
+            },
+            {
+              "outputBytes": 19200000,
+              "peakRssBytes": 16113664,
+              "cpuMs": 16
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "20ms overruns describe saturation, not paced playback. No codec provider decode or network is modeled.",
+        "Parent CPU excludes Rust/FFmpeg. FFmpeg reports its own CPU; Rust child CPU is unavailable here.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    },
+    {
+      "stage": "opus",
+      "scope": "offline saturated PCM batches; one pending frame per guild; no Discord",
+      "node": "v24.19.0",
+      "os": "win32",
+      "osRelease": "10.0.26300",
+      "arch": "x64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+      "logicalCpus": 16,
+      "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "rustExecutableSha256": "d1321565523b1d9133a9106ff4f50edfc5718f371e9a3a22f8d15875412b3aac",
+      "ffmpegVersion": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+      "config": {
+        "frames": 5000,
+        "repeats": 3,
+        "guilds": [
+          1,
+          4
+        ],
+        "warmup": 500,
+        "ffmpeg": "opus"
+      },
+      "runs": [
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 554.1868,
+          "submittedMs": 540.7124000000001,
+          "finalFlushMs": 13.474399999999832,
+          "framesPerSecond": 9022.228605950197,
+          "parentCpuMs": 266,
+          "parentLifetimePeakRssBytes": 82866176,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.02149999999994634,
+            "p95Ms": 1.1505000000000223,
+            "p99Ms": 1.3459000000000287,
+            "maxMs": 34.874600000000015
+          },
+          "batchLatency": {
+            "p50Ms": 0.021700000000009823,
+            "p95Ms": 1.1513000000000488,
+            "p99Ms": 1.3465999999999667,
+            "maxMs": 34.87880000000001
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17498112,
+              "cpuMs": 563
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 537.2183,
+          "submittedMs": 525.2365,
+          "finalFlushMs": 11.981800000000021,
+          "framesPerSecond": 9307.203421774722,
+          "parentCpuMs": 328,
+          "parentLifetimePeakRssBytes": 85753856,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            35.778400000000005
+          ],
+          "latency": {
+            "p50Ms": 0.04409999999995762,
+            "p95Ms": 0.5701999999999998,
+            "p99Ms": 0.9338999999999942,
+            "maxMs": 28.917099999999976
+          },
+          "batchLatency": {
+            "p50Ms": 0.04450000000008458,
+            "p95Ms": 0.5711000000000013,
+            "p99Ms": 0.934599999999989,
+            "maxMs": 28.922999999999973
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17473536,
+              "cpuMs": 594
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 543.7083,
+          "submittedMs": 531.8258,
+          "finalFlushMs": 11.88250000000005,
+          "framesPerSecond": 9196.10754516714,
+          "parentCpuMs": 266,
+          "parentLifetimePeakRssBytes": 86917120,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            38.27030000000002
+          ],
+          "latency": {
+            "p50Ms": 0.04410000000001446,
+            "p95Ms": 0.6439000000000306,
+            "p99Ms": 0.9365000000000236,
+            "maxMs": 30.196300000000008
+          },
+          "batchLatency": {
+            "p50Ms": 0.04460000000000264,
+            "p95Ms": 0.6449000000000069,
+            "p99Ms": 0.9375,
+            "maxMs": 30.20240000000001
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17489920,
+              "cpuMs": 578.0000000000001
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 540.3768,
+          "submittedMs": 528.2517,
+          "finalFlushMs": 12.125099999999975,
+          "framesPerSecond": 9252.802859042062,
+          "parentCpuMs": 266,
+          "parentLifetimePeakRssBytes": 82296832,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.021500000000003183,
+            "p95Ms": 1.130800000000022,
+            "p99Ms": 1.3383000000000038,
+            "maxMs": 34.6952
+          },
+          "batchLatency": {
+            "p50Ms": 0.021700000000009823,
+            "p95Ms": 1.13190000000003,
+            "p99Ms": 1.3395000000000437,
+            "maxMs": 34.698999999999984
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17534976,
+              "cpuMs": 547
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 545.8768,
+          "submittedMs": 534.0848,
+          "finalFlushMs": 11.79200000000003,
+          "framesPerSecond": 9159.575933617254,
+          "parentCpuMs": 235,
+          "parentLifetimePeakRssBytes": 82472960,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.021599999999921238,
+            "p95Ms": 1.1435000000000173,
+            "p99Ms": 1.3239999999999554,
+            "maxMs": 33.063500000000005
+          },
+          "batchLatency": {
+            "p50Ms": 0.021700000000009823,
+            "p95Ms": 1.1450000000000102,
+            "p99Ms": 1.3267999999999347,
+            "maxMs": 33.06800000000001
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17481728,
+              "cpuMs": 625
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 1,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 526.0081,
+          "submittedMs": 513.7038,
+          "finalFlushMs": 12.304300000000012,
+          "framesPerSecond": 9505.55704370332,
+          "parentCpuMs": 329,
+          "parentLifetimePeakRssBytes": 86687744,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            36.144800000000004
+          ],
+          "latency": {
+            "p50Ms": 0.048900000000003274,
+            "p95Ms": 0.44839999999999236,
+            "p99Ms": 0.8618000000000166,
+            "maxMs": 29.45840000000004
+          },
+          "batchLatency": {
+            "p50Ms": 0.04939999999999145,
+            "p95Ms": 0.4492999999999938,
+            "p99Ms": 0.862700000000018,
+            "maxMs": 29.465400000000045
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17543168,
+              "cpuMs": 594
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 691.751,
+          "submittedMs": 677.653,
+          "finalFlushMs": 14.097999999999956,
+          "framesPerSecond": 28912.13745986634,
+          "parentCpuMs": 781,
+          "parentLifetimePeakRssBytes": 85590016,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.08969999999999345,
+            "p95Ms": 0.14459999999996853,
+            "p99Ms": 0.45990000000000464,
+            "maxMs": 38.179299999999984
+          },
+          "batchLatency": {
+            "p50Ms": 0.09180000000003474,
+            "p95Ms": 0.25279999999997926,
+            "p99Ms": 0.6831999999999425,
+            "maxMs": 38.184200000000004
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17309696,
+              "cpuMs": 797
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17424384,
+              "cpuMs": 703.0000000000001
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17534976,
+              "cpuMs": 703
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17403904,
+              "cpuMs": 687
+            }
+          ]
+        },
+        {
+          "repeat": 1,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 703.6366,
+          "submittedMs": 690.9844,
+          "finalFlushMs": 12.652199999999993,
+          "framesPerSecond": 28423.763061785015,
+          "parentCpuMs": 687,
+          "parentLifetimePeakRssBytes": 90865664,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5373952,
+              5378048,
+              5378048,
+              5382144
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            30.763900000000007,
+            25.177300000000002,
+            31.51690000000002,
+            28.662799999999976
+          ],
+          "latency": {
+            "p50Ms": 0.0887000000000171,
+            "p95Ms": 0.17579999999998108,
+            "p99Ms": 0.5967000000000553,
+            "maxMs": 31.341099999999983
+          },
+          "batchLatency": {
+            "p50Ms": 0.09630000000004202,
+            "p95Ms": 0.22299999999995634,
+            "p99Ms": 0.7548999999999069,
+            "maxMs": 31.345699999999965
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17338368,
+              "cpuMs": 594
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17379328,
+              "cpuMs": 688
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17506304,
+              "cpuMs": 750
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17387520,
+              "cpuMs": 781
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 708.6119999999999,
+          "submittedMs": 694.2022,
+          "finalFlushMs": 14.409799999999905,
+          "framesPerSecond": 28224.190389098694,
+          "parentCpuMs": 656,
+          "parentLifetimePeakRssBytes": 90341376,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5382144,
+              5378048,
+              5378048,
+              5378048
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            34.948200000000014,
+            27.328099999999978,
+            31.5873,
+            32.81129999999999
+          ],
+          "latency": {
+            "p50Ms": 0.08820000000002892,
+            "p95Ms": 0.1786000000000172,
+            "p99Ms": 0.6231000000000222,
+            "maxMs": 30.711299999999994
+          },
+          "batchLatency": {
+            "p50Ms": 0.09649999999999181,
+            "p95Ms": 0.21879999999998745,
+            "p99Ms": 0.7460999999999558,
+            "maxMs": 30.718799999999987
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17276928,
+              "cpuMs": 500
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17432576,
+              "cpuMs": 656
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17547264,
+              "cpuMs": 719.0000000000001
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17276928,
+              "cpuMs": 687
+            }
+          ]
+        },
+        {
+          "repeat": 2,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 693.5511,
+          "submittedMs": 679.2319,
+          "finalFlushMs": 14.319200000000023,
+          "framesPerSecond": 28837.096502334145,
+          "parentCpuMs": 673,
+          "parentLifetimePeakRssBytes": 86044672,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.09399999999999409,
+            "p95Ms": 0.15190000000001191,
+            "p99Ms": 0.38290000000000646,
+            "maxMs": 33.411599999999964
+          },
+          "batchLatency": {
+            "p50Ms": 0.09600000000000364,
+            "p95Ms": 0.22829999999999018,
+            "p99Ms": 0.5959000000000287,
+            "maxMs": 33.41579999999999
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17317888,
+              "cpuMs": 578
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17457152,
+              "cpuMs": 718
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17440768,
+              "cpuMs": 734
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17395712,
+              "cpuMs": 718.0000000000001
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "typescript",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 686.5932,
+          "submittedMs": 672.1619000000001,
+          "finalFlushMs": 14.431299999999965,
+          "framesPerSecond": 29129.330147749788,
+          "parentCpuMs": 625,
+          "parentLifetimePeakRssBytes": 86306816,
+          "rustChildMemory": {
+            "source": "no children",
+            "bytes": [],
+            "error": null
+          },
+          "startupFirstReplyMs": [],
+          "latency": {
+            "p50Ms": 0.09050000000002001,
+            "p95Ms": 0.1391999999999598,
+            "p99Ms": 0.43089999999995143,
+            "maxMs": 35.62210000000002
+          },
+          "batchLatency": {
+            "p50Ms": 0.09319999999996753,
+            "p95Ms": 0.2682999999999538,
+            "p99Ms": 0.6748999999999796,
+            "maxMs": 35.6258
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17301504,
+              "cpuMs": 719
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17432576,
+              "cpuMs": 782
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17539072,
+              "cpuMs": 781
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17448960,
+              "cpuMs": 735
+            }
+          ]
+        },
+        {
+          "repeat": 3,
+          "mode": "rust",
+          "guilds": 4,
+          "framesPerGuild": 5000,
+          "warmupFramesPerGuild": 500,
+          "ffmpegMode": "opus",
+          "elapsedMs": 725.9907000000001,
+          "submittedMs": 712.0043000000001,
+          "finalFlushMs": 13.986400000000003,
+          "framesPerSecond": 27548.562261197007,
+          "parentCpuMs": 734,
+          "parentLifetimePeakRssBytes": 91734016,
+          "rustChildMemory": {
+            "source": "Windows PeakWorkingSet64, PID order",
+            "bytes": [
+              5378048,
+              5390336,
+              5373952,
+              5369856
+            ],
+            "error": null
+          },
+          "startupFirstReplyMs": [
+            31.395399999999995,
+            26.77029999999999,
+            29.861199999999997,
+            27.699900000000014
+          ],
+          "latency": {
+            "p50Ms": 0.0887000000000171,
+            "p95Ms": 0.1856000000000222,
+            "p99Ms": 0.643100000000004,
+            "maxMs": 36.60410000000002
+          },
+          "batchLatency": {
+            "p50Ms": 0.09710000000001173,
+            "p95Ms": 0.23439999999999372,
+            "p99Ms": 0.7939999999999827,
+            "maxMs": 36.610299999999995
+          },
+          "batchesOver20Ms": 1,
+          "ffmpeg": [
+            {
+              "outputBytes": 2531370,
+              "peakRssBytes": 17342464,
+              "cpuMs": 657
+            },
+            {
+              "outputBytes": 3036149,
+              "peakRssBytes": 17326080,
+              "cpuMs": 688
+            },
+            {
+              "outputBytes": 2959498,
+              "peakRssBytes": 17461248,
+              "cpuMs": 734
+            },
+            {
+              "outputBytes": 2861164,
+              "peakRssBytes": 17362944,
+              "cpuMs": 688
+            }
+          ]
+        }
+      ],
+      "limitations": [
+        "Raw repeats, no performance pass/fail threshold; inspect their range, not one favorable run.",
+        "Batch latency includes scheduling from common submission until mix/FFmpeg stdin acceptance, not audible output.",
+        "20ms overruns describe saturation, not paced playback. No codec provider decode or network is modeled.",
+        "Parent CPU excludes Rust/FFmpeg. FFmpeg reports its own CPU; Rust child CPU is unavailable here.",
+        "RSS fields are process lifetime peaks, not simultaneous whole-tree peak. FFmpeg RSS can be unavailable."
+      ]
+    }
+  ]
+}
