@@ -274,6 +274,40 @@ test("D1 radio uses and persists its original choice after an automatic transiti
     assert.equal(saved.radioHistory?.[0].id,changed.id);
   } finally { f.close(); }
 });
+test("D1 radio refreshes old search metadata and excludes explicit non-music categories", async () => {
+  const f = fixture();
+  const bad = { ...next, id: "wrong000001", title: "Another Artist - A day in Paris | Future House" };
+  try {
+    await f.save();
+    const query = 'future house audio -"Feel Good"';
+    const oldVideos = [bad, next];
+    for (const key of [`search:${query.toLowerCase()}`, `videos:${bad.id},${next.id}`]) {
+      f.sqlite.prepare("INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)")
+        .run(key, JSON.stringify(oldVideos), Date.now() + 3600000);
+    }
+    const stages: string[] = [];
+    globalThis.fetch = async (target) => {
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search")) {
+        stages.push("search");
+        return Response.json({ items: oldVideos.map((video) => ({ id: { videoId: video.id } })) });
+      }
+      stages.push("metadata");
+      return Response.json({ items: oldVideos.map((video) => ({
+        id: video.id,
+        snippet: { title: video.title, channelTitle: video.artist, categoryId: video.id === bad.id ? "22" : "10" },
+        contentDetails: { duration: "PT3M20S" }, status: { embeddable: true },
+      })) });
+    };
+    const { room } = await mutate(f.request, "TESTROOM", { action: "radio-prefetch", version: 1 });
+    assert.deepEqual(stages, ["search", "metadata"]);
+    assert.deepEqual(room.queue.map((video) => video.id), [next.id]);
+    assert.equal(room.queue[0].music, true);
+    assert(!JSON.stringify(room).includes("radioRelatedTo"));
+    assert.equal(f.roomState().queue[0].music, true);
+  } finally { f.close(); }
+});
 test("D1 starts the recommended video clock after its metadata lookup completes", async () => {
   const f = fixture(),
     now = Date.now;

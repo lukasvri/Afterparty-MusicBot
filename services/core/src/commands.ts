@@ -2,6 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { ConcertQueue } from './concert-queue.ts';
 import { Engine } from './engine.ts';
 import { UserError, type Track, type Settings, type SavedQueue } from './types.ts';
+
+function replayTrack(track: Track): Track {
+    // Restoring history or a saved queue is an explicit selection, so automatic
+    // radio exclusions must not discard the chosen recording later in the queue.
+    const selected = { ...track, entryId: randomUUID(), radio: false };
+    delete selected.radioRelatedTo;
+    return selected;
+}
+
 export class Commands {
     engine: Engine;
     concertQueue: ConcertQueue;
@@ -87,8 +96,8 @@ export class Commands {
                 if (!previous)
                     throw new UserError('Ingen tidligere sang å gå tilbake til.');
                 if (e.current)
-                    e.queue.unshift({ ...e.current, entryId: randomUUID() });
-                await e.startTrack({ ...previous, entryId: randomUUID() });
+                    e.queue.unshift(replayTrack(e.current));
+                await e.startTrack(replayTrack(previous));
                 break;
             }
             case 'remove':
@@ -121,11 +130,11 @@ export class Commands {
                 break;
             case 'sleep-timer':
             case 'sleep': {
-                if (this.sleep)
-                    clearTimeout(this.sleep);
                 const minutes = Number(input.minutes);
                 if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440)
                     throw new UserError('Velg en stopptimer fra 1 til 1440 minutter.');
+                if (this.sleep)
+                    clearTimeout(this.sleep);
                 this.sleepUntil = Date.now() + minutes * 60000;
                 this.sleep = setTimeout(() => { e.stop(); this.sleep = null; this.sleepUntil = null; }, minutes * 60000);
                 break;
@@ -150,16 +159,17 @@ export class Commands {
                     throw new UserError('Fant ikke spillelisten.');
                 if (input.replace)
                     e.clear();
-                e.enqueue(s.tracks.map((t: Track) => ({ ...t, entryId: randomUUID() })));
+                e.enqueue(s.tracks.map(replayTrack));
                 break;
             }
             case 'snapshot-delete':
                 e.store.set('snapshots', e.store.get<SavedQueue[]>('snapshots', []).filter(s => s.id !== input.id));
                 break;
             case 'cleanup-duplicates': {
-                const seen = new Set([e.current?.id]);
-                e.queue = e.queue.filter(t => { if (seen.has(t.id))
-                    return false; seen.add(t.id); return true; });
+                const key = (track: Track) => JSON.stringify([track.concert === true, track.id]);
+                const seen = new Set(e.current ? [key(e.current)] : []);
+                e.queue = e.queue.filter(t => { const id = key(t); if (seen.has(id))
+                    return false; seen.add(id); return true; });
                 e.mixer?.invalidateNext();
                 e.persist();
                 e.changed();

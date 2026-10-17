@@ -1,5 +1,5 @@
 import type {YouTubeResponses} from "@/services/core/src/external-types";
-import { metadataGenres } from "../services/core/src/radio.ts";
+import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { env as cloudEnv } from "cloudflare:workers";
 import type { Video, RoomState, Room } from "./types";
@@ -266,7 +266,7 @@ export async function videos(
   ids: string[],
 ): Promise<Video[]> {
   if (!ids.length) return [];
-  return cached(`videos:${ids.join(",")}`, async () => {
+  return cached(`videos:v2:${ids.join(",")}`, async () => {
     if (coreUrl()) {
       try {
         return (
@@ -286,6 +286,7 @@ export async function videos(
     return data.items.map((v) => ({
       id: v.id,
       genres: metadataGenres(v.snippet.description, v.snippet.tags),
+      music: metadataMusic(v.snippet.categoryId),
       title: decode(v.snippet.title),
       artist: decode(v.snippet.channelTitle),
       image: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
@@ -302,7 +303,7 @@ export async function search(request: Request, query: string) {
   await limit(request, "search-visitor", 20, 600000);
   if (/^https?:\/\//.test(query))
     return { videos: await videos(request, [videoId(query)]) };
-  const result = await cached(`search:${query.toLowerCase()}`, async () => {
+  const result = await cached(`search:v2:${query.toLowerCase()}`, async () => {
     if (coreUrl()) {
       try {
         return (

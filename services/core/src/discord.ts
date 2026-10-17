@@ -1,5 +1,5 @@
 import {playerAction} from './player-compatibility.ts';
-import { Client, GatewayIntentBits, Events, MessageFlags, PermissionFlagsBits, ActivityType, ChannelType, type Interaction, type VoiceState, type ChatInputCommandInteraction, type ButtonInteraction, type VoiceBasedChannel, type Guild } from 'discord.js';
+import { Client, GatewayIntentBits, Events, MessageFlags, PermissionFlagsBits, ActivityType, ChannelType, type Interaction, type AutocompleteInteraction, type VoiceState, type ChatInputCommandInteraction, type ButtonInteraction, type VoiceBasedChannel, type Guild } from 'discord.js';
 import { joinVoiceChannel, entersState, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import { readFile } from 'node:fs/promises';
 import { PlayerMessage, playerEmbed, playerComponents, playerMoreComponents, formatTime } from './player-message.ts';
@@ -16,6 +16,7 @@ export class DiscordBot {
     roomCode:string;
     stateListener:(()=>void)|null=null;
     joining=false;
+    private voiceJoin:{channelId:string;task:Promise<void>}|null=null;
     client: Client;
     engine: Engine;
     commands: Commands;
@@ -62,10 +63,37 @@ export class DiscordBot {
     handleInteraction(interaction:Interaction){
         if(interaction.guildId!==this.guildId)return;
         if(interaction.isAutocomplete()){
-            const focused=interaction.options.getFocused(),now=Date.now(),last=this.autocompleteAt.get(interaction.user.id)??0;if(focused.length<3||now-last<1000){void interaction.respond([]);return;}if(this.autocompleteAt.size>1000)this.autocompleteAt.clear();this.autocompleteAt.set(interaction.user.id,now);
-            void Promise.race([this.engine.providers.search(focused,5),new Promise<never[]>(r=>setTimeout(()=>r([]),2000))]).then(tracks=>interaction.respond(tracks.map(t=>({name:(t.artist+' · '+t.title).slice(0,100),value:'https://www.youtube.com/watch?v='+t.id})))).catch(()=>interaction.respond([]).catch(()=>{}));return;
+            void this.autocomplete(interaction);return;
         }
         if(interaction.isChatInputCommand()||interaction.isButton())void this.interaction(interaction);
+    }
+    async autocomplete(interaction:AutocompleteInteraction){
+        let timeout:ReturnType<typeof setTimeout>|undefined;
+        try{
+            const focused=interaction.options.getFocused(true),query=String(focused.value).trim();
+            if(interaction.commandName==='favorites'&&focused.name==='name'){
+                const matching=this.engine.store.favorites(interaction.user.id)
+                    .filter(f=>f.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+                    .slice(0,25).map(f=>({name:f.name,value:f.name}));
+                await interaction.respond(matching);return;
+            }
+            if(!['play','play-next','play-advanced'].includes(interaction.commandName)||focused.name!=='query'){
+                await interaction.respond([]);return;
+            }
+            const now=Date.now(),last=this.autocompleteAt.get(interaction.user.id)??0;
+            if(query.length<3||now-last<1000){await interaction.respond([]);return;}
+            if(this.autocompleteAt.size>1000)this.autocompleteAt.clear();
+            this.autocompleteAt.set(interaction.user.id,now);
+            const tracks=await Promise.race([
+                this.engine.providers.search(query,5),
+                new Promise<Track[]>(resolve=>{timeout=setTimeout(()=>resolve([]),2000);}),
+            ]);
+            await interaction.respond(tracks.map(t=>({name:(t.artist+' · '+t.title).slice(0,100),value:'https://www.youtube.com/watch?v='+t.id})));
+        }catch{
+            if(!interaction.responded)await interaction.respond([]).catch(()=>{});
+        }finally{
+            if(timeout)clearTimeout(timeout);
+        }
     }
     voiceState(before:VoiceState,after:VoiceState){
         if(after.guild.id!==this.guildId||!this.connection)return;
@@ -131,7 +159,19 @@ export class DiscordBot {
         this.engine.setSettings(settings);
         this.testing = false;
     } }
-    async join(channel:VoiceBasedChannel){if(this.connection?.joinConfig.channelId===channel.id&&this.engine.connected)return;this.admitVoice?.();this.joining=true;try{await this.connectVoice(channel);}finally{this.joining=false;}}
+    async join(channel:VoiceBasedChannel){
+        if(this.voiceJoin){
+            if(this.voiceJoin.channelId!==channel.id)throw new UserError('Boten kobler allerede til en annen talekanal. Prøv igjen.');
+            return this.voiceJoin.task;
+        }
+        if(this.connection?.joinConfig.channelId===channel.id&&this.engine.connected)return;
+        this.admitVoice?.();this.joining=true;
+        const task=this.connectVoice(channel).finally(()=>{
+            if(this.voiceJoin?.task===task){this.voiceJoin=null;this.joining=false;}
+        });
+        this.voiceJoin={channelId:channel.id,task};
+        return task;
+    }
     async connectVoice(channel: VoiceBasedChannel) { if (this.connection?.joinConfig.channelId === channel.id && this.engine.connected)
         return; const me = channel.guild.members.me; if (!me || !channel.permissionsFor(me).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]))
         throw new UserError('Boten mangler tilgang til å bli med og spille lyd.'); this.connection?.destroy(); this.connection = joinVoiceChannel({ guildId: this.guildId, channelId: channel.id, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: !this.engine.settings.turnDownVolumeWhenPeopleSpeak }); const connection = this.connection; this.watchVoiceErrors(connection); try {
@@ -157,7 +197,7 @@ export class DiscordBot {
             this.engine.changed();
         });
     }
-    disconnect() { this.connection?.destroy(); this.connection = null; this.talking.clear(); this.engine.ducking = false; this.engine.setConnection(false); }
+    disconnect() { const connection=this.connection;this.connection=null;this.voiceJoin=null;this.joining=false;if(connection&&connection.state.status!==VoiceConnectionStatus.Destroyed)connection.destroy();this.talking.clear();this.engine.ducking=false;this.engine.setConnection(false); }
     async sameVoice(interaction: ChatInputCommandInteraction | ButtonInteraction, join = false) { const member = await interaction.guild!.members.fetch(interaction.user.id), channel = member.voice.channel; if (!channel)
         throw new UserError('Bli med i en talekanal først.'); if (this.connection && channel.id !== this.connection.joinConfig.channelId)
         throw new UserError('Du må være i samme talekanal som boten.'); if (join)
@@ -254,12 +294,11 @@ export class DiscordBot {
                 return;
             }
             if (name === 'favorites') {
-                const sub = interaction.options.getSubcommand(), favorites = e.store.favorites();
+                const sub = interaction.options.getSubcommand(), favorites = e.store.favorites(interaction.user.id);
                 if (sub === 'list') {
                     await interaction.editReply(favorites.length ? favorites.map(f => f.name).join('\n').slice(0, 1900) : 'Ingen favoritter ennå.');
                     return;
                 }
-                await this.sameVoice(interaction, sub === 'use');
                 if (sub === 'create') {
                     e.store.favorite(interaction.user.id, text('name', true), text('query', true));
                     await interaction.editReply('Favoritten er lagret.');
@@ -273,6 +312,7 @@ export class DiscordBot {
                 const favorite = favorites.find(f => f.name === text('name', true));
                 if (!favorite)
                     throw new UserError('Fant ikke favoritten.');
+                await this.sameVoice(interaction, true);
                 const count=await this.commands.add(favorite.query, interaction.user.id, {next:boolean('immediate') || boolean('skip'),immediate:boolean('skip'),shuffle:boolean('shuffle')});
                 await this.playerMessage.confirmQueue(count,false);
                 await interaction.deleteReply();

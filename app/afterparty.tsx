@@ -150,7 +150,12 @@ export default function Afterparty() {
     settleUntil = useRef(0),
     audioWriteUntil = useRef(0),
     nativeSeek = useRef(new NativeSeekTracker()),
-    nativeSeekPending = useRef(false),
+    nativeSeekPending = useRef<{
+      context: string;
+      settled: boolean;
+      successful: boolean;
+    } | null>(null),
+    nativeSeekDeferred = useRef<{ context: string; position: number } | null>(null),
     transportChangedRef = useRef(false),
     correctionCandidate = useRef<number | null>(null);
   useLayoutEffect(() => { syncModeRef.current = syncMode; }, [syncMode]);
@@ -182,8 +187,8 @@ export default function Afterparty() {
     searchGeneration = useRef(0),
     lastEnded = useRef(""),
     actionRef = useRef<
-      (action: string, extras?: Record<string, unknown>) => Promise<void>
-    >(async () => {}),
+      (action: string, extras?: Record<string, unknown>) => Promise<boolean>
+    >(async () => false),
     toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const announce = useCallback((message: string) => {
     setToast(message);
@@ -402,7 +407,7 @@ export default function Afterparty() {
   const action = useCallback(
     async (name: string, extras: Record<string, unknown> = {}) => {
       const current = roomRef.current;
-      if (!current || busy.current) return;
+      if (!current || busy.current) return false;
       const generation = pollGeneration.current;
       busy.current = true;
       setPending(true);
@@ -460,14 +465,16 @@ export default function Afterparty() {
                 : t("Låta er lagd til."),
             );
         }
+        return generation === pollGeneration.current && activeCode.current === current.code;
       } catch (e) {
-        if (generation !== pollGeneration.current) return;
+        if (generation !== pollGeneration.current) return false;
         setError((e as Error).message);
         try {
           await refresh(current.code);
         } catch {
           /* keep action error visible */
         }
+        return false;
       } finally {
         busy.current = false;
         setPending(false);
@@ -688,7 +695,7 @@ export default function Afterparty() {
       generation = pollGeneration.current;
     if (!target?.guildId || target.mode !== "discord" || !concertQueue.data?.canManage ||
       discord?.guildId !== target.guildId || !discord.queueRevision)
-      return;
+      return false;
     const current = () => mounted.current &&
       generation === pollGeneration.current &&
       roomRef.current?.playbackKey === target.playbackKey &&
@@ -711,7 +718,7 @@ export default function Afterparty() {
       const deadline = performance.now() + 35000;
       while (current() && status === "processing" && performance.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 500));
-        if (!current()) return;
+        if (!current()) return false;
         const result = await request<{ commands: Array<{ id: string; status: string; result?: string }> }>(
           "/api/admin/control?guildId=" + target.guildId,
         );
@@ -720,13 +727,15 @@ export default function Afterparty() {
         if (job && ["failed", "unknown", "expired"].includes(job.status))
           throw new Error(job.result || "Boten bekreftet ikke kommandoen.");
       }
-      if (!current()) return;
+      if (!current()) return false;
       if (status !== "done") throw new Error("Boten bekreftet ikke kommandoen.");
       // A cached stream sample can predate the command. Read public authority
       // directly, retaining concert filtering and rejecting older snapshots.
       await refresh(target.code);
+      return current();
     } catch (error) {
       if (current()) setError((error as Error).message);
+      return false;
     }
   }
   const queueRoom =
@@ -1147,8 +1156,21 @@ export default function Afterparty() {
     }
   }
   function syncPlayer(force = false) {
-    const p = player.current,
+    const requestedSync = force,
+      p = player.current,
       r = roomRef.current;
+    const seekContext = r?.current
+      ? JSON.stringify([pollGeneration.current, r.code, r.mode, r.guildId, r.playbackKey ?? r.current.id])
+      : "";
+    const retiredSeek = Boolean(
+      (nativeSeekPending.current && nativeSeekPending.current.context !== seekContext) ||
+      (nativeSeekDeferred.current && nativeSeekDeferred.current.context !== seekContext),
+    );
+    if (retiredSeek) nativeSeekPending.current = null;
+    if (requestedSync || retiredSeek) {
+      nativeSeekDeferred.current = null;
+      nativeSeek.current.reset();
+    }
     if (!p || !playerReady.current) return;
     if (!r?.current || r.current.source === "soundcloud") {
       p.pauseVideo();
@@ -1215,35 +1237,57 @@ export default function Afterparty() {
     // manager permissions are loading. Observe the landing before those guards
     // so subsequent user scrubs are not mistaken for our unfinished write.
     nativeSeek.current.acknowledge(currentTime, now);
+    if (nativeSeekPending.current?.settled && !nativeSeekPending.current.successful) {
+      nativeSeekPending.current = null;
+      nativeSeekDeferred.current = null;
+      nativeSeek.current.resetObservation();
+    }
+    const canSeek = !r.current.live && Boolean(
+      r.mode === "discord"
+        ? concertQueue.data?.canManage && discord?.guildId === r.guildId && Boolean(discord?.queueRevision)
+        : r.isHost,
+    );
+    if (!canSeek) {
+      nativeSeekDeferred.current = null;
+      nativeSeek.current.resetObservation();
+    }
+    const operation = nativeSeekPending.current,
+      retainingSeek = Boolean(operation || nativeSeekDeferred.current);
+    if (
+      canSeek && !requestedSync &&
+      (!force || retainingSeek) &&
+      (!(r.buffering && r.playing) || retainingSeek)
+    ) {
+      // A later scrub can arrive while Core acknowledges the first. Keep the
+      // latest confirmed intent through that acknowledgment and its refresh.
+      const seek = nativeSeek.current.observe(currentTime, now, state);
+      if (seek !== null) nativeSeekDeferred.current = { context: seekContext, position: seek };
+      if (nativeSeek.current.pending) return;
+      const deferred = nativeSeekDeferred.current;
+      if (deferred && (!operation || operation.settled)) {
+        const pending = { context: seekContext, settled: false, successful: false };
+        nativeSeekPending.current = pending;
+        nativeSeekDeferred.current = null;
+        const command = r.mode === "discord"
+          ? seekDiscord(deferred.position)
+          : actionRef.current("seek", { position: deferred.position });
+        const completed = (successful: boolean) => {
+          if (nativeSeekPending.current !== pending) return;
+          pending.settled = true;
+          pending.successful = successful;
+        };
+        void command.then(completed, () => completed(false));
+        return;
+      }
+    }
+    if (operation && !operation.settled && !requestedSync) return;
+    if (operation?.settled) nativeSeekPending.current = null;
     // A short audio stall is not a shared pause. Keep the iframe intact and
     // let the normal drift policy reconcile once the authoritative clock moves.
     if (r.buffering && r.playing) {
       setSyncStatus("Bufrer lyd i Discord");
       return;
     }
-    if (
-      (r.mode === "discord"
-        ? concertQueue.data?.canManage && discord?.guildId === r.guildId && Boolean(discord?.queueRevision)
-        : r.isHost) &&
-      !r.current.live &&
-      !force &&
-      !nativeSeekPending.current
-    ) {
-      const seek = nativeSeek.current.observe(currentTime, now, state);
-      if (seek !== null) {
-        nativeSeekPending.current = true;
-        const command = r.mode === "discord"
-          ? seekDiscord(seek)
-          : actionRef.current("seek", { position: seek });
-        void command.finally(() => {
-          nativeSeekPending.current = false;
-          nativeSeek.current.reset();
-        });
-        return;
-      }
-      if (nativeSeek.current.pending) return;
-    }
-    if (nativeSeekPending.current) return;
     setSyncDrift(
       r.current.live
         ? null

@@ -57,7 +57,7 @@ export function StartEvening({
           </button>
         </div>
         <div className="welcome-art">
-          <ConcertScenery />
+          <ConcertScenery composition="welcome" />
         </div>
       </div>
       <div className="welcome-bottom">
