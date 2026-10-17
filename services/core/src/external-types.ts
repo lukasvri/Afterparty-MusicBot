@@ -1,7 +1,7 @@
 /** Responses consumed at the provider boundary, independent of SDKs. */
 export type YouTubeVideo = {
   id: string;
-  snippet: {title: string; channelTitle: string; description?: string; tags?: string[]; liveBroadcastContent?: string};
+  snippet: {title: string; channelTitle: string; description?: string; tags?: string[]; categoryId?: string; liveBroadcastContent?: string};
   contentDetails: {duration: string};
   status: {embeddable?: boolean};
 };
@@ -15,6 +15,8 @@ export type ExtractedMedia = {
   title?: string;
   description?: string;
   tags?: string[];
+  categories?: string[];
+  track?: string;
   artist?: string;
   uploader?: string;
   duration?: number;

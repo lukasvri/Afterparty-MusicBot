@@ -95,17 +95,27 @@ try {
   });
   const page = await context.newPage();
   await page.goto(base);
-  for (const width of [390, 1440, 2560]) {
+  for (const width of [360, 390, 768, 1440, 2560]) {
     await page.setViewportSize({ width, height: width === 2560 ? 1440 : 900 });
     await page.getByRole("heading", { name: "Afterparty", exact:true }).waitFor();
     const geometry = await page.locator(".welcome-art").evaluate(el => {
       const frame = el.getBoundingClientRect();
       const head = el.querySelector(".performer-head")!.getBoundingClientRect();
       const rig = el.querySelector(".stage-truss")!.getBoundingClientRect();
+      const booth = el.querySelector(".dj-booth")!.getBoundingClientRect();
+      const speakers = el.querySelector(".speaker-stacks")!.getBoundingClientRect();
       return { contained: head.top >= frame.top && head.bottom <= frame.bottom && head.left >= frame.left && head.right <= frame.right && rig.top >= frame.top,
+        stageContained: booth.bottom <= frame.bottom && speakers.left >= frame.left && speakers.right <= frame.right,
+        centred: Math.abs((booth.left + booth.right) / 2 - (frame.left + frame.right) / 2) < frame.width * .01,
+        headScale: head.height / frame.height,
+        artworkCentred: Math.abs((frame.left + frame.right) / 2 - innerWidth / 2) < 2,
         overflow: document.documentElement.scrollWidth > innerWidth };
     });
     assert(geometry.contained, "DJ head and lighting rig must remain inside the welcome scene");
+    assert(geometry.stageContained, "The console and both speakers must fit the welcome scene");
+    assert(geometry.centred, "The DJ console must be centred within the welcome artwork");
+    assert(geometry.headScale > .12, "The DJ must remain legible in the responsive welcome artwork");
+    if (width <= 950) assert(geometry.artworkCentred, "Tablet and mobile artwork must be centred on the page");
     assert(!geometry.overflow, "Welcome page must fit the viewport");
     if(width===2560){
       const content=await page.locator('.content').boundingBox();
@@ -115,6 +125,17 @@ try {
     }
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/v2-welcome-${width}.png`, fullPage: true });
   }
+  const sceneAnimations = () => page.locator(".welcome-art").evaluate(el =>
+    el.getAnimations({subtree: true}).filter(animation => animation.playState === "running").length,
+  );
+  await page.emulateMedia({reducedMotion: "reduce"});
+  assert.equal(await sceneAnimations(), 0, "The complete stage must respect reduced motion");
+  await page.emulateMedia({reducedMotion: "no-preference"});
+  assert((await sceneAnimations()) > 0, "Stage animation must resume when reduced motion is off");
+  await page.locator(".motion-toggle").click();
+  assert.equal(await sceneAnimations(), 0, "The site's motion control must stop all stage animation");
+  await page.locator(".motion-toggle").click();
+  assert((await sceneAnimations()) > 0, "The site's motion control must restore stage animation");
   await page.locator(".welcome-release").click();
   await page.getByRole("heading", { name: "Discord video seeking and release readiness" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
@@ -123,6 +144,10 @@ try {
   await page.getByRole("button", { name: "Spel i nettlesaren" }).click();
   const dialog = page.getByRole("dialog", { name: "Start kvelden" });
   await dialog.waitFor();
+  assert(await dialog.getByLabel("Namn på kvelden").evaluate(el => {
+    const frame = el.getBoundingClientRect();
+    return document.elementFromPoint(frame.left + frame.width / 2, frame.top + frame.height / 2) === el;
+  }), "The room dialog must receive input above decorative scene layers");
   assert(
     await dialog
       .getByRole("radio", { name: "Berre dei med lenkja" })

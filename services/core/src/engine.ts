@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { randomUUID, createHash } from "node:crypto";
 import { Store } from "./store.ts";
 import { Providers } from "./providers.ts";
-import { canPlayRadioTrack } from "./radio.ts";
+import { canPlayRadioTrack, rankRadio, sameRadioSong, type RadioTrack } from "./radio.ts";
 import {
   Mixer,
   PcmDecoder,
@@ -17,6 +17,7 @@ import {
   UserError,
   type Track,
   type PublicState,
+  type PublicTrack,
   type Settings,
 } from "./types.ts";
 export type Segment = { track: Track; startFrame: number; offset: number };
@@ -71,6 +72,7 @@ export class Engine extends EventEmitter {
   radioRetryAt = 0;
   radioGeneration = 0;
   radioSeed: Track | null;
+  private restoringEntry: string | null = null;
   constructor(store: Store, providers: Providers, sink: Sink) {
     super();
     this.store = store;
@@ -85,6 +87,7 @@ export class Engine extends EventEmitter {
       position: number;
       paused: boolean;
     } | null>("recovery", null);
+    this.restoringEntry = recovery?.track?.entryId ?? null;
     if (
       recovery?.track &&
       !this.queue.some((t) => t.entryId === recovery.track.entryId)
@@ -152,7 +155,10 @@ export class Engine extends EventEmitter {
       this.historyEntries.push(track);
       this.historyEntries = this.historyEntries.slice(-50);
       const video = publicTrack(track);
-      if (video) this.store.record("core:" + track.entryId, video);
+      if (video) this.store.transaction(() => {
+        this.store.record("core:" + track.entryId, video);
+        this.providers.rememberRadioTrack(track);
+      });
       this.changed();
     }
     const second = Math.floor(position);
@@ -362,7 +368,7 @@ export class Engine extends EventEmitter {
       try {
         const next = await this.providers.radio(original, [original.id, seed.id]);
         if (!valid()) return;
-        if (next && canPlayRadioTrack(original, next)) {
+        if (next && this.validRadioTrack(original, next)) {
           this.radioError = "";
           this.radioRetryAt = Infinity;
           this.queue.push({
@@ -501,17 +507,78 @@ export class Engine extends EventEmitter {
       this.stop(false);
       return;
     }
+    this.restoringEntry = null;
     await this.startTrack(next, next.offset ?? 0);
   }
   private dropUnsafeRadio(seed: Track | null) {
+    if (!this.queue.some((track) => track.radio)) return;
+    const recent = [
+      ...this.providers.radioHistory(),
+      ...(this.current ? [this.current] : []),
+      ...this.queue.filter((track) => !track.radio),
+    ];
     const queue = this.queue.filter(
-      (track) => !track.radio || canPlayRadioTrack(seed ?? track, track),
+      (track) => {
+        if (!track.radio) return true;
+        // A checkpoint resumes this exact queue entry. It is not a new radio
+        // selection, so its already-played recording must remain recoverable.
+        if (!this.current && track.entryId === this.restoringEntry) {
+          return canPlayRadioTrack(seed ?? track, track);
+        }
+        if (!seed || !this.validRadioTrack(seed, track, recent)) return false;
+        recent.push(track);
+        return true;
+      },
     );
     if (queue.length !== this.queue.length) {
       this.queue = queue;
       this.persist();
       this.changed();
     }
+  }
+  private validRadioTrack(seed: Track, track: Track, recent?: PublicTrack[]) {
+    return canPlayRadioTrack(seed, track) && rankRadio(
+      seed,
+      [{ ...track, concert: false }],
+      recent ?? [...this.providers.radioHistory(), ...(this.current ? [this.current] : [])],
+      [],
+      track.radioRelatedTo === seed.id,
+    ).length > 0;
+  }
+  rejectRadio(tracks: Track[]) {
+    const rejected = tracks.filter((track) => track.radio);
+    if (!rejected.length) return;
+    const now = Date.now();
+    const skipped = this.store.get<Record<string, number>>("radio-skips", {});
+    for (const track of rejected) skipped[track.id] = now;
+    this.store.set("radio-skips", Object.fromEntries(
+      Object.entries(skipped).filter(([, at]) => now - at < 7 * 86400000)
+        .sort((a, b) => b[1] - a[1]).slice(0, 200),
+    ));
+    const songs = this.store.get<{ track: RadioTrack; at: number }[]>("radio-skipped-tracks", []);
+    this.store.set("radio-skipped-tracks", [
+      ...songs.filter((entry) => now - entry.at < 7 * 86400000),
+      ...rejected.map((track) => ({ track: { ...publicTrack(track)!, ...(track.catalog ? { catalog: track.catalog } : {}) }, at: now })),
+    ].slice(-200));
+    this.radioGeneration++;
+    this.radioAttempts = 0;
+    this.radioRetryAt = 0;
+  }
+  restoreRadio(tracks: Track[]) {
+    const restored = tracks.filter((track) => track.radio);
+    if (!restored.length) return;
+    const songs = this.store.get<{ track: RadioTrack; at: number }[]>("radio-skipped-tracks", []);
+    const restoredIds = new Set([
+      ...restored.map((track) => track.id),
+      ...songs.filter((entry) => restored.some((track) => sameRadioSong(track, entry.track))).map((entry) => entry.track.id),
+    ]);
+    this.store.set("radio-skipped-tracks", songs.filter((entry) => !restoredIds.has(entry.track.id)));
+    this.store.set("radio-skips", Object.fromEntries(Object.entries(
+      this.store.get<Record<string, number>>("radio-skips", {}),
+    ).filter(([id]) => !restoredIds.has(id))));
+    this.radioGeneration++;
+    this.radioAttempts = 0;
+    this.radioRetryAt = 0;
   }
   async naturalNext() {
     if (this.loop && this.current)
@@ -520,7 +587,8 @@ export class Engine extends EventEmitter {
         this.current.offset ?? 0,
       );
     if (this.loopQueue && this.current)
-      this.queue.push({ ...this.current, entryId: randomUUID() });
+      this.queue.push({ ...this.current, entryId: randomUUID(), radio: false, radioRelatedTo: undefined });
+    this.dropUnsafeRadio(this.radioSeed ?? this.current);
     const generation = this.generation;
     if (!this.queue.length) await this.ensureRadio();
     if (generation !== this.generation || !this.connected) return;
@@ -545,21 +613,21 @@ export class Engine extends EventEmitter {
   async skip(count = 1) {
     if (!Number.isInteger(count) || count < 1 || count > this.queue.length + 1)
       throw new UserError("Ugyldig antall sanger.");
-    const next = this.queue[count - 1];
-    if (this.current?.radio && this.snapshot().position < 60) {
-      const skipped = this.store.get<Record<string, number>>("radio-skips", {});
-      skipped[this.current.id] = Date.now();
-      this.store.set(
-        "radio-skips",
-        Object.fromEntries(
-          Object.entries(skipped)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 200),
-        ),
-      );
-    }
+    // Capture the user's requested target before removing old unsafe entries.
+    // Filtering must never shift a numbered skip onto a later manual song.
+    const requested = this.queue.slice(0, count);
+    const target = this.queue[count - 1];
+    const later = this.queue.slice(count);
+    this.dropUnsafeRadio(this.radioSeed ?? this.current);
+    const retained = new Set(this.queue.map((track) => track.entryId));
+    const next = target && (retained.has(target.entryId) ? target : later.find((track) => retained.has(track.entryId)));
+    this.rejectRadio([
+      ...(this.current?.radio && this.snapshot().position < 60 ? [this.current] : []),
+      ...requested.filter((track) => track.entryId !== next?.entryId),
+    ]);
     this.stop(false);
-    this.queue.splice(0, count);
+    const consumed = new Set([...requested.map((track) => track.entryId), ...(next ? [next.entryId] : [])]);
+    this.queue = this.queue.filter((track) => !consumed.has(track.entryId));
     this.persist();
     if (next) await this.startTrack(next, next.offset ?? 0);
     else this.changed();
@@ -579,6 +647,7 @@ export class Engine extends EventEmitter {
     this.paused = false;
     this.lastEntry = "";
     if (clear) {
+      this.restoringEntry = null;
       this.radioSeed = null;
       this.queue = [];
       this.historyEntries = [];
@@ -599,6 +668,7 @@ export class Engine extends EventEmitter {
     await this.startTrack(this.current, seconds, this.paused);
   }
   clear() {
+    this.rejectRadio(this.queue);
     this.queue = [];
     this.mixer?.invalidateNext();
     this.persist();
@@ -607,7 +677,7 @@ export class Engine extends EventEmitter {
   remove(index: number, count = 1) {
     if (!Number.isInteger(index) || index < 0 || index >= this.queue.length)
       throw new UserError("Køen er endret. Oppdater og prøv igjen.");
-    this.queue.splice(index, count);
+    this.rejectRadio(this.queue.splice(index, count));
     this.mixer?.invalidateNext();
     this.persist();
     this.changed();

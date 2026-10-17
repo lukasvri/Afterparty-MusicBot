@@ -11,7 +11,7 @@ import {mixPcm,FRAME_BYTES,type Sink,type Prepared,type PcmDecoder} from '../src
 import {deferred} from './deferred.ts';
 import type {Track} from '../src/types.ts';
 import {parseTime} from '../src/discord.ts';
-const track=(id='abcdefghijk',entryId=id):Track=>({id,entryId,title:'Example song',artist:'Artist',duration:200,image:'',live:false,embeddable:true,source:'youtube'});
+const track=(id='abcdefghijk',entryId=id):Track=>({id,entryId,title:id==='abcdefghijk'?'Example song':`Example song ${id}`,artist:'Artist - Topic',duration:200,image:'',live:false,embeddable:true,source:'youtube'});
 class FakeSink implements Sink{ms=0;playing=true;onIdle:((id:string)=>void)|null=null;onError:((e:Error,id:string)=>void)|null=null;play(){this.ms=0;this.playing=true;}pause(){this.playing=false;}resume(){this.playing=true;}stop(){this.ms=0;this.playing=false;}duration(){return this.ms;}advancing(){return this.playing;}buffering(){return false;}}
 
 test('a long-running mix releases consumed segments while retaining the audible and future clocks',()=>{

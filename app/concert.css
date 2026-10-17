@@ -69,9 +69,9 @@ body::before{background:radial-gradient(ellipse at 60% 0,#6f17251a,transparent 6
 @media(prefers-reduced-motion:reduce){.concert-shell .library-panel [role=tabpanel]{animation:none}}
 @media(max-width:380px){.concert-shell .sidebar{padding:0 14px;gap:8px}.concert-shell .brand{font-size:18px;gap:6px}.concert-shell .brand>span:last-child{white-space:nowrap}.concert-shell .brand-mark{width:25px;height:29px}.concert-shell .nav-link{font-size:10px;padding:12px 5px}.concert-shell .stage:not([data-current=true]){aspect-ratio:.95}}
 /* A single SVG keeps fixtures and light origins aligned at every size. */
-.concert-scenery{position:absolute;inset:0;overflow:hidden;background:#090b16;pointer-events:none}
+.concert-scenery{position:absolute;inset:0;z-index:0;isolation:isolate;overflow:hidden;background:#090b16;pointer-events:none;user-select:none}
 .concert-venue{display:block;width:100%;height:100%;position:absolute;inset:0}
-.rig-beam{transform-origin:0 0;animation:rig-sweep 14s ease-in-out infinite;will-change:transform}
+.rig-beam{transform-origin:0 0;animation:rig-sweep 14s ease-in-out infinite}
 .rig-beam-even{animation-direction:reverse}.rig-beam-odd{animation-delay:-7s}
 .laser-fan{transform-origin:0 0;opacity:.45;animation:laser-sweep 9s ease-in-out infinite alternate}
 .laser-fan-right{animation-direction:alternate-reverse;animation-delay:-4.5s}

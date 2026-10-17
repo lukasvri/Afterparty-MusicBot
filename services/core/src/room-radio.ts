@@ -7,6 +7,7 @@ import {
   isRadioMusic,
   specificRadioGenre,
   sameRadioRecording,
+  RADIO_HISTORY_LIMIT,
 } from "./radio.ts";
 import type { RoomVideo } from "./protocol.ts";
 
@@ -18,6 +19,7 @@ export type RoomRadioState = {
   radioHistory?: RoomVideo[];
   history?: RoomVideo[];
   radioExcluded?: string[];
+  radioExcludedSongs?: RoomVideo[];
 };
 export function roomRadioSeed(state: RoomRadioState) {
   if (state.current?.radio === false) return state.current;
@@ -32,19 +34,26 @@ export function roomRadioSeed(state: RoomRadioState) {
 }
 export function playableRoomQueue(state: RoomRadioState) {
   const seed = roomRadioSeed(state);
-  return state.queue.filter(
-    (video) =>
-      !video.radio ||
-      (video.embeddable &&
-        isRadioMusic(video) &&
-        (!seed ||
-          rankRadio(
-            { ...seed, entryId: seed.id },
-            [{ ...video, entryId: video.id }],
-            [],
-            [],
-          ).length > 0)),
-  );
+  const recent = [
+    ...(state.radioHistory ?? []),
+    ...(state.history ?? []),
+    ...(state.radioExcludedSongs ?? []),
+    ...(state.current ? [state.current] : []),
+    ...state.queue.filter((video) => !video.radio),
+  ];
+  return state.queue.filter((video) => {
+    if (!video.radio) return true;
+    if (state.radio === false || !seed || !video.embeddable) return false;
+    const valid = rankRadio(
+      { ...seed, entryId: seed.id },
+      [{ ...video, entryId: video.id }],
+      recent,
+      state.radioExcluded ?? [],
+      video.radioRelatedTo === seed.id,
+    ).length > 0;
+    if (valid) recent.push(video);
+    return valid;
+  });
 }
 export async function roomRecommendation(
   state: RoomRadioState,
@@ -55,6 +64,7 @@ export async function roomRecommendation(
     state.radio === false ||
     !seed ||
     seed.live ||
+    seed.music === false ||
     playableRoomQueue(state).length
   )
     return null;
@@ -106,6 +116,7 @@ export async function roomRecommendation(
         [
           ...(state.radioHistory ?? []),
           ...(state.history ?? []),
+          ...(state.radioExcludedSongs ?? []),
           ...(state.current ? [state.current] : []),
         ],
         state.radioExcluded ?? [],
@@ -116,6 +127,8 @@ export async function roomRecommendation(
           title: next.title,
           artist: next.artist,
           genres: next.genres,
+          music: next.music,
+          radioRelatedTo: seed.id,
           image: next.image,
           duration: next.duration,
           live: next.live,
@@ -132,5 +145,5 @@ export function roomRadioHistory(state: RoomRadioState) {
   return [
     ...(state.radioHistory ?? []),
     ...(state.current ? [state.current] : []),
-  ].slice(-20);
+  ].slice(-RADIO_HISTORY_LIMIT);
 }
