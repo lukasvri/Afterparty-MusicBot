@@ -13,6 +13,7 @@ export type Video = {
   source?: "youtube" | "soundcloud";
   url?: string;
   genres?: string[];
+  music?: boolean;
   requestedBy?: string;
   radio?: boolean;
 };

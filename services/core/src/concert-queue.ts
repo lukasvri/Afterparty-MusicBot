@@ -133,9 +133,13 @@ export class ConcertQueue {
             ?.entryId ?? "",
         ]),
       );
-      if (action === "clear") e.queue = e.queue.filter((t) => !t.concert);
+      if (action === "clear") {
+        e.rejectRadio(visible);
+        e.queue = e.queue.filter((t) => !t.concert);
+      }
       else if (action === "remove") {
         const t = find();
+        e.rejectRadio([t]);
         e.queue = e.queue.filter((v) => v.entryId !== t.entryId);
       } else {
         const t = find(),
@@ -184,6 +188,11 @@ export class ConcertQueue {
         ...old.filter((t) => remaining.has(t.entryId)),
         ...additions,
       );
+      // Only entries brought back by this undo lift their removal exclusions.
+      // Reordering an existing entry must not erase an unrelated rejection.
+      e.restoreRadio(old.filter((track) =>
+        !visible.some((current) => current.entryId === track.entryId),
+      ));
       e.queue = restored;
       delete s.undo;
       delete s.undoBefore;

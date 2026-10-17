@@ -55,7 +55,7 @@ button>svg,a>svg,summary>svg{flex-shrink:0}
 @media(max-width:650px){.cinema-button{width:44px;padding:0}.cinema-button>span{display:none}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary{width:44px;padding:0;justify-content:center}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary>.settings-label{display:none}.stage-panel[data-immersive=true] .cinema-toolbar{bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px));gap:6px}.stage-panel[data-immersive=true] .cinema-toolbar .video-settings-body{right:50%;transform:translateX(50%);width:min(360px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 164px);padding:16px}.studio-shell .brand{font-size:17px;gap:8px;letter-spacing:-.5px}.studio-shell .brand-mark{width:36px;height:36px;flex-basis:36px}.brand-mark>svg{width:20px;height:20px}.studio-shell .brand-sub{font-size:6px;letter-spacing:2.7px}.concert-shell .library-tabs button{font-size:14px;min-height:48px}.concert-shell .now-playing{flex-wrap:wrap}.concert-shell .track-details{flex-basis:50%}.concert-shell .studio-heading h1{overflow-wrap:anywhere}}
 @media(max-width:380px){.studio-shell .brand{font-size:15px;gap:7px}.studio-shell .brand-mark{width:32px;height:32px;flex-basis:32px}.studio-shell .brand-sub{font-size:5px;letter-spacing:2.5px}.studio-shell .sidebar{padding:0 12px;gap:8px}.studio-shell .nav-link{font-size:10px;padding:12px 5px}.concert-shell .library-tabs button{font-size:13px;gap:7px}}
 
-.stage-pixel-ribbon rect{animation:ribbon-pulse 2.8s ease-in-out infinite alternate}.deck-ring{animation:deck-light 3s linear infinite}.speaker-stacks{opacity:.9}@keyframes ribbon-pulse{from{opacity:.15}to{opacity:.9}}@keyframes deck-light{to{stroke-dashoffset:-84}}@media(prefers-reduced-motion:reduce){.stage-pixel-ribbon rect,.deck-ring{animation:none}}
+.stage-pixel-ribbon rect{animation:ribbon-pulse 2.8s ease-in-out infinite alternate}.deck-ring{transform-origin:0 0;animation:deck-light 6s linear infinite}.speaker-stacks{opacity:.9}@keyframes ribbon-pulse{from{opacity:.15}to{opacity:.9}}@keyframes deck-light{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.stage-pixel-ribbon rect,.deck-ring{animation:none}}
 
 .led-orbit{transform-origin:0 0;animation:led-orbit 32s linear infinite}.led-orbit-inner{transform-origin:0 0;animation:led-orbit 24s linear infinite reverse}@keyframes led-orbit{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.led-orbit,.led-orbit-inner{animation:none}}
 
@@ -68,8 +68,12 @@ button>svg,a>svg,summary>svg{flex-shrink:0}
 .concert-shell .library-panel .empty-queue h3{margin:0;max-width:100%;font-weight:700}
 .concert-shell .library-panel .empty-queue p{max-width:240px;margin:12px auto 18px;text-align:center}
 .concert-shell .empty-queue .text-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:40px;margin:0;padding:8px 12px}
-.performer-head{transform-origin:0 -42px;animation:performer-nod 4s ease-in-out infinite}
+.performer-head{transform-origin:0 -42px;animation:performer-nod 3.2s ease-in-out infinite}
+.performer-arm-left{transform-origin:-37px -20px;animation:performer-cue 6.4s ease-in-out infinite}
+.performer-arm-right{transform-origin:36px -20px;animation:performer-mix 4.8s ease-in-out infinite}
 .mixer-meter{animation:meter-level 1.2s ease-in-out infinite alternate}
-@keyframes performer-nod{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
+@keyframes performer-nod{0%,100%{transform:rotate(-2deg)}25%{transform:rotate(.5deg)}50%{transform:rotate(2.5deg)}75%{transform:rotate(-.5deg)}}
+@keyframes performer-cue{0%,40%,100%{transform:rotate(0)}55%,70%{transform:rotate(-3deg)}85%{transform:rotate(1deg)}}
+@keyframes performer-mix{0%,100%{transform:rotate(-1deg)}45%,65%{transform:rotate(3deg)}}
 @keyframes meter-level{from{opacity:.25}to{opacity:1}}
-@media(prefers-reduced-motion:reduce){.performer-head,.mixer-meter{animation:none}}
+@media(prefers-reduced-motion:reduce){.performer-head,.performer-arm,.mixer-meter{animation:none}}

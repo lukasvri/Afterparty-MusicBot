@@ -4,7 +4,8 @@ export class NativeSeekTracker {
   private candidate: { position: number; at: number } | null = null;
   private written = false;
   private target = 0;
-  reset() { this.sample = null; this.candidate = null; this.written = false; }
+  resetObservation() { this.sample = null; this.candidate = null; }
+  reset() { this.resetObservation(); this.written = false; }
   write(position: number) { this.reset(); this.written = true; this.target = position; }
   get pending() { return this.candidate !== null; }
   acknowledge(position: number, at: number) {

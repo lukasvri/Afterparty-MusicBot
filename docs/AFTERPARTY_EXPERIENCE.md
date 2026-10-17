@@ -26,6 +26,8 @@ Invitation and recovery credentials use URL fragments, are consumed locally, and
 - `components/party/admin-seek.tsx`: live position with protected pointer/keyboard editing.
 - `lib/browser-api.ts` and `lib/youtube-player.ts`: browser transport and player bootstrap.
 
+The welcome page gives `components/concert-scenery.tsx` its own centred composition, with a larger DJ and console and responsive framing. Room scenery retains space for empty-state controls. Decorative SVG layers remain noninteractive, with lights behind the performer and hands above the decks. Both system reduced-motion preferences and the manual animation switch stop the scene's movement.
+
 The evening library is device-local, with validated JSON import/export. It is not an account-synchronized cloud library. Room playback history is shared and bounded. Local storage failures retain host credentials and preferences for the current page and offer a private recovery-link download. Reloading a page with blocked storage still requires that recovery link.
 
 Mobile controls keep player, search, queue and saved evenings reachable. Search moves focus into the visible input. Navigation uses browser history, and TV mode is a shareable URL state. TV mode keeps guest QR sharing visible while hiding editing panels. YouTube consent and autoplay restrictions still apply; the app does not bypass them.
@@ -38,12 +40,11 @@ The browser workflow uses synthetic API responses and a local preview only:
 
 ```bash
 PREVIEW_URL=http://127.0.0.1:8787 \
-PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
 CHROMIUM_PATH=/path/to/chromium \
 node scripts/party.browser.ts
 ```
 
-It exercises private setup, first-song search, focus and scrolling, adding tracks, moderation, saved evenings, favorites, QR generation, TV mode, browser back navigation and mobile overflow. Automated audio and browser tests do not establish what people hear on a production Discord voice connection.
+It uses the locked Playwright dependency and exercises private setup, first-song search, focus and scrolling, adding tracks, moderation, saved evenings, favorites, QR generation, TV mode and browser back navigation. Welcome checks span 360, 390, 768, 1440 and 2560 pixel widths, including centring, performer visibility, overflow, motion preferences and dialog hit-testing above scenery. Automated audio and browser tests do not establish what people hear on a production Discord voice connection.
 
 ## Playback recovery and radio (2.0.1)
 
@@ -52,6 +53,14 @@ of iframe reporting jitter and requires sustained drift before an automatic seek
 Room transport changes apply promptly; buffering never publishes a host seek.
 YouTube is the only seek bar in browser rooms. A confirmed discontinuity updates
 the shared room for hosts. Buffering and pending programmatic seeks are excluded.
+
+Native seeks from room hosts and authorized Discord managers retain the latest
+confirmed scrub while an earlier shared seek is awaiting acknowledgment. Commands
+remain serialized and use the current permissions and revision when submitted,
+without reloading the iframe. Deferred intent belongs to one navigation, guild
+and playback instance. Leaving that scope, requesting an explicit resync or
+receiving a failed command drops the deferred target; an older completion cannot
+clear a newer operation.
 
 Radio searches explicit genre labels across artists, favouring artists not heard
 recently. It retries empty or failed searches. If the title has no reliable genre

@@ -141,6 +141,16 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
       if (!closed && !route.request().failure()) throw error;
     }
   };
+  const close = async () => {
+    for (const pending of allGates) pending.release();
+    try {
+      // Route callbacks sample the page clock, so finish them before closing it.
+      await page.unrouteAll({ behavior: "wait" });
+    } finally {
+      closed = true;
+      await browser.close();
+    }
+  };
   await page.route("**/*", async (route) => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin !== base) return route.abort();
@@ -201,9 +211,7 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
     await page.goto(base + "/?room=" + (kind === "room" ? "TESTROOM" : "DISCORD1"));
     await page.getByRole("heading", { name: kind === "room" ? "Initial room video" : "Initial concert", exact: true }).first().waitFor();
   } catch (error) {
-    closed = true;
-    for (const pending of allGates) pending.release();
-    await browser.close();
+    await close();
     throw error;
   }
   return {
@@ -217,11 +225,7 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
       return pending;
     },
     holdDiscord: (guild: string) => hold(discordGates, guild),
-    close: async () => {
-      closed = true;
-      for (const pending of allGates) pending.release();
-      await browser.close();
-    },
+    close,
   };
 }
 
