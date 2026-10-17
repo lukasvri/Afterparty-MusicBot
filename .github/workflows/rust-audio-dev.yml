@@ -57,4 +57,15 @@ jobs:
       - name: Typecheck the offline parity harness
         run: node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
       - name: Cross-language PCM, pipe protocol and process lifecycle checks
-        run: node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts
+        run: node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts
+      - name: Record repeated concurrent-guild measurements (no performance threshold)
+        if: matrix.toolchain == 'stable'
+        shell: bash
+        run: node experiments/rust-audio/benchmark-suite.ts 1000 3 1,4,16 100 > rust-audio-benchmark.json
+      - name: Save offline measurement report
+        if: matrix.toolchain == 'stable'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-audio-benchmark-${{ matrix.os }}
+          path: rust-audio-benchmark.json
+          retention-days: 14

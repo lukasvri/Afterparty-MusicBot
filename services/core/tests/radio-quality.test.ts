@@ -371,6 +371,41 @@ test(`undo preserves exclusions for a manual ${alternate ? "alternate upload" : 
   assert.deepEqual(original.radioExcluded, [rejected.id], "the input snapshot is not mutated");
 });
 
+for (const radio of [true, false])
+test(`undo retains a removed suggestion manually re-added before undo (radio: ${radio})`, async () => {
+  const rejected = { ...next, radio: true };
+  const before = song("manual00001", "First manual choice", { radio: false });
+  const after = song("manual00002", "Second manual choice", { radio: false });
+  const addition = song("manual00003", "Later manual choice", { radio: false });
+  const otherRejected = song("reject00001", "Night", { radio: true });
+  const original = {
+    current: seed, queue: [before, rejected, after], playing: true, position: 0,
+    playbackKey: "unchanged-playback", radioExcluded: [otherRejected.id],
+    radioExcludedSongs: [otherRejected],
+  };
+  let state = changeRoom(original, { action: "remove", videoId: rejected.id }, true, 10);
+  state = changeRoom(state, { action: "add", video: rejected, displayName: "Manual requester" }, true, 12);
+  state = changeRoom(state, { action: "add", video: addition }, true, 13);
+  if (!radio) state = changeRoom(state, { action: "radio", enabled: false }, true, 14);
+  const manual = state.queue.find(track => track.id === rejected.id)!;
+  assert.equal(manual.radio, false);
+  const restored = changeRoom(state, { action: "undo" }, true, 15);
+  assert.deepEqual(restored.queue.map(track => track.id), [before.id, rejected.id, after.id, addition.id]);
+  assert.deepEqual(restored.queue[1], manual, "the current manual request wins over the saved automatic entry");
+  assert.deepEqual(restored.radioExcluded, [otherRejected.id, rejected.id]);
+  assert.deepEqual(restored.radioExcludedSongs, [otherRejected, rejected]);
+  assert.equal(restored.current?.id, seed.id);
+  assert.equal(restored.playbackKey, original.playbackKey);
+  assert.equal(restored.position, 15);
+  assert.equal(restored.playing, true);
+  assert.equal(restored.undoQueue, undefined);
+  assert.equal(await roomRecommendation({ ...restored, queue: [], radio: true }, async () => [
+    rejected, song("copy0000001", "Evening (2024 Remaster)"), otherRejected,
+  ]), null, "manual re-addition must not lift ID or recording exclusions for future radio");
+  assert.deepEqual(original.queue.map(track => track.id), [before.id, rejected.id, after.id]);
+  assert.equal(original.queue[1].radio, true, "the saved snapshot is not mutated");
+});
+
 test("radio history includes the last hundred tracks and skip suppression is scoped to its store", async () => {
   const first = fixture();
   const other = fixture();
