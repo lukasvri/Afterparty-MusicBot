@@ -47,6 +47,39 @@ function setup() {
     },
   };
 }
+for (const withAddition of [false, true]) {
+  test(`concert undo counts pending requests${withAddition ? " and new queued tracks" : ""} toward capacity`, async () => {
+    const a = setup(), b = setup();
+    clearInterval(a.e.timer);
+    clearInterval(b.e.timer);
+    try {
+      a.e.settings.playlistLimit = withAddition ? 5 : 4;
+      const act = (action: string, extra = {}) =>
+        a.q.apply({ action, revision: a.q.revision(), ...extra }, true);
+      const other = { saved: b.q.read(), queue: [...b.e.queue], revision: b.q.revision() };
+      await act("approval", { enabled: true });
+      await act("clear");
+      if (withAddition) a.e.enqueue([track("added")]);
+      assert(a.q.request([track("request1"), track("request2")]));
+      const revision = a.q.revision();
+      const saved = a.q.read();
+      const queue = [...a.e.queue];
+      const persisted = a.e.store.get<Track[]>("queue", []);
+      await assert.rejects(act("undo"), /Køen er full/);
+      assert.equal(a.q.revision(), revision);
+      assert.deepEqual(a.q.read(), saved, "Rejected undo retains requests and undo state");
+      assert.deepEqual(a.e.queue, queue);
+      assert.deepEqual(a.e.store.get<Track[]>("queue", []), persisted);
+      await act("reject", { videoId: "request2" });
+      await act("undo");
+      assert.deepEqual(a.e.queue.map(t => t.entryId), ["one", "private", "two", ...(withAddition ? ["added"] : [])]);
+      assert.deepEqual(a.q.read().requests.map(t => t.entryId), ["request1"]);
+      assert.equal(a.e.queue.length + a.q.read().requests.length, a.e.settings.playlistLimit);
+      assert.equal(a.q.read().undo, undefined);
+      assert.deepEqual({ saved: b.q.read(), queue: b.e.queue, revision: b.q.revision() }, other, "Undo remains isolated to its server");
+    } finally { a.close(); b.close(); }
+  });
+}
 test("concert queue revisions, moderation and undo preserve private music and server isolation", async () => {
   const a = setup(),
     b = setup();
