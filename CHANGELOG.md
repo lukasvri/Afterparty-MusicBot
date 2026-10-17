@@ -16,6 +16,7 @@ See [release policy](docs/RELEASING.md).
 2026-10-17
 
 - Undoing a room queue edit clears radio exclusions only for automatic suggestions actually restored by that undo. Previously rejected songs and alternate uploads stay excluded from radio when they are also present as explicit manual queue choices. Manual playback, queue order and the shared playback clock are preserved.
+- When a removed radio suggestion is manually added again before undo, its current manual request and requester are retained at the restored queue position, including after radio is disabled. Undo no longer silently drops that manual choice, and its radio exclusions remain in place.
 
 ## v2.1.3: Unified settings and radio recovery
 
