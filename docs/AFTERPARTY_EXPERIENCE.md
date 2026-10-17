@@ -54,6 +54,14 @@ Room transport changes apply promptly; buffering never publishes a host seek.
 YouTube is the only seek bar in browser rooms. A confirmed discontinuity updates
 the shared room for hosts. Buffering and pending programmatic seeks are excluded.
 
+Native seeks from room hosts and authorized Discord managers retain the latest
+confirmed scrub while an earlier shared seek is awaiting acknowledgment. Commands
+remain serialized and use the current permissions and revision when submitted,
+without reloading the iframe. Deferred intent belongs to one navigation, guild
+and playback instance. Leaving that scope, requesting an explicit resync or
+receiving a failed command drops the deferred target; an older completion cannot
+clear a newer operation.
+
 Radio searches explicit genre labels across artists, favouring artists not heard
 recently. It retries empty or failed searches. If the title has no reliable genre
 label, artist matching remains a conservative fallback. Publisher channels alone
