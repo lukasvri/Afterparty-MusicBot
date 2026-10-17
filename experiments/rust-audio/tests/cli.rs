@@ -63,6 +63,36 @@ fn echo_mode_is_explicit_and_returns_unmixed_pcm_with_binary_only_stdout() {
 }
 
 #[test]
+fn batch_mode_has_separate_framing_and_fails_whole_invalid_batches() {
+    let frame = identity_request();
+    let mut input = Vec::from(*b"APBT\x01\x01\x04\x00");
+    input.extend_from_slice(&17u32.to_le_bytes());
+    input.extend_from_slice(&((4 * frame.len()) as u32).to_le_bytes());
+    for _ in 0..4 {
+        input.extend_from_slice(&frame);
+    }
+    let output = run(&["--batch-stream"], &input);
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    assert_eq!(&output.stdout[..8], b"APBT\x01\x81\x04\x00");
+    assert_eq!(output.stdout.len(), 16 + 4 * (8 + FRAME_BYTES));
+    for index in 0..4 {
+        let offset = 16 + index * (8 + FRAME_BYTES);
+        assert_eq!(&output.stdout[offset..offset + 4], &frame[8..12]);
+        assert_eq!(
+            &output.stdout[offset + 8..offset + 8 + FRAME_BYTES],
+            &frame[32..]
+        );
+    }
+    input[16 + 3 * frame.len() + 4] = 2;
+    let invalid = run(&["--batch-stream"], &input);
+    assert_eq!(invalid.status.code(), Some(1));
+    assert!(invalid.stdout.is_empty());
+    assert_eq!(run(&["--stream"], &input).status.code(), Some(1));
+    assert_eq!(run(&["--batch-stream"], &frame).status.code(), Some(1));
+}
+
+#[test]
 fn invalid_or_truncated_input_has_no_reply_and_returns_failure() {
     let input = identity_request();
     for input in [b"XPCM".as_slice(), &input[..input.len() - 1]] {
@@ -85,6 +115,7 @@ fn unknown_or_extra_arguments_return_usage_without_binary_output() {
         vec!["--stream", "extra"],
         vec!["--bench", "extra"],
         vec!["--echo-stream", "extra"],
+        vec!["--batch-stream", "extra"],
     ] {
         let output = run(&args, &[]);
         assert_eq!(output.status.code(), Some(2));

@@ -65,8 +65,9 @@ for any future integration.
 
 ## Offline stream worker
 
-The release executable accepts exactly one mode: `--bench`, `--stream` or the
-explicit offline control `--echo-stream`.
+The release executable accepts exactly one mode: `--bench`, `--stream`, the
+explicit offline control `--echo-stream` or the separate `--batch-stream`
+experiment described below.
 `--bench` retains the synthetic in-process benchmark. `--stream` reads binary
 requests from stdin and writes binary replies to stdout. Diagnostics go only
 to stderr. It does not discover Core, start FFmpeg, open a network listener or
@@ -88,7 +89,7 @@ offline tests. They do not start the bot:
 ```bash
 npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
 node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
-node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts experiments/rust-audio/process-cpu.test.ts
+node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts experiments/rust-audio/process-cpu.test.ts experiments/rust-audio/batch-client.test.ts experiments/rust-audio/batch-benchmark.test.ts
 ```
 
 The harness selects the platform's release executable, including `.exe` on
@@ -585,3 +586,231 @@ Rust 1.85 and Linux/Windows CI remain required; the local run used Rust 1.99.1.
 The required full `check:all` was attempted again: lint passed, then the same
 four existing POSIX `fcntl` deployment modules failed to import on Windows.
 This is not a passing full check; Linux CI must validate that suite.
+
+## Opt-in bounded batches
+
+This experiment builds on the process-CPU profiling in
+[PR #58](https://github.com/lukasvri/Afterparty-MusicBot/pull/58). The batch task
+branch is stacked on that work; if the dependency is still open, review it
+before treating the batch diff as independent. No Rust code is adopted into
+production `main` by this experiment.
+
+`--batch-stream` is explicit and uses separate `APBT` framing. Existing `APCM`
+version-1 `--stream` requests and semantics are unchanged. The batch mode accepts
+exactly 1, 4 or 8 complete PCM frames per request. Each frame retains its own
+version-1 controls, optional second source and opaque ID. There is also an opaque
+outer batch ID; IDs correlate replies, not permissions or deduplication.
+
+Both outer request and reply headers are 16 bytes, little-endian:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 4 | ASCII `APBT` |
+| 4 | 1 | Batch protocol version `1` |
+| 5 | 1 | Request opcode `1`, reply opcode `129` |
+| 6 | 1 | Frame count, exactly `1`, `4` or `8` |
+| 7 | 1 | Reserved, zero |
+| 8 | 4 | Opaque unsigned batch ID, echoed unchanged |
+| 12 | 4 | Exact body length, excluding this outer header |
+
+The request body contains consecutive complete version-1 `APCM` requests:
+32-byte frame header, frame A and optional frame B. Their magic, version,
+opcode, flags, fixed payload lengths and finite controls are all validated.
+For count `N`, the declared body must be between `N * (32 + 3840)` and
+`N * (32 + 7680)` bytes. The worker checks that bound before reading frame
+headers, and checks the remaining declared budget before reading each body.
+The actual frame sizes must consume the budget exactly; extra declared bytes
+do not cause reads into another batch.
+
+The reply body has `N` records, each containing the frame ID (4 bytes), exact
+PCM length `3840` (4 bytes), then the mixed PCM. Every frame is parsed and mixed
+into a fixed reply array before any reply bytes are submitted. An invalid or
+truncated later frame therefore produces no successful partial batch. Complete
+earlier batches remain valid. The whole reply is flushed before reading the
+next batch header. Short/interrupted I/O remains supported, and any other I/O
+or protocol failure ends the process without resynchronization.
+
+The maximum request is **61,712 bytes** and the maximum reply **30,800 bytes**.
+Rust uses fixed arrays, not payload-length allocations or a request queue.
+The isolated `RustBatchWorker` parent permits only one outstanding batch and
+caps the captured reply to the expected fixed size. It checks outer and every
+per-frame ID/length before returning any frames. Returned storage is not reused
+by later calls; submitted input is copied before returning to the caller.
+stderr retention is limited to 4 KiB. Runtime and OS pipe buffering is additional.
+Timeout, cancellation, malformed/oversized replies, stream errors and child exit
+are terminal and reject only after child/pipe cleanup. A retry constructs a new
+parent; there is no automatic replay, production fallback or integration.
+
+### Comparing the batch boundary
+
+After the locked Core dependency install and Rust release build:
+
+```bash
+node experiments/rust-audio/batch-benchmark.ts 8000 3 1,4 512
+node experiments/rust-audio/batch-benchmark.ts 4000 3 4 512 opus
+```
+
+Arguments are frames per guild, repeats, guild counts, warmup frames per guild
+and optional codec `none` or `opus`. Frames are bounded to 128 through 100,000,
+repeats to 1 through 10, and guilds to up to four distinct counts from 1 to 16.
+Frames and warmup must divide by eight; warmup is between 8 and 1,024 frames.
+
+The five conditions are direct Core TypeScript, existing Rust version-1 IPC,
+and batch IPC with sizes 1, 4 and 8. Every condition receives the same ordered,
+deterministic eight-frame sequence per guild, including independent frame
+controls, one/two-source requests, volume/fade bounds and negative-half rounding
+controls. This is a synthetic mixture, not a measured production distribution.
+Byte parity is checked against Core before measurement and on the first/last
+measured ready block. Each path processes identical warmup frames.
+
+Every eight-frame block is already fully available before processing starts.
+TypeScript mixes those eight frames synchronously with no per-frame await in
+the PCM-only condition. The version-1 parent awaits one request per frame;
+batch parents await one request per 1, 4 or 8 frames. All paths yield once after
+the entire shared ready block. Each guild has its own worker and at most one
+pending request. Optional Opus uses the same bounded encoder writes and settings
+as the earlier suite, drains output continuously, and includes final EOF/flush.
+
+Fresh processes and rotated condition order reduce persistent history bias.
+Reports include runtime/binary metadata, throughput, whole owned CPU when all
+counters are available, parent peak RSS, IPC request/byte counts and observed
+Node reply-data events. These are logical protocol counts, not syscall counts.
+Direct mix invocations are reported separately from IPC requests. CPU probes
+and their limitations follow the preceding process-CPU section.
+
+`frameReadyLatency` measures each PCM frame's completion from the common
+ready-block submission, including earlier work in that block. `callLatency`
+measures a local mix or complete IPC request; requests with different frame
+counts do different amounts of work and their tails must not be divided by N.
+`blockLatency` covers the complete eight-frame block across guilds.
+`framePipelineLatency` additionally includes accepted encoder stdin writes,
+not encoded-packet or audible Discord latency.
+
+### Latency tradeoff and live-input boundary
+
+The measured ready-frame latency deliberately excludes waiting for future input.
+For frames that arrive every 20 ms, gathering a full batch adds the following
+delay before processing, independent of any IPC speedup:
+
+| Batch size | Maximum added gathering delay | Delay by frame position |
+| --- | ---: | --- |
+| 1 | 0 ms | 0 |
+| 4 | 60 ms | 60, 40, 20, 0 ms |
+| 8 | 140 ms | 140, 120, 100, 80, 60, 40, 20, 0 ms |
+
+The JSON reports this budget separately. It is not measured runtime latency and
+is never added to a percentile as if it were an observed percentile. The harness
+must not be described as improved 50 Hz or live playback: unknown future audio,
+crossfade changes, volume changes and cancellation cannot simply be assumed
+available ahead of time. Any production design would need an explicit buffering
+policy, control latency limits and a separate owner-approved integration review.
+
+### Ready-frame batch observations, 2026-10-17
+
+The [45-run capture](../experiments/rust-audio/measurements/2026-10-17-batched-boundary.json)
+contains three fresh-process repeats of all five conditions: PCM with 8,000
+frames per guild at one and four guilds, then PCM-to-Opus with 4,000 frames per
+guild at four guilds. Warmup was 512 frames per guild. The parent and sibling
+agents paused heavy work during capture; host scheduling and thermal state were
+not controlled. The artifact retains exact reports, commands, source hashes and
+the actual Rust executable hash. It records Node 24.19.0, Rust 1.99.1 GNU,
+Windows 10.0.26300, Intel Core Ultra 7 255H with 16 logical CPUs, and FFmpeg
+9.0.2 for Opus. All conditions use the same input sequence and binary.
+
+Ranges below are the minimum and maximum of three runs, not confidence
+intervals. CPU is summed parent plus owned Rust plus optional FFmpeg time,
+not wall time or a percentage. Windows counter units do not establish practical
+measurement precision. Throughput is thousands of completed frames per second
+across all guilds. Each p99 range contains the per-run p99, not a pooled p99.
+
+PCM, one guild, 8,000 frames:
+
+| Condition | Elapsed ms | kframes/s | Whole owned CPU ms | Ready-frame p99 ms | IPC requests |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| TypeScript | 105.76–109.03 | 73.4–75.6 | 109.00–172.00 | 0.14–0.24 | 0 |
+| Rust v1 | 354.69–377.35 | 21.2–22.6 | 422.00–483.75 | 0.75–0.80 | 8,000 |
+| Batch 1 | 318.01–341.23 | 23.4–25.2 | 374.75–389.75 | 0.61–0.63 | 8,000 |
+| Batch 4 | 204.43–240.77 | 33.2–39.1 | 219.50–327.50 | 0.55–1.07 | 2,000 |
+| Batch 8 | 178.80–182.19 | 43.9–44.7 | 171.50–327.25 | 0.63–0.75 | 1,000 |
+
+PCM, four guilds, 32,000 total frames:
+
+| Condition | Elapsed ms | kframes/s | Whole owned CPU ms | Ready-frame p99 ms | IPC requests |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| TypeScript | 392.92–425.91 | 75.1–81.4 | 405.00–563.00 | 0.57–0.70 | 0 |
+| Rust v1 | 503.89–571.52 | 56.0–63.5 | 905.25–1156.38 | 1.35–1.49 | 32,000 |
+| Batch 1 | 526.30–597.30 | 53.6–60.8 | 1157.50–1452.75 | 1.40–1.90 | 32,000 |
+| Batch 4 | 451.28–483.11 | 66.2–70.9 | 859.00–1156.38 | 1.72–1.99 | 8,000 |
+| Batch 8 | 386.22–414.94 | 77.1–82.9 | 655.00–811.75 | 1.67–1.82 | 4,000 |
+
+PCM-to-Opus, four guilds, 16,000 total frames, including encoder startup and EOF:
+
+| Condition | Elapsed ms | kframes/s | Whole owned CPU ms | Encoder-write frame p99 ms | IPC requests |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| TypeScript | 630.65–647.16 | 24.7–25.4 | 3092.00–3295.00 | 1.83–1.87 | 0 |
+| Rust v1 | 641.77–664.76 | 24.1–24.9 | 3720.38–4154.63 | 2.21–2.45 | 16,000 |
+| Batch 1 | 645.37–674.43 | 23.7–24.8 | 3718.38–3952.00 | 1.93–2.33 | 16,000 |
+| Batch 4 | 644.44–662.53 | 24.2–24.8 | 3453.75–3734.13 | 2.63–2.72 | 4,000 |
+| Batch 8 | 640.91–684.04 | 23.4–25.0 | 3405.50–3813.38 | 2.70–3.30 | 2,000 |
+
+The boundary change demonstrably reduces IPC requests by factors of four/eight
+for ready inputs. At four-guild PCM, Node reply-data events fall from
+32,010–32,038 for v1 to 4,001–4,003 for batch 8. This does not imply eight times
+fewer syscalls: each request still transports the PCM, and Node events are not
+syscalls. Request/reply bytes change only from 200,704,000/123,392,000 to
+200,768,000/123,200,000. Extra batch framing adds some request bytes. Reported
+direct TypeScript mix invocations remain 32,000. Batch 1 is a useful separate
+protocol/control implementation comparison, not a pure Rust-kernel comparison;
+it improves one-guild wall time here but worsens four-guild wall time and CPU.
+
+Batch 8 improves ready PCM wall time and owned CPU relative to v1 in these
+captures. It does not establish lower CPU than direct TypeScript: the
+four-guild TypeScript CPU range is lower and does not overlap batch 8's, while
+wall-time ranges overlap. One-guild CPU ranges overlap only narrowly. Ready-frame tails
+at four guilds are also worse for batch 8 than v1 despite higher throughput.
+Opus wall times overlap across every condition, and batch 8 retains more owned
+CPU and worse encoder-write frame tails than TypeScript. Parent peak RSS at
+four-guild PCM is 138.1–140.0 MiB for batch 8 versus 93.7–97.2 MiB for
+TypeScript and 107.6–108.0 MiB for v1; this is process peak RSS, not a whole
+pipeline memory total. Kernel-only cost, GC and parent protocol work are not
+isolated by this comparison.
+
+Retain TypeScript in production. The useful result is a bounded, byte-exact
+offline path that lowers Rust crossing overhead when complete future work is
+already available. The separate 60/140 ms gathering budget remains much larger
+than these ready-frame tails and is absent from all measured tables. No live
+playback, control-responsiveness or audible benefit is established. The fixture
+mix differs from earlier fixed-control captures, so absolute numbers must not
+be compared between those cohorts as a source-change speedup.
+
+### Experimental patch notes for batching
+
+- Added an explicit, separately framed batch worker for exactly 1/4/8 frames,
+  preserving version-1 streaming and independent per-frame controls/IDs.
+- Added bounded parent lifecycle, full-batch validation before publication,
+  and byte-parity, ownership, fragmentation, malformed-last-frame and cleanup
+  regressions. Invalid later input never publishes a successful partial batch.
+- Added a five-condition ready-frame benchmark with owned CPU, tails and
+  transport counts, keeping live accumulation costs separate from runtime.
+- Added a stable-toolchain Linux/Windows batch diagnostic artifact alongside
+  the existing suite artifact. Its 1,024-frame, one-repeat conditions validate
+  the cross-platform harness; they have no performance threshold and do not
+  establish repeatability or a production speedup.
+- This remains an offline experiment stacked on the profiling work. No product
+  version, production website patch note, release publication or deployment is
+  part of the change.
+
+Batch validation on the Windows development checkout passed Rust formatting,
+Clippy with zero warnings, the locked release build, 26 library tests and six
+CLI tests. Harness typechecking, lint with zero warnings and all 35 TypeScript
+regressions passed, with no skips, including actual FFmpeg, both protocol
+clients, OS CPU counters, fragmentation and child cleanup. The Rust CI matrix
+retains Linux/Windows and minimum Rust 1.85 coverage; local execution used
+Rust 1.99.1. Automated parity is not a listening result.
+
+The required full `check:all` was also attempted on this branch. Repository-wide
+lint passed with zero warnings, then the Python deployment suites stopped on
+four import errors because Windows does not provide POSIX `fcntl`. Subsequent
+steps in that command did not run; this is not a green full-suite result.
+Those deployment tests require the Linux CI result. The focused Rust/harness
+checks above ran independently and passed.
