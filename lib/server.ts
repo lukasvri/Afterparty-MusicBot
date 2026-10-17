@@ -677,8 +677,6 @@ export async function mutate(
       { ...state, ...(command.action === "radio" ? { radio: command.enabled === true } : {}) },
       async (query) => (await search(request, query)).videos,
     );
-  if (action === "next" && state.current && state.radio !== false && !playableRoomQueue(state).length && !recommended && !finished(state,value.updated_at,Date.now()))
-    fail(422,"Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.");
   const now = Date.now(),
     position =
       state.position +
@@ -689,7 +687,13 @@ export async function mutate(
               Math.max(value.updated_at, state.startsAt ?? value.updated_at),
           ) / 1000
         : 0);
-  const next = changeRoom(state, { ...command, now }, host, position, recommended);
+  const emptyEarlyNext = action === "next" && state.current && state.radio !== false &&
+    !playableRoomQueue(state).length && !recommended && !finished(state, value.updated_at, now);
+  // Match Core: save the normal prefetch cooldown before rejecting an empty
+  // early skip. The same revision guard protects a newer pause or radio change.
+  const next = changeRoom(state, {
+    ...command, action: emptyEarlyNext ? "radio-prefetch" : action, now,
+  }, host, position, recommended);
   const result = await db()
     .prepare(
       "UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?",
@@ -698,6 +702,8 @@ export async function mutate(
     .run();
   if (!result.meta.changes)
     fail(409, "En annen endring kom først. Prøv igjen.");
+  if (emptyEarlyNext)
+    fail(422, "Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.");
   if (needsRecommendation(state, command) && action === "radio" && command.enabled === true && !recommended)
     fail(422, "Radioen fann ingen passande låtar. Prøv radio igjen eller legg til ei låt.");
   return { room: await publicRoom(request, await row(code), true, false) };

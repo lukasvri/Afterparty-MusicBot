@@ -1,6 +1,8 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Rom":["Rom","Room"],
+ "Video":["Video","Video"],
  "Logg inn med Discord for å administrere denne serveren.":["Logg inn med Discord for å administrere denne serveren.","Sign in with Discord to manage this server."],
  "Konsertkøen er ikkje tilgjengeleg.":["Konsertkøen er ikke tilgjengelig.","The concert queue is unavailable."],
  "Lydstatus":["Lydstatus","Audio status"],

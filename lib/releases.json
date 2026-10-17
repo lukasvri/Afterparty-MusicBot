@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.1.5",
+    "date": "2026-10-17",
+    "title": "Accessible settings tabs and consistent radio backoff",
+    "items": [
+      "Room, Queue and Video settings now have separate localized tabs in browser rooms and Discord concerts, including empty rooms and fullscreen. Arrow keys, Home and End move between tabs; only the selected panel is shown. Permissions, saved device preferences and the active player are preserved.",
+      "An unsuccessful early radio skip in a browser room now saves the same 15 second automatic-search cooldown as Core before reporting the empty result. Playback and its clock continue, and a newer room command cannot be overwritten by the delayed response."
+    ]
+  },
+  {
     "version": "2.1.4",
     "date": "2026-10-17",
     "title": "Preserve radio exclusions when undoing queue edits",
