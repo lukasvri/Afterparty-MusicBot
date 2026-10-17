@@ -1,0 +1,210 @@
+import type { CatalogSong } from "./matching.ts";
+import { normalized, scoreMatch } from "./matching.ts";
+import type { PublicTrack, Track } from "./types.ts";
+import {
+  createRadioRanker, isRadioMusic, isRadioTitle, radioArtist, radioGenre,
+  radioQuery, radioRelated, radioStyleCompatible, radioTitle,
+  sameRadioRecording, sameRadioSong, specificRadioGenre,
+} from "./radio.ts";
+
+export const RADIO_LIMITS = Object.freeze({ metadata: 12, descriptors: 15, similarMatches: 3,
+  catalogMatches: 4, searchResults: 20, discoverySearches: 2, candidates: 60 });
+export type RadioSource = "catalog" | "artist-catalog" | "genre" | "artist";
+type Stage = "metadata" | "catalog" | "artist-catalog" | "genre" | "artist";
+type StageResult = "unavailable" | "skipped" | "selected" | "empty" | "filtered" | "failed";
+type Rejection = "content" | "visibility" | "style" | "relationship" | "excluded" | "recording" | "catalog-match";
+export type RadioDiagnostic = {
+  version: 2;
+  outcome: "selected" | "empty" | "filtered" | "provider-error" | "insufficient-metadata";
+  seedGenre: string | null;
+  artistKnown: boolean;
+  metadata: "unchanged" | "refined" | "unavailable";
+  searches: number;
+  failedSearches: number;
+  candidates: number;
+  catalogMatches: number;
+  failedCatalogMatches: number;
+  source: RadioSource | null;
+  stages: Record<Stage, StageResult>;
+  rejected: Record<Rejection, number>;
+};
+export type RadioInput = {
+  seed: Track;
+  recent: PublicTrack[];
+  excluded: string[];
+  requireEmbeddable: boolean;
+  search: (query: string) => Promise<Track[]>;
+  similar?: (seed: Track) => Promise<CatalogSong[]>;
+  topTracks?: (seed: Track) => Promise<CatalogSong[]>;
+  match?: (song: CatalogSong) => Promise<Track>;
+  favorites?: string[];
+  diagnose?: (diagnostic: RadioDiagnostic) => void;
+};
+export type RadioSelection = { track: Track | null; source: RadioSource | null;
+  diagnostic: RadioDiagnostic; error?: unknown };
+
+/** Platform-neutral discovery and policy. No state writes, clocks or provider credentials. */
+export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
+  const original = input.seed;
+  let seed = original;
+  const artist = radioArtist(original);
+  const diagnostic: RadioDiagnostic = {
+    version: 2, outcome: "empty", seedGenre: radioGenre(seed), artistKnown: Boolean(artist),
+    metadata: "unchanged", searches: 0, failedSearches: 0, candidates: 0, catalogMatches: 0, failedCatalogMatches: 0, source: null,
+    stages: { metadata: "skipped", catalog: input.similar && input.match ? "skipped" : "unavailable",
+      "artist-catalog": input.topTracks && input.match ? "skipped" : "unavailable", genre: "skipped", artist: "skipped" },
+    rejected: { content: 0, visibility: 0, style: 0, relationship: 0, excluded: 0, recording: 0, "catalog-match": 0 },
+  };
+  const finish = (track: Track | null, source: RadioSource | null, error?: unknown): RadioSelection => {
+    diagnostic.source = source;
+    if (track) diagnostic.outcome = "selected";
+    input.diagnose?.(diagnostic);
+    return { track, source, diagnostic, ...(error === undefined ? {} : { error }) };
+  };
+  if (original.live || original.music === false || (!artist && !specificRadioGenre(seed))) {
+    diagnostic.outcome = "insufficient-metadata";
+    return finish(null, null);
+  }
+
+  // Learn only from a safe upload of the exact original recording. The original
+  // object and catalog remain intact; later discovery still uses its identity.
+  if (!specificRadioGenre(seed) && artist) {
+    try {
+      const candidates = (await input.search(`${artist} "${radioTitle(seed).replace(/"/g, "")}"`)).slice(0, RADIO_LIMITS.metadata);
+      const tagged = candidates.find(track => isRadioMusic(track) && track.embeddable &&
+        specificRadioGenre(track) && radioStyleCompatible(seed, track) && sameRadioRecording(seed, track));
+      if (tagged) {
+        seed = { ...original, title: tagged.title, genres: tagged.genres };
+        diagnostic.metadata = "refined";
+        diagnostic.seedGenre = radioGenre(seed);
+        diagnostic.stages.metadata = "selected";
+      } else diagnostic.stages.metadata = candidates.length ? "filtered" : "empty";
+    } catch {
+      diagnostic.metadata = "unavailable";
+      diagnostic.stages.metadata = "failed";
+    }
+  }
+
+  const ids = new Set([original.id, ...input.excluded, ...input.recent.map(track => track.id)]);
+  const ranker = createRadioRanker(seed, input.recent, input.excluded);
+  const pool: { track: Track; source: RadioSource; related: boolean; index: number }[] = [];
+  let lastError: unknown;
+  let successfulDiscovery = 0;
+  const queries: { source: "genre" | "artist"; query: string }[] = [
+    { source: specificRadioGenre(seed) ? "genre" as const : "artist" as const, query: radioQuery(seed) },
+    ...(artist ? [{ source: "artist" as const, query: `${artist} music audio` }] : []),
+  ].slice(0, RADIO_LIMITS.discoverySearches);
+  const reject = (reason: Rejection) => { diagnostic.rejected[reason]++; return false; };
+  const admit = (value: Track, source: RadioSource, related = false) => {
+    if (diagnostic.candidates >= RADIO_LIMITS.candidates) return false;
+    diagnostic.candidates++;
+    const track = { ...value };
+    // Provider/search metadata is not a relationship token. Only this pass can
+    // supply catalog proof after matching a named recording to the original seed.
+    delete track.radioRelatedTo;
+    if (!isRadioMusic(track) || track.concert) return reject("content");
+    if (input.requireEmbeddable && ((track.source ?? "youtube") !== "youtube" || !track.embeddable)) return reject("visibility");
+    if (!radioStyleCompatible(seed, track)) return reject("style");
+    if (!radioRelated(seed, track, related)) return reject("relationship");
+    if (ids.has(track.id)) return reject("excluded");
+    if (!ranker.rank([track], related).length) return reject("recording");
+    pool.push({ track, source, related, index: pool.length });
+    return true;
+  };
+
+  const known = [original, ...input.recent];
+  const descriptors = new Set<string>();
+  const discoverCatalog = async (source: "catalog" | "artist-catalog", limit: number) => {
+    const discover = source === "catalog" ? input.similar : input.topTracks;
+    if (!discover || !input.match || !artist) return;
+    let songs: CatalogSong[];
+    try {
+      songs = (await discover(original)).slice(0, RADIO_LIMITS.descriptors);
+    } catch (error) {
+      lastError = error;
+      diagnostic.stages[source] = "failed";
+      return;
+    }
+    const localDescriptors = new Set<string>();
+    const descriptorKey = (song: CatalogSong) => JSON.stringify([normalized(song.artist), normalized(song.title)]);
+    const eligible = songs.filter(song => {
+      if (!song || typeof song.title !== "string" || typeof song.artist !== "string" ||
+        !song.title.trim() || !song.artist.trim() || !isRadioTitle(song.title)) return false;
+      if (source === "artist-catalog" && normalized(song.artist) !== normalized(artist)) return false;
+      const recording: Track = { ...original, id: "catalog", title: song.title, artist: `${song.artist} - Topic`, catalog: song };
+      const key = descriptorKey(song);
+      if (descriptors.has(key) || localDescriptors.has(key) || known.some(track => sameRadioSong(track, recording))) return false;
+      localDescriptors.add(key);
+      return true;
+    });
+    const favorite = (song: CatalogSong) => (input.favorites ?? []).some(name => normalized(name).includes(normalized(song.title)));
+    eligible.sort((a, b) => Number(favorite(b)) - Number(favorite(a)));
+    const before = pool.length;
+    const attemptsBefore = diagnostic.catalogMatches, failuresBefore = diagnostic.failedCatalogMatches;
+    for (const song of eligible) {
+      if (diagnostic.catalogMatches >= limit || diagnostic.catalogMatches >= RADIO_LIMITS.catalogMatches) break;
+      diagnostic.catalogMatches++;
+      descriptors.add(descriptorKey(song));
+      try {
+        const matched = await input.match(song);
+        successfulDiscovery++;
+        const raw = { ...matched };
+        delete raw.catalog;
+        const expected = { ...raw, title: song.title, artist: `${song.artist} - Topic`, catalog: song };
+        if (scoreMatch(song, raw) < 0.85 || !sameRadioRecording(expected, raw)) {
+          reject("catalog-match");
+          continue;
+        }
+        admit(matched, source, source === "catalog");
+      } catch (error) {
+        lastError = error;
+        diagnostic.failedCatalogMatches++;
+        reject("catalog-match");
+      }
+    }
+    const attempts = diagnostic.catalogMatches - attemptsBefore;
+    diagnostic.stages[source] = pool.length > before ? "selected" : attempts > 0 &&
+      diagnostic.failedCatalogMatches - failuresBefore === attempts ? "failed" : songs.length ? "filtered" : "empty";
+  };
+  await discoverCatalog("catalog", RADIO_LIMITS.similarMatches);
+  if (!pool.length) await discoverCatalog("artist-catalog", RADIO_LIMITS.catalogMatches);
+
+  // Both bounded discovery pools participate. An early same-artist catalog or
+  // genre hit cannot hide a later, equally supported and more diverse song.
+  const stagePriority: Record<StageResult, number> = { unavailable: 0, skipped: 0, failed: 1, empty: 2, filtered: 3, selected: 4 };
+  for (const { source, query } of queries) {
+    diagnostic.searches++;
+    let status: StageResult;
+    try {
+      // Keep hydration sequential: search adapters may share metadata caches
+      // without coalescing in-flight video requests from different queries.
+      const found = (await input.search(query)).slice(0, RADIO_LIMITS.searchResults);
+      successfulDiscovery++;
+      const before = pool.length;
+      for (const candidate of found) admit(candidate, source);
+      status = pool.length > before ? "selected" : found.length ? "filtered" : "empty";
+    } catch (error) {
+      lastError = error;
+      diagnostic.failedSearches++;
+      status = "failed";
+    }
+    if (stagePriority[status] > stagePriority[diagnostic.stages[source]]) diagnostic.stages[source] = status;
+  }
+
+  const recentArtists = input.recent.slice(-5).map(track => normalized(radioArtist(track)));
+  const seedArtist = normalized(artist), genre = specificRadioGenre(seed);
+  const favorite = (track: Track) => (input.favorites ?? []).some(name => normalized(name).includes(normalized(radioTitle(track))));
+  const quality = (item: typeof pool[number]) => genre && radioGenre(item.track) === genre || item.related ? 3 : 2;
+  const diversity = (track: Track) => {
+    const name = normalized(radioArtist(track));
+    return recentArtists.filter(value => value === name).length * 2 + Number(name === seedArtist);
+  };
+  const official = (track: Track) => /\b(official audio|official music video|provided to youtube)\b/i.test(track.title) || /Topic$|VEVO$/i.test(track.artist);
+  pool.sort((a, b) => quality(b) - quality(a) || diversity(a.track) - diversity(b.track) ||
+    Number(favorite(b.track)) - Number(favorite(a.track)) || Number(official(b.track)) - Number(official(a.track)) || a.index - b.index);
+  const chosen = pool[0];
+  if (chosen) return finish({ ...chosen.track, radioRelatedTo: original.id }, chosen.source);
+  diagnostic.outcome = !successfulDiscovery && lastError ? "provider-error" : diagnostic.candidates ||
+    diagnostic.rejected["catalog-match"] > diagnostic.failedCatalogMatches ? "filtered" : "empty";
+  return finish(null, null, diagnostic.outcome === "provider-error" ? lastError : undefined);
+}

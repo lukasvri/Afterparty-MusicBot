@@ -150,6 +150,8 @@ test("Last.fm radio applies video safety and the original genre even after catal
       { artist: "Old Artist", title: "Eighties", duration: 210 },
       { artist: "Third Artist", title: "Third", duration: 210 },
     ];
+    p.search = async () => [];
+    p.recommendations.topTracks = async () => [];
     p.matchSong = async (catalog) =>
       catalog.title === "Lesson"
         ? song("howto000001", "Martin Garrix - How to make Animals", [

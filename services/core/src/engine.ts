@@ -366,7 +366,10 @@ export class Engine extends EventEmitter {
       !this.queue.length;
     this.radioTask = (async () => {
       try {
-        const next = await this.providers.radio(original, [original.id, seed.id]);
+        // tick records a consumed entry before discovery. Only supply extra
+        // current context while that exact entry is not yet in played history.
+        const next = await this.providers.radio(original, [original.id, seed.id],
+          seed.entryId === this.lastEntry ? [] : [seed]);
         if (!valid()) return;
         if (next && this.validRadioTrack(original, next)) {
           this.radioError = "";

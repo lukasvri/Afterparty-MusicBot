@@ -37,6 +37,8 @@ flowchart TB
 
 Providers resolve playable sources and metadata. FFmpeg decodes, mixes and encodes audio for Discord. The engine owns the playback timeline, queue revisions, recovery and radio decisions. A shared extraction gate bounds concurrent media processes and prioritizes audio startup.
 
+[Radio 2.0](RADIO.md) uses one platform-neutral selection pipeline for Discord providers, browser rooms and the website fallback. Optional catalog and bounded search adapters supply candidates; shared policy checks content, recording identity, style, exclusions and playback capabilities before ranking them. The engine and room handlers retain final generation/revision checks and own all playback and persistence changes.
+
 Ordinary `/play` tracks are private Discord music. `/konsert` exposes concert state to the website. Public concert operations do not gain access to a guild's private tracks, requester information or administration.
 
 ## Browser rooms

@@ -268,7 +268,8 @@ for (const action of ["remove", "clear"] as const) {
     let searches = 0;
     a.e.current = original;
     a.e.queue = [];
-    a.e.providers.search = async () => ++searches === 1 ? [suggested] : [alternate, replacement];
+    a.e.providers.search = async query => query === 'Artist "Original"' ? [] :
+      ++searches <= 2 ? [suggested] : [alternate, replacement];
     try {
       await a.e.ensureRadio();
       assert.equal(a.e.queue[0]?.id, suggested.id);
@@ -282,7 +283,7 @@ for (const action of ["remove", "clear"] as const) {
       assert(persisted.radioHistory().some((track) => track.id === suggested.id));
       await assert.rejects(a.q.apply({ action, videoId: suggested.entryId, revision }, true), /endret/);
       await a.e.ensureRadio();
-      assert.equal(searches, 2);
+      assert.equal(searches, 4, "each shared selection compares its two bounded discovery pools");
       assert.deepEqual(a.e.queue.map((track) => track.id), [replacement.id]);
       assert.deepEqual(a.e.store.get<Track[]>("queue", []).map((track) => track.id), [replacement.id]);
     } finally { a.close(); }

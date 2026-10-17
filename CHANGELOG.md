@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.0: Radio 2.0: shared discovery and safer recovery
+
+2026-10-17
+
+- Radio uses one shared selection pipeline for Discord, browser rooms and the website fallback. It compares bounded recommendation and search pools before selecting, preserving the original song, matching style, manual queue priority and private server boundaries.
+- Known played or rejected recordings are filtered before catalog matching, so duplicate results no longer consume the limited playback lookups. Sparse results can fall back to the original artist, and empty recommendation caches expire sooner so a later retry can recover.
+- Automatic choices still reject unsafe content, conflicting styles and repeated recordings. Structured diagnostics distinguish empty providers, rejected candidates and lookup failures without recording song titles, room identifiers or credentials. Existing playback clocks, revision checks and cooldowns remain in effect.
+
 ## v2.1.6: Less repeated work in settings, queues and radio
 
 2026-10-17

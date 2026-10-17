@@ -7,20 +7,12 @@ import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
 import {
-  normalized,
   scoreMatch,
   mapLimited,
   type CatalogSong,
 } from "./matching.ts";
 export { normalized, scoreMatch } from "./matching.ts";
-import {
-  radioArtist,
-  radioQuery,
-  specificRadioGenre,
-  rankRadio,
-  songIdentity,
-  canPlayRadioTrack,
-} from "./radio.ts";
+import { selectRadio } from "./radio-pipeline.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
 export function youtubeId(query: string) {
@@ -406,68 +398,31 @@ export class Providers {
       ...skipped.filter((item) => Date.now() - item.at < 7 * 86400000),
     ].sort((a, b) => a.at - b.at).map((item) => item.track);
   }
-  async radio(seed: Track, excluded: string[]) {
+  async radio(seed: Track, excluded: string[], current: RadioTrack[] = []) {
     if (seed.live || seed.music === false) return null;
-    const recent = this.radioHistory(),
-      skipped = this.store.get<Record<string, number>>("radio-skips", {});
-    const banned = new Set([
-      ...excluded,
-      ...recent.map((t) => t.id),
-      ...Object.entries(skipped)
-        .filter(([, at]) => Date.now() - at < 7 * 86400000)
-        .map(([id]) => id),
-    ]);
-    if (this.recommendations.enabled) {
-      try {
-        const songs = await this.recommendations.similar(seed);
-        const favorites = this.store.favorites().map((f) => normalized(f.name));
-        songs.sort(
-          (a, b) =>
-            Number(favorites.some((f) => f.includes(normalized(b.title)))) -
-            Number(favorites.some((f) => f.includes(normalized(a.title)))),
-        );
-        const recentSongs = new Set([
-          songIdentity(seed),
-          ...recent.map(songIdentity),
-        ]);
-        for (const song of songs.slice(0, 4)) {
-          try {
-            const next = await this.matchSong(song);
-            if (
-              canPlayRadioTrack(seed, next) &&
-              rankRadio(seed, [next], recent, [...banned], true).length > 0 &&
-              next.id !== seed.id &&
-              !banned.has(next.id) &&
-              !recentSongs.has(songIdentity(next))
-            ) {
-              this.recommendationStatus = "lastfm";
-              return { ...next, radioRelatedTo: seed.id };
-            }
-          } catch {}
-        }
-      } catch {
-        this.recommendationStatus = "fallback";
-      }
-    }
-    if (seed.source === "soundcloud" && !seed.concert) {
-      const found = await resolveSoundcloud(
-        `sc:${radioArtist(seed)}`,
-        5,
-        (args) => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args),
-        5,
-      );
-      this.recommendationStatus = "soundcloud";
-      return rankRadio(seed, found, recent, [...banned])[0] ?? null;
-    }
-    const artist = radioArtist(seed);
-    if (!artist && !specificRadioGenre(seed)) return null;
-    const found = await this.search(radioQuery(seed), 20, true);
-    this.recommendationStatus = "artist";
-    return (
-      rankRadio(seed, found, recent, [...banned]).find((track) =>
-        canPlayRadioTrack(seed, track),
-      ) ?? null
-    );
+    const recent = [...this.radioHistory(), ...current];
+    const skipped = this.store.get<Record<string, number>>("radio-skips", {});
+    const banned = [...excluded, ...Object.entries(skipped)
+      .filter(([, at]) => Date.now() - at < 7 * 86400000).map(([id]) => id)];
+    const soundcloud = seed.source === "soundcloud" && !seed.concert;
+    const result = await selectRadio({
+      seed, recent, excluded: banned, requireEmbeddable: Boolean(seed.concert),
+      search: query => soundcloud
+        ? resolveSoundcloud(`sc:${query}`, 5,
+          args => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args), 5)
+        : this.search(query, 20, true),
+      ...(this.recommendations.enabled ? {
+        similar: (original: Track) => this.recommendations.similar(original),
+        topTracks: (original: Track) => this.recommendations.topTracks(original),
+        match: (song: CatalogSong) => this.matchSong(song),
+      } : {}),
+      favorites: this.store.favorites().map(favorite => favorite.name),
+      diagnose: diagnostic => console.info("core-radio", JSON.stringify(diagnostic)),
+    });
+    this.recommendationStatus = result.source === "catalog" || result.source === "artist-catalog"
+      ? "lastfm" : soundcloud ? "soundcloud" : "artist";
+    if (result.error) throw result.error;
+    return result.track;
   }
   async spotify(kind: string, id: string): Promise<CatalogSong[]> {
     return this.spotifyCatalog.load(

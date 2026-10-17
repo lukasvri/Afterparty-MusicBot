@@ -84,6 +84,7 @@ test('public Spotify embed fallback is retained while rate limits are not retrie
 test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions and falls back on provider failure',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{LASTFM_API_KEY:'test'}),seed=track();
+  p.search=async()=>[];p.recommendations.topTracks=async()=>[];
   p.recommendations.similar=async()=>[{title:'Other',artist:'Artist',duration:200},{title:'Favorite',artist:'Artist',duration:200}];
   p.matchSong=async song=>track('Artist - '+song.title,song.title);
   t.store.favorite('listener','Artist - Favorite','https://youtube.com/watch?v=Favorite');
@@ -97,6 +98,7 @@ test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions an
 test('concert radio falls back past incompatible recommendations to an embeddable video',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{LASTFM_API_KEY:'synthetic-key'}),seed={...track(),concert:true};
+  p.recommendations.topTracks=async()=>[];
   p.recommendations.similar=async()=>[{title:'Audio only',artist:'Artist',duration:200}];
   p.matchSong=async()=>({...track('Artist - Audio only','audio'),source:'soundcloud',embeddable:false});
   p.search=async()=>[{...track('Artist - Blocked','blocked'),embeddable:false},track('Artist - Next','next')];

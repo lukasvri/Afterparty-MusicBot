@@ -301,7 +301,7 @@ test("D1 radio refreshes old search metadata and excludes explicit non-music cat
       })) });
     };
     const { room } = await mutate(f.request, "TESTROOM", { action: "radio-prefetch", version: 1 });
-    assert.deepEqual(stages, ["search", "metadata"]);
+    assert.deepEqual(stages, ["search", "metadata", "search"], "Both discovery pools reuse fresh music-category metadata");
     assert.deepEqual(room.queue.map((video) => video.id), [next.id]);
     assert.equal(room.queue[0].music, true);
     assert(!JSON.stringify(room).includes("radioRelatedTo"));
@@ -504,6 +504,7 @@ test("D1 current-track radio retry preserves playback and sets a future cooldown
   const f = fixture();
   const now = Date.now;
   let time = now();
+  const startedAt = time;
   Date.now = () => time;
   try {
     await f.save("TESTROOM", { current: seed, queue: [], playing: true, position: 20,
@@ -514,7 +515,7 @@ test("D1 current-track radio retry preserves playback and sets a future cooldown
     assert.equal(room.current?.id, seed.id);
     assert.equal(room.playbackKey, "same-playback");
     assert.equal(room.playing, true);
-    assert.equal(room.position, 25);
+    assert.equal(room.position, 20 + (time - startedAt) / 1000);
     assert.deepEqual(room.queue.map(video => video.id), [next.id]);
     assert.equal(f.roomState().radioRetryAt, time + 15000);
   } finally { Date.now = now; f.close(); }
@@ -619,4 +620,45 @@ test("D1 empty early next cannot overwrite a concurrent radio-off command", asyn
     assert.deepEqual(f.roomState().queue, []);
     assert.equal(f.roomRow().version, 2);
   } finally { f.close(); }
+});
+
+test("D1 Radio 2.0 compares discovery pools without restarting current playback", async () => {
+  const f = fixture();
+  const originalNow = Date.now;
+  let time = originalNow();
+  const startedAt = time;
+  Date.now = () => time;
+  try {
+    const sameArtist = { ...seed, id: "same1234567", title: "Syn Cole - Another Song | Future House" };
+    const differentArtist = { ...seed, id: "other123456", title: "Another Artist - New Song | Future House" };
+    const videos = new Map([sameArtist, differentArtist].map(video => [video.id, video]));
+    const queries: string[] = [];
+    await f.save("TESTROOM", { current: seed, queue: [], radio: false, playing: true,
+      position: 20, playbackKey: "unchanged-playback" });
+    globalThis.fetch = async target => {
+      time += 250;
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search")) {
+        const query = url.searchParams.get("q") ?? "";
+        queries.push(query);
+        const id = query.includes("future house") ? sameArtist.id : differentArtist.id;
+        return Response.json({ items: [{ id: { videoId: id } }] });
+      }
+      return Response.json({ items: (url.searchParams.get("id") ?? "").split(",").flatMap(id => {
+        const video = videos.get(id);
+        return video ? [{ id, snippet: { title: video.title, channelTitle: video.artist, categoryId: "10" },
+          contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] : [];
+      }) });
+    };
+    const { room } = await mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 });
+    assert.equal(room.queue[0]?.id, differentArtist.id, "Compare eligible pools before choosing a repeat artist");
+    assert.equal(room.current?.id, seed.id);
+    assert.equal(room.playbackKey, "unchanged-playback");
+    assert.equal(room.position, 20 + (time - startedAt) / 1000, "Preparing radio preserves the advancing clock");
+    assert.equal(f.roomState().radioSeed?.id, seed.id);
+    assert.equal(f.roomState().queue[0]?.radioRelatedTo, seed.id);
+    assert(!("radioRelatedTo" in room.queue[0]), "Recommendation evidence stays private");
+    assert(queries.length <= 3, "Discovery has a bounded request budget");
+  } finally { Date.now = originalNow; f.close(); }
 });
