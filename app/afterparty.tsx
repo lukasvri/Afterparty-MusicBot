@@ -1439,7 +1439,7 @@ export default function Afterparty() {
               <div className="party-tools">
                 {room?.isHost && !discordMode && (
                   <button
-                    className="button subtle"
+                    className="button subtle room-radio-control"
                     aria-pressed={room.radio !== false}
                     disabled={pending}
                     onClick={() =>

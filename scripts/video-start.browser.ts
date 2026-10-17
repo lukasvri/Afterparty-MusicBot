@@ -952,7 +952,10 @@ test("unified settings preserve playback across mobile and desktop fullscreen", 
         const panel=el.getBoundingClientRect();
         const name=el.querySelector<HTMLInputElement>('.display-name input')!.getBoundingClientRect();
         const tv=el.querySelector('.tv-mode-button')!.getBoundingClientRect();
-        return panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= innerHeight &&
+        const controls=Array.from(el.querySelectorAll('.party-tools > button,.party-tools > label')).map(control=>control.getBoundingClientRect());
+        const controlsFit=controls.every((control,index)=>control.left>=panel.left && control.right<=panel.right &&
+          controls.slice(index+1).every(other=>!(control.left<other.right && control.right>other.left && control.top<other.bottom && control.bottom>other.top)));
+        return controlsFit && panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= innerHeight &&
           !(name.left < tv.right && name.right > tv.left && name.top < tv.bottom && name.bottom > tv.top);
       }), 'Fullscreen settings and nickname/TV controls must fit without overlap');
       if(process.env.SCREENSHOT_DIR) {
