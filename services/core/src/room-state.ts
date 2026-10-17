@@ -267,7 +267,11 @@ export function changeRoom(
     }
   } else if (action === "undo") {
     if (!state.undoQueue) throw new UserError("Ingen køendring å angre.");
-    const restored = state.undoQueue.filter((v) => v.id !== state.current?.id && (state.radio !== false || !v.radio));
+    // A manual re-add is the current explicit choice. Keep its metadata and
+    // manual status at the restored slot instead of resurrecting its radio copy.
+    const restored = state.undoQueue.map((saved) =>
+      state.queue.find((queued) => queued.id === saved.id && !queued.radio) ?? saved,
+    ).filter((v) => v.id !== state.current?.id && (state.radio !== false || !v.radio));
     const additions = state.queue.filter(
       (v) => !restored.some((saved) => saved.id === v.id),
     );
