@@ -342,6 +342,35 @@ test("removing a room suggestion suppresses its remaster and undo restores only 
   assert.deepEqual(restored.radioExcludedSongs?.map((track) => track.id), [otherRejected.id]);
 });
 
+for (const alternate of [false, true])
+test(`undo preserves exclusions for a manual ${alternate ? "alternate upload" : "rejected video"}`, async () => {
+  const rejected = song("reject00001", "Night", { radio: true });
+  const manual = alternate
+    ? song("manual00001", "Night (2024 Remaster)", { radio: false })
+    : { ...rejected, radio: false };
+  const suggestion = { ...next, radio: true };
+  const original = {
+    current: seed, queue: [manual, suggestion], playing: true, position: 0,
+    playbackKey: "unchanged-playback", radioExcluded: [rejected.id], radioExcludedSongs: [rejected],
+  };
+  const removed = changeRoom(original, { action: "remove", videoId: suggestion.id }, true, 12);
+  const restored = changeRoom(removed, { action: "undo" }, true, 15);
+  assert.deepEqual(restored.queue.map(track => track.id), [manual.id, suggestion.id]);
+  assert.equal(restored.queue[0].radio, false, "manual playback remains an explicit choice");
+  assert.deepEqual(restored.radioExcluded, [rejected.id]);
+  assert.deepEqual(restored.radioExcludedSongs, [rejected]);
+  assert.equal(restored.current?.id, seed.id);
+  assert.equal(restored.playbackKey, original.playbackKey);
+  assert.equal(restored.position, 15);
+  assert.equal(restored.playing, true);
+  assert.equal(restored.undoQueue, undefined);
+  const afterQueue = { ...restored, queue: [] };
+  assert.equal(await roomRecommendation(afterQueue, async () => [
+    rejected, song("copy0000001", "Night (2024 Remaster)"),
+  ]), null, "both the rejected video and another upload remain excluded from radio");
+  assert.deepEqual(original.radioExcluded, [rejected.id], "the input snapshot is not mutated");
+});
+
 test("radio history includes the last hundred tracks and skip suppression is scoped to its store", async () => {
   const first = fixture();
   const other = fixture();

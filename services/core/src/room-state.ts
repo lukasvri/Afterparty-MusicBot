@@ -275,11 +275,14 @@ export function changeRoom(
       throw new UserError(
         "Køen er for full til å angre. Fjern noen låter først.",
       );
+    const restoredSuggestions = restored.filter(
+      (track) => track.radio && !state.queue.some((queued) => queued.id === track.id),
+    );
     state.queue = [...restored, ...additions];
     // Undo is an explicit request to restore these suggestions. It lifts only
     // their removal exclusions; current/history validation still applies.
-    const restoredIds = new Set(restored.map((track) => track.id));
-    const restoredSongs = new Set(restored.map(songIdentity));
+    const restoredIds = new Set(restoredSuggestions.map((track) => track.id));
+    const restoredSongs = new Set(restoredSuggestions.map(songIdentity));
     state.radioExcluded = state.radioExcluded?.filter((id) => !restoredIds.has(id));
     state.radioExcludedSongs = state.radioExcludedSongs?.filter((track) => !restoredSongs.has(songIdentity(track)));
     state.queue = playableRoomQueue(state);
