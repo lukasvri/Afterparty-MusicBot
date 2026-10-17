@@ -137,7 +137,7 @@ try {
   await page.locator(".motion-toggle").click();
   assert((await sceneAnimations()) > 0, "The site's motion control must restore stage animation");
   await page.locator(".welcome-release").click();
-  await page.getByRole("heading", { name: "Discord video seeking and release readiness" }).waitFor();
+  await page.getByRole("heading", { name: "Unified settings and radio recovery" }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -168,6 +168,13 @@ try {
       return r.top >= 0 && r.bottom < innerHeight;
     }),
   );
+  assert.equal(await page.locator(".video-settings").count(), 1, "Empty rooms need the same settings panel");
+  await page.locator(".video-settings > summary").click();
+  assert(await page.getByRole("heading", {name:"Rominnstillingar", exact:true}).isVisible());
+  assert(await page.getByRole("heading", {name:"Køinnstillingar", exact:true}).isVisible());
+  assert(await page.getByRole("heading", {name:"Videoinnstillinger", exact:true}).isVisible());
+  assert(await page.getByRole("button", {name:"Synk nå", exact:true}).isDisabled(), "Empty rooms cannot resync a missing player");
+  await page.locator(".video-settings > summary").click();
   await page
     .getByRole("button", { name: /Legg.*Synthetic evening song/ })
     .click();
@@ -178,7 +185,25 @@ try {
   assert(await queued.isVisible(), "Manually queued track must be visible");
   assert.equal(await page.locator("#queue-tab .tab-count").innerText(), "1");
 
-  await page.locator(".room-options > summary").click();
+  await page.locator(".video-settings > summary").click();
+  assert.equal(await page.locator(".video-settings").count(), 1, "Room, queue and video share one panel");
+  assert.equal(await page.locator(".video-settings details").count(), 0, "Settings sections must not require nested disclosure controls");
+  for (const width of [360, 390, 1440]) {
+    await page.setViewportSize({width, height:900});
+    const geometry = await page.locator(".party-tools").evaluate(el => {
+      const name = el.querySelector<HTMLInputElement>(".display-name input")!.getBoundingClientRect();
+      const tv = el.querySelector(".tv-mode-button")!.getBoundingClientRect();
+      const panel = el.closest(".video-settings")!.getBoundingClientRect();
+      return { overlap: name.left < tv.right && name.right > tv.left && name.top < tv.bottom && name.bottom > tv.top,
+        contained: name.left >= panel.left && name.right <= panel.right && tv.left >= panel.left && tv.right <= panel.right,
+        overflow: document.documentElement.scrollWidth > innerWidth };
+    });
+    assert(!geometry.overlap, "The nickname field and TV button must not overlap");
+    assert(geometry.contained, "Settings controls must fit inside their panel");
+    assert(!geometry.overflow, "Open settings must fit the viewport");
+    if (process.env.SCREENSHOT_DIR) await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/settings-${width}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:390,height:844});
   const radio = page.getByRole("button", {name:"Radio på",exact:true});
   assert(await radio.isVisible(), "Radio must be available in room settings");
   await radio.click();
@@ -197,7 +222,6 @@ try {
     assert(visible,"Queued track must be inside the visible queue area");
   }
   await page.setViewportSize({width:390,height:844});
-  await page.locator(".room-options .queue-options summary").click();
   await page
     .getByRole("checkbox", { name: "Godkjenn gjestene sine låtønske" })
     .click();

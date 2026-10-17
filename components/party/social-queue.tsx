@@ -120,12 +120,18 @@ export function SocialQueue({
 
 export function QueueSettings({room,busy,onAction}:{room:Room;busy:boolean;onAction:(action:string,extra?:Record<string,unknown>)=>void}) {
  const {t}=useLanguage();
- return (      <details className="queue-options"><summary>{t("Køinnstillingar")}</summary>
+ return (      <div className="queue-options">
+      {room.isHost && room.mode !== "discord" && room.radio !== false && !room.queue.length && (room.current || !!room.history?.length) && (
+        <button className="button subtle" disabled={busy} onClick={() => onAction("radio", { enabled: true })}>
+          {t("Prøv radio igjen")}
+        </button>
+      )}
       <div className="queue-summary">
 
         {room.isHost && (
           <>
             <button
+              className="button subtle"
               disabled={busy || !room.queue.length}
               onClick={() => {
                 if (
@@ -136,7 +142,7 @@ export function QueueSettings({room,busy,onAction}:{room:Room;busy:boolean;onAct
             >
               {t("Tøm")}
             </button>
-            <button disabled={busy} onClick={() => onAction("undo")}>
+            <button className="button subtle" disabled={busy} onClick={() => onAction("undo")}>
               {t("Angre køendring")}
             </button>
           </>
@@ -160,6 +166,6 @@ export function QueueSettings({room,busy,onAction}:{room:Room;busy:boolean;onAct
           {t("Godkjenn gjestene sine låtønske")}
         </label>
       )}
-      </details>
+      </div>
 );
 }
