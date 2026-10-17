@@ -486,7 +486,7 @@ test("radio falls back to a second artist search and can restart after the last 
     assert.equal(resumed.current?.id, next.id);
     assert.equal(resumed.playing, true);
     assert.equal(queries.length, 2);
-    assert(queries.every(query => query.includes("future house")));
+    assert.deepEqual(queries, ['future house audio -"Feel Good"', "Syn Cole music audio"]);
   } finally { store.close(); }
 });
 
@@ -598,3 +598,70 @@ for (const skipFirst of [false, true]) test(`empty shared radio lookup persists 
     recovered.dispose();
   } finally { rooms.dispose(); store.close(); }
 });
+
+test("retrying radio during playback prepares a song without restarting the shared clock", async () => {
+  const { store, rooms, input } = setup();
+  try {
+    const room = rooms.load("TESTROOM");
+    room.state.playbackKey = "same-playback";
+    room.state.startsAt = 9000;
+    rooms.save(room);
+    rooms.search = async () => [next];
+    const retried = await rooms.control("TESTROOM", { ...input, action: "radio", enabled: true });
+    assert.equal(retried.current?.id, seed.id);
+    assert.equal(retried.position, 100);
+    assert.equal(retried.playbackKey, "same-playback");
+    assert.equal(retried.startsAt, 9000);
+    assert.equal(retried.playing, true);
+    assert.deepEqual(retried.queue.map(video => video.id), [next.id]);
+  } finally { rooms.dispose(); store.close(); }
+});
+
+test("an empty current-track radio retry reports an actionable failure and persists backoff", async () => {
+  const { store, rooms, input } = setup();
+  let calls = 0;
+  try {
+    rooms.search = async () => { calls++; return []; };
+    await assert.rejects(rooms.control("TESTROOM", { ...input, action: "radio", enabled: true }),
+      error => error instanceof Error && "status" in error && error.status === 422 && /Prøv radio igjen/.test(error.message));
+    const saved = rooms.load("TESTROOM");
+    assert.equal(saved.state.current?.id, seed.id);
+    assert.equal(saved.state.position, 100);
+    assert.equal(saved.state.playing, true);
+    assert.equal(saved.state.radioRetryAt, 25000);
+    assert.equal(saved.version, 2);
+    await rooms.tick();
+    assert.equal(calls, 2, "the failed explicit retry cannot immediately trigger an automatic retry");
+    rooms.search = async () => [next];
+    const recovered = await rooms.control("TESTROOM", { ...input, action: "radio", enabled: true, version: saved.version });
+    assert.equal(recovered.queue[0]?.id, next.id);
+  } finally { rooms.dispose(); store.close(); }
+});
+
+test("current-track radio retry rejects guests and stale callers before searching", async () => {
+  const { store, rooms, input } = setup();
+  try {
+    rooms.search = async () => { assert.fail("unauthorized retry spent a search"); };
+    for (const change of [{ actorHash: "guest" }, { version: 0 }])
+      await assert.rejects(rooms.control("TESTROOM", { ...input, ...change, action: "radio", enabled: true }),
+        error => error instanceof Error && "status" in error && [403, 409].includes(Number(error.status)));
+  } finally { rooms.dispose(); store.close(); }
+});
+
+for (const winner of ["add", "radio"])
+  test(`a late radio retry cannot override a newer ${winner} command`, async () => {
+    const { store, rooms, input } = setup();
+    const gate = deferred<RoomVideo[]>();
+    try {
+      rooms.search = async () => gate.promise;
+      const pending = rooms.control("TESTROOM", { ...input, action: "radio", enabled: true });
+      const rejected = assert.rejects(pending, error => error instanceof Error && "status" in error && error.status === 409);
+      rooms.mutate("TESTROOM", { ...input, action: winner, enabled: false, video: next });
+      gate.resolve([next]);
+      await rejected;
+      const current = rooms.snapshot("TESTROOM");
+      assert.equal(current.current?.id, seed.id);
+      assert.equal(current.radio, winner !== "radio");
+      assert.deepEqual(current.queue.map(video => video.id), winner === "add" ? [next.id] : []);
+    } finally { rooms.dispose(); store.close(); }
+  });

@@ -79,7 +79,7 @@ export function needsRecommendation(
   const actor = String(input.participantHash ?? "");
   return (
     input.action === "next" || input.action === "radio-prefetch" ||
-    (input.action === "radio" && input.enabled === true && !state.current) ||
+    (input.action === "radio" && input.enabled === true) ||
     Boolean(
       input.action === "skip-vote" &&
       state.current &&
@@ -217,7 +217,13 @@ export function changeRoom(
     if (action === "radio") {
       state.radio = input.enabled;
       if (!input.enabled) state.queue = state.queue.filter(track => !track.radio);
-      if (input.enabled && !state.current && recommended) advance();
+      if (input.enabled) {
+        if (!state.current && recommended) advance();
+        else if (!state.queue.length) {
+          if (recommended) state.queue.push({ ...recommended, radio: true });
+          state.radioRetryAt = Number(input.now ?? 0) + 15000;
+        }
+      }
     }
     else state.approvalRequired = input.enabled;
   } else if (action === "approve" || action === "reject") {

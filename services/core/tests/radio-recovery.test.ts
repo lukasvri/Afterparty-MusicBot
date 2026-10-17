@@ -88,3 +88,47 @@ test("provider failure remains different from a successful empty search", async 
   await assert.rejects(roomRecommendation(state, async () => { throw new Error("provider unavailable"); }), /provider unavailable/);
   assert.equal(await roomRecommendation(state, async () => []), null);
 });
+
+test("artist fallback rejects irrelevant videos and repeated recordings after an empty genre search", async () => {
+  const specific = video("specific003", "Lensko - Let's Go! [Electro House]");
+  const previous = video("previous001", "Lensko - Previous Song");
+  const unsafe = [
+    video("wrongnext01", "Unrelated Artist - Untagged Song"),
+    video("wrongnext02", "Lensko - Production Lesson [Electro House]"),
+    video("wrongnext03", "Lensko - Let's Go! (2024 Remaster)"),
+    video("wrongnext04", "Lensko - Previous Song (Official Audio)"),
+    { ...video("wrongnext05", "Lensko - New Song"), music: false },
+    { ...video("wrongnext06", "Lensko - New Song"), embeddable: false },
+    video("wrongnext07", "Lensko - New Song [Tech House]"),
+    video("excluded001", "Lensko - Removed Song"),
+  ];
+  const diagnostics: unknown[] = [];
+  const result = await roomRecommendation({ current: specific, queue: [], radio: true,
+    history: [previous], radioExcluded: ["excluded001"] },
+    async query => query.startsWith("Lensko ") ? unsafe : [],
+    diagnostic => diagnostics.push(diagnostic));
+  assert.equal(result, null);
+  assert.deepEqual(diagnostics, [{ outcome: "filtered", seedGenre: "electro house", artistKnown: true,
+    metadata: "unchanged", searches: 2, failedSearches: 0, candidates: unsafe.length }]);
+});
+
+test("sanitized diagnostics distinguish empty searches, provider errors and missing seed evidence", async () => {
+  const specific = video("specific004", "Lensko - Let's Go! [Electro House]");
+  const diagnostics: unknown[] = [];
+  const diagnose = (value: unknown) => diagnostics.push(value);
+  await roomRecommendation({ current: specific, queue: [] }, async () => [], diagnose);
+  await assert.rejects(roomRecommendation({ current: specific, queue: [] }, async () => {
+    throw new Error("private provider detail must never be logged");
+  }, diagnose));
+  await roomRecommendation({ current: { ...specific, title: "Unknown song", genres: ["house"] }, queue: [] }, async () => {
+    assert.fail("insufficient metadata should not trigger provider searches");
+  }, diagnose);
+  assert.deepEqual(diagnostics, [
+    { outcome: "empty", seedGenre: "electro house", artistKnown: true, metadata: "unchanged", searches: 2, failedSearches: 0, candidates: 0 },
+    { outcome: "provider-error", seedGenre: "electro house", artistKnown: true, metadata: "unchanged", searches: 2, failedSearches: 2, candidates: 0 },
+    { outcome: "insufficient-metadata", seedGenre: "house", artistKnown: false, metadata: "unchanged", searches: 0, failedSearches: 0, candidates: 0 },
+  ]);
+  assert(!JSON.stringify(diagnostics).includes("private provider detail"));
+  assert(!JSON.stringify(diagnostics).includes(specific.title));
+  assert(!JSON.stringify(diagnostics).includes(specific.id));
+});
