@@ -87,7 +87,7 @@ offline tests. They do not start the bot:
 ```bash
 npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
 node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
-node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts
+node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts
 ```
 
 The harness selects the platform's release executable, including `.exe` on
@@ -162,8 +162,8 @@ channel. A producer that leaves an incomplete request open, or a consumer that
 never drains stdout, can block it indefinitely. The parent owns timeout,
 cancellation and process cleanup. Closing stdin requests graceful completion
 after complete queued requests; stopping a blocked worker requires terminating
-the child. These are explicit experiment limits, not a production recovery
-strategy.
+the child. The isolated parent below now exercises these responsibilities. It remains an
+experiment, not a production recovery strategy.
 
 ### Validation and next decision
 
@@ -187,3 +187,78 @@ copies, scheduling, FFmpeg children, Opus encoding, concurrent guilds, tail
 latency and failure recovery still need whole-pipeline measurements before a
 Rust adoption decision. Keep the TypeScript implementation as the production
 path until that separate review.
+
+
+## Bounded parent and process lifecycle
+
+`experiments/rust-audio/worker-client.ts` is an offline TypeScript parent for the
+Rust executable. Production Core does not import or launch it. It allows one
+outstanding request, rejects concurrent requests instead of growing a queue,
+validates full response headers, IDs and exact frame sizes, and caps stored
+stderr at 4 KiB. The one pending request bounds submitted input to 7,712 bytes
+and accumulated reply data to 3,856 bytes. Node and OS pipe buffers are additional.
+
+Each request has a configurable deadline (default 1 second), including child
+startup for the first request. Cancellation, malformed output, stream errors,
+spawn failure, unexpected exit and deadline expiry terminate the child. Pending
+calls reject only after the child's `close` event confirms process exit and pipe
+closure. `close()` drains an idle worker through stdin EOF, with forced
+termination if it ignores EOF; closing during a request cancels that request.
+Timers and abort listeners are removed on completion. Pre-aborted or locally
+invalid inputs leave a healthy worker reusable.
+
+Failure is terminal. To retry, explicitly construct a new parent; there is no
+automatic replay, process restart or production fallback. The Rust worker spawns
+no descendants. This parent terminates only its direct child, and is not a
+process-tree supervisor for FFmpeg or any future subprocess pipeline.
+
+The lifecycle tests run both real Rust parity requests and synthetic child
+processes that hang, ignore EOF, crash, truncate replies, flood output or send
+invalid headers/IDs. They verify that rejected requests have reaped the child,
+that concurrent work is bounded, and that cancellation and repeated shutdown
+complete. Linux and Windows CI run the same harness on Rust stable and 1.85.0.
+
+## Measuring the process boundary
+
+After building the release executable and installing Core dependencies:
+
+```bash
+node experiments/rust-audio/benchmark.ts 5000
+```
+
+This uses the actual Core TypeScript mixer and a persistent Rust worker on the
+same synthetic two-frame crossfade. It warms each path with 500 frames, verifies
+byte parity before measurement, then reports 5,000 serial calls per path with
+wall time, throughput, per-call p50/p95/p99/max latency, first-reply startup cost
+and **parent-only** CPU time. Child CPU is excluded from the reported CPU field;
+throughput and latency include IPC and Rust execution. The benchmark has no
+performance pass/fail threshold because shared runners are noisy. It is an
+inspectable measurement, not proof of reduced whole-pipeline CPU or latency.
+
+A serial IPC call includes allocation, copies, protocol validation, pipe I/O,
+Rust mixing and event-loop scheduling. Compare this total against the 20 ms
+frame budget and against TypeScript before proposing adoption. In-process Rust
+mixing speed by itself cannot establish a useful production improvement.
+
+### Observed cloud run, 17 October 2026
+
+One Linux x64 shared-runner observation used Node v24.19.0, Rust stable 1.99.1
+release build and an AMD EPYC 9V74 CPU, with 20,000 frames after warmup:
+
+| Metric | Core TypeScript | Persistent Rust IPC |
+| --- | ---: | ---: |
+| Wall time | 836.24 ms | 1,108.57 ms |
+| Frames/second | 23,916.7 | 18,041.2 |
+| Per-call p50 | 0.0338 ms | 0.0356 ms |
+| Per-call p95 | 0.0635 ms | 0.0874 ms |
+| Per-call p99 | 0.1061 ms | 0.4089 ms |
+| Maximum call | 10.9614 ms | 8.2640 ms |
+| Parent CPU | 781.41 ms | 597.38 ms |
+
+Rust's process startup through its first reply took 8.789 ms. The IPC path took
+about 33% more total wall time than TypeScript in this run. Parent CPU excludes
+Rust child execution and cannot establish a CPU saving. This single synthetic
+shared-runner observation supports keeping the current TypeScript production
+path; it does not predict concurrent-guild or real Discord performance. Rerun
+the command on the intended host with production playback stopped before using
+these numbers for a decision.
