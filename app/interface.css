@@ -1,8 +1,7 @@
 /* Shared control geometry and colour. Display type belongs to headings only. */
-:root{--accent:#ff263e;--red-button:#d71931;--font-body:Afterparty,Arial,Helvetica,sans-serif;--muted:#b6b6bd;--line:#343438}
 button,input,select,textarea{font-family:var(--font-body)}
 button>svg,a>svg,summary>svg{flex-shrink:0}
-:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:4px}
 .stage-panel:focus{outline:none}
 .brand,.studio-shell .brand{flex-shrink:0;gap:10px;font-family:var(--font-display);font-size:23px;font-weight:900;letter-spacing:-1px;line-height:1.1}
 .brand-mark,.studio-shell .brand-mark{width:48px;height:48px;flex:0 0 48px;transform:none;background:#111113;color:#fff;border-radius:13px;display:grid;place-items:center}
@@ -60,6 +59,51 @@ button>svg,a>svg,summary>svg{flex-shrink:0}
 .led-orbit{transform-origin:0 0;animation:led-orbit 32s linear infinite}.led-orbit-inner{transform-origin:0 0;animation:led-orbit 24s linear infinite reverse}@keyframes led-orbit{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.led-orbit,.led-orbit-inner{animation:none}}
 
 .stage-panel[data-immersive=true] .stage[data-current=true] .stage-intro h2{font:600 clamp(20px,2.4vw,32px)/1.35 var(--font-body);letter-spacing:0;max-width:760px;-webkit-line-clamp:2;text-shadow:0 2px 16px #000}.stage-panel[data-immersive=true] .stage[data-current=true] .stage-intro{bottom:30%;left:7%;max-width:85%}.stage-panel[data-immersive=true] .stage[data-current=true] .stage-intro p{font-size:14px;max-width:560px;color:#ddd}
+
+/* Shared surfaces and actions across rooms, administration and service pages. */
+.button,.icon-button,.mode-button,.language-switch { border-radius:var(--radius-control); }
+.button.primary,.concert-shell .primary { background:var(--red-button); border-color:var(--accent); }
+.button.subtle { border-color:var(--line); background:#ffffff03; }
+.button.subtle:hover:not(:disabled) { border-color:#696970; background:#ffffff09; }
+.sidebar,.concert-shell .sidebar { background:#0b0b0e; border-bottom-color:var(--line); }
+.admin-shell .admin-login,.admin-shell .admin-card,.admin-shell .bot-control,.admin-shell .admin-room,
+.room-directory,.open-room-card { border-color:var(--line); background:var(--panel); border-radius:var(--radius-panel); }
+.admin-shell .admin-login { box-shadow:none; }
+.admin-shell .admin-login>p { color:var(--muted); }
+.admin-shell .admin-login input,.admin-card input:not([type=checkbox]),.guild-select select,.admin-card select {
+  background:var(--bg); border-color:#505058; border-radius:var(--radius-control);
+}
+.admin-tabs button,.admin-tabs a { background:var(--panel); border-color:var(--line); border-radius:var(--radius-control); }
+.admin-tabs button[aria-pressed=true] { background:#ff263e0d; border-color:var(--accent); }
+.directory-heading p,.room-card-copy p,.room-card-copy small,.directory-empty p { color:var(--muted); }
+.open-room-card { background:var(--panel2); }
+.room-card-icon { border-radius:var(--radius-control); background:#ff263e10; color:var(--accent); }
+.patch-content>.studio-heading,.patch-entry { border-color:var(--line); }
+.patch-content>.studio-heading+p { margin-top:20px; max-width:720px; color:var(--muted); font-size:14px; line-height:1.7; }
+.patch-body h2 { font-size:23px; font-weight:650; line-height:1.35; }
+.patch-body li { font-size:14px; line-height:1.75; color:#ceced5; }
+.patch-stamp time { color:var(--muted); font-size:12px; }
+.patch-stamp>span { font-variant-numeric:tabular-nums; }
+.patch-shell .studio-foot,.admin-shell .studio-foot { border-color:var(--line); background:transparent; }
+.nav-link { white-space:nowrap; }
+
+@media(max-width:650px) {
+  /* All pages use the same compact mark and one-line navigation. */
+  .brand,.studio-shell .brand,.concert-shell .brand { font-size:17px; gap:8px; letter-spacing:-.5px; }
+  .brand-mark,.studio-shell .brand-mark,.concert-shell .brand-mark { width:36px; height:36px; flex-basis:36px; }
+  .sidebar,.concert-shell .sidebar,.studio-shell .sidebar { height:70px; padding:0 16px; gap:8px; }
+  .sidebar .nav-link,.studio-shell .sidebar .nav-link,.concert-shell .sidebar .nav-link { min-height:44px; padding:12px 6px; font-size:11px; }
+  .sidebar .nav-link>svg { display:none; }
+  .language-switch button { min-height:44px; }
+  .concert-shell .top-actions>.button,.admin-shell .topbar .button { min-height:44px; }
+  .directory-heading>.button,.room-directory>footer>.button { min-height:44px; }
+  .admin-shell .admin-login { padding:28px 22px; margin:32px auto 48px; }
+  .admin-shell .admin-login h1 { font-size:clamp(36px,10vw,48px); }
+  .admin-shell .admin-login>p { font-size:14px; }
+  .patch-body h2 { font-size:21px; }
+  .patch-body li { font-size:14px; }
+  .patch-stamp time { font-size:12px; }
+}
 
 /* Empty queue: a centred composition, independent of queue tab styles. */
 .concert-shell .library-panel .empty-queue{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:270px;padding:30px 18px 34px;text-align:center;box-sizing:border-box}

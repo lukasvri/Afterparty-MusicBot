@@ -71,6 +71,7 @@ export function Sidebar({
         </Link>
         <Link prefetch={false} target="_top"
           className={admin ? "nav-link active" : "nav-link"}
+          aria-current={admin ? "page" : undefined}
           href="/admin"
         >
           <ShieldCheck size={17} /> Admin

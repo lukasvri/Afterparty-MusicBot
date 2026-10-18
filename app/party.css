@@ -432,13 +432,13 @@ button:disabled {
     min-height: 48px;
     border: 0;
     border-radius: 6px;
-    background: #281b23;
+    background: var(--panel2);
     color: #fff;
     font-size: 13px;
   }
   .mobile-party-nav button:hover,
   .mobile-party-nav button:focus-visible {
-    background: #5b2535;
+    background: #ff263e24;
   }
   .concert-shell .toast {
     bottom: 90px;
@@ -526,7 +526,7 @@ button:disabled {
 .welcome-discord:hover { border-color:#ff536780; background:#21171b; }
 .welcome-offline { padding-top:16px; font-size:13px; }
 .welcome-join:hover,.welcome-release:hover .release-link { color:#ff8a9a; }
-.start-evening :is(button,a):focus-visible { outline:2px solid #ffa4b1; outline-offset:5px; }
+.start-evening :is(button,a):focus-visible { outline:2px solid var(--focus-ring); outline-offset:5px; }
 .concert-shell[data-empty="true"] .stage:not([data-current="true"]) { aspect-ratio:16/9; min-height:0; }
 .concert-shell .stage .concert-venue { width:100%; height:100%; left:0; overflow:hidden; }
 @media(max-width:1000px) {
@@ -558,7 +558,7 @@ button:disabled {
 .settings-tabs { display:flex; gap:4px; padding:4px; border-radius:10px; background:#ffffff08; }
 .settings-tabs [role=tab] { flex:1; min-width:0; min-height:44px; padding:8px; border:1px solid transparent; border-radius:7px; background:transparent; color:#bfb4ba; font:600 13px/1.4 var(--font-body); cursor:pointer; }
 .settings-tabs [role=tab][aria-selected=true] { background:#ff263e18; border-color:#ff263e66; color:#fff; }
-.settings-tabs [role=tab]:focus-visible { outline:2px solid #ff788a; outline-offset:2px; }
+.settings-tabs [role=tab]:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 .video-settings .settings-section h3 { margin:0; font:600 13px/1.5 var(--font-body); color:#fff; }
 .video-settings .party-tools { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:12px; margin:0; min-width:0; }
 .video-settings .party-tools > .button { min-width:0; min-height:44px; }

@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.5: Faster radio discovery and a more consistent interface
+
+2026-10-18
+
+- Radio fetches its two bounded discovery pools concurrently while preserving selection order and music safeguards. Overlapping cold video lookups share metadata work, retain independent playback entries and can recover after failures.
+- Core cleans up listeners, timers and any already opened server when startup fails to bind a port. Closing the service remains safe to repeat.
+- The stage has two matching DJ decks, a centered four-channel mixer and controls and hands aligned to one consistent perspective.
+- Shared dark surfaces, red accents, navigation proportions and keyboard focus make music, rooms, administration, support and patch notes more consistent on desktop and mobile.
+
 ## v2.2.4: Radio venue and artist-alias safeguards
 
 2026-10-18

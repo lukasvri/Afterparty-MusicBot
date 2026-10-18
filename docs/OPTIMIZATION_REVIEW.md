@@ -5,6 +5,9 @@ Reviewed on 17 October 2026 against `main` commit
 synthetic operation counts and a paired microbenchmark. It does not establish
 that every line, production workload or host has been profiled.
 
+A TypeScript-focused follow-up on 18 October 2026 is recorded below. Earlier
+measurements remain dated evidence from their original review.
+
 ## Scope and decisions
 
 | Area inspected | Selected work or retained contract |
@@ -120,3 +123,123 @@ Product notes follow the shared [release policy](RELEASING.md). Production data,
 configuration, deployment locks and recovery procedures are unchanged. No live
 Discord account, production database, merge or deployment was used for this
 audit. Owner approval remains required before merge, publication or deployment.
+
+## TypeScript follow-up, 18 October 2026
+
+Baseline: `5be83a8459e6e67c906e7957e49600500230a33a`, the reviewed head of
+PR #65. The owner merged it during this work; refreshed `main` `cde5afc` has
+the identical source tree and is incorporated before submission. This pass
+keeps its venue/Beatles safeguards and release entry. The owner paused Rust research;
+see [the recorded decision](AI_CONTEXT.md#architectural-boundaries). No Rust
+source is changed or promoted by this product work.
+
+### Radio discovery and metadata
+
+An observed regression test held the first discovery reply and found only one
+of the two independent searches had started. They now start concurrently but
+are admitted in original query order after both settle. All music, relationship,
+history, visibility and request/candidate limits remain in the shared selector.
+Provider failures remain independent, without private query/error data in logs.
+
+Three initial cold-provider tests reproduced duplicate metadata requests for
+overlapping IDs, distinct search queries and unavailable fallback. Core now
+coalesces pending outcomes per ID, keeping strict/tolerant caller interpretation
+outside the shared operation and cloning returned entry/genre/catalog data.
+The nine new tests also cover actual `Providers.radio`, failure/retry, successful
+API omissions, capacity/recovery, 131 IDs in sequential 50/50/31 batches and
+three-worker extractor limits. An additional red test during review exposed a
+whole-batch completion barrier: a fast shared ID waited for an unrelated slow
+fallback. Per-ID completion removes that barrier as well.
+
+The [paired timing harness](../services/core/benchmarks/radio-discovery.ts)
+loads the exact baseline selector from its local Git object and compares it
+with the changed selector using the same unchanged policy helpers. Specific
+seed metadata and no catalog callbacks isolate only the two discovery pools.
+Each call injects 25/35 ms provider waits, checks the same selected track/source
+and two calls, and records peak concurrent calls. Two warmup pairs precede five
+alternating measured pairs. The [raw capture](../services/core/benchmarks/results/radio-discovery-20261018.json)
+includes source hashes, exact baseline, runtime, hardware and all observations.
+
+| Controlled operation | Before | After |
+| --- | ---: | ---: |
+| Discovery calls per selection | 2 | 2 |
+| Peak independent discovery calls | 1 | 2 |
+| Median controlled discovery elapsed, ms | 78.4082 | 46.2744 |
+| Cold metadata work for one ID shared by two queries | 2 | 1 |
+
+The first three rows use the controlled timing fixture; the last is a separate
+actual provider counter regression, not a timing claim. Windows timer
+quantization means injected 25/35 ms waits need not complete in exactly those
+durations. The measurements demonstrate critical-path overlap on one development
+host, not real YouTube/Last.fm latency, provider quotas, end-to-end audio or
+audible quality. Metadata learning and catalog matching remain outside this
+timing fixture and retain their existing sequencing.
+
+### Startup recovery
+
+Four isolated startup failures reproduced three retained intervals, one bound
+sibling HTTP server and engine/guild listeners when the other bind failed.
+The server now waits for all attempted binds to settle before rolling back the
+same owned resources as normal shutdown. Startup rollback terminates upgraded
+clients and HTTP connections; normal shutdown retains its existing close
+semantics. The original bind/invalid-port error is preserved. Repeated close
+calls share the same cleanup promise rather than returning early.
+
+Eight new cases cover either/both occupied ports and synchronous invalid-port
+errors in single-engine and multi-guild mode, exact freed-port reuse, listener
+and interval baselines, room/WebSocket disposal, private access after recovery
+and repeated close. This strengthens the constructor/recovery contract; it is
+not a measured CPU saving or a claim that a fatal process would retain ports
+after exiting.
+
+### Interface scope and remaining limits
+
+The UI pass uses the canonical black/white/red identity, shared self-hosted
+typography and control/focus tokens across music, rooms, administration and
+service pages. The stage uses matched decks and one projected mixer plane;
+SVG geometry is verified by actual local renders, not described as photographic
+realism. Player, clock and permission logic is unchanged by these visual edits.
+See [branding](BRANDING.md#shared-interface-language) and the PR for actual
+desktop/mobile and language checks, screenshots and final submitted-head CI.
+
+Deferred opportunities remain explicit: cancelling stale engine lookups and
+autocomplete work needs subscriber-safe provider cancellation; long-station
+cache replenishment needs request-cost evidence; the decoder fragment deadline
+needs its own reproduction. No broad timeout or music-policy change is hidden
+in this pass. PR #65 is already merged into refreshed main, and its 2.2.4 release
+entry is preserved below this patch's 2.2.5 entry. No production access, merge, publication or deployment
+is performed here.
+
+### Validation for this pass
+
+Locked setup, zero-warning lint, both application typechecks, all 112 website
+unit tests, release/diff validation and the production build passed locally.
+Core passed 380/381 tests including local FFmpeg; its existing POSIX
+stalled-decoder executable cannot spawn on Windows. Required `check:all` stops
+at four existing Python import errors requiring POSIX `fcntl`. Remaining checks
+ran explicitly. The PR records Linux CI on the exact submitted head, rather
+than treating those local platform limits as a green full-suite result.
+
+Actual Chromium-family browser checks passed all 27 video-start/playback cases
+and four synchronization cases, including local Core/FFmpeg integration, plus
+party, admin, admin-seek, concert-queue and service-page workflows. All synthetic
+checks used isolated API/transport data. The design audit captured 24 genuine
+before contexts and 36 after contexts: nine surfaces, both UI language settings,
+390 px mobile and 1440 px desktop. The extra install/privacy/terms contexts are
+after-only, and those service pages retain their existing English content.
+Keyboard/dialog focus, 44 px mobile navigation/actions, reduced motion, equal
+projected deck dimensions and player identity across tabs/settings passed.
+
+Latest-release navigation and the 2.2.5 patch-notes title, date and all four
+bullets were rendered and visually inspected at both widths. Selected sanitized
+[DJ before](assets/dj-console-before-20261018.png)/[after](assets/dj-console-after-20261018.png)
+and [mobile admin before](assets/admin-mobile-before-20261018.png)/[after](assets/admin-mobile-after-20261018.png)
+are retained with [provenance](assets/README.md). Authenticated administration
+uses synthetic fixtures; no real account, live listening or production health
+claim follows from these checks.
+
+The raw Node preview logged an unsupported `cloudflare:` module request for a
+Worker-only server route. That preview has no Cloudflare bindings: browser API
+responses were intercepted fixtures, and D1 handlers were checked separately
+through the isolated SQL adapter. The visual checks do not validate real Worker
+routes, OAuth or a deployed website backend.

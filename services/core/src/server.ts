@@ -108,7 +108,6 @@ export async function createServers(
   });
   const rate = new Map<string, { until: number; count: number }>(),
     sessions = new Map<string, number>();
-  let closing = false;
   let rejectedUpgrades = 0;
   const upgradeOrigins = new Set<string>();
   const eventClients = new Set<ServerResponse>();
@@ -871,31 +870,9 @@ export async function createServers(
     server.headersTimeout = 10000;
     server.on("clientError", (_e, socket) => socket.destroy());
   }
-  await Promise.all(
-    [
-      [publicServer, options.publicPort ?? 3990],
-      ...(options.adminPort === false
-        ? []
-        : [[adminServer, options.adminPort ?? 3847]]),
-    ].map(
-      ([server, port]) =>
-        new Promise<void>((resolve, reject) => {
-          (server as typeof publicServer).once("error", reject);
-          (server as typeof publicServer).listen(
-            port as number,
-            options.host ?? "0.0.0.0",
-            resolve,
-          );
-        }),
-    ),
-  );
-  return {
-    publicServer,
-    adminServer,
-    wss,
-    close: async () => {
-      if (closing) return;
-      closing = true;
+  let closePromise: Promise<void> | undefined;
+  const close = (failedStartup = false) =>
+    (closePromise ??= (async () => {
       clearInterval(heartbeat);
       clearInterval(roomClock);
       clearInterval(roomAdvance);
@@ -906,17 +883,59 @@ export async function createServers(
         source.off("state", listeners.state);
         source.off("clock", listeners.clock);
       }
+      subscriptions.clear();
       options.guilds?.off("added", added);
       options.guilds?.off("removed", removed);
-      for (const ws of wss.clients) ws.close(1001);
+      for (const ws of wss.clients) {
+        if (failedStartup) ws.terminate();
+        else ws.close(1001);
+      }
       wss.close();
       for (const client of eventClients) client.end();
       eventClients.clear();
       await Promise.all(
         [publicServer, adminServer].map(
-          (server) => new Promise<void>((r) => server.close(() => r())),
+          (server) => new Promise<void>((r) => {
+            server.close(() => r());
+            if (failedStartup) server.closeAllConnections();
+          }),
         ),
       );
-    },
-  };
+    })());
+  // Settle every attempted bind before rollback, otherwise a later successful
+  // listen could reopen a server after the first bind has already failed.
+  const listening = await Promise.allSettled(
+    [
+      [publicServer, options.publicPort ?? 3990],
+      ...(options.adminPort === false
+        ? []
+        : [[adminServer, options.adminPort ?? 3847]]),
+    ].map(([value, port]) => {
+      const server = value as typeof publicServer;
+      return new Promise<void>((resolve, reject) => {
+        const onError = (error: Error) => {
+          server.off("listening", onListening);
+          server.off("error", onError);
+          reject(error);
+        };
+        const onListening = () => {
+          server.off("error", onError);
+          resolve();
+        };
+        server.once("error", onError);
+        server.once("listening", onListening);
+        try {
+          server.listen(port as number, options.host ?? "0.0.0.0");
+        } catch (error) {
+          onError(error as Error);
+        }
+      });
+    }),
+  );
+  const failure = listening.find(result => result.status === "rejected");
+  if (failure) {
+    await close(true);
+    throw failure.reason;
+  }
+  return { publicServer, adminServer, wss, close: () => close() };
 }
