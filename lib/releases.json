@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.2.3",
+    "date": "2026-10-18",
+    "title": "Radio fixes from real catalog testing",
+    "items": [
+      "Automatic radio can keep studio songs such as Live Forever and Cover Me while still rejecting live, cover and instructional upload labels. Existing duration and music-category limits remain in effect.",
+      "Artist names containing commas stay intact, and recordings by different known artists can share a song title without excluding one another. Alternate uploads and remasters by the same artist remain blocked as repeats.",
+      "Radio recognizes explicit R&B and DnB genre aliases without treating free-form artist tags such as Daft Punk as genre evidence. Core and website metadata caches refresh under the corrected interpretation."
+    ]
+  },
+  {
     "version": "2.2.2",
     "date": "2026-10-18",
     "title": "Manual requests replace radio at queue capacity",

@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.3: Radio fixes from real catalog testing
+
+2026-10-18
+
+- Automatic radio can keep studio songs such as Live Forever and Cover Me while still rejecting live, cover and instructional upload labels. Existing duration and music-category limits remain in effect.
+- Artist names containing commas stay intact, and recordings by different known artists can share a song title without excluding one another. Alternate uploads and remasters by the same artist remain blocked as repeats.
+- Radio recognizes explicit R&B and DnB genre aliases without treating free-form artist tags such as Daft Punk as genre evidence. Core and website metadata caches refresh under the corrected interpretation.
+
 ## v2.2.2: Manual requests replace radio at queue capacity
 
 2026-10-18

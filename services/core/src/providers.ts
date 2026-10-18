@@ -80,7 +80,7 @@ export class Providers {
       missing: string[] = [];
     for (const id of ids) {
       const cached = this.store.get<{ at: number; track: Track } | null>(
-        "metadata:v3:" + id,
+        "metadata:v4:" + id,
         null,
       );
       if (cached && Date.now() - cached.at < 86400000)
@@ -89,7 +89,7 @@ export class Providers {
     }
     const remember = (track: Track) => {
       found.set(track.id, track);
-      this.store.set("metadata:v3:" + track.id, { at: Date.now(), track });
+      this.store.set("metadata:v4:" + track.id, { at: Date.now(), track });
     };
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
@@ -158,7 +158,7 @@ export class Providers {
   }
   async search(query: string, count = 8, musicOnly = false): Promise<Track[]> {
     const key =
-        "search:v4:" +
+        "search:v5:" +
         JSON.stringify([
           query.trim().normalize("NFKC").toLowerCase(),
           count,
