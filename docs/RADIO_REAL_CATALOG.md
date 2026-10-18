@@ -171,6 +171,17 @@ This checks the handler lifecycle, not delivery of an operating-system console s
 
 ## Repeating metadata checks
 
+PR #64 review identified three additional parser/cache boundary regressions on
+the reviewed `dbec3d5` implementation. Controlled tests on its unchanged successor
+`fad79f3` reproduced qualified live/cover labels being admitted, compound taxonomy
+tags losing their genre, and still-valid private artist proof being lost after
+the 24-hour video cache expired before the seven-day catalog-match cache. These
+are synthetic review regressions, not additional live-provider observations.
+The focused suites cover safe studio names, free-form credit exclusions, changed
+recordings and expired proof. A D1 handler regression also checks cross-artist
+discovery from a compound specific genre while preserving playback and removing
+private proof from public state. Consult the PR for the final-head test results.
+
 `scripts/radio-catalog-probe.ts` does no network work without an explicit mode.
 Use `--live` only for a reviewed manifest of public video IDs and a controlled
 absolute yt-dlp executable path. It uses an empty provider environment, fresh

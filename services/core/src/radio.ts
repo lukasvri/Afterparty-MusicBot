@@ -56,6 +56,7 @@ export function isRadioTitle(title: string) {
     !/\S+\s+demo(?:\s+version)?\s*(?:[|\[(]|$)/i.test(title) &&
     !/(?:^|\s[-|\u2013\u2014]\s*)\s*(?:live|covers?)\s*[:|-]/i.test(title) &&
     !/\b(?:live|covers?)\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\b(?:live|covers?)\s+(?:official|music|audio|video|hd|hq|4k)(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
     !/\b(?:live|covers?)\s+(?:at|from|in|on|by|session|performance|version|recording)\b/i.test(text) &&
     !/\blive(?:\s+[\p{L}\p{N}]+){0,4}\s+(?:19|20)\d{2}\b/iu.test(title) &&
     !/^how to\s*:/i.test(title) &&
@@ -201,15 +202,18 @@ export function radioGenre(track: RadioTrack) {
   ];
   const labelText = (value: string) => normalize(value.replace(/\br\s*&\s*b\b/gi, "rnb"))
     .replace(/\bdrum bass\b|\bdnb\b/g, "drum and bass").replace(/\blofi\b/g, "lo fi");
-  const detected = labels.map(label => {
+  const detected = labels.flatMap(label => {
     const content = label.trim().replace(/^[([]|[\])]$/g, "").trim();
+    if (/^(?:feat(?:uring)?\.?|ft\.?)\s+/i.test(content)) return [];
     const explicit = /^(?:genre|style)\s*:/i.test(content);
-    const text = labelText(content.replace(/^(?:genre|style)\s*:\s*/i, ""));
     // Credits and song annotations are free-form text, not genre evidence.
-    // Whole labels may add "music"; explicitly named Genre:/Style: lines
-    // may contain additional labels without relying on an artist's name.
-    return genres.find(genre => text === labelText(genre) || text === `${labelText(genre)} music`)
-      ?? (explicit ? genres.find(genre => ` ${text} `.includes(` ${labelText(genre)} `)) : undefined);
+    // Taxonomy separators delimit complete labels, not words within names.
+    // Keep ampersands inside R&B and Drum&Bass; preserve existing priority.
+    return content.replace(/^(?:genre|style)\s*:\s*/i, "").split(/[/;,]/).map(component => {
+      const text = labelText(component);
+      return genres.find(genre => text === labelText(genre) || text === `${labelText(genre)} music`)
+        ?? (explicit ? genres.find(genre => ` ${text} `.includes(` ${labelText(genre)} `)) : undefined);
+    });
   });
   const found = genres.find(genre => detected.includes(genre));
   return found === "drum bass" || found === "dnb"

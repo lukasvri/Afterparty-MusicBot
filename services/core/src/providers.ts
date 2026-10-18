@@ -1,5 +1,5 @@
 import type {YouTubeResponses, ExtractedMedia} from "./external-types.ts";
-import { metadataGenres, metadataMusic, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
+import { metadataGenres, metadataMusic, radioArtist, radioTitle, sameRadioRecording, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
 import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
@@ -33,12 +33,30 @@ function extractedCatalogArtist(media: ExtractedMedia) {
   return { artist, ...(normalized(original) !== normalized(artist) &&
     normalized(original) === normalized(artists.join(", ")) ? { artistCredit: original } : {}) };
 }
-function matchedCatalog(song: CatalogSong, track: Track): CatalogSong {
+function cachedArtistCredit(song: CatalogSong, track: Track, cached: Track) {
+  const evidence = cached.catalog;
+  if (typeof evidence?.artistCredit !== "string" || !evidence.artistCredit.trim() ||
+    normalized(evidence.artist) !== normalized(song.artist) || cached.id !== track.id ||
+    (cached.source ?? "youtube") !== (track.source ?? "youtube") ||
+    !Number.isFinite(cached.duration) || cached.duration <= 0 ||
+    !Number.isFinite(track.duration) || track.duration <= 0) return;
+  const observedArtist = radioArtist(track) || track.artist.replace(/(?:\s*-\s*Topic|VEVO)$/i, "").trim();
+  if (normalized(observedArtist) !== normalized(song.artist)) return;
+  // API metadata has no private catalog. Compare its actual title/version and
+  // duration with the verified cached recording before restoring that proof.
+  const observed = { ...track, catalog: { artist: evidence.artist, title: radioTitle(track), duration: track.duration } };
+  return sameRadioRecording(cached, observed) ? evidence.artistCredit : undefined;
+}
+function matchedCatalog(song: CatalogSong, track: Track, cached?: Track): CatalogSong {
   const catalog = { ...song };
   delete catalog.artistCredit;
   const evidence = track.catalog;
   if (typeof evidence?.artistCredit === "string" && evidence.artistCredit.trim() &&
     normalized(evidence.artist) === normalized(song.artist)) catalog.artistCredit = evidence.artistCredit;
+  else if (cached) {
+    const credit = cachedArtistCredit(song, track, cached);
+    if (credit) catalog.artistCredit = credit;
+  }
   return catalog;
 }
 export function youtubeId(query: string) {
@@ -377,7 +395,7 @@ export class Providers {
     if (cached && Date.now() - cached.at < 7 * 86400000) {
       const fresh = (await this.video([cached.track.id]))[0];
       if (fresh && scoreMatch(song, fresh) >= 0.85)
-        return { ...fresh, catalog: matchedCatalog(song, fresh), entryId: randomUUID() };
+        return { ...fresh, catalog: matchedCatalog(song, fresh, cached.track), entryId: randomUUID() };
     }
     let candidates: Track[] = [];
     if (song.isrc && /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/i.test(song.isrc))

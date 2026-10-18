@@ -725,3 +725,31 @@ test("D1 refreshes both cached search and video genres after the free-form tag c
       .get(`videos:v2:${old.id}`)?.data))[0].genres, ["punk"], "Old cache is bypassed, not destructively migrated");
   } finally { f.close(); }
 });
+
+test("D1 compound genre labels retain specific cross-artist discovery and private proof", async () => {
+  const f = fixture();
+  try {
+    const original = { ...seed, title: "Seed Artist - Synthetic Original", artist: "Seed Artist",
+      genres: ["Drum & Bass/Jungle"], radio: false };
+    const candidate = { ...next, title: "Different Artist - Synthetic Next", artist: "Different Artist" };
+    await f.save("TESTROOM", { current: original, queue: [], playing: true, position: 20,
+      playbackKey: "compound-genre-playback" });
+    globalThis.fetch = async target => {
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search"))
+        return Response.json({ items: [{ id: { videoId: candidate.id } }] });
+      return Response.json({ items: [{ id: candidate.id,
+        snippet: { title: candidate.title, channelTitle: candidate.artist, categoryId: "10", tags: ["Drum & Bass/Jungle"] },
+        contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] });
+    };
+    const { room } = await mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 });
+    assert.equal(room.queue[0]?.id, candidate.id);
+    assert.deepEqual(room.queue[0]?.genres, ["drum and bass"]);
+    assert.equal(room.current?.id, original.id);
+    assert.equal(room.playbackKey, "compound-genre-playback");
+    assert(room.position >= 20 && room.position < 22);
+    assert.equal(f.roomState().queue[0]?.radioRelatedTo, original.id);
+    assert(!JSON.stringify(room).includes("radioRelatedTo"));
+  } finally { f.close(); }
+});

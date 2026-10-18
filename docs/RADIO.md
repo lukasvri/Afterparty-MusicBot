@@ -57,6 +57,8 @@ The yt-dlp fallback distinguishes a structured artist list from a comma inside o
 
 When validated complete credits match the original combined artist string, private catalog metadata retains that exact full-credit alias. Older persisted originals and recording history can still match it after artist refinement. One overlapping collaborator or a shared credit list does not establish artist identity. This requires no history migration, and catalog aliases stay out of public state.
 
+When a still-valid catalog match outlives its video metadata, a refresh may retain that cached private credit only for the same verified recording and canonical artist. A changed recording, source, version, featured credit or incompatible duration cannot inherit it. Untrusted aliases supplied by a catalog request are never proof.
+
 ## Music filtering
 
 Automatic candidates must be finite, non-live songs between 90 and 600 seconds. YouTube video metadata and the yt-dlp fallback retain explicit music-category evidence. A known non-music category excludes automatic selection, including on the website fallback; absent category metadata remains unknown and can use the other evidence above. Search and metadata cache versions prevent older results from bypassing this check. Manual playback remains available for non-music videos.
@@ -64,6 +66,8 @@ Automatic candidates must be finite, non-live songs between 90 and 600 seconds. 
 Searches, metadata learning, catalog matches and prepared radio entries reject instructional and non-song titles, including tutorials, procedural how-to phrases, production lessons, DAW projects, step-by-step videos, reactions, interviews, vlogs, gameplay, covers, remakes and long sets. Filtering uses the song portion after a recognized artist prefix, so an artist name such as The Trailer Park Troubadours is not mistaken for a trailer. Real song names such as Music, How To Love, Live Forever and Cover Me remain usable, including Topic uploads. Live and cover upload labels are checked in their format context; the provider's actual live flag still excludes a candidate.
 
 Provider genre evidence uses complete genre tags, optionally followed by `music`, or explicit Genre:/Style: description lines. A free-form artist tag such as `Daft Punk` is not a punk genre label. R&B and DnB aliases normalize to the existing R&B and drum and bass categories; broad R&B still does not prove cross-artist relevance. Updated Core and website cache versions bypass older parsed genres.
+
+Compound taxonomy tags split at slash, comma or semicolon boundaries before complete-label matching, so `Hip-Hop/Rap`, `R&B/Soul` and `Drum & Bass/Jungle` retain their recognized genre. Existing genre priority and broad-genre restrictions still apply. Featured-credit annotations cannot supply genre proof. Live or cover upload labels also remain excluded when followed by a chain of format labels such as `Official Music Video`, `HD` or `HQ`; ordinary song words in `Live Forever` and `Cover Me` remain valid.
 
 Explicit demo upload labels are excluded from automatic selection. Demo and promotional annotations do not turn the original composition into a new song for repeat detection. Dated live-performance suffixes remain unsafe even when the provider reports `live: false` for a previously recorded video. Manual playback is unaffected.
 
