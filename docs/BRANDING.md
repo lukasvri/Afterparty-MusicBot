@@ -44,6 +44,18 @@ shares the interface palette. Backdrop graphics, including the rotating halo,
 must stay inside the LED screen in both scene compositions and at every
 animation angle. Both reduced motion and the in-app motion switch apply.
 
+Match video, TV, fullscreen and administration controls to the shared neutral
+surface, border, radius, focus and typography tokens. Short settings fields
+must have bounded widths and align with related actions. Size the complete
+player panel when a viewport limits its height; constraining only the video
+child can leave an unused strip inside the panel. TV invitation cards should
+fit their content rather than stretch to the video's full height. Verify the
+actual iframe replacement and its outer panel at wide and short viewports.
+
+Stage PA modules share one projection and non-overlapping seams. Keep logo,
+backdrop graphics and performer silhouettes visually separated throughout
+animation; fewer coherent shapes are preferable to intersecting detail.
+
 ## Compatibility
 
 Internal identifiers are stored or exchanged by existing installations. Changing a display name does not rename them.

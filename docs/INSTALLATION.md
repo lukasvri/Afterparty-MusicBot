@@ -197,15 +197,26 @@ Useful commands:
 | `/help` | Show the bot's help |
 
 Bot descriptions, help, player controls and standard replies use English.
-Existing `/konsert lenke` and `/hjelp` commands remain aliases; `/history count`
-also accepts the old `antall` option from previously registered commands.
+The 17 registered commands are `/play`, `/pause`, `/resume`, `/skip`, `/stop`,
+`/disconnect`, `/queue`, `/now-playing`, `/favorites`, `/concert`, `/help`,
+`/vote-skip`, `/history`, `/volume`, `/seek`, `/fseek` and `/cleanup`.
+Use optional `next`, `now` and `shuffle` fields on `/play` instead of separate
+advanced-play commands. Playback controls also remain on the player and in admin.
 
-Slash registration omits unsupported `split` options on `/play-advanced` and
-`/favorites use`, plus the inactive `set-queue-add-response-hidden` and
-`set-auto-announce-next-song` config commands. Stale invocations receive an
-explicit unsupported response before changing playback or settings. Stored
-configuration/import fields are retained for compatibility. The corresponding
-features were not implemented; this cleanup does not remove working controls.
+Open `/admin`, select an authorized Discord server and choose Settings for
+persistent defaults. Audio, queue and voice groups cover bitrate, crossfade,
+default volume, radio, playlist limits, queue page size, empty-queue delay,
+leaving empty voice channels and voice ducking. Helpers show units and limits;
+save confirmation requires the Core settings acknowledgment. Manage Server,
+Administrator or server ownership is required; owner-password access stays
+limited to the configured server.
+
+`/config`, `/crossfade`, duplicate play commands and legacy aliases are omitted
+from new registration. Cached `/config` and `/crossfade` calls privately link
+to the selected server's admin page without changing settings. Other legacy
+handlers remain compatible, including old play options and `antall` on history.
+Unsupported chapter splitting remains unavailable. The two inactive announcement
+settings are hidden from the form; stored/import fields remain unchanged.
 The updated command definitions are registered when an approved Core update
 starts normally. Source changes and local synthetic tests do not update Discord
 registration on an existing deployment.

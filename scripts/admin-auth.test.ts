@@ -46,6 +46,10 @@ const hooks = registerHooks({
             if(globalThis.__afterpartyAuthTest.rejectAdmin)throw Object.assign(new Error('Synthetic Core permission rejection'),{status:403});
             return {guildId:new URL(args[0],'https://core.example').searchParams.get('guildId')};
           }
+          if(args[0]==='/v1/admin' && args[1]==='POST'){
+            if(globalThis.__afterpartyAuthTest.rejectAdmin)throw Object.assign(new Error('Synthetic Core permission rejection'),{status:403});
+            return {settings:{...args[2].settings,updatedAt:'2026-10-18T00:00:00.000Z'}};
+          }
           if(args[0]==='/v1/concert-queue')return {state:{queue:[],revision:'synthetic'},canManage:args[2].admin===true};
           throw new Error('Unexpected upstream call');
         };
@@ -71,6 +75,7 @@ const { adminGuilds, adminContext, adminState } = await import("../lib/discord-a
 const session = await import("../app/api/admin/session/route.ts");
 const me = await import("../app/api/me/route.ts");
 const queue = await import("../app/api/discord/queue/route.ts");
+const control = await import("../app/api/admin/control/route.ts");
 hooks.deregister();
 
 function fixture() {
@@ -253,4 +258,35 @@ test("implicit guild selection still reads the configured default for Discord an
     assert.deepEqual(await adminContext(f.request(owner), undefined), { guildId: "222222222222222222" });
     assert.deepEqual(context.coreCalls.map(call => call[0]), ["/v1/application"]);
   } finally { f.sqlite.close(); }
+});
+
+test("admin settings writes enforce origin, authenticated selected-guild scope and the actual Core settings acknowledgment", async () => {
+  const f = setup();
+  try {
+    const settings = {playlistLimit: 100, defaultQueuePageSize: 20, defaultVolume: 55, audioBitrateKbps: 192,
+      crossfade: 4, secondsToWaitAfterQueueEmpties: 600, leaveIfNoListeners: true,
+      turnDownVolumeWhenPeopleSpeak: true, turnDownVolumeWhenPeopleSpeakTarget: 25, radio: false};
+    const own = '222222222222222222', foreign = '333333333333333333';
+    const input = (guildId: string) => ({guildId, operation: 'settings', settings, tokenCipher: 'forged-client-grant'});
+    const response = await control.POST(f.request('', 'POST', input(own)));
+    assert.equal(response.status, 403);
+    assert.equal(context.coreCalls.length, 0);
+    const cookie = await f.signIn();
+    const blocked = f.request(cookie, 'POST', input(own));
+    const headers = new Headers(blocked.headers); headers.set('Origin', 'https://foreign.example');
+    assert.equal((await control.POST(new Request(blocked, {headers}))).status, 403);
+    assert.equal(context.coreCalls.length, 0, 'Cross-origin requests must stop before any Core request');
+    assert.equal((await control.POST(f.request(cookie, 'POST', input(foreign)))).status, 403);
+    assert.equal(context.coreCalls.filter(call => call[0] === '/v1/admin').length, 0, 'Owner access cannot write another guild');
+    const token = 'b7'.repeat(32), grant = 'synthetic-authorized-grant';
+    f.sqlite.prepare('INSERT INTO discord_admin_sessions VALUES(?,?,?)').run(await hash(token), grant, Date.now() + 60000);
+    context.coreCalls.length = 0;
+    const allowed = await control.POST(f.request('gk-discord=' + token, 'POST', input(foreign)));
+    assert.equal(allowed.status, 200);
+    assert.deepEqual(await allowed.json(), {settings: {...settings, updatedAt: '2026-10-18T00:00:00.000Z'}});
+    assert.deepEqual(context.coreCalls, [['/v1/admin', 'POST', {...input(foreign), tokenCipher: grant}]]);
+    context.rejectAdmin = true;
+    assert.equal((await control.POST(f.request('gk-discord=' + token, 'POST', input(foreign)))).status, 403,
+      'Core rechecks the Discord grant on every settings write');
+  } finally {f.sqlite.close();}
 });

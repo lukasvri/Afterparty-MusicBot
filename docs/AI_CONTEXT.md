@@ -11,7 +11,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - Visual direction: dark/black background, white lowercase `ap` lettering and a restrained red accent (`#ff263e`). Keep interfaces clean, readable, consistent and professional.
 - Reuse the canonical vector logo and existing UI components. Do not recreate the brand from old discussion screenshots or replace it with photorealistic/AI-looking artwork.
 - Public documentation is written in English, with no em dashes. Replies to the repository owner can be in Nynorsk.
-- New website sessions default to English; retain explicit saved language choices. Discord command descriptions, help, controls and standard replies use English. Canonical `/help` and `/concert` commands retain the old Norwegian aliases for compatibility; see [command setup](INSTALLATION.md#8-play-your-first-track).
+- New website sessions default to English; retain explicit saved language choices. Discord command descriptions, help, controls and standard replies use English. Keep a compact slash menu for playback and discovery, and manage persistent bot settings on the server-scoped administration page. Existing cached command invocations retain compatibility handlers; removed configuration commands link privately to administration. See [command setup](INSTALLATION.md#8-play-your-first-track).
 
 ## Architectural boundaries
 

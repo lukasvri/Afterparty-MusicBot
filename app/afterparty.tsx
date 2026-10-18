@@ -1470,6 +1470,7 @@ export default function Afterparty() {
                   </label>
                 )}
 
+                <div className="room-personalization">
                 <label className="display-name">
                   {t("Kallenamnet ditt")}
                   <input
@@ -1481,13 +1482,14 @@ export default function Afterparty() {
                       setDisplayName(e.target.value);
                     }}
                   />
-                  <small id="display-name-help">
-                    {t("Namnet som blir vist på låtønska dine. Det gir ingen ekstra tilgang.")}
-                  </small>
                 </label>
                 <button className="button subtle tv-mode-button" onClick={toggleTV}>
                   {tv ? t("Avslutt TV-modus") : t("TV-modus")}
                 </button>
+                <small id="display-name-help">
+                  {t("Namnet som blir vist på låtønska dine. Det gir ingen ekstra tilgang.")}
+                </small>
+                </div>
               </div>
               {discordMode && !concertQueue.data?.canManage && (
                 <p>

@@ -37,7 +37,7 @@ export function RoomSharing({
       void import("qrcode")
         .then(({ default: QRCode }) =>
           QRCode.toDataURL(url, {
-            width: 180,
+            width: 320,
             margin: 2,
             color: { dark: "#111111", light: "#ffffff" },
           }),

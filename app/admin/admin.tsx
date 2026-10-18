@@ -21,6 +21,7 @@ import {
 import { useLanguage, LanguageSwitch } from "@/components/language";
 import { Sidebar } from "@/components/afterparty-navigation";
 import type { DiscordState, Room } from "@/lib/types";
+import "./settings.css";
 type Guild = { id: string; name: string; roomCode: string; installed: boolean };
 type Job = {
   id: string;
@@ -62,29 +63,25 @@ async function api<T>(
   if (!r.ok) throw Error(d.error ?? "Tjenesten svarer ikke.");
   return d;
 }
-const labels: Record<string, string> = {
-  playlistLimit: "Maks sanger fra spilleliste",
-  defaultQueuePageSize: "Sanger per køside",
-  defaultVolume: "Standardvolum, prosent",
-  audioBitrateKbps: "Lydkvalitet, kbit/s",
-  crossfade: "Kryssfade, sekunder",
-  secondsToWaitAfterQueueEmpties: "Vent etter tom kø, sekunder",
-  leaveIfNoListeners: "Forlat tom talekanal",
-  queueAddResponseEphemeral: "Privat købekreftelse",
-  autoAnnounceNextSong: "Meld neste sang",
-  turnDownVolumeWhenPeopleSpeak: "Demp når noen snakker",
-  turnDownVolumeWhenPeopleSpeakTarget: "Volum under tale, prosent",
-  radio: "Radio når køen er tom",
-};
-const bounds: Record<string, [number, number]> = {
-  playlistLimit: [1, 1000],
-  defaultQueuePageSize: [1, 30],
-  defaultVolume: [0, 100],
-  audioBitrateKbps: [64, 384],
-  crossfade: [0, 12],
-  secondsToWaitAfterQueueEmpties: [0, 86400],
-  turnDownVolumeWhenPeopleSpeakTarget: [0, 100],
-};
+type SettingField = {key: string; label: string; help: string; min?: number; max?: number; toggle?: boolean};
+const settingGroups: {title: string; description: string; fields: SettingField[]}[] = [
+  {title: "Audio playback", description: "Playback defaults for this Discord server.", fields: [
+    {key: "defaultVolume", label: "Default volume", min: 0, max: 100, help: "0–100%. Current playback volume has its own control."},
+    {key: "audioBitrateKbps", label: "Audio bitrate", min: 64, max: 384, help: "64–384 kbit/s. Applies at the next playback start, capped by the voice channel."},
+    {key: "crossfade", label: "Crossfade", min: 0, max: 12, help: "0–12 seconds between tracks. Set 0 to turn crossfade off."},
+    {key: "radio", label: "Radio when the queue is empty", toggle: true, help: "Prepare related music when the manual queue runs out."},
+  ]},
+  {title: "Voice and listeners", description: "Connection behavior and volume while people speak.", fields: [
+    {key: "secondsToWaitAfterQueueEmpties", label: "Wait after the queue empties", min: 0, max: 86400, help: "0–86400 seconds. Set 0 to stay connected indefinitely after the queue ends."},
+    {key: "leaveIfNoListeners", label: "Leave when no listeners remain", toggle: true, help: "Disconnect when everyone else leaves the voice channel."},
+    {key: "turnDownVolumeWhenPeopleSpeak", label: "Lower volume while people speak", toggle: true, help: "Voice detection is enabled when joining. Reconnect after changing this option."},
+    {key: "turnDownVolumeWhenPeopleSpeakTarget", label: "Volume while people speak", min: 0, max: 100, help: "0–100%. Used while voice volume reduction is enabled."},
+  ]},
+  {title: "Queue and playlists", description: "Import limits and the Discord queue display.", fields: [
+    {key: "playlistLimit", label: "Playlist limit", min: 1, max: 1000, help: "1–1000 tracks imported from a playlist."},
+    {key: "defaultQueuePageSize", label: "Tracks per queue page", min: 1, max: 30, help: "1–30 tracks shown by the Discord queue command."},
+  ]},
+];
 export default function Admin() {
   const { t, language } = useLanguage();
   const [authenticated, setAuthenticated] = useState(false),
@@ -101,6 +98,8 @@ export default function Admin() {
     [query, setQuery] = useState(""),
     [volume, setVolume] = useState(60),
     [settings, setSettings] = useState<Record<string, number | boolean>>({}),
+    [settingsError, setSettingsError] = useState(""),
+    [settingsNotice, setSettingsNotice] = useState(""),
     [snapshotName, setSnapshotName] = useState(""),
     [minutes, setMinutes] = useState(30),
     [channels, setChannels] = useState<
@@ -110,12 +109,15 @@ export default function Admin() {
   const [globalAdmin, setGlobalAdmin] = useState(false),
     [rooms, setRooms] = useState<Room[]>([]);
   const volumeDirty = useRef(false);
+  const requestedGuild = useRef("");
   const generation = useRef(0),
     refreshing = useRef(false),
     alive = useRef(true),
     actionBusy = useRef(false);
   const selected = guilds.find((g) => g.id === guildId);
   function loadGuilds() {
+      const requested = new URLSearchParams(location.search).get("guildId");
+      if (requested && /^\d{14,22}$/.test(requested)) requestedGuild.current = requested;
       return api<{
         authenticated: boolean;
         globalAdmin: boolean;
@@ -128,8 +130,8 @@ export default function Admin() {
       setGuilds(r.guilds);
       setInvite(r.invite);
       setGuildId((previous) =>
-        r.guilds.some((g) => g.id === previous)
-          ? previous
+        r.guilds.some((g) => g.id === (previous || requestedGuild.current))
+          ? (previous || requestedGuild.current)
           : (r.guilds.find((g) => g.installed)?.id ?? r.guilds[0]?.id ?? ""),
       );
     }, e => {
@@ -173,6 +175,8 @@ export default function Admin() {
     setChannels([]);
     setChannelId("");
     setSettings({});
+    setSettingsError("");
+    setSettingsNotice("");
   }
   useEffect(() => {
     invalidate();
@@ -201,7 +205,7 @@ export default function Admin() {
     const id = guildId,
       version = generation.current;
     try {
-      const result = await api<{id: string; status: string; channels?: Array<{id: string; name: string; voice: boolean}>}>("/api/admin/control", "POST", {
+      const result = await api<{id: string; status: string; settings?: Record<string, number | boolean>; channels?: Array<{id: string; name: string; voice: boolean}>}>("/api/admin/control", "POST", {
         guildId: id,
         operation,
         ...extra,
@@ -223,12 +227,21 @@ export default function Admin() {
           );
       }
       if (version === generation.current) {
-        setNotice(operation === "command" ? "Utført." : "Lagret.");
+        if (operation === "settings") {
+          const keys = settingGroups.flatMap(group => group.fields.map(field => field.key));
+          if (!result.settings || keys.some(key => result.settings![key] !== (extra.settings as Record<string, unknown>)[key]))
+            throw Error("The server did not confirm these settings. Reload and check before trying again.");
+          setSettings(Object.fromEntries(keys.map(key => [key, result.settings![key]])));
+          setSettingsNotice("Settings saved for " + (selected?.name ?? "this server") + ".");
+        } else setNotice(operation === "command" ? "Utført." : "Lagret.");
         await refresh(id);
       }
       return result;
     } catch (e) {
-      if (version === generation.current) setError((e as Error).message);
+      if (version === generation.current) {
+        if (operation === "settings") setSettingsError((e as Error).message);
+        else setError((e as Error).message);
+      }
     } finally {
       actionBusy.current = false;
       setBusy(false);
@@ -721,53 +734,35 @@ export default function Admin() {
                     </>
                   ) : tab === "settings" ? (
                     <form
-                      className="admin-card settings-grid"
+                      className="admin-card settings-grid admin-settings"
                       onSubmit={(e) => {
                         e.preventDefault();
-                        void control("settings", { settings });
+                        setSettingsError("");
+                        setSettingsNotice("");
+                        setNotice("");
+                        const selectedSettings = Object.fromEntries(settingGroups.flatMap(group => group.fields.map(field => [field.key, settings[field.key] ?? detail.settings[field.key]])));
+                        void control("settings", { settings: selectedSettings });
                       }}
                     >
-                      <h2>{t("Serverinnstillinger")}</h2>
-                      {Object.entries(labels).map(([key, label]) => (
-                        <label key={key}>
-                          {t(label)}
-                          {typeof detail.settings[key] === "boolean" ? (
-                            <input
-                              type="checkbox"
-                              checked={Boolean(
-                                settings[key] ?? detail.settings[key],
-                              )}
-                              onChange={(e) =>
-                                setSettings((s) => ({
-                                  ...s,
-                                  [key]: e.target.checked,
-                                }))
-                              }
-                            />
-                          ) : (
-                            <input
-                              type="number"
-                              min={bounds[key]?.[0]}
-                              max={bounds[key]?.[1]}
-                              required
-                              value={Number(
-                                settings[key] ?? detail.settings[key],
-                              )}
-                              onChange={(e) =>
-                                setSettings((s) => ({
-                                  ...s,
-                                  [key]: Number(e.target.value),
-                                }))
-                              }
-                            />
-                          )}
-                        </label>
-                      ))}
-                      <p>
-                        {t(
-                          "Lydkvaliteten begrenses av talekanalen. Endringer gjelder fra neste avspillingsstart.",
-                        )}
-                      </p>
+                      <h2>Server settings</h2>
+                      <p>Changes apply only to {selected?.name}. Settings are managed here instead of Discord slash commands.</p>
+                      {settingGroups.map(group => <fieldset key={group.title} disabled={busy}>
+                        <legend>{group.title}</legend>
+                        <p>{group.description}</p>
+                        <div className="setting-fields">
+                          {group.fields.map(field => <label className="setting-row" key={field.key} htmlFor={"setting-" + field.key}>
+                            <span><strong>{field.label}</strong><small id={"setting-help-" + field.key}>{field.help}</small></span>
+                            {field.toggle ? <input id={"setting-" + field.key} type="checkbox" aria-label={field.label}
+                              aria-describedby={"setting-help-" + field.key} checked={Boolean(settings[field.key] ?? detail.settings[field.key])}
+                              onChange={e => {setSettingsNotice(""); setSettings(s => ({...s, [field.key]: e.target.checked}));}} />
+                              : <input id={"setting-" + field.key} type="number" aria-label={field.label} aria-describedby={"setting-help-" + field.key}
+                                min={field.min} max={field.max} step={1} required value={Number(settings[field.key] ?? detail.settings[field.key])}
+                                onChange={e => {setSettingsNotice(""); setSettings(s => ({...s, [field.key]: Number(e.target.value)}));}} />}
+                          </label>)}
+                        </div>
+                      </fieldset>)}
+                      {settingsError && <p className="settings-save-error" role="alert">{settingsError}</p>}
+                      {settingsNotice && <p className="settings-save-notice" role="status">{settingsNotice}</p>}
                       <button className="button primary" disabled={busy}>
                         {t("Lagre innstillinger")}
                       </button>

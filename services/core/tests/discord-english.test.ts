@@ -17,9 +17,10 @@ function interaction(commandName: string, values: Record<string, unknown> = {}) 
   };
 }
 
-test('English command registration retains legacy help and concert aliases without advertising no-op splitting', () => {
-  assert.equal(definitions.find(d => d.name === 'clear')?.description, 'Clear the queue while keeping the current track');
-  for (const name of ['help', 'concert', 'hjelp', 'konsert']) assert(definitions.some(d => d.name === name), name);
+test('English registration advertises canonical commands while legacy aliases remain handler-only', () => {
+  assert.equal(definitions.find(d => d.name === 'play')?.description, 'Play a track from a link or search');
+  for (const name of ['help', 'concert']) assert(definitions.some(d => d.name === name), name);
+  for (const name of ['hjelp', 'konsert', 'config']) assert(!definitions.some(d => d.name === name), name);
   assert(definitions.find(d => d.name === 'concert')?.options?.some(o => o.name === 'url'));
   assert(definitions.find(d => d.name === 'history')?.options?.some(o => o.name === 'count'));
   assert(!definitions.find(d => d.name === 'play-advanced')?.options?.some(o => o.name === 'split'));
@@ -90,27 +91,21 @@ test('retired no-op settings reject stale invocations without changing stored se
     const bot = {engine: {}, manager: async () => {throw Error('Unexpected permission lookup');},
       commands: {updateSettings: () => {throw Error('Unexpected setting mutation');}}};
     await DiscordBot.prototype.interaction.call(bot as never, call as never);
-    assert.deepEqual(call.replies, ['This legacy setting has no effect and is no longer offered.']);
+    assert.match(String(call.replies[0]), /settings are managed in web admin/);
   }
 });
 
-test('every remaining registered config mutation routes to its documented setting after manager admission', async () => {
-  const settings: Record<string, string> = {'set-playlist-limit': 'playlistLimit', 'set-wait-after-queue-empties': 'secondsToWaitAfterQueueEmpties',
-    'set-leave-if-no-listeners': 'leaveIfNoListeners', 'set-reduce-vol-when-voice': 'turnDownVolumeWhenPeopleSpeak',
-    'set-reduce-vol-when-voice-target': 'turnDownVolumeWhenPeopleSpeakTarget', 'set-default-volume': 'defaultVolume',
-    'set-default-queue-page-size': 'defaultQueuePageSize', 'set-audio-quality': 'audioBitrateKbps'};
-  for (const sub of definitions.find(d => d.name === 'config')!.options!.filter(o => o.name !== 'get')) {
-    const call = Object.assign(interaction('config', {subcommand: sub.name}), {options: {
-      getSubcommand: () => sub.name, data: [{options: [{value: 42}]}],
+test('all eight previous config mutations now redirect without changing settings', async () => {
+  for (const sub of ['set-playlist-limit', 'set-wait-after-queue-empties', 'set-leave-if-no-listeners', 'set-reduce-vol-when-voice',
+    'set-reduce-vol-when-voice-target', 'set-default-volume', 'set-default-queue-page-size', 'set-audio-quality']) {
+    const call = Object.assign(interaction('config', {subcommand: sub}), {options: {
+      getSubcommand: () => sub, data: [{options: [{value: 42}]}],
     }});
-    let admitted = false;
     const changed: unknown[] = [];
-    const bot = {engine: {}, manager: async () => {admitted = true;}, commands: {updateSettings: (input: unknown) => {
-      assert(admitted); changed.push(input);
-    }}};
+    const bot = {engine: {}, site: 'https://site.example', commands: {updateSettings: (input: unknown) => {changed.push(input);}}};
     await DiscordBot.prototype.interaction.call(bot as never, call as never);
-    assert.deepEqual(changed, [{[settings[sub.name]]: 42}]);
-    assert.deepEqual(call.replies, ['The setting was saved.']);
+    assert.deepEqual(changed, []);
+    assert.match(String(call.replies[0]), /https:\/\/site.example\/admin/);
   }
 });
 
@@ -128,8 +123,7 @@ test('voice and manager admission errors reach private replies in English withou
   }
   const call = Object.assign(interaction('crossfade', {subcommand: 'off'}), {guild: {members: {fetch: async () => ({permissions: {has: () => false}})}}});
   const bot = Object.assign(Object.create(DiscordBot.prototype), {engine: {}, commands: {updateSettings: () => {throw Error('Forbidden mutation');}}});
-  await bot.interaction(call as never);
-  assert.deepEqual(call.replies, ['You need Manage Server permission to change this setting.']);
+  await assert.rejects(DiscordBot.prototype.manager.call(bot as never, call as never), /You need Manage Server permission/);
 });
 
 test('validation and unexpected failures remain English without exposing provider diagnostics', async () => {
@@ -153,8 +147,8 @@ test('guild startup submits the English definitions to a synthetic guild without
   try {
     await DiscordBot.prototype.start.call(bot as never, 'unused-synthetic-token');
     assert.deepEqual(registered, definitions);
-    assert.equal(registered!.length, 33);
-    assert.equal(new Set(registered!.map(d => d.name)).size, 33);
+    assert.equal(registered!.length, 17);
+    assert.equal(new Set(registered!.map(d => d.name)).size, 17);
     const inspect = (nodes: {name: string; description?: string; options?: unknown[]}[]) => {
       for (const node of nodes) {
         assert.match(node.name, /^[a-z0-9-]{1,32}$/);

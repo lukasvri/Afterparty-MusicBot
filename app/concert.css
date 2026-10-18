@@ -1,10 +1,10 @@
 /* Afterparty: a concert stage framed by quiet, consistent controls. */
 body::before{background:radial-gradient(ellipse at 60% 0,#6f17251a,transparent 65%)}
-.button{border-radius:6px;min-height:44px;font-size:13px;transition:background .2s,border-color .2s,box-shadow .2s,transform .2s}
+.button{border-radius:var(--radius-control);min-height:44px;font-size:13px;transition:background .2s,border-color .2s,box-shadow .2s,transform .2s}
 .primary{background:var(--red-button);border-color:#ff263e;box-shadow:inset 0 1px #ffffff1a}
 .primary:hover:not(:disabled){background:#ef2039;box-shadow:0 4px 20px #d7193128}
 .subtle{border-color:#4c404a;background:#ffffff03}.subtle:hover:not(:disabled){background:#ffffff08;border-color:#88727b}
-.icon-button{min-width:40px;min-height:40px;border-radius:6px}.icon-button:hover:not(:disabled){background:#ff263e14;color:#ff596c}
+.icon-button{min-width:40px;min-height:40px;border-radius:var(--radius-control)}.icon-button:hover:not(:disabled){background:#ff263e14;color:#ff596c}
 .concert-shell .sidebar{height:88px;background:#0b0b0d;gap:44px;border-bottom:1px solid #ffffff0c}
 .concert-shell .topbar{height:88px}.concert-shell .brand{font-size:25px;letter-spacing:.2px}.concert-shell .brand-sub{font-size:8px;letter-spacing:2px;color:#c6bbc1}.brand-mark{background:#ff263e;color:#120a0e;border-radius:4px}
 .concert-shell .nav-link{font-size:13px;font-weight:500;padding:13px 12px}.concert-shell .nav-link.active::after{height:2px;background:#ff263e}
@@ -13,9 +13,9 @@ body::before{background:radial-gradient(ellipse at 60% 0,#6f17251a,transparent 6
 .concert-shell .studio-heading h1{font-size:clamp(48px,6.4vw,94px);letter-spacing:-1.5px;color:var(--text);line-height:1.06}
 .concert-shell .studio-heading .title-stop{color:var(--accent)}
 .concert-subtitle{font-size:15px;line-height:1.5;color:var(--muted);margin-top:10px}
-.concert-shell .mode-button{min-height:44px;border-radius:6px;padding:10px 15px;font-size:13px;background:#141416;border-color:#37373b;transition:background .2s,border-color .2s}
+.concert-shell .mode-button{min-height:44px;border-radius:var(--radius-control);padding:10px 15px;font-size:13px;background:#141416;border-color:#37373b;transition:background .2s,border-color .2s}
 .concert-shell .mode-button.selected{background:#211012;border-color:#88404e}.concert-shell .mode-button>svg{color:#ff7b88}
-.concert-shell .share-button{border-radius:6px;width:44px;height:44px;border-color:#37373b}
+.concert-shell .share-button{border-radius:var(--radius-control);width:44px;height:44px;border-color:#37373b}
 .concert-shell .studio-grid{grid-template-columns:minmax(0,1fr) 350px;gap:24px;align-items:start}
 .concert-shell .stage-panel:not([data-immersive=true]){border:1px solid #37373b;border-radius:10px;box-shadow:0 20px 60px #0005;animation:venue-arrival .7s var(--ease-out) both;background:#131116}
 .concert-stage-bar{height:45px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px;background:#19191b;border-bottom:1px solid #ffffff0a;font-size:12px;color:#e0d5db}

@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.6: Consistent playback layouts and simpler server controls
+
+2026-10-18
+
+- TV, fullscreen and room settings use more consistent spacing, readable controls and bounded form fields. The embedded video fills its available player area without an unused side strip, while the source player stays mounted across layout changes.
+- The concert illustration has evenly spaced PA modules, cleaner rigging and a calmer LED backdrop with clear separation between the logo, ring and performer.
+- Configure the bot on the administration page using grouped playback, queue and voice settings. The registered slash menu is reduced from 33 to 17 commands; advanced playback options are grouped under /play, and old configuration commands privately link to administration instead of changing settings.
+
 ## v2.2.5: Faster radio discovery and a more consistent interface
 
 2026-10-18
