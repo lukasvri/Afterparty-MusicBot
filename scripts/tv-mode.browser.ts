@@ -139,17 +139,32 @@ try {
           const copy=Array.from(el.closest('.stage')?.querySelectorAll('.stage-intro h2,.stage-intro p,.stage-intro button')??[]);
           const subjects=[el.querySelector('.stage-backdrop image')!,el.querySelector('.performer-head')!].map(subject=>subject.getBoundingClientRect());
           const copyClear=copy.every(item=>subjects.every(subject=>!intersects(item.getBoundingClientRect(),subject)));
+          const stage=el.closest('.stage')?.getBoundingClientRect();
+          const copyContained=copy.every(item=>{
+            const r=item.getBoundingClientRect();
+            return !stage||(r.left>=stage.left&&r.right<=stage.right&&r.top>=stage.top&&r.bottom<=stage.bottom);
+          });
+          const copyTextVisible=copy.filter(item=>item.tagName==='H2').every(item=>{
+            const natural=item.cloneNode(true) as HTMLElement;
+            Object.assign(natural.style,{display:'block',position:'absolute',visibility:'hidden',width:`${item.getBoundingClientRect().width}px`,height:'auto',webkitLineClamp:'unset'});
+            item.parentElement!.appendChild(natural);
+            const height=natural.getBoundingClientRect().height;
+            natural.remove();
+            return height<=item.getBoundingClientRect().height+.5;
+          });
           const cabinets=Array.from(el.querySelectorAll('[data-pa-array]')).map(array=>Array.from(array.querySelectorAll('[data-pa-cabinet]')).map(cabinet=>{
             const r=cabinet.getBoundingClientRect();return {top:r.top,bottom:r.bottom};
           }));
           return {composition:el.getAttribute('data-composition'),screen,halo,mark,head,
-            copyClear,performerGap:head.top-Math.max(halo.bottom,mark.bottom),
+            copyClear,copyContained,copyTextVisible,performerGap:head.top-Math.max(halo.bottom,mark.bottom),
             haloContained:halo.left>=screen.left&&halo.right<=screen.right&&halo.top>=screen.top&&halo.bottom<=screen.bottom,
             cabinetCounts:cabinets.map(array=>array.length),
             cabinetSeams:cabinets.every(array=>array.slice(1).every((cabinet,index)=>cabinet.top>=array[index].bottom-.5))};
         });
         observation.checks.push(geometry);
         check(geometry.copyClear,`${composition}: empty-room copy must not overlap the logo or performer`);
+        check(geometry.copyTextVisible,`${composition}: the complete empty-room heading must stay readable`);
+        check(geometry.copyContained,`${composition}: empty-room text and its action must fit inside the stage`);
         check(geometry.haloContained,`${composition}: the rotating halo stays inside the LED screen`);
         check(geometry.performerGap>=0,`${composition}: backdrop graphics remain above the performer`);
         check(geometry.cabinetCounts.every(count=>count===7)&&geometry.cabinetSeams,`${composition}: both PA stacks retain seven aligned cabinets without overlapping seams`);

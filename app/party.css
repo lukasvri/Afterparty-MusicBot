@@ -714,3 +714,9 @@ button:disabled {
     flex:none;
   }
 }
+
+/* Fixed empty-state copy must remain complete; song titles keep their clamp. */
+.concert-shell[data-empty="true"] .stage:not([data-current="true"]) .stage-intro h2 {
+  display:block;
+  -webkit-line-clamp:unset;
+}
