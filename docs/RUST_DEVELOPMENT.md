@@ -89,7 +89,7 @@ offline tests. They do not start the bot:
 ```bash
 npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
 node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
-node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts experiments/rust-audio/process-cpu.test.ts experiments/rust-audio/batch-client.test.ts experiments/rust-audio/batch-benchmark.test.ts
+node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts experiments/rust-audio/process-cpu.test.ts experiments/rust-audio/batch-client.test.ts experiments/rust-audio/batch-benchmark.test.ts experiments/rust-audio/paced-client.test.ts experiments/rust-audio/paced-benchmark.test.ts
 ```
 
 The harness selects the platform's release executable, including `.exe` on
@@ -814,3 +814,71 @@ four import errors because Windows does not provide POSIX `fcntl`. Subsequent
 steps in that command did not run; this is not a green full-suite result.
 Those deployment tests require the Linux CI result. The focused Rust/harness
 checks above ran independently and passed.
+
+## Arrival-aware bounded batch experiment
+
+The next offline stage supplies PCM at absolute `start + frame * 20 ms` arrival
+times instead of assuming eight future frames are ready. `paced-client.ts`
+owns at most eight queued inputs and one active request of at most eight frames.
+It copies PCM and per-frame volume/crossfade controls at admission, publishes
+independent output buffers only after backend validation, and rejects overflow.
+No production Core module imports this adapter.
+
+The target size is 1, 4 or 8. A full available target dispatches immediately;
+otherwise the oldest queued frame's collection deadline permits the largest
+supported available count. Remaining frames keep their own arrival deadlines.
+`finish()` rejects new arrivals and drains existing tails as 8/4/1 without
+padding or waiting for future input. `close()` rejects queued and active work,
+aborts the active backend and suppresses late output. It waits at most one
+second for backend settlement; the owner must independently close/reap a backend
+that ignores cancellation. Tests exercise an actual Rust child and both fake
+clock and stalled-backend controls.
+
+`maxWaitMs` is a collection policy, not a hard end-to-end latency guarantee.
+An active backend or a delayed event loop can exceed it. The hard memory bound
+remains enforced; an overwhelmed run fails rather than silently dropping frames
+or slowing its input clock. This models synthetic arrivals, not a real decoder.
+
+```text
+node experiments/rust-audio/paced-benchmark.ts 250 3 1,4 > paced-pcm.json
+```
+
+Five fresh-process conditions share the actual TypeScript reference mixer,
+fixtures, bounded queue, absolute arrival grid, 16 single-frame warmup calls
+and owned-process CPU probes: TypeScript; Rust v1; target 4 with an 80 ms
+collection deadline; target 8 with 160 ms; and target 8 with a 10 ms deadline.
+The longer deadlines allow full batches when scheduling permits; the short one
+tests whether a responsive policy still amortizes crossings. Each synthetic
+guild owns its own queue and Rust process. Repeats rotate condition order.
+
+The report keeps scheduled-to-actual arrival lateness, actual arrival-to-dispatch
+queue time, dispatch-to-validated-reply time and scheduled/actual arrival-to-reply
+latency separate. It records actual 1/4/8 request counts, protocol bytes, Node
+reply-data events, queue peaks, completed frames and missed 20 ms scheduled
+completion targets per guild. Completion includes PCM verification and parent
+dispatch bookkeeping, with no encoder, provider or Discord output. The supplied
+50 frames/s is offered load, not measured maximum throughput. Volume timing
+measures completion of a new per-frame control snapshot; it cannot undo audio
+already submitted and is not audible response latency.
+
+CPU covers timed parent work and owned Rust counter deltas, with startup,
+warmup and probe calls outside the parent interval. Child counters bracket that
+interval and can include probe-edge work. Missing counters produce `null`;
+nominal counter units do not establish practical precision. RSS is the parent
+process's lifetime peak, not simultaneous whole-pipeline memory. Hardware,
+runtime, source/binary hashes and exact command are included. Reports are
+exploratory observations with uncontrolled host scheduling and thermal state.
+
+### Experimental patch notes for paced arrivals
+
+- Added an offline bounded arrival queue, per-frame control/buffer snapshots,
+  supported partial draining and terminal cancellation with late-reply disposal.
+- Added actual 20 ms input experiments separating collection, backend and
+  scheduling delay, with exact PCM parity, owned CPU and observed batch counts.
+- Added Linux/Windows, stable/minimum-toolchain regressions and short stable CI
+  diagnostic artifacts without a performance threshold. CI samples are harness
+  checks, not production capacity measurements.
+- Production Core, Rust mixer/protocol source, product version and website notes
+  are unchanged by this experimental step. Adoption still requires a separate
+  owner decision and reviewed PR. No listening assistance, production account,
+  merge, publication or deployment is part of this work.

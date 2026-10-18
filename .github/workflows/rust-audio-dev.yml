@@ -57,7 +57,7 @@ jobs:
       - name: Typecheck the offline parity harness
         run: node services/core/node_modules/typescript/bin/tsc --project experiments/rust-audio/tsconfig.json --noEmit
       - name: Cross-language PCM, pipe protocol and process lifecycle checks
-        run: node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts experiments/rust-audio/process-cpu.test.ts experiments/rust-audio/batch-client.test.ts experiments/rust-audio/batch-benchmark.test.ts
+        run: node --test --test-timeout=30000 experiments/rust-audio/stream-parity.test.ts experiments/rust-audio/worker-client.test.ts experiments/rust-audio/benchmark-suite.test.ts experiments/rust-audio/process-cpu.test.ts experiments/rust-audio/batch-client.test.ts experiments/rust-audio/batch-benchmark.test.ts experiments/rust-audio/paced-client.test.ts experiments/rust-audio/paced-benchmark.test.ts
       - name: Record repeated concurrent-guild measurements (no performance threshold)
         if: matrix.toolchain == 'stable'
         shell: bash
@@ -66,6 +66,10 @@ jobs:
         if: matrix.toolchain == 'stable'
         shell: bash
         run: node experiments/rust-audio/batch-benchmark.ts 1024 1 1,4 128 > rust-audio-batch-benchmark.json
+      - name: Record arrival-aware PCM diagnostics (no performance threshold)
+        if: matrix.toolchain == 'stable'
+        shell: bash
+        run: node experiments/rust-audio/paced-benchmark.ts 24 1 1,4 > rust-audio-paced-benchmark.json
       - name: Save offline measurement report
         if: matrix.toolchain == 'stable'
         uses: actions/upload-artifact@v4
@@ -74,4 +78,5 @@ jobs:
           path: |
             rust-audio-benchmark.json
             rust-audio-batch-benchmark.json
+            rust-audio-paced-benchmark.json
           retention-days: 14
