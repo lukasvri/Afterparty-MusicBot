@@ -250,3 +250,32 @@ test('exhausted crossfade recovery skips the consumed incoming entry, not back i
   assert.equal(e.diagnostics.snapshot().events.at(-1)?.reason,'recovery-exhausted');
  }finally{t.close();}
 });
+
+for (const sameRecording of [false, true]) {
+ test(`manual enqueue replaces a full radio queue (${sameRecording ? 'same' : 'different'} recording)`,()=>{
+  const t=setup();clearInterval(t.engine.timer);try{
+   t.engine.settings.playlistLimit=1;
+   const radio={...track('radio123456'),radio:true};t.engine.queue=[radio];
+   const manual=track(sameRecording?radio.id:'manual12345');
+   assert.equal(t.engine.enqueue([manual]),1);
+   assert.deepEqual(t.engine.queue,[manual]);
+   assert.deepEqual(t.store.get<Track[]>('queue',[]),[manual]);
+  }finally{t.close();}
+ });
+}
+for (const next of [false,true]) {
+ test(`manual enqueue uses retained capacity and preserves atomic rejection (next=${next})`,()=>{
+  const t=setup();clearInterval(t.engine.timer);try{
+   t.engine.settings.playlistLimit=3;
+   const existing=track('manual12345'),radio={...track('radio123456'),radio:true};
+   const first=track('first123456'),second=track('second12345');
+   t.engine.queue=[existing,radio];t.engine.persist();
+   const before={queue:[...t.engine.queue],saved:t.store.get<Track[]>('queue',[]),revision:t.engine.revision()};
+   assert.throws(()=>t.engine.enqueue([first,second,track('third123456')],next),/Køen er full/);
+   assert.deepEqual({queue:t.engine.queue,saved:t.store.get<Track[]>('queue',[]),revision:t.engine.revision()},before);
+   assert.equal(t.engine.enqueue([existing,first,first,second],next),2);
+   assert.deepEqual(t.engine.queue,next?[first,second,existing]:[existing,first,second]);
+   assert.equal(t.engine.queue.length,t.engine.settings.playlistLimit);
+  }finally{t.close();}
+ });
+}
