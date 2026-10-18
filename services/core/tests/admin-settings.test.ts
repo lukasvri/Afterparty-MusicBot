@@ -27,6 +27,8 @@ test('all ten web-admin settings persist through real Core while bounds and guil
     crossfade: 4, secondsToWaitAfterQueueEmpties: 650, leaveIfNoListeners: false,
     turnDownVolumeWhenPeopleSpeak: true, turnDownVolumeWhenPeopleSpeakTarget: 25, radio: false};
   const originalOther = structuredClone(resources[1].engine.settings);
+  const inactive = {queueAddResponseEphemeral: false, autoAnnounceNextSong: true};
+  resources[0].engine.setSettings(inactive);
   const post = (guildId: string, values: Record<string, unknown>, tokenCipher?: string) => fetch(base + '/v1/admin', {
     method: 'POST', headers: {Authorization: 'Bearer synthetic-key', 'Content-Type': 'application/json'},
     body: JSON.stringify({operation: 'settings', guildId, settings: values, ...(tokenCipher ? {tokenCipher} : {})}),
@@ -38,6 +40,8 @@ test('all ten web-admin settings persist through real Core while bounds and guil
     for (const [key, value] of Object.entries(settings)) assert.equal(ack.settings[key], value, key);
     assert.equal(typeof ack.settings.updatedAt, 'string');
     for (const [key, value] of Object.entries(settings)) assert.equal(resources[0].store.get<Record<string, unknown>>('settings', {})[key], value, key);
+    for (const [key, value] of Object.entries(inactive)) assert.equal(resources[0].store.settings()[key as keyof typeof inactive], value,
+      'Omitted inactive compatibility settings retain their stored value');
     assert.deepEqual(resources[1].engine.settings, originalOther);
     assert.equal((await post(second, {defaultVolume: 1})).status, 403);
     assert.equal((await post(second, {defaultVolume: 1}, grant)).status, 403);

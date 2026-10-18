@@ -232,7 +232,7 @@ export default function Admin() {
           if (!result.settings || keys.some(key => result.settings![key] !== (extra.settings as Record<string, unknown>)[key]))
             throw Error("The server did not confirm these settings. Reload and check before trying again.");
           setSettings(Object.fromEntries(keys.map(key => [key, result.settings![key]])));
-          setSettingsNotice("Settings saved for " + (selected?.name ?? "this server") + ".");
+          setSettingsNotice("Settings saved for {server}.");
         } else setNotice(operation === "command" ? "Utført." : "Lagret.");
         await refresh(id);
       }
@@ -744,25 +744,25 @@ export default function Admin() {
                         void control("settings", { settings: selectedSettings });
                       }}
                     >
-                      <h2>Server settings</h2>
-                      <p>Changes apply only to {selected?.name}. Settings are managed here instead of Discord slash commands.</p>
+                      <h2>{t("Serverinnstillinger")}</h2>
+                      <p>{t("Changes apply only to {server}. Settings are managed here instead of Discord slash commands.", {server: selected?.name ?? t("this server")})}</p>
                       {settingGroups.map(group => <fieldset key={group.title} disabled={busy}>
-                        <legend>{group.title}</legend>
-                        <p>{group.description}</p>
+                        <legend>{t(group.title)}</legend>
+                        <p>{t(group.description)}</p>
                         <div className="setting-fields">
                           {group.fields.map(field => <label className="setting-row" key={field.key} htmlFor={"setting-" + field.key}>
-                            <span><strong>{field.label}</strong><small id={"setting-help-" + field.key}>{field.help}</small></span>
-                            {field.toggle ? <input id={"setting-" + field.key} type="checkbox" aria-label={field.label}
+                            <span><strong>{t(field.label)}</strong><small id={"setting-help-" + field.key}>{t(field.help)}</small></span>
+                            {field.toggle ? <input id={"setting-" + field.key} type="checkbox" aria-label={t(field.label)}
                               aria-describedby={"setting-help-" + field.key} checked={Boolean(settings[field.key] ?? detail.settings[field.key])}
                               onChange={e => {setSettingsNotice(""); setSettings(s => ({...s, [field.key]: e.target.checked}));}} />
-                              : <input id={"setting-" + field.key} type="number" aria-label={field.label} aria-describedby={"setting-help-" + field.key}
+                              : <input id={"setting-" + field.key} type="number" aria-label={t(field.label)} aria-describedby={"setting-help-" + field.key}
                                 min={field.min} max={field.max} step={1} required value={Number(settings[field.key] ?? detail.settings[field.key])}
                                 onChange={e => {setSettingsNotice(""); setSettings(s => ({...s, [field.key]: Number(e.target.value)}));}} />}
                           </label>)}
                         </div>
                       </fieldset>)}
-                      {settingsError && <p className="settings-save-error" role="alert">{settingsError}</p>}
-                      {settingsNotice && <p className="settings-save-notice" role="status">{settingsNotice}</p>}
+                      {settingsError && <p className="settings-save-error" role="alert">{t(settingsError)}</p>}
+                      {settingsNotice && <p className="settings-save-notice" role="status">{t(settingsNotice, {server: selected?.name ?? t("this server")})}</p>}
                       <button className="button primary" disabled={busy}>
                         {t("Lagre innstillinger")}
                       </button>

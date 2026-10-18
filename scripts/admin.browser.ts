@@ -25,8 +25,10 @@ try {
      if(route.request().method() === 'POST') {
        const input: { guildId: string; operation: string; settings: Settings } = route.request().postDataJSON();
        assert(guilds.some(g => g.id === input.guildId));
-       if(input.operation === 'settings') settings.set(input.guildId,input.settings);
-       data = {status:'done'};
+       if(input.operation === 'settings') {
+         settings.set(input.guildId,input.settings);
+         data = {settings:settings.get(input.guildId)};
+       } else data = {status:'done'};
      } else {
        const guildId = url.searchParams.get('guildId');
        assert(guildId);
@@ -53,6 +55,7 @@ try {
  assert.equal(await volume.inputValue(),'80','Server selection must discard another server draft');
  await volume.fill('44');
  await Promise.all([page.waitForResponse(response => new URL(response.url()).pathname === '/api/admin/control' && response.request().method() === 'POST'),page.locator('.settings-grid button').click()]);
+ await page.getByRole('status').filter({hasText:'Settings saved'}).waitFor();
  assert.equal(settings.get(guilds[1].id)!.defaultVolume,44);
  assert.equal(settings.get(guilds[0].id)!.defaultVolume,60);
  // An in-flight A response must not reappear after switching back to B.

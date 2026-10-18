@@ -9,8 +9,8 @@ See [release policy](docs/RELEASING.md).
 2026-10-18
 
 - TV, fullscreen and room settings use more consistent spacing, readable controls and bounded form fields. The embedded video fills its available player area without an unused side strip, while the source player stays mounted across layout changes.
-- The concert illustration has evenly spaced PA modules, cleaner rigging and a calmer LED backdrop with clear separation between the logo, ring and performer.
-- Configure the bot on the administration page using grouped playback, queue and voice settings. The registered slash menu is reduced from 33 to 17 commands; advanced playback options are grouped under /play, and old configuration commands privately link to administration instead of changing settings.
+- The concert illustration has evenly spaced PA modules, cleaner rigging and a calmer LED backdrop with clear separation between the logo, ring and performer. Empty mobile rooms place explanatory text above the stage instead of over the performer.
+- Configure the bot on the administration page using grouped playback, queue and voice settings. The registered slash menu is reduced from 33 to 17 commands; advanced playback options are grouped under /play, and old configuration commands privately link to administration instead of changing settings. Group labels, help and save confirmations follow the selected website language without changing stored values.
 
 ## v2.2.5: Faster radio discovery and a more consistent interface
 

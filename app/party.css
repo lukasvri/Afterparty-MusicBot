@@ -684,3 +684,33 @@ button:disabled {
 .concert-shell[data-welcome="true"] .welcome-copy .party-kicker { font-size:10px; letter-spacing:.2em; color:#d7a6b1; }
 @media(max-width:650px) { .studio-shell .brand { font-size:17px; } }
 @media(prefers-contrast:more) { .concert-shell[data-welcome="true"] .welcome-copy h1 { background:none; color:var(--text,#fff); } }
+
+/* Empty mobile rooms give their copy and illustration separate layout space. */
+@media(max-width:600px) {
+  .concert-shell[data-empty="true"][data-tv="false"] .stage-panel:not([data-immersive="true"]) .stage {
+    display:flex;
+    flex-direction:column;
+    aspect-ratio:auto;
+    min-height:0;
+  }
+  .concert-shell[data-empty="true"][data-tv="false"] .stage-panel:not([data-immersive="true"]) .stage-intro {
+    position:relative;
+    inset:auto;
+    order:-1;
+    max-width:none;
+    margin:24px 20px 12px;
+  }
+  .concert-shell[data-empty="true"][data-tv="false"] .stage-panel:not([data-immersive="true"]) .stage-intro h2 {
+    max-width:100%;
+  }
+  .concert-shell[data-empty="true"][data-tv="false"] .stage-panel:not([data-immersive="true"]) .stage-intro .button {
+    min-height:44px;
+  }
+  .concert-shell[data-empty="true"][data-tv="false"] .stage-panel:not([data-immersive="true"]) .concert-scenery {
+    position:relative;
+    inset:auto;
+    width:100%;
+    aspect-ratio:16/9;
+    flex:none;
+  }
+}

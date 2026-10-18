@@ -43,14 +43,14 @@ try {
         }
         window.YT={Player:TVPlayer};
       });
-      let writes=0;
+      let writes=0,sceneOnly=false;
       await context.route("**/*", route => {
         const url=new URL(route.request().url());
         if(url.origin!==new URL(base).origin) return route.abort();
         if(!url.pathname.startsWith("/api/")) return route.continue();
         if(route.request().method()!=="GET"){writes++;return route.abort();}
         if(url.pathname.includes("realtime")) return route.abort();
-        const room={code:"TESTROOM",name:"Afterparty TV room",current:{id:"preview0001",title:"TV continuity song",artist:"Preview artist",image:"",duration:180,live:false,embeddable:true},queue:[],playing:false,position:30,version:1,serverTime:Date.now(),viewers:2,isHost:false,isOwner:false,expiresAt:Date.now()+86400000,requests:[],history:[],voteCounts:{}};
+        const room={code:"TESTROOM",name:"Afterparty TV room",current:sceneOnly?null:{id:"preview0001",title:"TV continuity song",artist:"Preview artist",image:"",duration:180,live:false,embeddable:true},queue:[],playing:false,position:30,version:1,serverTime:Date.now(),viewers:2,isHost:false,isOwner:false,expiresAt:Date.now()+86400000,requests:[],history:[],voteCounts:{}};
         const data=url.pathname==="/api/rooms/TESTROOM"?room:url.pathname==="/api/discord"?{state:null}:url.pathname==="/api/history"?{videos:[]}:url.pathname==="/api/rooms"?{rooms:[]}:{};
         return route.fulfill({json:data});
       });
@@ -112,7 +112,7 @@ try {
       });observation.checks.push(fullscreenGeometry);
       check(fullscreenGeometry.bottom<=fullscreenGeometry.viewport-64,"Fullscreen toolbar leaves the native iframe control area clear");
       check(fullscreenGeometry.panelLeft>=0&&fullscreenGeometry.panelRight<=viewport.width&&fullscreenGeometry.panelTop>=0,"Fullscreen settings fit within the display");
-      await page.screenshot({path:`${output}/fullscreen-${viewport.width}x${viewport.height}.png`,fullPage:true,animations:"disabled"});
+      await page.screenshot({path:`${output}/fullscreen-${viewport.width}x${viewport.height}.png`,fullPage:false,animations:"disabled"});
       await page.getByRole("button",{name:"Exit fullscreen",exact:true}).click();
       await page.locator('.stage-panel:not([data-immersive=true])').waitFor();
       await page.getByRole("button",{name:"TV mode",exact:true}).click();
@@ -125,7 +125,38 @@ try {
       await page.goto(base+"/?tv=1",{waitUntil:"networkidle"});
       assert(await page.getByRole("button",{name:"Play in the browser",exact:true}).isVisible(),
         "A TV link without a room must keep the welcome actions available");
-      console.log(`${phase}: ${viewport.width}x${viewport.height}: ${observation.failures.length ? observation.failures.join('; ') : 'PASS slot geometry, settings, QR, controls and stable iframe'}`);
+      for (const composition of ["welcome","room"] as const) {
+        if(composition==="room") {
+          sceneOnly=true;
+          await page.goto(base+"/?room=TESTROOM",{waitUntil:"networkidle"});
+        }
+        const scene=page.locator(`.concert-scenery[data-composition=${composition}]`);
+        await scene.waitFor();
+        const geometry=await scene.evaluate(el=>{
+          const box=(selector:string)=>{const r=el.querySelector(selector)!.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
+          const screen=box('[data-led-screen]'),halo=box('[data-led-halo]'),mark=box('.stage-backdrop image'),head=box('.performer-head');
+          const intersects=(a:DOMRect,b:DOMRect)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+          const copy=Array.from(el.closest('.stage')?.querySelectorAll('.stage-intro h2,.stage-intro p,.stage-intro button')??[]);
+          const subjects=[el.querySelector('.stage-backdrop image')!,el.querySelector('.performer-head')!].map(subject=>subject.getBoundingClientRect());
+          const copyClear=copy.every(item=>subjects.every(subject=>!intersects(item.getBoundingClientRect(),subject)));
+          const cabinets=Array.from(el.querySelectorAll('[data-pa-array]')).map(array=>Array.from(array.querySelectorAll('[data-pa-cabinet]')).map(cabinet=>{
+            const r=cabinet.getBoundingClientRect();return {top:r.top,bottom:r.bottom};
+          }));
+          return {composition:el.getAttribute('data-composition'),screen,halo,mark,head,
+            copyClear,performerGap:head.top-Math.max(halo.bottom,mark.bottom),
+            haloContained:halo.left>=screen.left&&halo.right<=screen.right&&halo.top>=screen.top&&halo.bottom<=screen.bottom,
+            cabinetCounts:cabinets.map(array=>array.length),
+            cabinetSeams:cabinets.every(array=>array.slice(1).every((cabinet,index)=>cabinet.top>=array[index].bottom-.5))};
+        });
+        observation.checks.push(geometry);
+        check(geometry.copyClear,`${composition}: empty-room copy must not overlap the logo or performer`);
+        check(geometry.haloContained,`${composition}: the rotating halo stays inside the LED screen`);
+        check(geometry.performerGap>=0,`${composition}: backdrop graphics remain above the performer`);
+        check(geometry.cabinetCounts.every(count=>count===7)&&geometry.cabinetSeams,`${composition}: both PA stacks retain seven aligned cabinets without overlapping seams`);
+        const surface=composition==="room"?page.locator('.stage'):scene;
+        await surface.screenshot({path:`${output}/scene-${composition}-${viewport.width}x${viewport.height}.png`,animations:"disabled"});
+      }
+      console.log(`${phase}: ${viewport.width}x${viewport.height}: ${observation.failures.length ? observation.failures.join('; ') : 'PASS slot geometry, settings, QR, controls, stable iframe and stage geometry'}`);
     } finally {await context.close();}
   }
   await writeFile(`${output}/checks.json`,JSON.stringify(observations,null,2));
