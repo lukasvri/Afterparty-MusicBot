@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.2.7",
+    "date": "2026-10-18",
+    "title": "Private owner update shortcut",
+    "items": [
+      "Owner-password sessions can open a configured private updater from the control room. The link is hidden from anonymous visitors, Discord-only administrators and bridge-key callers. The updater keeps its own authorization and still requires access to its private network.",
+      "Operators can configure the optional HTTPS address through the OWNER_UPDATE_URL runtime secret without publishing private hostnames in source. Existing deployments are unchanged when it is unset."
+    ]
+  },
+  {
     "version": "2.2.6",
     "date": "2026-10-18",
     "title": "Consistent playback layouts and simpler server controls",

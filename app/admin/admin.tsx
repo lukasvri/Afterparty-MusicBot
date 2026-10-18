@@ -89,6 +89,7 @@ export default function Admin() {
     [guilds, setGuilds] = useState<Guild[]>([]),
     [guildId, setGuildId] = useState(""),
     [invite, setInvite] = useState(""),
+    [ownerUpdateUrl, setOwnerUpdateUrl] = useState(""),
     [password, setPassword] = useState(""),
     [detail, setDetail] = useState<Detail | null>(null),
     [error, setError] = useState(""),
@@ -123,12 +124,14 @@ export default function Admin() {
         globalAdmin: boolean;
         guilds: Guild[];
         invite: string;
+        ownerUpdateUrl?: string;
       }>("/api/admin/guilds").then(r => {
       if (!alive.current) return;
       setAuthenticated(r.authenticated);
       setGlobalAdmin(r.globalAdmin);
       setGuilds(r.guilds);
       setInvite(r.invite);
+      setOwnerUpdateUrl(r.ownerUpdateUrl ?? "");
       setGuildId((previous) =>
         r.guilds.some((g) => g.id === (previous || requestedGuild.current))
           ? (previous || requestedGuild.current)
@@ -393,6 +396,17 @@ export default function Admin() {
                   <RefreshCw size={16} /> {t("Oppdater servere")}
                 </button>
               </section>
+              {ownerUpdateUrl && (
+                <section className="admin-card owner-update-card" aria-label={t("Software updates")}>
+                  <div>
+                    <h2>{t("Software updates")}</h2>
+                    <p>{t("Open the private updater. Requires Tailscale on this device.")}</p>
+                  </div>
+                  <a className="button subtle" href={ownerUpdateUrl} target="_blank" rel="noopener noreferrer">
+                    {t("Update bot and website")} <ArrowUpRight size={16} />
+                  </a>
+                </section>
+              )}
               <label className="guild-select">
                 {t("Discord-server")}
                 <select

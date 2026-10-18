@@ -1,5 +1,6 @@
 import {db,hash,fail,isAdmin,limit} from './server';
 import {coreRequest} from './core-server';
+import {ownerUpdateUrl} from './owner-update';
 export type GuildChoice={id:string;name:string;roomCode:string;installed:boolean};
 type Application={clientId:string;defaultGuildId:string;oauthReady:boolean;guilds:GuildChoice[]};
 const cookie=(request:Request,name:string)=>request.headers.get('cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='))?.slice(name.length+1)??'';
@@ -8,8 +9,9 @@ const header=(name:string,value:string,seconds:number)=>`${name}=${value}; Path=
 export async function application(){return coreRequest<Application>('/v1/application');}
 export async function discordSession(request:Request){const value=cookie(request,'gk-discord');if(!/^[a-f0-9]{64}$/.test(value))return null;return db().prepare('SELECT token_cipher FROM discord_admin_sessions WHERE token_hash=? AND expires_at>?').bind(await hash(value),Date.now()).first<{token_cipher:string}>();}
 export async function adminGuilds(request:Request){const app=await application(),session=await discordSession(request);const permissions=3230720;const invite=`https://discord.com/oauth2/authorize?client_id=${app.clientId}&scope=bot%20applications.commands&permissions=${permissions}`;
- if(session){const access=await coreRequest<{user:{name:string};guilds:Array<{id:string;name:string}>}>('/v1/oauth','POST',{operation:'guilds',tokenCipher:session.token_cipher});return {authenticated:true,method:'discord',globalAdmin:await isAdmin(request),user:access.user,guilds:access.guilds.map(g=>({...g,roomCode:app.guilds.find(s=>s.id===g.id)?.roomCode??'',installed:app.guilds.some(s=>s.id===g.id)})),invite,oauthReady:app.oauthReady};}
- const owner=await isAdmin(request);return {authenticated:owner,globalAdmin:owner,method:owner?'owner':'discord',guilds:owner?app.guilds.filter(s=>s.id===app.defaultGuildId).map(g=>({...g,installed:true})):[],invite,oauthReady:app.oauthReady};
+ const updateUrl=await ownerUpdateUrl(request),ownerUpdate=updateUrl?{ownerUpdateUrl:updateUrl}:{};
+ if(session){const access=await coreRequest<{user:{name:string};guilds:Array<{id:string;name:string}>}>('/v1/oauth','POST',{operation:'guilds',tokenCipher:session.token_cipher});return {authenticated:true,method:'discord',globalAdmin:await isAdmin(request),user:access.user,guilds:access.guilds.map(g=>({...g,roomCode:app.guilds.find(s=>s.id===g.id)?.roomCode??'',installed:app.guilds.some(s=>s.id===g.id)})),invite,oauthReady:app.oauthReady,...ownerUpdate};}
+ const owner=await isAdmin(request);return {authenticated:owner,globalAdmin:owner,method:owner?'owner':'discord',guilds:owner?app.guilds.filter(s=>s.id===app.defaultGuildId).map(g=>({...g,installed:true})):[],invite,oauthReady:app.oauthReady,...ownerUpdate};
 }
 export async function adminContext(request:Request,value:unknown){
  const explicit=typeof value==='string'&&value?value:undefined;

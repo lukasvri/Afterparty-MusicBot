@@ -13,8 +13,14 @@
 .admin-settings .settings-save-error { color:#ff9daa; }
 .admin-settings .settings-save-notice { color:var(--text); }
 .admin-settings > button { min-height:44px; }
+.owner-update-card { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.owner-update-card > div { min-width:0; }
+.owner-update-card h2 { margin:0 0 6px; }
+.owner-update-card p { margin:0; color:var(--muted); font-size:14px; }
+.owner-update-card > a { flex-shrink:0; }
 @media(max-width:900px) { .admin-settings .setting-fields { grid-template-columns:minmax(0,1fr); } }
 @media(max-width:600px) {
+  .owner-update-card { align-items:flex-start; flex-direction:column; gap:14px; }
   .admin-settings fieldset { padding:14px; margin-bottom:18px; }
   .admin-settings .setting-row { gap:12px; }
   .admin-settings .setting-row input[type=number] { width:82px; flex-basis:82px; }

@@ -20,6 +20,7 @@ type FixtureEnvironment = {
   ADMIN_PASSWORD_HASH?: string;
   ADMIN_BRIDGE_KEY?: string;
   OWNER_EMAIL?: string;
+  OWNER_UPDATE_URL?: string;
 };
 const context: { env: FixtureEnvironment; coreCalls: unknown[][]; rejectAdmin: boolean } = { env: {}, coreCalls: [], rejectAdmin: false };
 const globals = globalThis as typeof globalThis & { __afterpartyAuthTest: typeof context };
@@ -41,6 +42,10 @@ const hooks = registerHooks({
             clientId:'111111111111111111',defaultGuildId:'222222222222222222',oauthReady:true,
             guilds:[{id:'222222222222222222',name:'Owner test guild',roomCode:'TESTROOM'},
               {id:'333333333333333333',name:'Other test guild',roomCode:'OTHERONE'}]
+          };
+          if(args[0]==='/v1/oauth' && args[1]==='POST' && args[2]?.operation==='guilds')return {
+            user:{name:'Synthetic server administrator'},
+            guilds:[{id:'333333333333333333',name:'Other test guild'}],
           };
           if(args[0].startsWith('/v1/admin?')){
             if(globalThis.__afterpartyAuthTest.rejectAdmin)throw Object.assign(new Error('Synthetic Core permission rejection'),{status:403});
@@ -161,6 +166,38 @@ test("password sessions authenticate handlers and lose access after expiry or ro
     assert(env.ADMIN_PASSWORD_HASH);
     env.ADMIN_PASSWORD_HASH = env.ADMIN_PASSWORD_HASH.replace(/a1/g, "b2");
     assert.equal(await isAdmin(f.request(rotated)), false);
+  } finally { f.sqlite.close(); }
+});
+
+test("private updater addresses are returned only to current owner-password sessions", async () => {
+  const f = setup();
+  try {
+    env.OWNER_UPDATE_URL = "https://private-updater.example.test/afterparty-update/";
+    assert.equal((await adminGuilds(f.request())).ownerUpdateUrl, undefined);
+    const bridge = new Request(f.request().url, { headers: { Authorization: "Bearer synthetic-bridge" } });
+    assert.equal((await adminGuilds(bridge)).ownerUpdateUrl, undefined);
+    const discordToken = "ab".repeat(32);
+    f.sqlite.prepare("INSERT INTO discord_admin_sessions VALUES(?,?,?)")
+      .run(await hash(discordToken), "synthetic-encrypted-grant", Date.now() + 60000);
+    const discord = await adminGuilds(f.request("gk-discord=" + discordToken));
+    assert.equal(discord.authenticated, true);
+    assert.equal(discord.method, "discord");
+    assert.equal(discord.ownerUpdateUrl, undefined);
+    const cookie = await f.signIn();
+    assert.equal((await adminGuilds(f.request(cookie))).ownerUpdateUrl, env.OWNER_UPDATE_URL);
+    f.sqlite.prepare("UPDATE admin_sessions SET expires_at=?").run(Date.now() - 1);
+    assert.equal((await adminGuilds(f.request(cookie))).ownerUpdateUrl, undefined);
+  } finally { f.sqlite.close(); }
+});
+
+test("unconfigured or unsafe updater URLs do not render a link", async () => {
+  const f = setup();
+  try {
+    const cookie = await f.signIn();
+    for (const value of [undefined, "", "bad-url", "http://private-updater.example.test/", "javascript:alert(1)", "https://user:password@private-updater.example.test/", "https://private-updater.example.test/?token=secret", "https://private-updater.example.test/#secret"]) {
+      env.OWNER_UPDATE_URL = value;
+      assert.equal((await adminGuilds(f.request(cookie))).ownerUpdateUrl, undefined);
+    }
   } finally { f.sqlite.close(); }
 });
 

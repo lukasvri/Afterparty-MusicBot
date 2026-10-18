@@ -1,6 +1,9 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Software updates":["Programvareoppdateringer","Software updates"],
+ "Open the private updater. Requires Tailscale on this device.":["Åpne den private oppdateringssiden. Krever Tailscale på denne enheten.","Open the private updater. Requires Tailscale on this device."],
+ "Update bot and website":["Oppdater bot og nettside","Update bot and website"],
  "Audio playback":["Lydavspilling","Audio playback"],
  "Playback defaults for this Discord server.":["Standardvalg for avspilling på denne Discord-serveren.","Playback defaults for this Discord server."],
  "Default volume":["Standardvolum","Default volume"],
