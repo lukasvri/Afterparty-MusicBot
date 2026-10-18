@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.2.1",
+    "date": "2026-10-18",
+    "title": "Fresh saved browser state across tabs",
+    "items": [
+      "Saved room ownership and device preferences read the latest stored value after another tab changes them, including when a settings view is reopened. Successful saves no longer leave a stale in-memory copy.",
+      "Browsers that block saving still retain changes for the current page. Observed settings continue to share cached reads and receive same-page and cross-tab updates."
+    ]
+  },
+  {
     "version": "2.2.0",
     "date": "2026-10-17",
     "title": "Radio 2.0: shared discovery and safer recovery",

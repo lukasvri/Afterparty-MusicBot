@@ -245,3 +245,40 @@ test("evening tracks preserve first occurrence and order with one ID read per in
   const invalid = {id:"not a valid YouTube ID"} as Video;
   assert.deepEqual(uniqueEveningTracks([first,invalid,other],[duplicate,other]),[first,other]);
 });
+
+test("successful browser writes stay fresh while a key has no subscribers", async () => {
+  const { browserStorage } = await import("../lib/browser-storage.ts");
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const events = new EventTarget();
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "window", {configurable:true, value:events});
+  Object.defineProperty(globalThis, "localStorage", {configurable:true, value:{
+    getItem:(key:string)=>values.get(key)??null,
+    setItem:(key:string,value:string)=>values.set(key,value),
+  }});
+  const credential = "afterparty-host:FRESHKEY";
+  const preference = "afterparty-synthetic-remount";
+  let unsubscribe = () => {};
+  try {
+    assert.equal(browserStorage.set(credential, "old-token"), true);
+    values.set(credential, "replacement-token");
+    assert.equal(browserStorage.get(credential), "replacement-token", "Unobserved credentials must see another tab's replacement after a local write");
+    values.delete(credential);
+    assert.equal(browserStorage.get(credential), null, "Removed credentials must not survive in memory");
+
+    unsubscribe = browserStorage.subscribe(preference, () => {});
+    browserStorage.set(preference, "old-choice");
+    assert.equal(browserStorage.get(preference), "old-choice");
+    unsubscribe();
+    values.set(preference, "new-choice");
+    unsubscribe = browserStorage.subscribe(preference, () => {});
+    assert.equal(browserStorage.get(preference), "new-choice", "Remount must read changes made while unsubscribed");
+  } finally {
+    unsubscribe();
+    if(originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if(originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
