@@ -34,6 +34,23 @@ Comparing multiple pools may use more provider work than returning the first acc
 
 The candidate universe is still finite. Existing positive search/catalog caches can become exhausted by a long station history. This rebuild does not promise unlimited discovery or bypass provider quotas by repeatedly refreshing every rejected pool. Adaptive replenishment needs an isolated reproduction and request-cost measurements before changing that cache behavior.
 
+The two existing discovery searches run concurrently after metadata/catalog
+stages, while their results enter ranking in the original query order. A slow
+pool therefore does not delay starting the other, and completion order cannot
+change tie-breaking or the existing request/candidate budgets. Each failed pool
+retains its own diagnostic and the other pool can still supply a safe result.
+
+Core shares pending video metadata by ID within one Providers instance, including
+overlap across distinct queries. Requests retain fresh playback entry IDs and
+independent genre/catalog objects. At most 128 unique IDs are pending at once;
+new IDs beyond that capacity receive a retryable busy error for strict callers
+or are omitted for callers already allowing unavailable results. Existing
+pending IDs can still be joined. Large lists retain sequential batches of up to
+50 IDs, with at most three extractor fallbacks per batch. Each fallback settles
+its own ID immediately, so a shared fast result does not wait for an unrelated
+slow fallback. Errors and missing IDs leave no retained pending promise, allowing
+a later retry. This does not cache permissions or broaden music relationships.
+
 ## Seed lifecycle
 
 Discord Core stores the original track in the server's private SQLite state. Browser rooms store it in their private room JSON. Both survive service restart. Queueing a manual song leaves the current original intact until the queued song becomes current; a direct play selection changes it immediately. Pausing, seeking or toggling radio does not change the original. An explicit Core stop clears it.

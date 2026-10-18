@@ -64,6 +64,7 @@ import { LanguageSwitch, useLanguage } from "@/components/language";
 import { OpenRooms } from "@/components/open-rooms";
 import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
+import releases from "@/lib/releases.json";
 
 export default function Afterparty() {
   const { t, language } = useLanguage();
@@ -805,7 +806,7 @@ export default function Afterparty() {
                 : "Sangen er lagt i køen.",
         );
         if (roomRef.current?.mode === "discord")
-          await refresh(activeCode.current);
+          await Promise.all([refresh(activeCode.current), concertQueue.reload()]);
         return true;
       }
       const deadline = performance.now() + 35000;
@@ -833,7 +834,7 @@ export default function Afterparty() {
                   : "Sangen er lagt i Discord-køen.",
           );
           if (roomRef.current?.mode === "discord")
-            await refresh(activeCode.current);
+            await Promise.all([refresh(activeCode.current), concertQueue.reload()]);
           break;
         }
         if (job && ["failed", "expired", "unknown"].includes(job.status))
@@ -1473,12 +1474,16 @@ export default function Afterparty() {
                   {t("Kallenamnet ditt")}
                   <input
                     maxLength={32}
+                    aria-describedby="display-name-help"
                     value={displayName}
                     placeholder={t("Gjest")}
                     onChange={(e) => {
                       setDisplayName(e.target.value);
                     }}
                   />
+                  <small id="display-name-help">
+                    {t("Namnet som blir vist på låtønska dine. Det gir ingen ekstra tilgang.")}
+                  </small>
                 </label>
                 <button className="button subtle tv-mode-button" onClick={toggleTV}>
                   {tv ? t("Avslutt TV-modus") : t("TV-modus")}
@@ -1544,7 +1549,7 @@ export default function Afterparty() {
       data-motion={motion ? "on" : "off"}
       data-welcome={!room && !directoryOpen ? "true" : "false"}
       data-playing={Boolean(room?.playing)}
-      data-tv={tv}
+      data-tv={tv && Boolean(room)}
       data-empty={!current}
     >
       <Sidebar view={directoryOpen ? "rooms" : "music"} onNavigate={navigate} />
@@ -2273,7 +2278,9 @@ export default function Afterparty() {
                 {language === "en" ? "Privacy" : "Personvern"}
               </a>
               <a href="/support">Support</a>
-              <a href="/patch-notes">{t("Patch notes")}</a>
+              <a href="/patch-notes" data-latest-release>
+                {t("Patch notes")} · v{releases[0].version}
+              </a>
               <a href="/admin" target="_top">
                 Admin <ArrowUpRight size={13} />
               </a>

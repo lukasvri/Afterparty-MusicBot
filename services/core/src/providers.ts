@@ -90,6 +90,7 @@ export class Providers {
   recommendations: Recommendations;
   recommendationStatus = "artist";
   private searches = new Map<string, Promise<Track[]>>();
+  private videoLookups = new Map<string, Promise<Track | undefined>>();
   constructor(store: Store, env: NodeJS.ProcessEnv = process.env) {
     this.store = store;
     this.key = env.YOUTUBE_API_KEY ?? "";
@@ -108,7 +109,7 @@ export class Providers {
     const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!response.ok)
       throw new UserError(
-        "YouTube-søket er midlertidig utilgjengelig.",
+        "YouTube search is temporarily unavailable.",
         response.status === 403 || response.status === 429 ? 429 : 502,
       );
     return response.json() as Promise<YouTubeResponses[K]>;
@@ -119,7 +120,7 @@ export class Providers {
   async video(ids: string[], skipUnavailable = false): Promise<Track[]> {
     if (!ids.length) return [];
     if (ids.some((id) => !/^[\w-]{11}$/.test(id)))
-      throw new UserError("Ugyldig video-ID.");
+      throw new UserError("Invalid video ID.");
     const found = new Map<string, Track>(),
       missing: string[] = [];
     for (const id of ids) {
@@ -131,74 +132,94 @@ export class Providers {
         found.set(id, cached.track);
       else if (!missing.includes(id)) missing.push(id);
     }
-    const remember = (track: Track) => {
-      found.set(track.id, track);
-      this.store.set("metadata:v4:" + track.id, { at: Date.now(), track });
-    };
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
-      try {
-        const data = await this.youtube("videos", {
-          id: batch.join(","),
-          part: "snippet,contentDetails,status",
-        });
-        for (const v of data.items ?? []) {
-          const parts = String(v.contentDetails.duration).match(
-            /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/,
-          );
-          remember({
-            id: v.id,
-            genres: metadataGenres(v.snippet.description, v.snippet.tags),
-            music: metadataMusic(v.snippet.categoryId),
-            title: decode(v.snippet.title),
-            artist: decode(v.snippet.channelTitle),
-            image: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
-            duration: parts
-              ? Number(parts[1] ?? 0) * 3600 +
-                Number(parts[2] ?? 0) * 60 +
-                Number(parts[3] ?? 0)
-              : 0,
-            live: v.snippet.liveBroadcastContent === "live",
-            embeddable: v.status.embeddable !== false,
-            entryId: randomUUID(),
-            source: "youtube",
-          });
+      const owned = new Map<string, { resolve: (value: Track | undefined) => void; reject: (error: unknown) => void }>();
+      const pending: [string, Promise<Track | undefined>][] = [];
+      const complete = (id: string, value: Track | Error | undefined) => {
+        const lookup = owned.get(id);
+        if (!lookup) return;
+        owned.delete(id);
+        if (value instanceof Error) lookup.reject(value); else lookup.resolve(value);
+      };
+      for (const id of batch) {
+        // Another caller or earlier batch may have populated this cache while
+        // we waited. Reserve only this <=50-ID batch, never a whole playlist.
+        if (index > 0) {
+          const cached = this.store.get<{ at: number; track: Track } | null>("metadata:v4:" + id, null);
+          if (cached && Date.now() - cached.at < 86400000) { found.set(id, cached.track); continue; }
         }
-      } catch {
-        await mapLimited(batch, 3, async (id) => {
-          try {
-            const v = await this.extract([
-              "--no-playlist",
-              "--dump-single-json",
-              "--skip-download",
-              "--js-runtimes",
-              "node",
-              "https://www.youtube.com/watch?v=" + id,
-            ]);
-            remember({
-              id,
-              genres: metadataGenres(v.description, v.tags),
-              music: metadataMusic(undefined, v.categories),
-              title: v.title ?? "YouTube",
-              artist: v.artist ?? v.uploader ?? "YouTube",
-              image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-              duration: Number(v.duration) || 0,
-              live: v.is_live === true,
-              embeddable: v.playable_in_embed === true,
-              source: "youtube",
-              entryId: randomUUID(),
-              ...(v.artist && v.track ? { catalog: { ...extractedCatalogArtist(v), title: v.track, duration: Number(v.duration) || 0 } } : {}),
-            });
-          } catch (error) {
-            if (!skipUnavailable) throw error;
+        let lookup = this.videoLookups.get(id);
+        if (!lookup) {
+          if (this.videoLookups.size >= 128) {
+            pending.push([id, Promise.reject(new UserError("The music source is busy. Try again shortly.", 503))]);
+            continue;
           }
-        });
+          const shared = new Promise<Track | undefined>((resolve, reject) => {
+            owned.set(id, { resolve, reject });
+          }).finally(() => { if (this.videoLookups.get(id) === shared) this.videoLookups.delete(id); });
+          this.videoLookups.set(id, shared); lookup = shared;
+        }
+        pending.push([id, lookup]);
       }
+      if (owned.size) void this.hydrateVideoBatch([...owned.keys()], complete).catch(error => {
+        for (const id of owned.keys()) complete(id, error instanceof Error ? error : new Error(String(error)));
+      });
+      await Promise.all(pending.map(async ([id, lookup]) => {
+        try { const track = await lookup; if (track) found.set(id, track); }
+        catch (error) { if (!skipUnavailable) throw error; }
+      }));
     }
     return ids
       .map((id) => found.get(id))
       .filter((t): t is Track => Boolean(t))
-      .map((t) => ({ ...t, entryId: randomUUID() }));
+      .map((t) => ({ ...t, entryId: randomUUID(),
+        ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) }));
+  }
+  /** A shared batch contains raw per-ID outcomes; caller strictness stays outside. */
+  private async hydrateVideoBatch(batch: string[], complete: (id: string, value: Track | Error | undefined) => void): Promise<void> {
+    const found = new Map<string, Track>();
+    const remember = (track: Track) => {
+      this.store.set("metadata:v4:" + track.id, { at: Date.now(), track });
+      found.set(track.id, track);
+    };
+    try {
+      const data = await this.youtube("videos", {
+        id: batch.join(","), part: "snippet,contentDetails,status",
+      });
+      for (const v of data.items ?? []) {
+        const parts = String(v.contentDetails.duration).match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+        remember({
+          id: v.id,
+          genres: metadataGenres(v.snippet.description, v.snippet.tags),
+          music: metadataMusic(v.snippet.categoryId),
+          title: decode(v.snippet.title), artist: decode(v.snippet.channelTitle),
+          image: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
+          duration: parts ? Number(parts[1] ?? 0) * 3600 + Number(parts[2] ?? 0) * 60 + Number(parts[3] ?? 0) : 0,
+          live: v.snippet.liveBroadcastContent === "live", embeddable: v.status.embeddable !== false,
+          entryId: randomUUID(), source: "youtube",
+        });
+      }
+      for (const id of batch) complete(id, found.get(id));
+    } catch {
+      await mapLimited(batch, 3, async (id) => {
+        try {
+          const v = await this.extract([
+            "--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node",
+            "https://www.youtube.com/watch?v=" + id,
+          ]);
+          remember({
+            id, genres: metadataGenres(v.description, v.tags), music: metadataMusic(undefined, v.categories),
+            title: v.title ?? "YouTube", artist: v.artist ?? v.uploader ?? "YouTube",
+            image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, duration: Number(v.duration) || 0,
+            live: v.is_live === true, embeddable: v.playable_in_embed === true,
+            source: "youtube", entryId: randomUUID(),
+            ...(v.artist && v.track ? { catalog: { ...extractedCatalogArtist(v), title: v.track, duration: Number(v.duration) || 0 } } : {}),
+          });
+          complete(id, found.get(id));
+        } catch (error) { complete(id, error instanceof Error ? error : new Error(String(error))); }
+      });
+    }
   }
   async search(query: string, count = 8, musicOnly = false): Promise<Track[]> {
     const key =
@@ -265,7 +286,7 @@ export class Providers {
   async resolve(query: string): Promise<Track[]> {
     query = query.trim();
     if (!query || query.length > 2000)
-      throw new UserError("Skriv et søk eller en gyldig musikklenke.");
+      throw new UserError("Enter a search or a valid music link.");
     if (/^https:\/\/spotify\.link\//i.test(query))
       query = await expandSpotifyLink(query);
     const id = youtubeId(query);
@@ -323,12 +344,12 @@ export class Providers {
         (args) => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args),
       );
     if (/^https?:\/\//.test(query))
-      throw new UserError("Bruk en YouTube-, Spotify- eller SoundCloud-lenke.");
+      throw new UserError("Use a YouTube, Spotify or SoundCloud link.");
     const audio = /\b(live|video|konsert|concert)\b/i.test(query)
       ? query
       : query + " audio";
     const found = await this.search(audio, 5);
-    if (!found[0]) throw new UserError("Ingen treff. Prøv et annet søk.");
+    if (!found[0]) throw new UserError("No results. Try another search.");
     return [found[0]];
   }
   async stream(track: Track, signal: AbortSignal) {
@@ -356,9 +377,9 @@ export class Providers {
       data.is_preview ||
       (data.full_duration && Number(data.duration) < data.full_duration - 2)
     )
-      throw new UserError("Kilden tilbyr bare en forhåndsvisning.");
+      throw new UserError("The source only offers a preview.");
     if (typeof data.url !== "string" || !/^https?:\/\//.test(data.url))
-      throw new UserError("Mediekilden har ingen lydstrøm.", 502);
+      throw new UserError("The media source has no audio stream.", 502);
     const headers = Object.entries(data.http_headers ?? {})
       .filter(([k, v]) => typeof v === "string" && !/[\r\n]/.test(k + v))
       .map(([k, v]) => `${k}: ${v}\r\n`)
@@ -417,7 +438,7 @@ export class Providers {
     }
     if (!ranked[0])
       throw new UserError(
-        `Fant ikke en sikker lydmatch for ${song.artist} - ${song.title}.`,
+        `Could not find a reliable audio match for ${song.artist} - ${song.title}.`,
       );
     const track = { ...ranked[0].track, catalog: matchedCatalog(song, ranked[0].track), entryId: randomUUID() };
     this.store.set(key, { at: Date.now(), track });

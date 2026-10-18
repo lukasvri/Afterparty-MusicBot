@@ -19,7 +19,8 @@ export function useConcertQueue(guildId: string | undefined) {
   if(previousGuild !== guildId){setPreviousGuild(guildId);setBusy(false);setData(null);setError("");}
   const generation = useRef(0),
     pending = useRef(false),
-    serial = useRef(0);
+    serial = useRef(0),
+    actionDone = useRef(Promise.resolve(true));
   const invalidate = useCallback(() => { generation.current++; }, []);
   const refresh = useCallback(async () => {
     if (!guildId) return;
@@ -31,6 +32,19 @@ export function useConcertQueue(guildId: string | undefined) {
     }>("/api/discord/queue?guildId=" + guildId, { headers: headers() });
     if (g === generation.current && id === serial.current) setData(result);
   }, [guildId]);
+  const reload = async () => {
+    const g = generation.current;
+    // Preserve the newer mutation response before reading another snapshot.
+    const actionSucceeded = pending.current ? await actionDone.current : true;
+    if (g !== generation.current) return;
+    const id = serial.current + 1;
+    try {
+      await refresh();
+      if (actionSucceeded && g === generation.current && id === serial.current) setError("");
+    } catch {
+      if (actionSucceeded && g === generation.current && id === serial.current) setError("Konsertkøen er ikkje tilgjengeleg.");
+    }
+  };
   useEffect(() => {
     invalidate();
     pending.current = false;
@@ -56,6 +70,9 @@ export function useConcertQueue(guildId: string | undefined) {
     if (!guildId || !data || pending.current) return;
     const g = generation.current,
       id = ++serial.current;
+    let complete: (succeeded: boolean) => void = () => {};
+    let succeeded = false;
+    actionDone.current = new Promise<boolean>(resolve => { complete = resolve; });
     pending.current = true;
     setBusy(true);
     setError("");
@@ -73,6 +90,7 @@ export function useConcertQueue(guildId: string | undefined) {
           ...extra,
         }),
       });
+      succeeded = true;
       if (g === generation.current && id === serial.current) setData(result);
     } catch (e) {
       if (g === generation.current) {
@@ -84,7 +102,8 @@ export function useConcertQueue(guildId: string | undefined) {
         pending.current = false;
         setBusy(false);
       }
+      complete(succeeded);
     }
   };
-  return { data, error, busy, action };
+  return { data, error, busy, action, reload };
 }

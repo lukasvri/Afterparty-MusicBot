@@ -37,7 +37,7 @@ test('undo counts pending guest requests toward the room capacity without losing
   state = changeRoom(state, {action: 'add', video: track(id)}, false, 30);
  }
  const before = structuredClone(state);
- assert.throws(() => changeRoom(state, {action: 'undo'}, true, 30), /Køen er for full/);
+ assert.throws(() => changeRoom(state, {action: 'undo'}, true, 30), /The queue is too full/);
  assert.deepEqual(state, before);
  // Freeing one pending slot makes the same undo possible at exactly 50 tracks.
  state = changeRoom(state, {action: 'reject', videoId: 'request0002'}, true, 30);
@@ -54,5 +54,5 @@ test('undo counts new queued tracks and pending requests together', () => {
  for (const id of ['request0001', 'request0002']) {
   state = changeRoom(state, {action: 'add', video: track(id)}, false, 30);
  }
- assert.throws(() => changeRoom(state, {action: 'undo'}, true, 30), /Køen er for full/);
+ assert.throws(() => changeRoom(state, {action: 'undo'}, true, 30), /The queue is too full/);
 });

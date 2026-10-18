@@ -12,7 +12,7 @@ The website and Discord music bot share the display name **Afterparty**. The vis
 | --- | --- | --- |
 | ap monogram | [`public/afterparty-mark.svg`](../public/afterparty-mark.svg) | Scalable interface mark |
 | Favicon | [`public/favicon.svg`](../public/favicon.svg) | Browser icon |
-| Variable Latin font | `public/fonts/inter-latin-wght-normal.woff2` | Self-hosted Inter display typography |
+| Variable Latin font | `public/fonts/inter-latin-wght-normal.woff2` | Self-hosted Inter body and display typography |
 | README banner and previews | [`docs/assets/`](assets/README.md) | Repository presentation |
 
 The application wordmark uses Inter 900. The monogram uses vector glyph outlines, so it does not need a remote font request. Keep the SIL Open Font License in [`public/fonts/Inter.LICENSE`](../public/fonts/Inter.LICENSE).
@@ -20,6 +20,29 @@ The application wordmark uses Inter 900. The monogram uses vector glyph outlines
 Use the `Logo` component in `components/afterparty-navigation.tsx` for shared website branding. It is reused by the service pages. Keep the dot round and red, retain generous spacing around the mark, and use accessible labels for standalone icons. The application accent is `#ff263e`; the documentation banner uses the same black, white and red direction.
 
 The AI-generated banner is documentation artwork. It is separate from the canonical vector UI mark. Screenshots show an isolated local preview; see [asset notes](assets/README.md) for provenance.
+
+## Shared interface language
+
+Use the shared variables in `app/globals.css` for neutral dark surfaces, light
+text, the red accent, control/panel radii and the visible keyboard focus ring.
+Body and display typography use the existing self-hosted Inter font. Service
+pages and administration use the same navigation proportions and action
+hierarchy as music and rooms; keep mobile links and primary actions usable
+without wrapping the navigation or shrinking touch targets.
+
+The decorative stage remains code-native SVG, separate from the logo. Its two
+decks share one component and projected control plane around a centered
+four-channel mixer. Preserve that geometry, align the hands with the controls,
+and honor reduced motion when changing the scene. This is an illustration,
+not a photograph or a claim of real hardware operation. Existing player,
+permission and playback-clock components remain independent of the artwork.
+
+Use opaque concert PA modules with rigging, grilles and ground subwoofers,
+not exposed hi-fi driver towers. Keep rear light behind their cabinets and
+anchor each beam to its fixture. Restrained red and neutral white lighting
+shares the interface palette. Backdrop graphics, including the rotating halo,
+must stay inside the LED screen in both scene compositions and at every
+animation angle. Both reduced motion and the in-app motion switch apply.
 
 ## Compatibility
 

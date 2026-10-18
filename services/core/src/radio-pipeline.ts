@@ -172,19 +172,25 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
   // Both bounded discovery pools participate. An early same-artist catalog or
   // genre hit cannot hide a later, equally supported and more diverse song.
   const stagePriority: Record<StageResult, number> = { unavailable: 0, skipped: 0, failed: 1, empty: 2, filtered: 3, selected: 4 };
-  for (const { source, query } of queries) {
+  const discoveries = await Promise.all(queries.map(async ({ source, query }) => {
     diagnostic.searches++;
-    let status: StageResult;
     try {
-      // Keep hydration sequential: search adapters may share metadata caches
-      // without coalescing in-flight video requests from different queries.
-      const found = (await input.search(query)).slice(0, RADIO_LIMITS.searchResults);
+      return { source, found: (await input.search(query)).slice(0, RADIO_LIMITS.searchResults) };
+    } catch (error) { return { source, error }; }
+  }));
+  // Fetch only the two existing bounded pools concurrently. Admit their results
+  // in query order, so provider completion timing cannot change tie-breaking.
+  // Core coalesces overlapping cold video IDs before hydration.
+  for (const discovery of discoveries) {
+    const { source, found } = discovery;
+    let status: StageResult;
+    if (found) {
       successfulDiscovery++;
       const before = pool.length;
       for (const candidate of found) admit(candidate, source);
       status = pool.length > before ? "selected" : found.length ? "filtered" : "empty";
-    } catch (error) {
-      lastError = error;
+    } else {
+      lastError = discovery.error;
       diagnostic.failedSearches++;
       status = "failed";
     }

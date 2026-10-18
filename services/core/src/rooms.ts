@@ -53,14 +53,14 @@ export class Rooms extends EventEmitter {
   }
   load(code: string): Saved {
     if (!/^[A-Z0-9]{8}$/.test(code) || code === "DISCORD1")
-      throw new UserError("Rommet finnes ikke.", 404);
+      throw new UserError("Room not found.", 404);
     const value = this.store
       .prepare("SELECT data FROM video_rooms WHERE code=?")
       .get(code);
-    if (!value) throw new UserError("Rommet finnes ikke.", 404);
+    if (!value) throw new UserError("Room not found.", 404);
     const room = JSON.parse(String(value.data)) as Saved;
     if (room.expiresAt <= this.now())
-      throw new UserError("Rommet er avsluttet.", 404);
+      throw new UserError("The room has ended.", 404);
     return room;
   }
   save(room: Saved) {
@@ -76,7 +76,7 @@ export class Rooms extends EventEmitter {
       typeof input.owner_hash !== "string" ||
       !/^[a-f0-9]{64}$/.test(input.owner_hash)
     )
-      throw new UserError("Ugyldig rom.");
+      throw new UserError("Invalid room.");
     try {
       return this.snapshot(code);
     } catch (error) {
@@ -105,7 +105,7 @@ export class Rooms extends EventEmitter {
       !Number.isFinite(input.expires_at) ||
       Number(input.expires_at) <= this.now()
     )
-      throw new UserError("Ugyldig rom.");
+      throw new UserError("Invalid room.");
     this.save({
       code,
       name: String(input.name),
@@ -160,9 +160,9 @@ export class Rooms extends EventEmitter {
       !guestActions.has(String(input.action)) &&
       input.actorHash !== room.ownerHash
     )
-      throw new UserError("Bare verten kan styre avspillingen.", 403);
+      throw new UserError("Only the host can control playback.", 403);
     if (input.version !== room.version)
-      throw new UserError("Rommet er endret. Prøv igjen.", 409);
+      throw new UserError("The room has changed. Try again.", 409);
     const lookupKey = `${code}:${room.version}`;
     if (input.action === "next") this.skipping.add(lookupKey);
     let lookup = this.radioLookups.get(lookupKey);
@@ -187,7 +187,7 @@ export class Rooms extends EventEmitter {
     } finally {
       this.radioLookups.delete(lookupKey);
     }
-    if (this.stopped) throw new UserError("Romtjenesten starter på nytt.", 503);
+    if (this.stopped) throw new UserError("The room service is restarting.", 503);
     if (input.action === "radio-prefetch" && this.skipping.has(lookupKey))
       return this.snapshot(code);
     this.skipping.delete(lookupKey);
@@ -196,7 +196,7 @@ export class Rooms extends EventEmitter {
       // and its shared clock remain untouched; mutate retains the revision guard.
       this.mutate(code, input);
       throw new UserError(
-        "Radioen fann ingen passande låtar. Prøv radio igjen eller legg til ei låt.",
+        "Radio found no suitable songs. Try radio again or add a song.",
         422,
       );
     }
@@ -213,7 +213,7 @@ export class Rooms extends EventEmitter {
       // mutate keeps revision protection if another command won during lookup.
       this.mutate(code, { ...input, action: "radio-prefetch" });
       throw new UserError(
-        "Radioen fann ikkje neste låt. Prøv igjen eller legg til ei låt.",
+        "Radio could not find the next song. Try again or add a song.",
         422,
       );
     }
@@ -226,7 +226,7 @@ export class Rooms extends EventEmitter {
   ) {
     const room = this.load(code);
     if (input.version !== room.version)
-      throw new UserError("Rommet er endret. Prøv igjen.", 409);
+      throw new UserError("The room has changed. Try again.", 409);
     const now = this.now(),
       previousKey = room.state.playbackKey;
     const state = changeRoom(

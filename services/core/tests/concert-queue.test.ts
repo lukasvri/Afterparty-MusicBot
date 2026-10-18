@@ -65,7 +65,7 @@ for (const withAddition of [false, true]) {
       const saved = a.q.read();
       const queue = [...a.e.queue];
       const persisted = a.e.store.get<Track[]>("queue", []);
-      await assert.rejects(act("undo"), /Køen er full/);
+      await assert.rejects(act("undo"), /The queue is full/);
       assert.equal(a.q.revision(), revision);
       assert.deepEqual(a.q.read(), saved, "Rejected undo retains requests and undo state");
       assert.deepEqual(a.e.queue, queue);
@@ -92,14 +92,14 @@ test("concert queue revisions, moderation and undo preserve private music and se
     );
     await assert.rejects(
       a.q.apply({ action: "clear", revision: a.q.revision() }, false),
-      /administratortilgang/,
+      /administrator access/,
     );
     await assert.rejects(
       a.q.apply(
         { action: "remove", revision: a.q.revision(), videoId: "private" },
         true,
       ),
-      /konsertkøen/,
+      /concert queue/,
     );
     const stale = a.q.revision();
     await act("move", { videoId: "two", to: 0 });
@@ -109,7 +109,7 @@ test("concert queue revisions, moderation and undo preserve private music and se
     );
     await assert.rejects(
       a.q.apply({ action: "clear", revision: stale }, true),
-      /endret/,
+      /changed/,
     );
     await act("clear");
     assert.deepEqual(
@@ -168,7 +168,7 @@ test("votes are per participant and do not invalidate prepared audio; undo expir
     a.e.current = track("new");
     await assert.rejects(
       a.q.apply({ action: "undo", revision: a.q.revision() }, true),
-      /endret/,
+      /changed/,
     );
   } finally {
     a.close();
@@ -201,8 +201,8 @@ test('three distinct skip votes apply only to the current public playback key',a
  const a=setup();try{let skips=0;a.e.skip=async()=>{skips++;};
  for(const actor of ['a','b','c'])await a.q.apply({action:'skip-vote',revision:a.q.revision(),playbackKey:'core:current',participantHash:actor.repeat(64)},false);
  assert.equal(skips,1);assert.equal(a.q.snapshot().skipVotes,0);
- await assert.rejects(a.q.apply({action:'skip-vote',revision:a.q.revision(),playbackKey:'core:old',participantHash:'d'.repeat(64)},false),/endret/);
- a.e.current={...a.e.current!,concert:false};await assert.rejects(a.q.apply({action:'skip-vote',revision:a.q.revision(),playbackKey:'core:current',participantHash:'d'.repeat(64)},false),/endret/);assert.equal(skips,1);
+ await assert.rejects(a.q.apply({action:'skip-vote',revision:a.q.revision(),playbackKey:'core:old',participantHash:'d'.repeat(64)},false),/changed/);
+ a.e.current={...a.e.current!,concert:false};await assert.rejects(a.q.apply({action:'skip-vote',revision:a.q.revision(),playbackKey:'core:current',participantHash:'d'.repeat(64)},false),/changed/);assert.equal(skips,1);
  }finally{a.close();}
 });
 
@@ -218,15 +218,15 @@ for (const location of ['current', 'queue'] as const) {
         if (route !== 'direct') await a.q.apply({ action: 'approval', enabled: true, revision: a.q.revision() }, true);
         if (route === 'request') {
           assert.equal(a.q.request([requested]), true);
-          assert.throws(() => a.q.request([{ ...requested, entryId: 'duplicate' }]), /allerede/);
+          assert.throws(() => a.q.request([{ ...requested, entryId: 'duplicate' }]), /already/);
         } else if (route === 'direct') {
           a.e.providers.resolve = async () => [requested];
           await a.c.execute({ action: 'enqueue', videoId: requested.id }, 'public');
-          await assert.rejects(a.c.execute({ action: 'enqueue', videoId: requested.id }, 'public'), /allerede/);
+          await assert.rejects(a.c.execute({ action: 'enqueue', videoId: requested.id }, 'public'), /already/);
         } else {
           // Seed an already pending request to exercise approval independently.
           a.q.save({ ...a.q.read(), requests: [requested] });
-          await assert.rejects(a.q.apply({ action: 'approve', videoId: requested.entryId, revision: a.q.revision() }, false), /administratortilgang/);
+          await assert.rejects(a.q.apply({ action: 'approve', videoId: requested.entryId, revision: a.q.revision() }, false), /administrator access/);
           await a.q.apply({ action: 'approve', videoId: requested.entryId, revision: a.q.revision() }, true);
           assert.equal(a.q.read().requests.length, 0);
         }
@@ -243,14 +243,14 @@ test('duplicate protection stays within visibility scopes, including batches and
   try {
     await a.q.apply({ action: 'approval', enabled: true, revision: a.q.revision() }, true);
     for (const existing of [a.e.current!, a.e.queue[0]]) {
-      assert.throws(() => a.q.request([{ ...existing, entryId: 'copy' }]), /allerede/);
-      assert.throws(() => a.e.enqueue([{ ...existing, entryId: 'copy' }]), /allerede/);
+      assert.throws(() => a.q.request([{ ...existing, entryId: 'copy' }]), /already/);
+      assert.throws(() => a.e.enqueue([{ ...existing, entryId: 'copy' }]), /already/);
     }
     const publicCopy = { ...track('batch'), id: 'batch000000' };
     const privateCopy = { ...publicCopy, concert: false, entryId: 'private-batch' };
     assert.equal(a.e.enqueue([publicCopy, { ...publicCopy, entryId: 'duplicate' }, privateCopy]), 2);
-    assert.throws(() => a.e.enqueue([{ ...privateCopy, concert: undefined, entryId: 'legacy-private' }]), /allerede/);
-    assert.throws(() => a.e.enqueue([{ ...track('private', false), entryId: 'duplicate-private' }]), /allerede/);
+    assert.throws(() => a.e.enqueue([{ ...privateCopy, concert: undefined, entryId: 'legacy-private' }]), /already/);
+    assert.throws(() => a.e.enqueue([{ ...track('private', false), entryId: 'duplicate-private' }]), /already/);
     const request = track('pending');
     assert(a.q.request([request, { ...request, entryId: 'duplicate-pending' }]));
     assert.equal(a.q.read().requests.length, 1);
@@ -281,7 +281,7 @@ for (const action of ["remove", "clear"] as const) {
       assert(a.e.store.get<Record<string, number>>("radio-skips", {})[suggested.id]);
       const persisted = new Providers(a.e.store, {});
       assert(persisted.radioHistory().some((track) => track.id === suggested.id));
-      await assert.rejects(a.q.apply({ action, videoId: suggested.entryId, revision }, true), /endret/);
+      await assert.rejects(a.q.apply({ action, videoId: suggested.entryId, revision }, true), /changed/);
       await a.e.ensureRadio();
       assert.equal(searches, 4, "each shared selection compares its two bounded discovery pools");
       assert.deepEqual(a.e.queue.map((track) => track.id), [replacement.id]);
@@ -303,7 +303,7 @@ test("concert undo restores only the selected rejection and preserves private qu
     a.e.rejectRadio([rejected]);
     const act = (action: string, extra = {}) =>
       a.q.apply({ action, revision: a.q.revision(), ...extra }, true);
-    await assert.rejects(a.q.apply({ action: "remove", videoId: selected.entryId, revision: a.q.revision() }, false), /administratortilgang/);
+    await assert.rejects(a.q.apply({ action: "remove", videoId: selected.entryId, revision: a.q.revision() }, false), /administrator access/);
     await act("remove", { videoId: selected.entryId });
     assert.deepEqual(a.e.queue.map((track) => track.entryId), ["private", "kept", "manual"]);
     assert.deepEqual(Object.keys(a.e.store.get("radio-skips", {})).sort(), [rejected.id, selected.id].sort());
@@ -356,7 +356,7 @@ test('approval replaces radio at capacity and preserves other pending requests a
   assert.deepEqual(a.e.queue.map(t=>t.entryId),['private','requested']);
   assert.deepEqual(a.q.read().requests.map(t=>t.entryId),['waiting']);
   const before={queue:[...a.e.queue],saved:a.q.read(),revision:a.q.revision()};
-  await assert.rejects(act('approve',{videoId:'waiting'}),/Køen er full/);
+  await assert.rejects(act('approve',{videoId:'waiting'}),/The queue is full/);
   assert.deepEqual({queue:a.e.queue,saved:a.q.read(),revision:a.q.revision()},before);
   assert.deepEqual({queue:b.e.queue,saved:b.q.read(),revision:b.q.revision()},other);
  }finally{a.close();b.close();}
@@ -369,7 +369,7 @@ test('pending request admission still counts radio that remains queued',async()=
   await a.q.apply({action:'approval',enabled:true,revision:a.q.revision()},true);
   assert(a.q.request([track('waiting')]));
   const before={queue:[...a.e.queue],saved:a.q.read(),revision:a.q.revision()};
-  assert.throws(()=>a.q.request([track('overflow')]),/Køen er full/);
+  assert.throws(()=>a.q.request([track('overflow')]),/The queue is full/);
   assert.deepEqual({queue:a.e.queue,saved:a.q.read(),revision:a.q.revision()},before);
  }finally{a.close();}
 });

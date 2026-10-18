@@ -98,7 +98,7 @@ export function changeRoom(
 ): RoomPlayback {
   const action = String(input.action);
   if (!host && !guestActions.has(action))
-    throw new UserError("Bare verten eller medverten kan styre rommet.", 403);
+    throw new UserError("Only the host or co-host can control the room.", 403);
   const state: RoomPlayback = structuredClone(previous);
   // Upgrade older rooms lazily. Automatic recommendations retain this anchor;
   // only an explicitly selected track that becomes current replaces it.
@@ -124,7 +124,7 @@ export function changeRoom(
       ? items.findIndex((v) => v.id === input.videoId)
       : Number(input.index);
     if (!Number.isInteger(i) || i < 0 || i >= items.length)
-      throw new UserError("Låten finnes ikke lenger i køen.", 409);
+      throw new UserError("This song is no longer in the queue.", 409);
     return i;
   };
   const advance = () => {
@@ -146,7 +146,7 @@ export function changeRoom(
   };
   if (action === "add" || action === "play-video") {
     if (!valid(video))
-      throw new UserError("Videoen kan ikke spilles her. Velg en annen.", 422);
+      throw new UserError("This video cannot be played here. Choose another one.", 422);
     const track = {
       ...video,
       radio: false,
@@ -172,14 +172,14 @@ export function changeRoom(
       state.skipVoters = [];
     } else {
       if (state.queue.length + (state.requests?.length ?? 0) >= 50)
-        throw new UserError("Køen har plass til 50 låter.");
+        throw new UserError("The queue holds up to 50 songs.");
       if (
         state.current?.id === track.id ||
         [...state.queue, ...(state.requests ?? [])].some(
           (v) => v.id === track.id,
         )
       )
-        throw new UserError("Låten er allerede i rommet.", 409);
+        throw new UserError("This song is already in the room.", 409);
       if (state.approvalRequired && !host) (state.requests ??= []).push(track);
       else if (!state.current) {
         state.current = track;
@@ -193,7 +193,7 @@ export function changeRoom(
       }
     }
   } else if (action === "play" || action === "pause") {
-    if (!state.current) throw new UserError("Legg til en låt først.");
+    if (!state.current) throw new UserError("Add a song first.");
     state.playing = action === "play";
   } else if (action === "seek") {
     if (
@@ -202,7 +202,7 @@ export function changeRoom(
       typeof input.position !== "number" ||
       !Number.isFinite(input.position)
     )
-      throw new UserError("Denne videoen kan ikke spoles.");
+      throw new UserError("This video does not support seeking.");
     state.position = Math.max(
       0,
       Math.min(Math.max(0, state.current.duration - 1), input.position),
@@ -213,7 +213,7 @@ export function changeRoom(
   } else if (action === "next") advance();
   else if (action === "radio" || action === "approval") {
     if (typeof input.enabled !== "boolean")
-      throw new UserError("Velg på eller av.");
+      throw new UserError("Choose on or off.");
     if (action === "radio") {
       state.radio = input.enabled;
       if (!input.enabled) state.queue = state.queue.filter(track => !track.radio);
@@ -231,7 +231,7 @@ export function changeRoom(
     const i = index(items);
     const [track] = items.splice(i, 1);
     if (action === "approve") {
-      if (state.queue.length >= 50) throw new UserError("Køen er full.");
+      if (state.queue.length >= 50) throw new UserError("The queue is full.");
       if (!state.current) {
         state.current = track;
         state.radioSeed = structuredClone(track);
@@ -262,11 +262,11 @@ export function changeRoom(
       const from = index(state.queue),
         to = Number(input.to);
       if (!Number.isInteger(to) || to < 0 || to >= state.queue.length)
-        throw new UserError("Ugyldig køplass.");
+        throw new UserError("Invalid queue position.");
       state.queue.splice(to, 0, state.queue.splice(from, 1)[0]);
     }
   } else if (action === "undo") {
-    if (!state.undoQueue) throw new UserError("Ingen køendring å angre.");
+    if (!state.undoQueue) throw new UserError("There is no queue change to undo.");
     // A manual re-add is the current explicit choice. Keep its metadata and
     // manual status at the restored slot instead of resurrecting its radio copy.
     const restored = state.undoQueue.map((saved) =>
@@ -277,7 +277,7 @@ export function changeRoom(
     );
     if (restored.length + additions.length + (state.requests?.length ?? 0) > 50)
       throw new UserError(
-        "Køen er for full til å angre. Fjern noen låter først.",
+        "The queue is too full to undo. Remove some songs first.",
       );
     const restoredSuggestions = restored.filter(
       (track) => track.radio && !state.queue.some((queued) => queued.id === track.id),
@@ -295,21 +295,21 @@ export function changeRoom(
   } else if (action === "vote" || action === "skip-vote") {
     const actor = String(input.participantHash ?? "");
     if (!/^[a-f0-9]{64}$/.test(actor))
-      throw new UserError("Bli med i rommet før du stemmer.", 403);
+      throw new UserError("Join the room before voting.", 403);
     const voters =
       action === "vote"
         ? ((state.votes ??= {})[state.queue[index(state.queue)].id] ??= [])
         : (state.skipVoters ??= []);
     if (action === "skip-vote" && !state.current)
-      throw new UserError("Ingen låt å hoppe over.");
+      throw new UserError("There is no song to skip.");
     if (voters.includes(actor)) voters.splice(voters.indexOf(actor), 1);
     else {
-      if (voters.length >= 128) throw new UserError("Stemmelisten er full.");
+      if (voters.length >= 128) throw new UserError("The voter list is full.");
       voters.push(actor);
     }
     // One vote per browser participant. A host can always skip immediately.
     if (action === "skip-vote" && voters.length >= 3) advance();
-  } else throw new UserError("Ukjent romhandling.");
+  } else throw new UserError("Unknown room action.");
   if (state.votes) {
     const retained = new Set(
       [...state.queue, ...(state.undoQueue ?? [])].map((v) => v.id),

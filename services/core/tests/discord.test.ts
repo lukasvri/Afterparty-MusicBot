@@ -47,15 +47,15 @@ function playerFixture(){
 test('play confirmation brings the complete player to the bottom and retires the old card',async()=>{
  const t=playerFixture();await t.player.confirmQueue(1,false);
  assert.equal(t.posts.length,1);assert.equal(t.old.deleted,true);assert.equal(t.saved.get('player-message'),'new1');
- const p=t.posts[0].payload;assert.deepEqual(p.allowedMentions,{parse:[]});assert.equal(p.embeds[0].data.title,'Spiller nå');assert.match(p.embeds[0].data.description!,/0:25\/1:40/);assert.equal(p.components.length,2);
+ const p=t.posts[0].payload;assert.deepEqual(p.allowedMentions,{parse:[]});assert.equal(p.embeds[0].data.title,'Now playing');assert.match(p.embeds[0].data.description!,/0:25\/1:40/);assert.equal(p.components.length,2);
  const labels=p.components.flatMap((r)=>r.components.map((b)=>("label" in b.data ? b.data.label : undefined)));
- for(const label of ['Pause','Hopp over','Stopp','Gjenta','Bland kø','Lagre favoritt'])assert(labels.includes(label));
+ for(const label of ['Pause','Skip','Stop','Loop','Shuffle queue','Save favorite'])assert(labels.includes(label));
  await t.player.update(true);assert.equal(t.posts.length,1);
 });
 test('failed replacement preserves the existing working player',async()=>{const t=playerFixture();t.fail();await assert.rejects(t.player.confirmQueue(1,false),/Forbidden/);assert.equal(t.old.deleted,false);assert.equal(t.saved.get('player-message'),'old');});
 test('progress handles start, end, long tracks, buffering and live seek restrictions',()=>{
  assert.equal(formatTime(3723),'1:02:03');
- const t=playerFixture();t.bot.engine.loading=true;assert.match(playerEmbed(t.bot as never).data.title!,/Laster/);
+ const t=playerFixture();t.bot.engine.loading=true;assert.match(playerEmbed(t.bot as never).data.title!,/Loading/);
  t.state.current.live=true;const navigation=playerMoreComponents(t.bot as never)[0];assert(navigation.components[0].data.disabled);assert(navigation.components[1].data.disabled);
 });
 test('now-playing restores the public interactive card',async()=>{const calls:string[]=[];const bot={engine:{},playerMessage:{update:async(force:boolean,bottom:boolean)=>{assert(force&&bottom);calls.push('player');}}};const i={commandName:'now-playing',deferred:true,deferReply:async()=>{},isButton:()=>false,options:{},deleteReply:async()=>calls.push('delete'),editReply:async()=>calls.push('private')};await DiscordBot.prototype.interaction.call(bot as never,i as never);assert.deepEqual(calls,['player','delete']);});

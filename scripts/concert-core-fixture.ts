@@ -83,8 +83,8 @@ export async function concertCore() {
    await route.fulfill({contentType:'application/json',body:JSON.stringify(result)}); return true;
   },
   async verifyPermissions() {
-   await assert.rejects(commands.execute({action:'seek',seconds:80},'public'),/administratortilgang/);
-   await assert.rejects(commands.execute({action:'seek',seconds:80,queueRevision:'stale'},'admin'),/Køen er endret/);
+   await assert.rejects(commands.execute({action:'seek',seconds:80},'public'),/administrator access/);
+   await assert.rejects(commands.execute({action:'seek',seconds:80,queueRevision:'stale'},'admin'),/The queue has changed/);
   },
   async close() { release(); await servers.close(); commands.close();engine.close();store.close(); },
  };

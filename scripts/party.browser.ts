@@ -17,6 +17,10 @@ try {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
+  // This workflow deliberately covers a saved Norwegian preference.
+  await context.addInitScript(() => {
+    if (localStorage.getItem("gutta-language") === null) localStorage.setItem("gutta-language", "nb");
+  });
   const track: Video = {
     id: "seed1234567",
     title: "Synthetic evening song",
@@ -137,7 +141,7 @@ try {
   assert.equal(await sceneAnimations(), 0, "The site's motion control must stop all stage animation");
   await page.locator(".motion-toggle").click();
   assert((await sceneAnimations()) > 0, "The site's motion control must restore stage animation");
-  await page.locator(".welcome-release").click();
+  await page.locator("[data-latest-release]").click();
   await page.getByRole("heading", { name: releases[0].title }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);

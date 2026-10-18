@@ -30,7 +30,7 @@ export const partyMessages: Record<string, string> = {
     "Music and video here. No Discord needed.",
   "Sjå med Discord": "Watch with Discord",
   "Lyden i talekanalen. Videoen her. Start med /konsert i Discord.":
-    "Audio in your voice channel. Video here. Start with /konsert in Discord.",
+    "Audio in your voice channel. Video here. Start with /concert in Discord.",
   "Har du ei romlenkje? Bli med": "Have a room link? Join",
   "Start kvelden": "Start the evening",
   "Bli med i rom": "Join a room",
@@ -125,6 +125,10 @@ export const partyMessages: Record<string, string> = {
     "Private host link downloaded. Anyone with this link gets your access. Keep it safe.",
   "Hopp til musikken": "Skip to music",
   "Kallenamnet ditt": "Your nickname",
+  "Namnet som blir vist på låtønska dine. Det gir ingen ekstra tilgang.":
+    "The name shown on your track requests. It does not give you extra access.",
+  "Bli med på telefonen for å søkje og leggje til musikk.":
+    "Join on your phone to search and add music.",
   "Lyden kjem frå Discord": "Audio plays in Discord",
   "Lyd og video i nettlesaren": "Audio and video in the browser",
   Festkontroll: "Party controls",

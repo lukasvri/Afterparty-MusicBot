@@ -46,7 +46,7 @@ test('Spotify references support URI and regional URLs without accepting spoofed
  for(const url of ['spotify:track:'+source.id,'https://open.spotify.com/intl-no/track/'+source.id+'?si=x'])assert.equal(spotifyRef(url)?.id,source.id);
  assert.equal(spotifyRef('https://evil.test/open.spotify.com/track/'+source.id),null);
  assert.equal(spotifyRef('https://open.spotify.com.evil.test/track/'+source.id),null);
- await assert.rejects(expandSpotifyLink('https://spotify.link/test',async()=>new Response(null,{status:302,headers:{location:'http://127.0.0.1:3990'}})),/Ugyldig/);
+ await assert.rejects(expandSpotifyLink('https://spotify.link/test',async()=>new Response(null,{status:302,headers:{location:'http://127.0.0.1:3990'}})),/Invalid/);
 });
 test('Spotify paginates in order and ignores episodes and local files',async()=>{
  const song=(id:string)=>({id,name:'Song '+id,artists:[{name:'Artist'}],duration_ms:200000,type:'track',external_ids:{isrc:source.isrc}});const calls:string[]=[];
@@ -65,7 +65,7 @@ test('SoundCloud supports search, share URLs and sets with a bounded ordered pla
  const args:string[][]=[];const extract=async(a:string[])=>{args.push(a);return {entries:[sc('one'),sc('two')]}};
  const songs=await resolveSoundcloud('https://soundcloud.com/artist/sets/set',2,extract);assert.deepEqual(songs.map(t=>t.id),['one','two']);assert(songs.every(t=>t.source==='soundcloud'&&!t.embeddable));
  const search=await resolveSoundcloud('sc: some music',50,extract);assert.equal(search.length,1);assert(args.at(-1)?.includes('scsearch5:some music'));
- await assert.rejects(resolveSoundcloud('https://soundcloud.com/artist/blocked',1,async()=>({...sc('blocked'),is_preview:true})),/forhåndsvisning/);
+ await assert.rejects(resolveSoundcloud('https://soundcloud.com/artist/blocked',1,async()=>({...sc('blocked'),is_preview:true})),/preview/);
 });
 test('Last.fm uses a bounded cached lookup and preserves metadata-only privacy',async()=>{
  const t=setup();try{let calls=0;const r=new Recommendations(t.store,'test',async()=>{calls++;return Response.json({similartracks:{track:[{name:'Other Song',artist:{name:'Other Artist'},match:'0.8'}]}})});const seed={...track(),catalog:source};assert.equal((await r.similar(seed))[0].artist,'Other Artist');await r.similar(seed);assert.equal(calls,1);assert.deepEqual(await new Recommendations(t.store,'').similar(seed),[]);}finally{t.close();}
@@ -78,7 +78,7 @@ test('public Spotify embed fallback is retained while rate limits are not retrie
  let embeds=0;
  const fake=async(url:Parameters<typeof fetch>[0])=>{if(String(url).includes('/embed/')){embeds++;return new Response('<script id="__NEXT_DATA__">'+JSON.stringify({props:{pageProps:{state:{data:{entity:{trackList:[{title:'Song',subtitle:'Artist',duration:200000}]}}}}}})+'</script>');}return new Response('',{status:403});};
  const p=new SpotifyCatalog('','',fake as typeof fetch);assert.equal((await p.load('playlist','test',5))[0].title,'Song');assert.equal(embeds,1);
- const rateLimited=new SpotifyCatalog('id','secret',async(url:Parameters<typeof fetch>[0])=>String(url).includes('/api/token')?Response.json({access_token:'test',expires_in:3600}):new Response('',{status:429}));await assert.rejects(rateLimited.load('playlist','test',5),/opptatt/);
+ const rateLimited=new SpotifyCatalog('id','secret',async(url:Parameters<typeof fetch>[0])=>String(url).includes('/api/token')?Response.json({access_token:'test',expires_in:3600}):new Response('',{status:429}));await assert.rejects(rateLimited.load('playlist','test',5),/busy/);
 });
 
 test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions and falls back on provider failure',async()=>{
@@ -127,7 +127,7 @@ test('YouTube search falls back on quota failure and preserves literal query sem
 test('bounded extractor queue releases slots when a waiting request is cancelled',async()=>{
  const {runJson}=await import('../src/providers.ts');
  const occupied=Array.from({length:4},()=>runJson(process.execPath,['-e','setTimeout(()=>process.stdout.write("{}"),150)']));
- const controller=new AbortController(),queued=runJson(process.execPath,['-e','process.stdout.write("{}")'],controller.signal);controller.abort();await assert.rejects(queued,/avbrutt|opptatt/);await Promise.all(occupied);assert.deepEqual(await runJson(process.execPath,['-e','process.stdout.write("{}")']),{});
+ const controller=new AbortController(),queued=runJson(process.execPath,['-e','process.stdout.write("{}")'],controller.signal);controller.abort();await assert.rejects(queued,/cancelled|busy/);await Promise.all(occupied);assert.deepEqual(await runJson(process.execPath,['-e','process.stdout.write("{}")']),{});
 });
 
 test('radio search survives an unavailable candidate in the no-key extractor fallback',async()=>{

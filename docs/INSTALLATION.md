@@ -182,7 +182,7 @@ The login requests `identify` and `guilds`. You must own the selected Discord se
 2. Type `/play` and fill in its query field with a song title or supported link.
 3. Check that the bot joins, the player message appears, and you can hear audio.
 4. Test Pause, Resume and Next from the player controls.
-5. Use `/konsert` with an embeddable YouTube video, then open the associated concert room on the website.
+5. Use `/concert url` with an embeddable YouTube video, then open the associated concert room on the website.
 6. If the browser asks for a click to start video, click its playback control. Browser autoplay restrictions are separate from the shared playback state.
 
 Useful commands:
@@ -190,13 +190,25 @@ Useful commands:
 | Command | Purpose |
 | --- | --- |
 | `/play` | Add ordinary Discord music |
-| `/konsert` | Add a public concert video |
+| `/concert url` | Add a public concert video |
 | `/queue` | View the queue |
 | `/now-playing` | Bring up the player |
 | `/favorites` | Manage favorites |
-| `/hjelp` | Show the bot's help |
+| `/help` | Show the bot's help |
 
-Some bot messages remain Norwegian. `konsert` means concert; `hjelp` means help.
+Bot descriptions, help, player controls and standard replies use English.
+Existing `/konsert lenke` and `/hjelp` commands remain aliases; `/history count`
+also accepts the old `antall` option from previously registered commands.
+
+Slash registration omits unsupported `split` options on `/play-advanced` and
+`/favorites use`, plus the inactive `set-queue-add-response-hidden` and
+`set-auto-announce-next-song` config commands. Stale invocations receive an
+explicit unsupported response before changing playback or settings. Stored
+configuration/import fields are retained for compatibility. The corresponding
+features were not implemented; this cleanup does not remove working controls.
+The updated command definitions are registered when an approved Core update
+starts normally. Source changes and local synthetic tests do not update Discord
+registration on an existing deployment.
 
 ## Troubleshooting
 

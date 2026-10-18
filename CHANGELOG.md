@@ -4,6 +4,18 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.5: Faster radio discovery and a more consistent interface
+
+2026-10-18
+
+- Radio fetches its two bounded discovery pools concurrently while preserving selection order and music safeguards. Overlapping cold video lookups share metadata work, retain independent playback entries and can recover after failures.
+- Core cleans up listeners, timers and any already opened server when startup fails to bind a port. Closing the service remains safe to repeat.
+- The stage has matching DJ decks and a centered four-channel mixer, flown concert PA arrays with subwoofers, and improved red and white stage lighting. Opaque speaker cabinets block rear beams, and the animated backdrop ring stays inside its LED screen.
+- Shared dark surfaces, red accents, navigation proportions and keyboard focus make music, rooms, administration, support and patch notes more consistent on desktop and mobile. The welcome page's top patch-notes banner is removed; the current version remains linked in the footer.
+- Adding music in a Discord concert refreshes the authoritative queue as soon as the command is confirmed. Queue-read failures remain separate from successful additions, and delayed replies cannot replace another server's queue or a newer error.
+- New website sessions default to English while retaining saved language choices. Discord help, player controls, command descriptions and standard errors use English. Use /help, /concert url and /history count; existing Norwegian command aliases still work. Unsupported split and inactive announcement settings are no longer offered as working slash options.
+- TV mode gives video and track information their own layout with a QR panel and a visible exit control, while retaining the mounted player when entering or leaving. Nickname settings explain that the name labels track requests and does not grant access.
+
 ## v2.2.4: Radio venue and artist-alias safeguards
 
 2026-10-18

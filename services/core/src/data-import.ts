@@ -15,7 +15,7 @@ export function previousDataImported(store:Store){
 
 /** Import a read-only export atomically; a failed import remains safe to retry. */
 export function importPreviousData(store:Store,dir:string,guild:string){
- if(!guild)throw new Error('Discord-serveren mangler i datamigreringen.');
+ if(!guild)throw new Error('The Discord server is missing from the data migration.');
  if(previousDataImported(store))return;
  const file=join(dir,'db.sqlite');
  if(!existsSync(file))return;

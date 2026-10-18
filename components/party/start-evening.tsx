@@ -2,7 +2,6 @@
 import { ArrowUpRight, Play, Radio, ArrowRight } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import { ConcertScenery } from "@/components/concert-scenery";
-import releases from "@/lib/releases.json";
 
 export function StartEvening({
   offline,
@@ -19,13 +18,6 @@ export function StartEvening({
   const en = language === "en";
   return (
     <section className="start-evening" aria-labelledby="start-evening-title">
-      <a className="welcome-release" href="/patch-notes">
-        <span>V{releases[0].version}</span>{" "}
-        {en ? "What’s new" : "Siste oppdatering"}
-        <span className="release-link">
-          Patch notes <ArrowUpRight size={15} />
-        </span>
-      </a>
       <div className="welcome-hero">
         <div className="welcome-copy">
           <span className="party-kicker">
@@ -67,8 +59,8 @@ export function StartEvening({
             <strong>{t("Sjå med Discord")}</strong>
             <small>
               {en
-                ? "Voice-channel audio, video here. Start with /konsert."
-                : "Lyden i talekanalen, videoen her. Start med /konsert."}
+                ? "Voice-channel audio, video here. Start with /concert."
+                : "Lyden i talekanalen, videoen her. Start med /concert."}
             </small>
           </span>
           <ArrowUpRight size={20} />

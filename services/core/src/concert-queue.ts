@@ -85,12 +85,12 @@ export class ConcertQueue {
       return true;
     });
     if (!fresh.length)
-      throw new UserError("Låten finnes allerede i rommet.", 409);
+      throw new UserError("This song is already in the room.", 409);
     if (
       s.requests.length + e.queue.length + fresh.length >
       e.settings.playlistLimit
     )
-      throw new UserError("Køen er full.");
+      throw new UserError("The queue is full.");
     s.requests.push(...fresh);
     this.save(s);
     return true;
@@ -100,30 +100,30 @@ export class ConcertQueue {
       action = String(input.action),
       s = this.read();
     if (!admin && !["vote", "skip-vote"].includes(action))
-      throw new UserError("Discord-administratortilgang kreves.", 403);
+      throw new UserError("Discord administrator access is required.", 403);
     if (input.revision !== this.revision())
-      throw new UserError("Køen er endret. Oppdater og prøv igjen.", 409);
+      throw new UserError("The queue has changed. Refresh and try again.", 409);
     const entry = String(input.videoId ?? "");
     const visible = e.queue.filter(
       (t) => t.concert && t.entryId !== e.current?.entryId,
     );
     const find = () => {
       const t = visible.find((t) => t.entryId === entry);
-      if (!t) throw new UserError("Låten finnes ikke i konsertkøen.", 409);
+      if (!t) throw new UserError("This song is not in the concert queue.", 409);
       return t;
     };
     if (action === "approval") {
       if (typeof input.enabled !== "boolean")
-        throw new UserError("Velg på eller av.");
+        throw new UserError("Choose on or off.");
       s.approvalRequired = input.enabled;
     } else if (action === "approve" || action === "reject") {
       const i = s.requests.findIndex((t) => t.entryId === entry);
-      if (i < 0) throw new UserError("Ønsket finnes ikke lenger.", 409);
+      if (i < 0) throw new UserError("This request is no longer available.", 409);
       if (action === "approve") e.enqueue([s.requests[i]]);
       s.requests.splice(i, 1);
     } else if (action === "clear" || action === "remove" || action === "move") {
       if (e.mixer?.fadeFrame)
-        throw new UserError("Vent til overgangen er ferdig.", 409);
+        throw new UserError("Wait for the transition to finish.", 409);
       s.undo = visible;
       s.undoKey = e.current?.entryId;
       s.undoBefore = Object.fromEntries(
@@ -145,7 +145,7 @@ export class ConcertQueue {
         const t = find(),
           to = Number(input.to);
         if (!Number.isInteger(to) || to < 0 || to >= visible.length)
-          throw new UserError("Ugyldig køplass.");
+          throw new UserError("Invalid queue position.");
         const reordered = [...visible];
         reordered.splice(reordered.indexOf(t), 1);
         reordered.splice(to, 0, t);
@@ -156,8 +156,8 @@ export class ConcertQueue {
       }
     } else if (action === "undo") {
       if (e.mixer?.fadeFrame || s.undoKey !== e.current?.entryId)
-        throw new UserError("Avspillingen er endret.", 409);
-      if (!s.undo) throw new UserError("Ingen køendring å angre.");
+        throw new UserError("Playback has changed.", 409);
+      if (!s.undo) throw new UserError("There is no queue change to undo.");
       const old = s.undo.filter(
         (t) =>
           t.entryId !== e.current?.entryId && (!t.radio || e.settings.radio),
@@ -170,7 +170,7 @@ export class ConcertQueue {
         e.queue.filter((t) => !t.concert).length + desired.length + s.requests.length >
         e.settings.playlistLimit
       )
-        throw new UserError("Køen er full.");
+        throw new UserError("The queue is full.");
       const remaining = new Set(old.map((t) => t.entryId));
       const restored: Track[] = [];
       for (const privateTrack of e.queue.filter((t) => !t.concert)) {
@@ -199,13 +199,13 @@ export class ConcertQueue {
     } else if (action === "vote" || action === "skip-vote") {
       const actor = String(input.participantHash ?? "");
       if (!/^[a-f0-9]{64}$/.test(actor))
-        throw new UserError("Bli med før du stemmer.", 403);
+        throw new UserError("Join before voting.", 403);
       if (action === "skip-vote") {
         if (
           !e.current?.concert ||
           input.playbackKey !== "core:" + e.current.entryId
         )
-          throw new UserError("Konserten er endret.", 409);
+          throw new UserError("The concert has changed.", 409);
         if (s.skipKey !== input.playbackKey) {
           s.skipKey = String(input.playbackKey);
           s.skipVoters = [];
@@ -216,7 +216,7 @@ export class ConcertQueue {
       const i = voters.indexOf(actor);
       if (i >= 0) voters.splice(i, 1);
       else {
-        if (voters.length >= 128) throw new UserError("Stemmelisten er full.");
+        if (voters.length >= 128) throw new UserError("The voter list is full.");
         voters.push(actor);
       }
       if (action === "skip-vote" && voters.length >= 3) {
@@ -226,7 +226,7 @@ export class ConcertQueue {
         await e.skip();
         return this.snapshot();
       }
-    } else throw new UserError("Ukjent køhandling.");
+    } else throw new UserError("Unknown queue action.");
     const ids = new Set([...e.queue, ...(s.undo ?? [])].map((t) => t.entryId));
     s.votes = Object.fromEntries(
       Object.entries(s.votes).filter(([id]) => ids.has(id)),

@@ -6,7 +6,7 @@ import "./interface.css";
 import "./party.css";
 export const metadata: Metadata = {
   title: "Afterparty",
-  description: "Søk etter musikk, del videorom og følg musikken fra Discord.",
+  description: "Find music, share video rooms and follow the music from Discord.",
   icons: { icon: "/favicon.svg" },
 };
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="nb">
+    <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="referrer" content="strict-origin-when-cross-origin" />

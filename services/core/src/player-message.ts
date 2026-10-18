@@ -11,43 +11,43 @@ export function progressBar(position:number,duration:number){
 export function playerEmbed(bot: DiscordBot) {
     const state=bot.engine.snapshot(),track=state.current;
     const embed=new EmbedBuilder().setColor(state.playing?'DarkGreen':'DarkRed');
-    if(!track)return embed.setTitle('Avspillingen er ferdig').setDescription(bot.engine.lastError?'Kunne ikke spille denne sangen. Prøv en annen med /play.':'Velg en ny sang med /play.');
-    const status=bot.engine.loading?'Laster':state.buffering?'Bufrer':state.playing?'Spiller nå':'På pause';
+    if(!track)return embed.setTitle('Playback finished').setDescription(bot.engine.lastError?'Could not play this track. Try another one with /play.':'Choose another track with /play.');
+    const status=bot.engine.loading?'Loading':state.buffering?'Buffering':state.playing?'Now playing':'Paused';
     const url=track.source==='soundcloud'?track.url:`https://www.youtube.com/watch?v=${track.id}`;
     const title=track.title.replace(/\[.*\]/,'').trim().slice(0,256).replace(/([\\[\]])/g,'\\$1');
     const requestedBy=bot.engine.current?.requestedBy;
-    const requester=requestedBy&&/^\d+$/.test(requestedBy)?`\nØnsket av: <@${requestedBy}>`:'';
-    const time=track.live?'Direkte':`${formatTime(state.position)}/${formatTime(track.duration)}`;
+    const requester=requestedBy&&/^\d+$/.test(requestedBy)?`\nRequested by: <@${requestedBy}>`:'';
+    const time=track.live?'Live':`${formatTime(state.position)}/${formatTime(track.duration)}`;
     const timeline=track.live?'':`${progressBar(state.position,track.duration)} `;
     const loop=bot.engine.loop?' 🔂':bot.engine.loopQueue?' 🔁':'';
     const volume=Number.isFinite(state.volume)?` 🔉 ${state.volume}%`:'';
     return embed.setTitle(status)
         .setDescription(`**${url?`[${title}](${url})`:title}**${requester}\n\n${state.playing?'⏹️':'▶️'} ${timeline}\`[${time}]\`${volume}${loop}`)
-        .setFooter({text:`Kilde: ${track.artist}`.slice(0,2048)})
+        .setFooter({text:`Source: ${track.artist}`.slice(0,2048)})
         .setThumbnail(track.image||null);
 }
 // Afterparty player controls; attribution is retained in THIRD_PARTY_NOTICES.md.
 const icons:Record<string,string>={skip:'⏭️',stop:'⏹️',more:'⚙️',back10:'⏪',forward30:'⏩',queue:'📜',loop:'🔁',shuffle:'🔀',favorite:'⭐'};
-const control=(id:string,label:string,style=ButtonStyle.Secondary)=>new ButtonBuilder().setCustomId('krutt:'+id).setLabel(label).setStyle(style).setEmoji(id==='pause-resume'?(label==='Fortsett'?'▶️':'⏸️'):icons[id]);
+const control=(id:string,label:string,style=ButtonStyle.Secondary)=>new ButtonBuilder().setCustomId('krutt:'+id).setLabel(label).setStyle(style).setEmoji(id==='pause-resume'?(label==='Resume'?'▶️':'⏸️'):icons[id]);
 export function playerComponents(bot: DiscordBot) {
     const e=bot.engine;
     const playback=new ActionRowBuilder<ButtonBuilder>().addComponents(
-        control('pause-resume',e.paused?'Fortsett':'Pause'),
-        control('skip','Hopp over',ButtonStyle.Primary),control('stop','Stopp',ButtonStyle.Danger),
+        control('pause-resume',e.paused?'Resume':'Pause'),
+        control('skip','Skip',ButtonStyle.Primary),control('stop','Stop',ButtonStyle.Danger),
     );
     const extras=new ActionRowBuilder<ButtonBuilder>().addComponents(
-        control('loop','Gjenta',e.loop?ButtonStyle.Success:ButtonStyle.Secondary),
-        control('shuffle','Bland kø'),control('favorite','Lagre favoritt'),
+        control('loop','Loop',e.loop?ButtonStyle.Success:ButtonStyle.Secondary),
+        control('shuffle','Shuffle queue'),control('favorite','Save favorite'),
     );
-    if(bot.site&&e.current?.concert)extras.addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Se video · Afterparty').setURL(bot.site+'/?room='+(bot.roomCode??'DISCORD1')));
+    if(bot.site&&e.current?.concert)extras.addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Watch video · Afterparty').setURL(bot.site+'/?room='+(bot.roomCode??'DISCORD1')));
     return [playback,extras];
 }
 /** Secondary actions are private to the person opening the menu. */
 export function playerMoreComponents(bot:DiscordBot){
     const e=bot.engine,seekDisabled=Boolean(!e.current||e.current.live||e.loading);
     return [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(control('back10','−10 sek').setDisabled(seekDisabled),control('forward30','+30 sek').setDisabled(seekDisabled),control('queue','Vis kø')),
-        new ActionRowBuilder<ButtonBuilder>().addComponents(control('loop','Gjenta',e.loop?ButtonStyle.Success:ButtonStyle.Secondary),control('shuffle','Bland kø').setDisabled(e.queue.length<2),control('favorite','Lagre favoritt')),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(control('back10','−10 sec').setDisabled(seekDisabled),control('forward30','+30 sec').setDisabled(seekDisabled),control('queue','Show queue')),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(control('loop','Loop',e.loop?ButtonStyle.Success:ButtonStyle.Secondary),control('shuffle','Shuffle queue').setDisabled(e.queue.length<2),control('favorite','Save favorite')),
     ];
 }
 export function formatTime(seconds:number){const n=Math.max(0,Math.floor(Number.isFinite(seconds)?seconds:0));return n>=3600?`${Math.floor(n/3600)}:${String(Math.floor(n%3600/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`:`${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;}
@@ -62,7 +62,7 @@ export class PlayerMessage {
     private notice='';
     private noticeUntil=0;
     async confirmQueue(count:number,concert:boolean):Promise<void>{
-        this.notice=`Lagt til ${count} ${concert?'konsert':'sang'+(count===1?'':'er')} i køen.`;
+        this.notice=`Added ${count} ${concert ? 'concert' : 'track'}${count === 1 ? '' : 's'} to the queue.`;
         this.noticeUntil=Date.now()+15000;
         await this.update(true,true);
     }
@@ -77,7 +77,7 @@ export class PlayerMessage {
             const guild = bot.client.guilds.cache.get(bot.guildId);
             const channel = guild?.channels.cache.get(bot.musicChannelId) || guild?.channels.cache.find(c => c.isTextBased() && c.name === 'musikk');
             if (!channel?.isTextBased() || !('send' in channel))
-                throw new UserError('Musikken er lagt i køen, men spilleren kunne ikke vises i #musikk. Sjekk kanaltilgangen.');
+                throw new UserError('The tracks were queued, but the player could not be shown. Check the configured music channel permissions.');
             const own = (m: Message) => m.author.id === bot.client.user?.id && !m.webhookId;
             if (!this.message) {
                 const id = bot.engine.store.get<string | null>('player-message', null);
@@ -103,7 +103,7 @@ export class PlayerMessage {
                 const previous=this.message;
                 this.message=await channel.send(payload);
                 bot.engine.store.set('player-message',this.message.id);
-                if(previous&&own(previous))await previous.delete().catch(async()=>{await previous.edit({content:'Spilleren er flyttet til den nyeste meldingen.',embeds:[],components:[]}).catch(()=>{});});
+                if(previous&&own(previous))await previous.delete().catch(async()=>{await previous.edit({content:'The player has moved to the latest message.',embeds:[],components:[]}).catch(()=>{});});
                 this.lastPayload=fingerprint;
                 return;
             }

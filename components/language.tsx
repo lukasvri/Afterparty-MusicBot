@@ -3,10 +3,10 @@ import {createContext,useContext,useEffect,useMemo,type ReactNode} from 'react';
 import {useBrowserValue} from '@/hooks/use-browser-value';
 import {browserStorage} from '@/lib/browser-storage';
 import {translate,type Language} from '@/lib/messages';
-const LanguageContext=createContext<{language:Language;setLanguage:(language:Language)=>void;t:(text:string,values?:Record<string,string|number>)=>string}>({language:'nb',setLanguage:()=>{},t:(text,values)=>translate('nb',text,values)});
+const LanguageContext=createContext<{language:Language;setLanguage:(language:Language)=>void;t:(text:string,values?:Record<string,string|number>)=>string}>({language:'en',setLanguage:()=>{},t:(text,values)=>translate('en',text,values)});
 export function LanguageProvider({children}:{children:ReactNode}){
- const saved=useBrowserValue('gutta-language','nb');
- const language:Language=saved==='en'?'en':'nb';
+ const saved=useBrowserValue('gutta-language','en');
+ const language:Language=saved==='nb'?'nb':'en';
  useEffect(()=>{document.documentElement.lang=language;},[language]);
  const value=useMemo(()=>({language,setLanguage:(next:Language)=>{browserStorage.set('gutta-language',next);},t:(text:string,values?:Record<string,string|number>)=>translate(language,text,values)}),[language]);
  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

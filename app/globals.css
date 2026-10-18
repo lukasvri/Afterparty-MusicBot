@@ -1,8 +1,10 @@
 @font-face{font-family:Afterparty;src:url('/fonts/inter-latin-wght-normal.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap}
 :root {
-  --bg:#050505; --panel:#0f090b; --panel2:#190b0f; --line:#42131d;
-  --text:#fff4f4; --muted:#c7a7ad; --accent:#ff263e; --red-button:#d71931;
-  --font-body:Arial,Helvetica,sans-serif; --font-display:Afterparty,'Arial Black',Arial,sans-serif;
+  --bg:#09090c; --panel:#121214; --panel2:#1a1a1e; --line:#343438;
+  --text:#f4f4f5; --muted:#b6b6bd; --accent:#ff263e; --red-button:#d71931;
+  --font-body:Afterparty,Arial,Helvetica,sans-serif; --font-display:Afterparty,'Arial Black',Arial,sans-serif;
+  --radius-control:8px; --radius-panel:12px; --focus-ring:#f4f4f5;
+  --ease-out:cubic-bezier(.22,.68,.22,1);
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -15,7 +17,7 @@ button{cursor:pointer;transition:background .18s,border-color .18s,color .18s,tr
 button:disabled{opacity:.38;cursor:not-allowed}
 button:active:not(:disabled){transform:scale(.97)}
 a{color:inherit;text-decoration:none}
-button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--focus-ring);outline-offset:4px}
 img{display:block;max-width:100%}
 h1,h2,h3,p{margin:0}
 .app-shell{min-height:100vh;position:relative;overflow-x:clip}

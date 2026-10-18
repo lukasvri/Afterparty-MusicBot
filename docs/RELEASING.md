@@ -36,7 +36,7 @@ compatibility or operator action; distinguish verified results from limitations.
   against the combined changes. Preserve other work and rerun release validation.
 - For user-facing website or Core changes, verify `/patch-notes` renders the
   relevant entry and the welcome page links to it using the current release data
-  (`app/patch-notes/page.tsx` and `components/party/start-evening.tsx`). Check the
+  (`app/patch-notes/page.tsx` and the versioned footer link in `app/afterparty.tsx`). Check the
   displayed title, version and bullets in a local preview, including mobile when
   layout changes. A data/import check alone is not a visual check. Report any
   preview limitation; do not deploy to validate notes.

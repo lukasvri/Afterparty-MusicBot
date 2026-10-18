@@ -1,0 +1,123 @@
+{
+  "scope": "controlled discovery IO only, not real provider latency or audible quality",
+  "capturedAt": "2026-10-18T16:36:25.949Z",
+  "baselineRef": "5be83a8459e6e67c906e7957e49600500230a33a",
+  "node": "v24.19.0",
+  "platform": "win32",
+  "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+  "baselinePipelineSha256": "8d1d8ab268bf45cb97b354d9e972c5f0a385dfad0a37d32fcc88bef57597b1d5",
+  "sourceSha256": {
+    "../src/radio-pipeline.ts": "b0d3d2c4ab25dd172b60fa77d4ef40d4db819e920d2e74e11bc387b360f988e2",
+    "../src/radio.ts": "71b61e6042ee3cea2bd6dc877933e06da1c753b164f25e0bc622799c88b7fa1b",
+    "../src/matching.ts": "e0617d453bcc1522b9f1d7569dd948ad0b556bdd65c60920f8671ffd5bcfe8e4",
+    "radio-discovery.ts": "1d3ddc3987d5a1fecbbc1dfb0a8b439b5cf107f1896cbf3b1f6fec208a42b90d"
+  },
+  "workload": {
+    "delaysMs": [
+      25,
+      35
+    ],
+    "rounds": 5,
+    "warmup": 2,
+    "queries": 2,
+    "catalog": "disabled",
+    "metadata": "already specific"
+  },
+  "results": [
+    {
+      "round": 1,
+      "mode": "before",
+      "elapsedMs": 77.82309999999995,
+      "calls": 2,
+      "maxConcurrentSearches": 1,
+      "selected": "first000001"
+    },
+    {
+      "round": 1,
+      "mode": "after",
+      "elapsedMs": 46.274400000000014,
+      "calls": 2,
+      "maxConcurrentSearches": 2,
+      "selected": "first000001"
+    },
+    {
+      "round": 2,
+      "mode": "after",
+      "elapsedMs": 46.2278,
+      "calls": 2,
+      "maxConcurrentSearches": 2,
+      "selected": "first000001"
+    },
+    {
+      "round": 2,
+      "mode": "before",
+      "elapsedMs": 78.15650000000005,
+      "calls": 2,
+      "maxConcurrentSearches": 1,
+      "selected": "first000001"
+    },
+    {
+      "round": 3,
+      "mode": "before",
+      "elapsedMs": 79.05690000000004,
+      "calls": 2,
+      "maxConcurrentSearches": 1,
+      "selected": "first000001"
+    },
+    {
+      "round": 3,
+      "mode": "after",
+      "elapsedMs": 46.766899999999964,
+      "calls": 2,
+      "maxConcurrentSearches": 2,
+      "selected": "first000001"
+    },
+    {
+      "round": 4,
+      "mode": "after",
+      "elapsedMs": 47.26580000000001,
+      "calls": 2,
+      "maxConcurrentSearches": 2,
+      "selected": "first000001"
+    },
+    {
+      "round": 4,
+      "mode": "before",
+      "elapsedMs": 78.40819999999997,
+      "calls": 2,
+      "maxConcurrentSearches": 1,
+      "selected": "first000001"
+    },
+    {
+      "round": 5,
+      "mode": "before",
+      "elapsedMs": 78.8229,
+      "calls": 2,
+      "maxConcurrentSearches": 1,
+      "selected": "first000001"
+    },
+    {
+      "round": 5,
+      "mode": "after",
+      "elapsedMs": 45.48040000000003,
+      "calls": 2,
+      "maxConcurrentSearches": 2,
+      "selected": "first000001"
+    }
+  ],
+  "summary": [
+    {
+      "mode": "before",
+      "medianMs": 78.40819999999997
+    },
+    {
+      "mode": "after",
+      "medianMs": 46.274400000000014
+    }
+  ],
+  "limitations": [
+    "Injected provider waits demonstrate critical-path overlap, not a measured speedup of live YouTube/Last.fm.",
+    "Five alternating pairs on one uncontrolled development host are observations, not confidence intervals.",
+    "Catalog and metadata-refinement stages are excluded; search budgets, ranking and selection are checked for parity."
+  ]
+}

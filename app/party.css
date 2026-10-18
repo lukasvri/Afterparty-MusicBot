@@ -324,29 +324,73 @@
   display: none !important;
 }
 [data-tv="true"] .content {
-  width: calc(100% - 40px);
-  padding: 20px 0;
+  width: calc(100% - 64px);
+  max-width: none;
+  min-height: 100svh;
+  padding: 32px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 248px;
+  gap: 28px;
+  align-content: center;
+  align-items: center;
 }
 [data-tv="true"] .studio-grid {
   display: block;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
 }
 [data-tv="true"] .main {
   margin: 0;
 }
 [data-tv="true"] .stage {
-  max-height: 80vh;
+  aspect-ratio: 16 / 9 !important;
+  max-height: calc(100svh - 180px);
 }
 [data-tv="true"] .tv-invite {
-  position: relative;
-  margin: 0 0 16px;
-  padding: 12px;
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  padding: 20px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  background: var(--panel);
+  border-color: var(--line);
 }
+[data-tv="true"] .tv-invite > div { display:grid; gap:12px; justify-content:stretch; }
+[data-tv="true"] .tv-room-heading h2 { font-size:24px; line-height:1.3; overflow-wrap:anywhere; }
+[data-tv="true"] .tv-exit { min-height:48px; order:3; width:100%; }
 [data-tv="true"] .tv-invite img {
-  width: 100px;
-  height: 100px;
+  width: 180px;
+  height: 180px;
+  max-width: 100%;
+  justify-self:center;
 }
+[data-tv="true"] .tv-join strong { font-size:19px; line-height:1.4; }
+[data-tv="true"] .tv-join p { color:var(--muted); font-size:14px; line-height:1.6; }
 [data-tv="true"] .tv-invite .share-url {
-  max-width: 450px;
+  min-width: 0;
+  max-width: 100%;
+  font-size:12px;
+}
+[data-tv="true"] .tv-invite input { min-width:0; width:100%; font-size:12px; }
+[data-tv="true"] .concert-stage-bar,[data-tv="true"] .guest-hint { display:none; }
+[data-tv="true"] .now-playing { min-height:100px; }
+[data-tv="true"] .track-details h2 { font-size:clamp(20px,2vw,32px); line-height:1.25; }
+[data-tv="true"] .track-details p { font-size:16px; }
+[data-tv="true"] .notice { grid-column:1 / -1; }
+@media(max-width:900px) {
+  [data-tv="true"] .content { width:calc(100% - 32px); padding:16px 0; grid-template-columns:minmax(0,1fr); gap:16px; align-content:start; }
+  [data-tv="true"] .studio-grid { grid-row:1; }
+  [data-tv="true"] .tv-invite { grid-column:1; grid-row:2; gap:16px; padding:16px; }
+  [data-tv="true"] .tv-invite .tv-join { grid-template-columns:100px minmax(0,1fr); column-gap:16px; }
+  [data-tv="true"] .tv-join img { grid-column:1; grid-row:1 / 4; width:100px; height:100px; }
+  [data-tv="true"] .tv-join strong,[data-tv="true"] .tv-join p,[data-tv="true"] .tv-join .share-url { grid-column:2; }
+  [data-tv="true"] .tv-join strong { font-size:16px; }
+  [data-tv="true"] .track-details h2 { font-size:20px; }
 }
 button,
 a,
@@ -432,13 +476,13 @@ button:disabled {
     min-height: 48px;
     border: 0;
     border-radius: 6px;
-    background: #281b23;
+    background: var(--panel2);
     color: #fff;
     font-size: 13px;
   }
   .mobile-party-nav button:hover,
   .mobile-party-nav button:focus-visible {
-    background: #5b2535;
+    background: #ff263e24;
   }
   .concert-shell .toast {
     bottom: 90px;
@@ -501,9 +545,6 @@ button:disabled {
 
 /* The welcome artwork owns its layers and never sits above interactive content. */
 .start-evening { padding: 0; background: transparent; border: 0; border-radius: 0; margin-bottom: 38px; }
-.welcome-release { display:flex; align-items:center; gap:12px; padding:12px 0 18px; color:#c7bdc7; font-size:12px; border-bottom:1px solid #ffffff19; }
-.welcome-release > span:first-child { color:#ff8a9a; background:#ff536715; border:1px solid #ff536740; border-radius:5px; padding:5px 8px; font-weight:700; }
-.release-link { margin-left:auto; display:flex; align-items:center; gap:6px; color:#fff; }
 .welcome-hero { display:grid; grid-template-columns:1fr 1.15fr; gap:20px; align-items:center; padding:44px 0; }
 .welcome-copy { position:relative; min-width:0; container-type:inline-size; }
 .welcome-copy h1 { font-family:var(--font-display); font-size:clamp(52px,5.6vw,88px); font-weight:800; line-height:1.02; letter-spacing:-1px; margin:18px 0 22px; }
@@ -525,8 +566,8 @@ button:disabled {
 .welcome-discord > svg:last-child { margin-left:auto; flex-shrink:0; }
 .welcome-discord:hover { border-color:#ff536780; background:#21171b; }
 .welcome-offline { padding-top:16px; font-size:13px; }
-.welcome-join:hover,.welcome-release:hover .release-link { color:#ff8a9a; }
-.start-evening :is(button,a):focus-visible { outline:2px solid #ffa4b1; outline-offset:5px; }
+.welcome-join:hover { color:#ff8a9a; }
+.start-evening :is(button,a):focus-visible { outline:2px solid var(--focus-ring); outline-offset:5px; }
 .concert-shell[data-empty="true"] .stage:not([data-current="true"]) { aspect-ratio:16/9; min-height:0; }
 .concert-shell .stage .concert-venue { width:100%; height:100%; left:0; overflow:hidden; }
 @media(max-width:1000px) {
@@ -535,9 +576,6 @@ button:disabled {
   .welcome-steps { gap:15px; }
 }
 @media(max-width:650px) {
-  .welcome-release { font-size:11px; gap:8px; }
-  .welcome-release > span:first-child { padding:4px 6px; }
-  .release-link { gap:3px; }
   .welcome-hero { display:flex; flex-direction:column; align-items:stretch; padding:28px 0 24px; gap:24px; }
   .welcome-copy h1 { font-size:clamp(45px,12vw,68px); margin:12px 0 15px; }
   .welcome-copy > p { font-size:14px; margin-bottom:20px; }
@@ -558,7 +596,7 @@ button:disabled {
 .settings-tabs { display:flex; gap:4px; padding:4px; border-radius:10px; background:#ffffff08; }
 .settings-tabs [role=tab] { flex:1; min-width:0; min-height:44px; padding:8px; border:1px solid transparent; border-radius:7px; background:transparent; color:#bfb4ba; font:600 13px/1.4 var(--font-body); cursor:pointer; }
 .settings-tabs [role=tab][aria-selected=true] { background:#ff263e18; border-color:#ff263e66; color:#fff; }
-.settings-tabs [role=tab]:focus-visible { outline:2px solid #ff788a; outline-offset:2px; }
+.settings-tabs [role=tab]:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 .video-settings .settings-section h3 { margin:0; font:600 13px/1.5 var(--font-body); color:#fff; }
 .video-settings .party-tools { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:12px; margin:0; min-width:0; }
 .video-settings .party-tools > .button { min-width:0; min-height:44px; }

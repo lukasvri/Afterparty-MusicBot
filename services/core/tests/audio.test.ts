@@ -26,7 +26,7 @@ test('a failed FFmpeg decoder rejects instead of reporting a clean end',async()=
  const dir=mkdtempSync(join(tmpdir(),'gutta-audio-failure-'));
  const decoder=new PcmDecoder({url:join(dir,'missing.wav'),headers:''},0,new AbortController().signal,ffmpeg);
  const closed=once(decoder.child,'close');
- try{await assert.rejects(decoder.frame(),/Lyddekodingen stoppet/);await closed;}
+ try{await assert.rejects(decoder.frame(),/Audio decoding stopped/);await closed;}
  finally{decoder.stop();await closed;rmSync(dir,{recursive:true,force:true});}
 });
 
@@ -50,7 +50,7 @@ test('a stalled decoder is killed when its frame deadline expires',async t=>{
  const closed=new Promise<void>(resolve=>decoder.child.once('close',()=>resolve()));
  try{
   await once(decoder.child,'spawn');t.mock.timers.enable({apis:['setTimeout']});
-  const frame=decoder.frame(),rejected=assert.rejects(frame,/sluttet å levere data/);
+  const frame=decoder.frame(),rejected=assert.rejects(frame,/stopped delivering data/);
   t.mock.timers.tick(6000);await rejected;
   assert.equal(decoder.disposed,true);await closed;
  }finally{t.mock.timers.reset();decoder.stop();await closed;rmSync(dir,{recursive:true,force:true});}
@@ -65,7 +65,7 @@ test('an encoder crash is an output error and disposes its input',async()=>{
  try{process.env.FFMPEG_PATH=process.execPath;encoded=encodeOpus(mixer,96000);}
  finally{if(previous===undefined)delete process.env.FFMPEG_PATH;else process.env.FFMPEG_PATH=previous;}
  const closed=new Promise<void>(resolve=>encoded.process.once('close',()=>resolve()));
- try{await assert.rejects(async()=>{for await(const chunk of encoded.stream){assert(Buffer.isBuffer(chunk));}},/Lydkodingen stoppet/);await closed;assert.equal(mixer.destroyed,true);}
+ try{await assert.rejects(async()=>{for await(const chunk of encoded.stream){assert(Buffer.isBuffer(chunk));}},/Audio encoding stopped/);await closed;assert.equal(mixer.destroyed,true);}
  finally{encoded.stream.destroy();encoded.process.kill('SIGKILL');mixer.destroy();await closed;}
 });
 
