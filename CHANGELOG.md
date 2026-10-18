@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.4: Radio venue and artist-alias safeguards
+
+2026-10-18
+
+- Automatic Radio excludes bare live-recording suffixes naming Wembley, Glastonbury or BBC Radio 1, including trailing video-format labels. Ordinary studio titles such as Live Forever remain eligible.
+- Radio repeat detection treats Beatles and The Beatles as the same artist spelling for the same song, including catalog suggestions and playback history. Other artist names and catalog relationship checks retain their existing rules.
+
 ## v2.2.3: Radio fixes from real catalog testing
 
 2026-10-18

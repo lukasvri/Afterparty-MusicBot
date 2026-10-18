@@ -58,6 +58,8 @@ export function isRadioTitle(title: string) {
     !/\b(?:live|covers?)\s*(?:[|\[(]|$)/i.test(title) &&
     !/\b(?:live|covers?)\s+(?:official|music|audio|video|hd|hq|4k)(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
     !/\b(?:live|covers?)\s+(?:at|from|in|on|by|session|performance|version|recording)\b/i.test(text) &&
+    // Recognized venue/broadcast labels, not arbitrary words after "Live".
+    !/\blive\s+(?:wembley(?:\s+stadium)?|glastonbury(?:\s+festival)?|bbc\s+radio\s*1)\b(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
     !/\blive(?:\s+[\p{L}\p{N}]+){0,4}\s+(?:19|20)\d{2}\b/iu.test(title) &&
     !/^how to\s*:/i.test(title) &&
     !/\bhow to$|\bhow (?:i|we) (?:made|make|produced|produce|remade|recreated|built)\b/i.test(
@@ -296,7 +298,11 @@ function recordingIdentity(track: RadioTrack) {
   };
 }
 function duplicateRecording(a: ReturnType<typeof recordingIdentity>, b: ReturnType<typeof recordingIdentity>) {
-  if (a.artist && b.artist && !sameArtistIdentity(a, b)) return false;
+  // Curated spelling alias for repeat exclusion only. Do not strip "The"
+  // from arbitrary names or broaden catalog/relationship proof.
+  const repeatArtist = (artist: string) => artist === "beatles" ? "the beatles" : artist;
+  if (a.artist && b.artist && !sameArtistIdentity(a, b) &&
+    repeatArtist(a.artist) !== repeatArtist(b.artist)) return false;
   if (a.song === b.song) return true;
   // A named remix without delimiters cannot be split reliably in isolation.
   // Compare it with the known original instead of treating the remixer as a
