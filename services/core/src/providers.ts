@@ -1,5 +1,5 @@
 import type {YouTubeResponses, ExtractedMedia} from "./external-types.ts";
-import { metadataGenres, metadataMusic, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
+import { metadataGenres, metadataMusic, radioArtist, radioTitle, sameRadioRecording, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
 import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
@@ -8,6 +8,7 @@ import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
 import {
   scoreMatch,
+  normalized,
   mapLimited,
   type CatalogSong,
 } from "./matching.ts";
@@ -15,6 +16,49 @@ export { normalized, scoreMatch } from "./matching.ts";
 import { selectRadio } from "./radio-pipeline.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
+function extractedCatalogArtist(media: ExtractedMedia) {
+  const original = media.artist ?? media.uploader ?? "YouTube";
+  const artists = media.artists;
+  const unchanged = { artist: original };
+  if (!Array.isArray(artists) || !artists.length || artists.length > 16 ||
+    !artists.every(artist => typeof artist === "string" && Boolean(artist.trim()) && artist.length <= 200)) return unchanged;
+  const uploader = (media.uploader ?? "").replace(/(?:\s*-\s*Topic|VEVO)$/i, "").trim();
+  // A list distinguishes collaborators from a comma inside one artist name.
+  // Do not guess a lead from list order: require the named uploader to agree.
+  const artist = artists.length === 1 ? artists[0].trim()
+    : artists.find(artist => normalized(artist) === normalized(uploader))?.trim();
+  if (!artist) return unchanged;
+  // Retain a private exact alias for older persisted combined credits. A
+  // contradictory/free-form artist string is never evidence for this alias.
+  return { artist, ...(normalized(original) !== normalized(artist) &&
+    normalized(original) === normalized(artists.join(", ")) ? { artistCredit: original } : {}) };
+}
+function cachedArtistCredit(song: CatalogSong, track: Track, cached: Track) {
+  const evidence = cached.catalog;
+  if (typeof evidence?.artistCredit !== "string" || !evidence.artistCredit.trim() ||
+    normalized(evidence.artist) !== normalized(song.artist) || cached.id !== track.id ||
+    (cached.source ?? "youtube") !== (track.source ?? "youtube") ||
+    !Number.isFinite(cached.duration) || cached.duration <= 0 ||
+    !Number.isFinite(track.duration) || track.duration <= 0) return;
+  const observedArtist = radioArtist(track) || track.artist.replace(/(?:\s*-\s*Topic|VEVO)$/i, "").trim();
+  if (normalized(observedArtist) !== normalized(song.artist)) return;
+  // API metadata has no private catalog. Compare its actual title/version and
+  // duration with the verified cached recording before restoring that proof.
+  const observed = { ...track, catalog: { artist: evidence.artist, title: radioTitle(track), duration: track.duration } };
+  return sameRadioRecording(cached, observed) ? evidence.artistCredit : undefined;
+}
+function matchedCatalog(song: CatalogSong, track: Track, cached?: Track): CatalogSong {
+  const catalog = { ...song };
+  delete catalog.artistCredit;
+  const evidence = track.catalog;
+  if (typeof evidence?.artistCredit === "string" && evidence.artistCredit.trim() &&
+    normalized(evidence.artist) === normalized(song.artist)) catalog.artistCredit = evidence.artistCredit;
+  else if (cached) {
+    const credit = cachedArtistCredit(song, track, cached);
+    if (credit) catalog.artistCredit = credit;
+  }
+  return catalog;
+}
 export function youtubeId(query: string) {
   if (/^[\w-]{11}$/.test(query)) return query;
   try {
@@ -80,7 +124,7 @@ export class Providers {
       missing: string[] = [];
     for (const id of ids) {
       const cached = this.store.get<{ at: number; track: Track } | null>(
-        "metadata:v3:" + id,
+        "metadata:v4:" + id,
         null,
       );
       if (cached && Date.now() - cached.at < 86400000)
@@ -89,7 +133,7 @@ export class Providers {
     }
     const remember = (track: Track) => {
       found.set(track.id, track);
-      this.store.set("metadata:v3:" + track.id, { at: Date.now(), track });
+      this.store.set("metadata:v4:" + track.id, { at: Date.now(), track });
     };
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
@@ -143,7 +187,7 @@ export class Providers {
               embeddable: v.playable_in_embed === true,
               source: "youtube",
               entryId: randomUUID(),
-              ...(v.artist && v.track ? { catalog: { artist: v.artist, title: v.track, duration: Number(v.duration) || 0 } } : {}),
+              ...(v.artist && v.track ? { catalog: { ...extractedCatalogArtist(v), title: v.track, duration: Number(v.duration) || 0 } } : {}),
             });
           } catch (error) {
             if (!skipUnavailable) throw error;
@@ -158,7 +202,7 @@ export class Providers {
   }
   async search(query: string, count = 8, musicOnly = false): Promise<Track[]> {
     const key =
-        "search:v4:" +
+        "search:v5:" +
         JSON.stringify([
           query.trim().normalize("NFKC").toLowerCase(),
           count,
@@ -351,7 +395,7 @@ export class Providers {
     if (cached && Date.now() - cached.at < 7 * 86400000) {
       const fresh = (await this.video([cached.track.id]))[0];
       if (fresh && scoreMatch(song, fresh) >= 0.85)
-        return { ...fresh, catalog: song, entryId: randomUUID() };
+        return { ...fresh, catalog: matchedCatalog(song, fresh, cached.track), entryId: randomUUID() };
     }
     let candidates: Track[] = [];
     if (song.isrc && /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/i.test(song.isrc))
@@ -375,7 +419,7 @@ export class Providers {
       throw new UserError(
         `Fant ikke en sikker lydmatch for ${song.artist} - ${song.title}.`,
       );
-    const track = { ...ranked[0].track, catalog: song, entryId: randomUUID() };
+    const track = { ...ranked[0].track, catalog: matchedCatalog(song, ranked[0].track), entryId: randomUUID() };
     this.store.set(key, { at: Date.now(), track });
     return track;
   }

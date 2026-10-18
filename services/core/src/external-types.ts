@@ -18,6 +18,7 @@ export type ExtractedMedia = {
   categories?: string[];
   track?: string;
   artist?: string;
+  artists?: string[];
   uploader?: string;
   duration?: number;
   full_duration?: number;

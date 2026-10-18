@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.3: Radio fixes from real catalog testing
+
+2026-10-18
+
+- Radio recognizes artist prefixes with colons and preserves names with commas. Structured collaborator credits no longer block valid Oasis songs. Studio titles such as Live Forever and Cover Me remain eligible, while explicit live, cover, demo and instructional upload labels are excluded, including live or cover labels followed by Official Video or HD.
+- Featured credits and demo or promo annotations no longer let another version of the starting song reappear as a new recommendation. Different known artists can share a title, while same-artist alternate uploads and remasters stay excluded as repeats. Existing playback history still blocks repeats after artist credits are refined, including when cached metadata refreshes for the same verified recording.
+- Radio recognizes explicit R&B and DnB genre aliases and compound tags such as Hip-Hop/Rap and Drum & Bass/Jungle without treating free-form artist tags such as Daft Punk as genre evidence. Broad genres still require stronger relationship evidence. Core and website metadata caches refresh under the corrected interpretation.
+
 ## v2.2.2: Manual requests replace radio at queue capacity
 
 2026-10-18

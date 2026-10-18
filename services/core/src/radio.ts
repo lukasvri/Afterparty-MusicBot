@@ -46,9 +46,19 @@ export function metadataMusic(category: unknown, categories?: unknown): boolean 
 export function isRadioTitle(title: string) {
   const text = normalize(title);
   return (
-    !/\b(reactions?|reacts|interviews?|tutorials?|howto|podcasts?|compilations?|playlist|full album|full set|dj set|live set|concert|hours?|best of|top \d+|karaoke|covers?|remake|recreation|recreated|bootleg|live|fanmade|sped up|slowed|lessons?|masterclass|walkthrough|walk through|step by step|sound design|production tips|production lesson|fl studio|ableton|logic pro|garageband|behind the scenes|making of|breakdown|explained|vlogs?|gameplay|unboxing|documentary|documentaries|studio tour|room tour|music news|album review|song review|track review|pranks?|challenge video|funny moments|memes?|trailer|teaser|shorts)\b/i.test(
+    !/\b(reactions?|reacts|interviews?|tutorials?|howto|podcasts?|compilations?|playlist|full album|full set|dj set|live set|concert|hours?|best of|top \d+|karaoke|remake|recreation|recreated|bootleg|fanmade|sped up|slowed|lessons?|masterclass|walkthrough|walk through|step by step|sound design|production tips|production lesson|fl studio|ableton|logic pro|garageband|behind the scenes|making of|breakdown|explained|vlogs?|gameplay|unboxing|documentary|documentaries|studio tour|room tour|music news|album review|song review|track review|pranks?|challenge video|funny moments|memes?|trailer|teaser|shorts)\b/i.test(
       text,
     ) &&
+    // These words also occur inside ordinary studio song names. Reject
+    // explicit upload-format positions and qualifiers, not every occurrence.
+    !/[\[(][^\])]*\b(?:live|covers?|demo)\b/i.test(title) &&
+    !/(?:\s[-|\u2013\u2014]\s*|\|)\s*(?:(?:hd|hq|4k|official|piano|guitar|drum|vocal|acoustic|instrumental)\s+)*(?:live|covers?|demo)\b/i.test(title) &&
+    !/\S+\s+demo(?:\s+version)?\s*(?:[|\[(]|$)/i.test(title) &&
+    !/(?:^|\s[-|\u2013\u2014]\s*)\s*(?:live|covers?)\s*[:|-]/i.test(title) &&
+    !/\b(?:live|covers?)\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\b(?:live|covers?)\s+(?:official|music|audio|video|hd|hq|4k)(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\b(?:live|covers?)\s+(?:at|from|in|on|by|session|performance|version|recording)\b/i.test(text) &&
+    !/\blive(?:\s+[\p{L}\p{N}]+){0,4}\s+(?:19|20)\d{2}\b/iu.test(title) &&
     !/^how to\s*:/i.test(title) &&
     !/\bhow to$|\bhow (?:i|we) (?:made|make|produced|produce|remade|recreated|built)\b/i.test(
       text,
@@ -88,8 +98,17 @@ export function specificRadioGenre(track: RadioTrack) {
   const genre = radioGenre(track);
   return genre && !broadGenres.has(genre) ? genre : null;
 }
+function artistTitleParts(track: RadioTrack) {
+  const colon = track.title.match(/^([^:]+):\s+(.+)$/);
+  const named = track.catalog?.artist || track.artist.replace(officialArtist, "").trim();
+  // A colon may belong to a song name. Only split an independently matching
+  // named uploader/catalog artist; a publisher alone cannot supply identity.
+  if (colon && named && !publisherArtist.test(named) && normalize(colon[1]) === normalize(named))
+    return [colon[1], colon[2]];
+  return track.title.split(artistSeparator);
+}
 export function radioArtist(track: RadioTrack) {
-  const parts = track.title.split(artistSeparator);
+  const parts = artistTitleParts(track);
   const prefix = parts[0];
   const channel = track.artist.replace(officialArtist, "").trim();
   const suffix = parts.slice(1).join(" - ").trim();
@@ -110,11 +129,10 @@ export function radioArtist(track: RadioTrack) {
     return "";
   return artist
     .replace(officialArtist, "")
-    .split(",")[0]
     .trim();
 }
 function contentTitle(track: RadioTrack) {
-  const parts = track.title.split(artistSeparator);
+  const parts = artistTitleParts(track);
   const artist = normalize(radioArtist(track)),
     prefix = normalize(parts[0]);
   const hasArtistPrefix =
@@ -130,7 +148,7 @@ export function radioTitle(track: RadioTrack) {
   return contentTitle(track)
     .split("|")[0]
     .replace(/\([^)]*\)|\[[^\]]*\]/g, "")
-    .replace(/\b(?:feat\.?|ft\.?)\s+.*/i, "")
+    .replace(/\b(?:feat(?:uring)?\.?|ft\.?)\s+.*/i, "")
     .trim();
 }
 /** Use explicit genre labels, not the uploader's identity, as similarity evidence. */
@@ -140,7 +158,6 @@ export function radioGenre(track: RadioTrack) {
     ...track.title.split("|").slice(1),
     ...(track.title.match(/\[[^\]]+\]|\([^)]*\)/g) ?? []),
   ];
-  const text = normalize(labels.join(" "));
   const genres = [
     "progressive house",
     "melodic house",
@@ -153,6 +170,7 @@ export function radioGenre(track: RadioTrack) {
     "drum and bass",
     "drum bass",
     "liquid dnb",
+    "dnb",
     "electronic pop",
     "dance pop",
     "synth pop",
@@ -182,8 +200,23 @@ export function radioGenre(track: RadioTrack) {
     "punk",
     "rnb",
   ];
-  const found = genres.find((genre) => ` ${text} `.includes(` ${genre} `));
-  return found === "drum bass"
+  const labelText = (value: string) => normalize(value.replace(/\br\s*&\s*b\b/gi, "rnb"))
+    .replace(/\bdrum bass\b|\bdnb\b/g, "drum and bass").replace(/\blofi\b/g, "lo fi");
+  const detected = labels.flatMap(label => {
+    const content = label.trim().replace(/^[([]|[\])]$/g, "").trim();
+    if (/^(?:feat(?:uring)?\.?|ft\.?)\s+/i.test(content)) return [];
+    const explicit = /^(?:genre|style)\s*:/i.test(content);
+    // Credits and song annotations are free-form text, not genre evidence.
+    // Taxonomy separators delimit complete labels, not words within names.
+    // Keep ampersands inside R&B and Drum&Bass; preserve existing priority.
+    return content.replace(/^(?:genre|style)\s*:\s*/i, "").split(/[/;,]/).map(component => {
+      const text = labelText(component);
+      return genres.find(genre => text === labelText(genre) || text === `${labelText(genre)} music`)
+        ?? (explicit ? genres.find(genre => ` ${text} `.includes(` ${labelText(genre)} `)) : undefined);
+    });
+  });
+  const found = genres.find(genre => detected.includes(genre));
+  return found === "drum bass" || found === "dnb"
     ? "drum and bass"
     : found === "lofi"
       ? "lo fi"
@@ -201,8 +234,7 @@ export function metadataGenres(description: unknown, tags: unknown): string[] {
   return [
     ...new Set(
       labels
-        .map((label) =>
-          radioGenre({
+        .map((label) => radioGenre({
             title: `| ${label}`,
             artist: "",
             id: "",
@@ -210,8 +242,7 @@ export function metadataGenres(description: unknown, tags: unknown): string[] {
             image: "",
             live: false,
             embeddable: true,
-          }),
-        )
+          }))
         .filter((genre): genre is string => Boolean(genre)),
     ),
   ].slice(0, 8);
@@ -228,8 +259,11 @@ export function songIdentity(track: RadioTrack) {
 function songTitleIdentity(rawTitle: string) {
   const title = rawTitle
       .replace(/\([^)]*\)|\[[^\]]*\]/g, "")
-      .replace(/\b(?:feat\.?|ft\.?)\s+.*/i, "");
+      .replace(/\b(?:feat(?:uring)?\.?|ft\.?)\s+.*/i, "");
   const identity = normalize(title
+      // Explicit promotional upload notes do not create a new composition.
+      .replace(/\s+(?:\*\s*|[-\u2013\u2014]\s+)(?:(?:rare|official)\s+)?promo(?:tional)?(?:\s+(?:cd|audio|video|copy|only|version)){1,5}\s*\*?\s*$/i, "")
+      .replace(/\s+(?:-\s*)?demo(?:\s+version)?\s*$/i, "")
       // Different uploads and remasters are still the same radio song. Keep
       // radioTitle intact for catalog searches and recording-version checks.
       .replace(/\s+[-\u2013\u2014]\s+[^|]*\b(?:remix|remaster(?:ed)?|radio edit|extended|instrumental|acoustic)\b.*$/i, "")
@@ -244,18 +278,26 @@ function songTitleIdentity(rawTitle: string) {
   // cleaned value must not turn them into invalid radio entries.
   return identity || (/^(?:music|audio|video|remix|instrumental|acoustic)$/i.test(title.trim()) ? normalize(title) : "");
 }
+function artistIdentity(track: RadioTrack) {
+  return { artist: normalize(radioArtist(track)),
+    credit: typeof track.catalog?.artistCredit === "string" ? normalize(track.catalog.artistCredit) : "" };
+}
+function sameArtistIdentity(a: ReturnType<typeof artistIdentity>, b: ReturnType<typeof artistIdentity>) {
+  return a.artist === b.artist || Boolean(a.artist && b.artist &&
+    ((a.credit && a.credit === b.artist) || (b.credit && b.credit === a.artist)));
+}
 function recordingIdentity(track: RadioTrack) {
   const title = radioTitle(track);
   return {
     song: songTitleIdentity(title),
-    artist: normalize(radioArtist(track)),
+    ...artistIdentity(track),
     title: normalize(title),
     variant: /\b(?:remix|instrumental|acoustic|remaster(?:ed)?|radio edit|extended)(?:\s+(?:version|mix|\d{4}))*\s*$/i.test(title),
   };
 }
 function duplicateRecording(a: ReturnType<typeof recordingIdentity>, b: ReturnType<typeof recordingIdentity>) {
+  if (a.artist && b.artist && !sameArtistIdentity(a, b)) return false;
   if (a.song === b.song) return true;
-  if (a.artist && b.artist && a.artist !== b.artist) return false;
   // A named remix without delimiters cannot be split reliably in isolation.
   // Compare it with the known original instead of treating the remixer as a
   // new song. This conservative rule is limited to an explicit version suffix.
@@ -269,26 +311,32 @@ export function sameRadioSong(a: RadioTrack, b: RadioTrack) {
 }
 /** A vetted catalog relationship may fill missing metadata, never a conflicting style. */
 export function radioRelated(seed: RadioTrack, track: RadioTrack, relatedRecording = false) {
-  const artist = normalize(radioArtist(seed));
+  const artist = artistIdentity(seed);
   const specific = specificRadioGenre(seed);
   return radioStyleCompatible(seed, track) && (
-    Boolean(artist && normalize(radioArtist(track)) === artist) ||
+    Boolean(artist.artist && sameArtistIdentity(artist, artistIdentity(track))) ||
     Boolean(specific && radioGenre(track) === specific) ||
     relatedRecording
   );
 }
 export function sameRadioRecording(seed: RadioTrack, candidate: RadioTrack) {
   if (
-    normalize(radioArtist(seed)) !== normalize(radioArtist(candidate)) ||
+    !sameArtistIdentity(artistIdentity(seed), artistIdentity(candidate)) ||
     songIdentity(seed) !== songIdentity(candidate)
   )
     return false;
   const versions =
-    /\b(?:remix|live|acoustic|instrumental|karaoke|cover|sped up|slowed|remaster(?:ed)?|radio edit|extended)\b/g;
+    /\b(?:remix|live|acoustic|instrumental|karaoke|cover|demo|sped up|slowed|remaster(?:ed)?|radio edit|extended)\b/g;
   const labels = (track: RadioTrack) =>
     [...new Set(normalize(track.title).match(versions) ?? [])].sort().join(",");
+  const features = (track: RadioTrack) => [...new Set(
+    [...`${track.title}|${track.catalog?.title ?? ""}`.matchAll(/\b(?:feat(?:uring)?\.?|ft\.?)\s+([^()[\]|]+)/gi)]
+      .map(match => normalize(match[1].replace(/\b(?:official(?: music)? (?:video|audio)|lyrics?|visualizer|hd|hq|4k)\b.*$/i, "")))
+      .filter(Boolean),
+  )].sort().join(",");
   return (
     labels(seed) === labels(candidate) &&
+    features(seed) === features(candidate) &&
     Math.abs(seed.duration - candidate.duration) <=
       Math.max(12, Math.min(30, seed.duration * 0.08))
   );

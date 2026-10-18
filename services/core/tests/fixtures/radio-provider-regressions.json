@@ -1,0 +1,91 @@
+{
+  "capturedAt": "2026-10-18T14:53:31.309Z",
+  "sourceSha": "8ae629d835ed215e4681e3609a43717f0fe481a1",
+  "extractor": "2026.08.19",
+  "sourceHashes": {
+    "scripts/radio-catalog-probe.ts": "3daaa718bf787e17924e5e6d558a5136abb6aa5d1b242fc1fb49bca8fc471b5c",
+    "services/core/src/providers.ts": "49ecb8eb6bd401b3ada9346413861dfcfcaec7e29353043d3cb344b5ae42feec",
+    "services/core/src/radio.ts": "2a9b98aee22b2ee9dd3719d2662f79500b24d42d241a6aba514fb72b9178ad11",
+    "services/core/src/radio-pipeline.ts": "8d1d8ab268bf45cb97b354d9e972c5f0a385dfad0a37d32fcc88bef57597b1d5",
+    "services/core/src/recommendations.ts": "bc620b9946a02a61b74061e9a3df9aae29d36e31eda2648bb8feba03f1ad805f",
+    "services/core/src/matching.ts": "34e503da2ff7f28833217199220363730df21c5ee71754f3d3a3fe32f6d0941f",
+    "services/core/src/store.ts": "bf563fbc858949857868c715e765337fcfb5c44e30f1010c71135bb8597c60e4",
+    "services/core/src/extractor.ts": "c8059bbfd8d490b099606c42d8dda3a93d246525aa256b565e8c3a8cc6c18d2a"
+  },
+  "purpose": "Minimal original public metadata inputs captured by the bounded live probe. Full capture is kept locally; no media or private provider URLs.",
+  "tracks": [
+    {
+      "seed": {
+        "id": "N000qglmmY0",
+        "title": "Dua Lipa - Levitating (Official Animated Music Video)",
+        "artist": "Dua Lipa",
+        "duration": 210,
+        "genres": [],
+        "music": true,
+        "live": false,
+        "embeddable": true,
+        "source": "youtube",
+        "url": "https://www.youtube.com/watch?v=N000qglmmY0"
+      },
+      "selected": {
+        "id": "TUVcZfQe-Kw",
+        "title": "Dua Lipa - Levitating Featuring DaBaby (Official Music Video)",
+        "artist": "Dua Lipa",
+        "duration": 230,
+        "genres": [
+          "pop"
+        ],
+        "music": true,
+        "live": false,
+        "embeddable": true,
+        "source": "youtube",
+        "url": "https://www.youtube.com/watch?v=TUVcZfQe-Kw",
+        "relatedTo": "N000qglmmY0"
+      }
+    },
+    {
+      "seed": {
+        "id": "CD-E-LDc384",
+        "title": "Metallica: Enter Sandman (Official Music Video)",
+        "artist": "Metallica",
+        "duration": 331,
+        "genres": [],
+        "music": true,
+        "live": false,
+        "embeddable": true,
+        "source": "youtube",
+        "url": "https://www.youtube.com/watch?v=CD-E-LDc384"
+      },
+      "selected": null
+    },
+    {
+      "seed": {
+        "id": "TDe1DqxwJoc",
+        "title": "Oasis - Live Forever (Official HD Remastered Video)",
+        "artist": "Oasis",
+        "duration": 278,
+        "genres": [
+          "rock"
+        ],
+        "music": true,
+        "live": false,
+        "embeddable": true,
+        "source": "youtube",
+        "url": "https://www.youtube.com/watch?v=TDe1DqxwJoc"
+      },
+      "selected": {
+        "id": "V28MtgQGKTA",
+        "title": "Oasis - Live Forever (Demo) *Rare Promo CD Audio*",
+        "artist": "TheRightEarOfNash",
+        "duration": 313,
+        "genres": [],
+        "music": true,
+        "live": false,
+        "embeddable": true,
+        "source": "youtube",
+        "url": "https://www.youtube.com/watch?v=V28MtgQGKTA",
+        "relatedTo": "TDe1DqxwJoc"
+      }
+    }
+  ]
+}
