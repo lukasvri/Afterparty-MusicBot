@@ -131,7 +131,7 @@ Rust testing continues with the [offline Rust mixer on `dev`](https://github.com
 | Prepare an update or release | [Operations](services/core/PUBLIC_RELEASE.md) · [Release policy](docs/RELEASING.md) |
 | Use the visual identity | [Branding and assets](docs/BRANDING.md) |
 
-New website sessions default to English and retain saved language choices. Discord command descriptions, help, controls and standard replies use English; `/help` and `/concert url` are canonical, with `/hjelp` and `/konsert lenke` retained as aliases. Spotify matching can differ from the original recording; chapter splitting and SponsorBlock are not implemented. Independent clients have different buffering and network delays, so synchronization is approximate.
+New website sessions default to English and retain saved language choices. Discord uses a compact English slash menu; `/play` includes optional `next`, `now` and `shuffle` controls. Persistent bot settings live on the server-scoped administration page rather than `/config`. Compatibility handlers accept previously cached command invocations. Spotify matching can differ from the original recording; chapter splitting and SponsorBlock are not implemented. Independent clients have different buffering and network delays, so synchronization is approximate.
 
 ## Contribute, report, remix
 

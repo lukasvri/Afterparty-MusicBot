@@ -9,6 +9,14 @@ import { Metrics } from './metrics.ts';
 import { Commands } from './commands.ts';
 import { DiscordSink } from './audio.ts';
 import { UserError, type Track, type SavedQueue } from './types.ts';
+function adminLink(site: string, guildId?: string) {
+    try {
+        const url = new URL('/admin', site);
+        if (!['http:', 'https:'].includes(url.protocol)) return '';
+        if (guildId && /^\d{14,22}$/.test(guildId)) url.searchParams.set('guildId', guildId);
+        return url.href;
+    } catch { return ''; }
+}
 export class DiscordBot {
     metrics:Metrics;
     ownsClient:boolean;
@@ -244,40 +252,19 @@ export class DiscordBot {
                 if (boolean('split')) throw new UserError('Chapter splitting is not supported. Leave split off and try again.');
                 await this.sameVoice(interaction, true);
                 if(!this.musicChannelId&&interaction.guild){const target=interaction.guild!.channels.cache.find(c=>c.isTextBased()&&c.name==='musikk')??interaction.channel;if(target?.isTextBased()&&'send'in target){this.musicChannelId=target.id;e.store.set('music-channel',target.id);}}
-                const count = await this.commands.add(text('query', true), interaction.user.id, {next:name === 'play-next' || boolean('immediate') || boolean('skip'),immediate:boolean('skip'),shuffle:boolean('shuffle')});
+                const count = await this.commands.add(text('query', true), interaction.user.id, {next:name === 'play-next' || boolean('next') || boolean('now') || boolean('immediate') || boolean('skip'),immediate:boolean('now') || boolean('skip'),shuffle:boolean('shuffle')});
                 await this.playerMessage.confirmQueue(count,false);
                 await this.updateMessage(true);
                 await interaction.deleteReply();
                 return;
             }
-            if (name === 'config') {
-                const sub = interaction.options.getSubcommand();
-                if (['set-queue-add-response-hidden', 'set-auto-announce-next-song'].includes(sub))
-                    throw new UserError('This legacy setting has no effect and is no longer offered.');
-                if (sub === 'get') {
-                    await interaction.editReply('```json\n' + JSON.stringify(e.settings, null, 2) + '\n```');
-                    return;
-                }
-                await this.manager(interaction);
-                const names: Record<string, string> = { 'set-audio-quality': 'audioBitrateKbps', 'set-playlist-limit': 'playlistLimit', 'set-wait-after-queue-empties': 'secondsToWaitAfterQueueEmpties', 'set-leave-if-no-listeners': 'leaveIfNoListeners', 'set-reduce-vol-when-voice': 'turnDownVolumeWhenPeopleSpeak', 'set-reduce-vol-when-voice-target': 'turnDownVolumeWhenPeopleSpeakTarget', 'set-default-volume': 'defaultVolume', 'set-default-queue-page-size': 'defaultQueuePageSize' };
-                const option = interaction.options.data[0]?.options?.[0];
-                if (!names[sub] || !option)
-                    throw new UserError('Unknown setting.');
-                this.commands.updateSettings({ [names[sub]]: option.value });
-                await interaction.editReply('The setting was saved.');
-                return;
-            }
-            if (name === 'crossfade') {
-                const sub = interaction.options.getSubcommand();
-                if (sub !== 'status') {
-                    await this.manager(interaction);
-                    this.commands.updateSettings({ crossfade: sub === 'off' ? 0 : number('seconds', 6) });
-                }
-                await interaction.editReply(`Crossfade: ${e.settings.crossfade} seconds.`);
+            if (name === 'config' || name === 'crossfade') {
+                const admin = adminLink(this.site, this.guildId);
+                await interaction.editReply('Bot settings are managed in web admin. ' + (admin || 'Ask the bot owner to configure the website URL.'));
                 return;
             }
             if (name === 'help' || name === 'hjelp') {
-                await interaction.editReply('**Afterparty**\n/play: YouTube, Spotify and SoundCloud links or track searches. Use sc: for SoundCloud search.\n/play-next: queue next. /play-advanced: shuffle, queue next or play immediately.\n/pause, /resume, /skip, /stop and /disconnect: playback controls.\n/queue, /history count and /favorites: your tracks. /vote-skip: listener voting.\n/concert url: share a YouTube concert in Discord and Afterparty. Ordinary /play stays private to Discord.\n/crossfade and /config: server settings. /hjelp and /konsert are legacy aliases.\n' + this.site);
+                await interaction.editReply('**Afterparty**\n/play: YouTube, Spotify and SoundCloud links or track searches. Use sc: for SoundCloud search. Add next to queue next, now to play immediately, or shuffle for multiple tracks.\n/pause, /resume, /skip, /stop and /disconnect: playback controls. /seek, /fseek and /volume: position and volume.\n/queue, /history count and /favorites: your tracks. /vote-skip: listener voting. /now-playing: restore the player controls. /cleanup: duplicates or absent listeners.\n/concert url: share a YouTube concert in Discord and Afterparty. Ordinary /play stays private to Discord.\nManage server settings in web admin: ' + (adminLink(this.site, this.guildId) || 'ask the bot owner for the website URL.'));
                 return;
             }
             if (name === 'concert' || name === 'konsert') {

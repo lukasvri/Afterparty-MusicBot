@@ -33,19 +33,19 @@ button>svg,a>svg,summary>svg{flex-shrink:0}
 .video-settings summary>.settings-quality{margin-left:auto;color:#aaa;font-size:11px}
 /* One fullscreen toolbar. YouTube owns the timeline, volume, captions and quality. */
 .cinema-toolbar{display:none}
-.stage-panel[data-immersive=true] .cinema-toolbar{display:flex;position:absolute;left:50%;right:auto;bottom:max(88px,calc(env(safe-area-inset-bottom) + 72px));transform:translateX(-50%);align-items:center;gap:4px;z-index:10;width:max-content;max-width:calc(100% - 32px);padding:6px;border:1px solid #ffffff25;border-radius:12px;background:#111114ed;box-shadow:0 8px 32px #0005}
-.cinema-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:44px;height:44px;padding:0 13px;border:0;border-radius:7px;background:transparent;color:#f5f5f5;font:500 13px/1 var(--font-body);white-space:nowrap}
+.stage-panel[data-immersive=true] .cinema-toolbar{display:flex;position:absolute;left:50%;right:auto;bottom:max(88px,calc(env(safe-area-inset-bottom) + 72px));transform:translateX(-50%);align-items:center;gap:6px;z-index:10;width:max-content;max-width:calc(100% - 32px);padding:6px;border:1px solid var(--line);border-radius:var(--radius-panel);background:var(--panel);box-shadow:0 8px 32px #0005}
+.cinema-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:48px;height:48px;padding:0 16px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--panel2);color:var(--text);font:500 clamp(14px,.7vw,16px)/1 var(--font-body);white-space:nowrap}
 .cinema-button:hover:not(:disabled){background:#ffffff12}.cinema-button:disabled{opacity:.35;cursor:default}
 .cinema-button svg{width:20px;height:20px;flex:0 0 20px}
 .stage-panel[data-immersive=true] .cinema-toolbar .video-settings,
 .stage-panel[data-immersive=true] .cinema-toolbar .video-settings[open],
 .stage-panel[data-immersive=true] .cinema-toolbar .video-settings:not([open]){position:static;inset:auto;width:auto;max-width:none;max-height:none;padding:0;border:0;background:transparent;overflow:visible;border-radius:7px;box-shadow:none}
-.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary{height:44px;min-height:44px;padding:0 13px;border-radius:7px;font:500 13px/1 var(--font-body);display:flex;align-items:center;gap:9px;color:#f5f5f5;list-style:none;overflow:visible}
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary{height:48px;min-height:48px;padding:0 16px;border:1px solid var(--line);border-radius:var(--radius-control);background:var(--panel2);font:500 clamp(14px,.7vw,16px)/1 var(--font-body);display:flex;align-items:center;gap:9px;color:var(--text);list-style:none;overflow:visible}
 .cinema-toolbar .video-settings summary::-webkit-details-marker{display:none}
 .cinema-toolbar .video-settings summary::after{display:none}
 .cinema-toolbar .video-settings summary:hover,.cinema-toolbar .video-settings[open] summary{background:#ffffff12}
 .stage-panel[data-immersive=true] .cinema-toolbar .video-settings summary>.settings-label{display:inline;margin:0;font:inherit;color:inherit}
-.stage-panel[data-immersive=true] .cinema-toolbar .video-settings-body{position:absolute;bottom:calc(100% + 12px);right:0;width:360px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 180px);overflow:auto;overscroll-behavior:contain;padding:20px;border:1px solid #ffffff25;border-radius:12px;background:#151518;box-shadow:0 12px 36px #0008;display:grid;gap:16px}
+.stage-panel[data-immersive=true] .cinema-toolbar .video-settings-body{position:absolute;bottom:calc(100% + 12px);right:0;width:440px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 180px);overflow:auto;overscroll-behavior:contain;padding:20px;border:1px solid var(--line);border-radius:var(--radius-panel);background:var(--panel);box-shadow:0 12px 36px #0008;display:grid;gap:16px}
 .cinema-toolbar .video-settings:not([open])>.video-settings-body{display:none!important}
 .stage-panel[data-immersive=true] .now-playing{display:none}
 .stage-panel[data-immersive=true] .buffer-notice{top:20px;left:20px;max-width:calc(100% - 40px)}
@@ -63,7 +63,7 @@ button>svg,a>svg,summary>svg{flex-shrink:0}
 /* Shared surfaces and actions across rooms, administration and service pages. */
 .button,.icon-button,.mode-button,.language-switch { border-radius:var(--radius-control); }
 .button.primary,.concert-shell .primary { background:var(--red-button); border-color:var(--accent); }
-.button.subtle { border-color:var(--line); background:#ffffff03; }
+.button.subtle { border-color:var(--line); background:var(--panel2); }
 .button.subtle:hover:not(:disabled) { border-color:#696970; background:#ffffff09; }
 .sidebar,.concert-shell .sidebar { background:#0b0b0e; border-bottom-color:var(--line); }
 .admin-shell .admin-login,.admin-shell .admin-card,.admin-shell .bot-control,.admin-shell .admin-room,

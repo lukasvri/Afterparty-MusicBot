@@ -1,0 +1,346 @@
+[
+  {
+    "viewport": {
+      "width": 2560,
+      "height": 1440
+    },
+    "checks": [
+      {
+        "stage": {
+          "x": 33,
+          "y": 43.6875,
+          "width": 2218,
+          "height": 1247.625
+        },
+        "panel": {
+          "x": 32,
+          "y": 42.6875,
+          "width": 2220,
+          "height": 1354.625
+        },
+        "frame": {
+          "x": 33,
+          "y": 43.6875,
+          "width": 2218,
+          "height": 1247.625
+        },
+        "parent": {
+          "x": 33,
+          "y": 43.6875,
+          "width": 2218,
+          "height": 1247.625
+        },
+        "card": {
+          "x": 2280,
+          "y": 42.6875,
+          "width": 248,
+          "height": 1354.625
+        },
+        "qr": {
+          "x": 2314,
+          "y": 555.703125,
+          "width": 180,
+          "height": 180
+        }
+      },
+      {
+        "inputWidth": 1025.984375,
+        "inputTop": 1214.84375,
+        "inputBottom": 1260.84375,
+        "buttonTop": 1240.4375,
+        "buttonBottom": 1284.4375,
+        "buttonHeight": 44,
+        "fontSize": 11,
+        "overflow": false
+      },
+      {
+        "bottom": 1352,
+        "viewport": 1440,
+        "panelLeft": 1052.46875,
+        "panelRight": 1412.46875,
+        "panelTop": 1029.3125
+      }
+    ],
+    "failures": [
+      "QR invitation remains a proportionate card rather than a stretched empty rail",
+      "Large-display QR remains legible",
+      "Nickname input uses a bounded reading width",
+      "Settings actions share readable 44px controls",
+      "TV action aligns with the nickname input rather than its help text"
+    ]
+  },
+  {
+    "viewport": {
+      "width": 2560,
+      "height": 1080
+    },
+    "checks": [
+      {
+        "stage": {
+          "x": 33,
+          "y": 37.5,
+          "width": 1600,
+          "height": 900
+        },
+        "panel": {
+          "x": 32,
+          "y": 36.5,
+          "width": 2220,
+          "height": 1007
+        },
+        "frame": {
+          "x": 33,
+          "y": 37.5,
+          "width": 1600,
+          "height": 900
+        },
+        "parent": {
+          "x": 33,
+          "y": 37.5,
+          "width": 1600,
+          "height": 900
+        },
+        "card": {
+          "x": 2280,
+          "y": 36.5,
+          "width": 248,
+          "height": 1007
+        },
+        "qr": {
+          "x": 2314,
+          "y": 375.703125,
+          "width": 180,
+          "height": 180
+        }
+      },
+      {
+        "inputWidth": 1025.984375,
+        "inputTop": 836.84375,
+        "inputBottom": 882.84375,
+        "buttonTop": 862.4375,
+        "buttonBottom": 906.4375,
+        "buttonHeight": 44,
+        "fontSize": 11,
+        "overflow": false
+      },
+      {
+        "bottom": 992,
+        "viewport": 1080,
+        "panelLeft": 1052.46875,
+        "panelRight": 1412.46875,
+        "panelTop": 669.3125
+      }
+    ],
+    "failures": [
+      "The video and its enclosing panel must have equal content widths without an unused side strip",
+      "QR invitation remains a proportionate card rather than a stretched empty rail",
+      "Large-display QR remains legible",
+      "Nickname input uses a bounded reading width",
+      "Settings actions share readable 44px controls",
+      "TV action aligns with the nickname input rather than its help text"
+    ]
+  },
+  {
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "checks": [
+      {
+        "stage": {
+          "x": 33,
+          "y": 43.6875,
+          "width": 1578,
+          "height": 887.625
+        },
+        "panel": {
+          "x": 32,
+          "y": 42.6875,
+          "width": 1580,
+          "height": 994.625
+        },
+        "frame": {
+          "x": 33,
+          "y": 43.6875,
+          "width": 1578,
+          "height": 887.625
+        },
+        "parent": {
+          "x": 33,
+          "y": 43.6875,
+          "width": 1578,
+          "height": 887.625
+        },
+        "card": {
+          "x": 1640,
+          "y": 42.6875,
+          "width": 248,
+          "height": 994.625
+        },
+        "qr": {
+          "x": 1674,
+          "y": 375.703125,
+          "width": 180,
+          "height": 180
+        }
+      },
+      {
+        "inputWidth": 1025.984375,
+        "inputTop": 836.84375,
+        "inputBottom": 882.84375,
+        "buttonTop": 862.4375,
+        "buttonBottom": 906.4375,
+        "buttonHeight": 44,
+        "fontSize": 11,
+        "overflow": false
+      },
+      {
+        "bottom": 992,
+        "viewport": 1080,
+        "panelLeft": 732.46875,
+        "panelRight": 1092.46875,
+        "panelTop": 669.3125
+      }
+    ],
+    "failures": [
+      "QR invitation remains a proportionate card rather than a stretched empty rail",
+      "Nickname input uses a bounded reading width",
+      "Settings actions share readable 44px controls",
+      "TV action aligns with the nickname input rather than its help text"
+    ]
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "checks": [
+      {
+        "stage": {
+          "x": 33,
+          "y": 46.1875,
+          "width": 938,
+          "height": 527.625
+        },
+        "panel": {
+          "x": 32,
+          "y": 45.1875,
+          "width": 940,
+          "height": 629.625
+        },
+        "frame": {
+          "x": 33,
+          "y": 46.1875,
+          "width": 938,
+          "height": 527.625
+        },
+        "parent": {
+          "x": 33,
+          "y": 46.1875,
+          "width": 938,
+          "height": 527.625
+        },
+        "card": {
+          "x": 1000,
+          "y": 45.1875,
+          "width": 248,
+          "height": 629.625
+        },
+        "qr": {
+          "x": 1034,
+          "y": 195.703125,
+          "width": 180,
+          "height": 180
+        }
+      },
+      {
+        "inputWidth": 669.984375,
+        "inputTop": 680.875,
+        "inputBottom": 726.875,
+        "buttonTop": 706.46875,
+        "buttonBottom": 750.46875,
+        "buttonHeight": 44,
+        "fontSize": 11,
+        "overflow": false
+      },
+      {
+        "bottom": 632,
+        "viewport": 720,
+        "panelLeft": 412.46875,
+        "panelRight": 772.46875,
+        "panelTop": 309.3125
+      }
+    ],
+    "failures": [
+      "Nickname input uses a bounded reading width",
+      "Settings actions share readable 44px controls",
+      "TV action aligns with the nickname input rather than its help text"
+    ]
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "checks": [
+      {
+        "stage": {
+          "x": 17,
+          "y": 17,
+          "width": 356,
+          "height": 200.25
+        },
+        "panel": {
+          "x": 16,
+          "y": 16,
+          "width": 358,
+          "height": 302.25
+        },
+        "frame": {
+          "x": 17,
+          "y": 17,
+          "width": 356,
+          "height": 200.25
+        },
+        "parent": {
+          "x": 17,
+          "y": 17,
+          "width": 356,
+          "height": 200.25
+        },
+        "card": {
+          "x": 16,
+          "y": 334.25,
+          "width": 358,
+          "height": 344.359375
+        },
+        "qr": {
+          "x": 33,
+          "y": 467.015625,
+          "width": 100,
+          "height": 100
+        }
+      },
+      {
+        "inputWidth": 330,
+        "inputTop": 812.140625,
+        "inputBottom": 858.140625,
+        "buttonTop": 908.140625,
+        "buttonBottom": 952.140625,
+        "buttonHeight": 44,
+        "fontSize": 11,
+        "overflow": false
+      },
+      {
+        "bottom": 764,
+        "viewport": 844,
+        "panelLeft": 15,
+        "panelRight": 375,
+        "panelTop": 396.5
+      }
+    ],
+    "failures": [
+      "Settings actions share readable 44px controls"
+    ]
+  }
+]

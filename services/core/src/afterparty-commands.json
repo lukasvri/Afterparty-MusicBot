@@ -1,138 +1,5 @@
 [
   {
-    "name": "clear",
-    "description": "Clear the queue while keeping the current track",
-    "default_member_permissions": null
-  },
-  {
-    "name": "config",
-    "description": "View or change bot settings",
-    "options": [
-      {
-        "type": 1,
-        "name": "set-playlist-limit",
-        "description": "Set the maximum tracks imported from one playlist",
-        "options": [
-          {
-            "type": 4,
-            "name": "limit",
-            "description": "Maximum tracks per playlist",
-            "required": true,
-            "min_value": 1,
-            "max_value": 1000
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "set-wait-after-queue-empties",
-        "description": "Set how long to wait before leaving an empty queue",
-        "options": [
-          {
-            "type": 4,
-            "name": "delay",
-            "description": "Seconds to wait; 0 means never disconnect",
-            "required": true,
-            "min_value": 0,
-            "max_value": 86400
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "set-leave-if-no-listeners",
-        "description": "Choose whether to leave when no listeners remain",
-        "options": [
-          {
-            "type": 5,
-            "name": "value",
-            "description": "Enable or disable this setting",
-            "required": true
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "set-reduce-vol-when-voice",
-        "description": "Choose whether to lower volume while listeners speak",
-        "options": [
-          {
-            "type": 5,
-            "name": "value",
-            "description": "Enable or disable this setting",
-            "required": true
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "set-reduce-vol-when-voice-target",
-        "description": "Set the volume used while listeners speak",
-        "options": [
-          {
-            "type": 4,
-            "name": "volume",
-            "description": "Volume percent, from 0 (muted) to 100",
-            "required": true,
-            "min_value": 0,
-            "max_value": 100
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "set-default-volume",
-        "description": "Set the default voice playback volume",
-        "options": [
-          {
-            "type": 4,
-            "name": "level",
-            "description": "Volume percent, from 0 (muted) to 100",
-            "required": true,
-            "min_value": 0,
-            "max_value": 100
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "set-default-queue-page-size",
-        "description": "Set the default number of tracks shown by /queue",
-        "options": [
-          {
-            "type": 4,
-            "name": "page-size",
-            "description": "Tracks per page, from 1 to 30",
-            "required": true,
-            "min_value": 1,
-            "max_value": 30
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "get",
-        "description": "Show all bot settings"
-      },
-      {
-        "type": 1,
-        "name": "set-audio-quality",
-        "description": "Set audio bitrate for the next playback start, within the voice channel limit",
-        "options": [
-          {
-            "type": 4,
-            "name": "kbps",
-            "description": "Requested bitrate, from 64 to 384 kbit/s",
-            "required": true,
-            "min_value": 64,
-            "max_value": 384
-          }
-        ]
-      }
-    ],
-    "default_member_permissions": "32"
-  },
-  {
     "name": "disconnect",
     "description": "Stop playback and disconnect from voice",
     "default_member_permissions": null
@@ -225,42 +92,6 @@
     "default_member_permissions": null
   },
   {
-    "name": "loop-queue",
-    "description": "Toggle repeating the entire queue",
-    "default_member_permissions": null
-  },
-  {
-    "name": "loop",
-    "description": "Toggle repeating the current track",
-    "default_member_permissions": null
-  },
-  {
-    "name": "move",
-    "description": "Move a track to another queue position",
-    "options": [
-      {
-        "type": 4,
-        "name": "from",
-        "description": "Current track position, starting at 1",
-        "required": true,
-        "min_value": 1
-      },
-      {
-        "type": 4,
-        "name": "to",
-        "description": "New track position, starting at 1",
-        "required": true,
-        "min_value": 1
-      }
-    ],
-    "default_member_permissions": null
-  },
-  {
-    "name": "next",
-    "description": "Skip to the next track",
-    "default_member_permissions": null
-  },
-  {
     "name": "now-playing",
     "description": "Show the current player and controls",
     "default_member_permissions": null
@@ -280,6 +111,21 @@
         "description": "Track name, YouTube, Spotify or SoundCloud link; use sc: for SoundCloud search",
         "required": true,
         "autocomplete": true
+      },
+      {
+        "type": 5,
+        "name": "next",
+        "description": "Queue these tracks next without interrupting playback"
+      },
+      {
+        "type": 5,
+        "name": "now",
+        "description": "Play these tracks now, skipping the current track"
+      },
+      {
+        "type": 5,
+        "name": "shuffle",
+        "description": "Shuffle the selection when adding multiple tracks"
       }
     ],
     "default_member_permissions": null
@@ -305,30 +151,6 @@
     "default_member_permissions": null
   },
   {
-    "name": "remove",
-    "description": "Remove tracks from the queue",
-    "options": [
-      {
-        "type": 4,
-        "name": "position",
-        "description": "First track position to remove, starting at 1",
-        "min_value": 1
-      },
-      {
-        "type": 4,
-        "name": "range",
-        "description": "Number of tracks to remove; defaults to 1",
-        "min_value": 1
-      }
-    ],
-    "default_member_permissions": null
-  },
-  {
-    "name": "replay",
-    "description": "Restart the current track",
-    "default_member_permissions": null
-  },
-  {
     "name": "resume",
     "description": "Resume playback",
     "default_member_permissions": null
@@ -344,11 +166,6 @@
         "required": true
       }
     ],
-    "default_member_permissions": null
-  },
-  {
-    "name": "shuffle",
-    "description": "Shuffle the queue",
     "default_member_permissions": null
   },
   {
@@ -370,11 +187,6 @@
     "default_member_permissions": null
   },
   {
-    "name": "unskip",
-    "description": "Return to the previous track",
-    "default_member_permissions": null
-  },
-  {
     "name": "volume",
     "description": "Change the current volume",
     "options": [
@@ -385,35 +197,6 @@
         "required": true,
         "min_value": 0,
         "max_value": 100
-      }
-    ],
-    "default_member_permissions": null
-  },
-  {
-    "name": "play-advanced",
-    "description": "Play tracks with additional queue options",
-    "options": [
-      {
-        "type": 3,
-        "name": "query",
-        "description": "Track name, YouTube, Spotify or SoundCloud link; use sc: for SoundCloud search",
-        "required": true,
-        "autocomplete": true
-      },
-      {
-        "type": 5,
-        "name": "immediate",
-        "description": "Queue these tracks next without interrupting the current track"
-      },
-      {
-        "type": 5,
-        "name": "shuffle",
-        "description": "Shuffle the selection when adding multiple tracks"
-      },
-      {
-        "type": 5,
-        "name": "skip",
-        "description": "Start this selection immediately, skipping the current track"
       }
     ],
     "default_member_permissions": null
@@ -436,18 +219,8 @@
     "default_member_permissions": null
   },
   {
-    "name": "grab",
-    "description": "Get a private link to the current track",
-    "default_member_permissions": null
-  },
-  {
     "name": "help",
     "description": "Show the music bot guide",
-    "default_member_permissions": null
-  },
-  {
-    "name": "hjelp",
-    "description": "Legacy alias for /help: show the music bot guide",
     "default_member_permissions": null
   },
   {
@@ -460,20 +233,6 @@
         "description": "Number of recent tracks, from 1 to 20; defaults to 10",
         "min_value": 1,
         "max_value": 20
-      }
-    ],
-    "default_member_permissions": null
-  },
-  {
-    "name": "play-next",
-    "description": "Add a track to the front of the queue",
-    "options": [
-      {
-        "type": 3,
-        "name": "query",
-        "description": "Track name, YouTube, Spotify or SoundCloud link; use sc: for SoundCloud search",
-        "required": true,
-        "autocomplete": true
       }
     ],
     "default_member_permissions": null
@@ -501,57 +260,12 @@
     "default_member_permissions": null
   },
   {
-    "name": "crossfade",
-    "description": "View or change transitions between tracks",
-    "options": [
-      {
-        "type": 1,
-        "name": "status",
-        "description": "Show the current setting or vote status"
-      },
-      {
-        "type": 1,
-        "name": "set",
-        "description": "Set the crossfade duration",
-        "options": [
-          {
-            "type": 4,
-            "name": "seconds",
-            "description": "Crossfade duration, from 1 to 12 seconds",
-            "required": true,
-            "min_value": 1,
-            "max_value": 12
-          }
-        ]
-      },
-      {
-        "type": 1,
-        "name": "off",
-        "description": "Turn crossfade off"
-      }
-    ],
-    "default_member_permissions": "32"
-  },
-  {
     "name": "concert",
     "description": "Play a YouTube concert in Discord and the shared Afterparty room",
     "options": [
       {
         "type": 3,
         "name": "url",
-        "description": "YouTube concert URL; leave empty to open Afterparty",
-        "max_length": 600
-      }
-    ],
-    "default_member_permissions": null
-  },
-  {
-    "name": "konsert",
-    "description": "Legacy alias for /concert: share a concert with Afterparty",
-    "options": [
-      {
-        "type": 3,
-        "name": "lenke",
         "description": "YouTube concert URL; leave empty to open Afterparty",
         "max_length": 600
       }
