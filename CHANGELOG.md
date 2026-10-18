@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.1: Fresh saved browser state across tabs
+
+2026-10-18
+
+- Saved room ownership and device preferences read the latest stored value after another tab changes them, including when a settings view is reopened. Successful saves no longer leave a stale in-memory copy.
+- Browsers that block saving still retain changes for the current page. Observed settings continue to share cached reads and receive same-page and cross-tab updates.
+
 ## v2.2.0: Radio 2.0: shared discovery and safer recovery
 
 2026-10-17

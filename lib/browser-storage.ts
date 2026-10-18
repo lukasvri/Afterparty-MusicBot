@@ -67,11 +67,13 @@ export const browserStorage = {
     }
   },
   set(key: string, value: string) {
-    memory.set(key, value);
     let saved = true;
     try {
       localStorage.setItem(key, value);
+      memory.delete(key);
+      if (subscriptions.has(key)) snapshots.set(key, value);
     } catch {
+      memory.set(key, value);
       saved = false;
     }
     subscriptions.get(key)?.listeners.forEach(listener => listener());
