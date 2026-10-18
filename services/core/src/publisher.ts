@@ -13,7 +13,7 @@ type BridgeJob = Record<string, unknown> & {
 type BridgeReply = { serverTime: number; commands: BridgeJob[] };
 
 function readReply(value: unknown): BridgeReply {
-  if (!value || typeof value !== "object") throw new Error("Ugyldig brosvar.");
+  if (!value || typeof value !== "object") throw new Error("Invalid bridge response.");
   const data = value as Partial<BridgeReply>;
   if (
     !Number.isFinite(data.serverTime) ||
@@ -30,7 +30,7 @@ function readReply(value: unknown): BridgeReply {
         !Number.isFinite(job.expiresAt),
     )
   )
-    throw new Error("Ugyldig brosvar.");
+    throw new Error("Invalid bridge response.");
   return data as BridgeReply;
 }
 
@@ -133,7 +133,7 @@ export class Publisher {
         ]),
       });
       if (this.closed) return;
-      if (!response.ok) throw new Error("Publikumsbroen svarte ikke.");
+      if (!response.ok) throw new Error("The audience bridge did not respond.");
       // A 200 response alone cannot acknowledge durable data or supply a clock.
       const data = readReply(await response.json());
       if (this.closed) return;
@@ -154,7 +154,7 @@ export class Publisher {
           this.engine.store.finishJob(
             job.id,
             "failed",
-            "Kommandoen utløp før den nådde boten.",
+            "The command expired before it reached the bot.",
           );
           this.dirty = true;
           continue;
@@ -170,7 +170,7 @@ export class Publisher {
             this.engine.store.finishJob(
               job.id,
               "failed",
-              error instanceof Error ? error.message : "Kommandoen mislyktes.",
+              error instanceof Error ? error.message : "The command failed.",
             );
             this.changed();
           });

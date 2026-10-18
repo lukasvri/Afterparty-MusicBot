@@ -94,7 +94,7 @@ export class PcmDecoder {
       this.child.once("close", (code) => {
         if (code !== 0 && !this.disposed)
           this.error ??= new Error(
-            "Lyddekodingen stoppet (" + this.stderrReason + ").",
+            "Audio decoding stopped (" + this.stderrReason + ").",
           );
         resolve();
       }),
@@ -118,7 +118,7 @@ export class PcmDecoder {
           })(),
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(
-              () => reject(new Error("Lydstrømmen sluttet å levere data.")),
+              () => reject(new Error("The audio stream stopped delivering data.")),
               DECODER_TIMEOUT_MS,
             );
           }),
@@ -414,7 +414,7 @@ export function encodeOpus(mixer: Mixer, bitrate: number) {
     stderrReason = ffmpegReason(chunk);
   });
   process.on("error", () =>
-    stream.destroy(new Error("Lydkodingen kunne ikke startes.")),
+    stream.destroy(new Error("Audio encoding could not start.")),
   );
   // stdout can end before the exit status arrives. Only a successful exit is EOF.
   process.on("close", (code) => {
@@ -422,7 +422,7 @@ export function encodeOpus(mixer: Mixer, bitrate: number) {
       if (code === 0) stream.end();
       else
         stream.destroy(
-          new Error("Lydkodingen stoppet (" + stderrReason + ")."),
+          new Error("Audio encoding stopped (" + stderrReason + ")."),
         );
     }
   });

@@ -19,15 +19,15 @@ export class SpotifyCatalog{
  async access(){
   if(Date.now()<this.token.until)return this.token.value;
   if(this.refreshing)return this.refreshing;
-  this.refreshing=(async()=>{const r=await this.request('https://accounts.spotify.com/api/token',{method:'POST',headers:{Authorization:'Basic '+Buffer.from(this.id+':'+this.secret).toString('base64'),'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=client_credentials',signal:AbortSignal.timeout(10000)});if(!r.ok)throw new UserError('Spotify-tilgangen kunne ikke bekreftes.',502);const t=await r.json() as {access_token:string;expires_in:number};this.token={value:t.access_token,until:Date.now()+t.expires_in*1000-60000};return this.token.value;})().finally(()=>{this.refreshing=null;});return this.refreshing;
+  this.refreshing=(async()=>{const r=await this.request('https://accounts.spotify.com/api/token',{method:'POST',headers:{Authorization:'Basic '+Buffer.from(this.id+':'+this.secret).toString('base64'),'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=client_credentials',signal:AbortSignal.timeout(10000)});if(!r.ok)throw new UserError('Could not verify Spotify access.',502);const t=await r.json() as {access_token:string;expires_in:number};this.token={value:t.access_token,until:Date.now()+t.expires_in*1000-60000};return this.token.value;})().finally(()=>{this.refreshing=null;});return this.refreshing;
  }
  async api<T=SpotifySong>(path:string){
-  const url=new URL(path,'https://api.spotify.com/v1/');if(url.origin!=='https://api.spotify.com'||!url.pathname.startsWith('/v1/'))throw new UserError('Ugyldig Spotify-side.');
-  for(let attempt=0;attempt<2;attempt++){const r=await this.request(url,{headers:{Authorization:'Bearer '+await this.access()},signal:AbortSignal.timeout(12000)});if(r.status===401&&!attempt){this.token.until=0;continue;}if(!r.ok)throw new UserError(r.status===429?'Spotify er opptatt. Prøv igjen om litt.':'Spotify-listen er privat eller utilgjengelig.',r.status===429?429:502);return await r.json() as T;}throw new UserError('Spotify-tilgangen er utløpt.',502);
+  const url=new URL(path,'https://api.spotify.com/v1/');if(url.origin!=='https://api.spotify.com'||!url.pathname.startsWith('/v1/'))throw new UserError('Invalid Spotify page.');
+  for(let attempt=0;attempt<2;attempt++){const r=await this.request(url,{headers:{Authorization:'Bearer '+await this.access()},signal:AbortSignal.timeout(12000)});if(r.status===401&&!attempt){this.token.until=0;continue;}if(!r.ok)throw new UserError(r.status===429?'Spotify is busy. Try again shortly.':'This Spotify playlist is private or unavailable.',r.status===429?429:502);return await r.json() as T;}throw new UserError('Spotify access has expired.',502);
  }
  async apiLoad(kind:string,id:string,limit:number):Promise<CatalogSong[]>{
-  if(!this.id||!this.secret)throw new UserError('Spotify API-tilgang mangler.');
-  if(kind==='track'){const t=catalog(await this.api(`tracks/${id}`));if(!t)throw new UserError('Spotify-sporet kan ikke spilles.');return [t];}
+  if(!this.id||!this.secret)throw new UserError('Spotify API access is not configured.');
+  if(kind==='track'){const t=catalog(await this.api(`tracks/${id}`));if(!t)throw new UserError('This Spotify track cannot be played.');return [t];}
   let path:string|null=kind==='playlist'?`playlists/${id}/items?limit=50`:`albums/${id}/tracks?limit=50`;
   const tracks:CatalogSong[]=[];const visited=new Set<string>();
   while(path&&tracks.length<limit&&!visited.has(path)){
@@ -35,7 +35,7 @@ export class SpotifyCatalog{
    for(const item of data.items??[]){const t=catalog(item.item??item.track??item);if(t)tracks.push(t);if(tracks.length>=limit)break;}
    path=data.next??null;
   }
-  if(!tracks.length)throw new UserError('Spotify-listen inneholder ingen tilgjengelige sanger.');
+  if(!tracks.length)throw new UserError('This Spotify playlist has no available songs.');
   return tracks.slice(0,limit);
  }
  async load(kind:string,id:string,limit:number):Promise<CatalogSong[]>{
@@ -57,11 +57,11 @@ export class SpotifyCatalog{
 export async function expandSpotifyLink(value:string,request:typeof fetch=fetch){
  let url=new URL(value);
  for(let n=0;n<5;n++){
-  if(url.protocol!=='https:'||url.username||url.password||!['spotify.link','open.spotify.com'].includes(url.hostname))throw new UserError('Ugyldig Spotify-delingslenke.');
+  if(url.protocol!=='https:'||url.username||url.password||!['spotify.link','open.spotify.com'].includes(url.hostname))throw new UserError('Invalid Spotify sharing link.');
   if(spotifyRef(url.href))return url.href;
   const r=await request(url,{redirect:'manual',signal:AbortSignal.timeout(10000)});
-  const location=r.headers.get('location');if(!location||r.status<300||r.status>=400)throw new UserError('Spotify-delingslenken kunne ikke åpnes.');
+  const location=r.headers.get('location');if(!location||r.status<300||r.status>=400)throw new UserError('Could not open the Spotify sharing link.');
   url=new URL(location,url);
  }
- throw new UserError('Spotify-delingslenken har for mange videresendinger.');
+ throw new UserError('The Spotify sharing link has too many redirects.');
 }

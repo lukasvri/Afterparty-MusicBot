@@ -84,6 +84,27 @@ export function RoomSharing({
       setBusy(false);
     }
   }
+  if (tv) return (
+    <section className="room-sharing tv-invite" aria-label={t("Del kvelden")}>
+      <div className="tv-room-heading">
+        <span className="party-kicker">AFTERPARTY / TV</span>
+        <h2>{room.name}</h2>
+      </div>
+      <button className="button subtle tv-exit" onClick={onTV}>
+        {t("Avslutt TV-modus")}
+      </button>
+      <div className="tv-join">
+        {qr && <Image unoptimized src={qr} width={180} height={180} alt={t("QR-kode for å bli med i rommet")} />}
+        <strong>{t("Skann og ønsk ei låt")}</strong>
+        <p>{t("Bli med på telefonen for å søkje og leggje til musikk.")}</p>
+        <label className="share-url">
+          {t("Romlenkje")}
+          <input readOnly value={url} onFocus={e => e.target.select()} />
+        </label>
+      </div>
+      {message && <p role="status">{message}</p>}
+    </section>
+  );
   return (
     <section
       className={"room-sharing" + (tv ? " tv-invite" : "")}

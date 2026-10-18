@@ -204,7 +204,7 @@ export const messages: Record<string, readonly [string, string]> = {
   ],
   "Start med /konsert i ein talekanal. Vi tek oss av videoen.": [
     "Start med /konsert i en talekanal. Vi tar oss av videoen.",
-    "Start with /konsert in a voice channel. We'll take care of the video."
+    "Start with /concert in a voice channel. We'll take care of the video."
   ],
   "Vel neste låt. Lyden går i Discord, videoen kjem her.": [
     "Velg neste låt. Lyden går i Discord, videoen kommer her.",
@@ -376,7 +376,7 @@ export const messages: Record<string, readonly [string, string]> = {
   ],
   "Start /konsert i ein talekanal i Discord.": [
     "Start /konsert i en talekanal i Discord.",
-    "Start /konsert in a Discord voice channel."
+    "Start /concert in a Discord voice channel."
   ],
   "Konsertar spelar i Discord og blir viste her.": [
     "Konserter spiller i Discord og vises her.",

@@ -17,6 +17,10 @@ try {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
+  // This workflow deliberately covers a saved Norwegian preference.
+  await context.addInitScript(() => {
+    if (localStorage.getItem("gutta-language") === null) localStorage.setItem("gutta-language", "nb");
+  });
   const track: Video = {
     id: "seed1234567",
     title: "Synthetic evening song",

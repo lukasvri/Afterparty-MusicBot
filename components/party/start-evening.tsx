@@ -59,8 +59,8 @@ export function StartEvening({
             <strong>{t("Sjå med Discord")}</strong>
             <small>
               {en
-                ? "Voice-channel audio, video here. Start with /konsert."
-                : "Lyden i talekanalen, videoen her. Start med /konsert."}
+                ? "Voice-channel audio, video here. Start with /concert."
+                : "Lyden i talekanalen, videoen her. Start med /concert."}
             </small>
           </span>
           <ArrowUpRight size={20} />

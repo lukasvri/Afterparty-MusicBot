@@ -32,11 +32,11 @@ export class Commands {
             const outcome=await found;
             if('error' in outcome)throw outcome.error;
             const tracks=outcome.tracks.map(t=>({...t,requestedBy:author,concert:options.concert===true}));
-            if(options.concert&&(!tracks.length||tracks.some(t=>t.source!=='youtube'||!t.embeddable)))throw new UserError('Videoen kan ikke vises i Afterparty. Velg en annen YouTube-video.');
-            if(epoch!==e.queueGeneration||!e.connected)throw new UserError('Avspillingen ble stoppet før søket var ferdig.');
+            if(options.concert&&(!tracks.length||tracks.some(t=>t.source!=='youtube'||!t.embeddable)))throw new UserError('This video cannot be shown in Afterparty. Choose another YouTube video.');
+            if(epoch!==e.queueGeneration||!e.connected)throw new UserError('Playback stopped before the search finished.');
             if(options.shuffle)for(let i=tracks.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tracks[i],tracks[j]]=[tracks[j],tracks[i]];}
             const count=options.moderated && this.concertQueue.request(tracks) ? tracks.length : e.enqueue(tracks,options.next,options.immediate);
-            this.note(options.concert?'La til konsert i Discord og Afterparty':'La til musikk i Discord');
+            this.note(options.concert?'Added a concert to Discord and Afterparty':'Added music to Discord');
             return count;
         });
         this.enqueueTail=result;
@@ -44,23 +44,23 @@ export class Commands {
     }
     async execute(input: Record<string, unknown>, scope: 'public' | 'admin' | 'discord' = 'admin', author = 'website') {
         const e = this.engine, action = String(input.action);
-        if(scope==='public'&&['pause','resume','skip'].includes(action)&&(!e.current?.concert||input.playbackKey!=='core:'+e.current.entryId))throw new UserError('Konserten er endret. Oppdater siden før du prøver igjen.',409);
+        if(scope==='public'&&['pause','resume','skip'].includes(action)&&(!e.current?.concert||input.playbackKey!=='core:'+e.current.entryId))throw new UserError('The concert has changed. Refresh the page and try again.',409);
         if (scope === 'public' && !['pause', 'resume', 'skip', 'enqueue'].includes(action))
-            throw new UserError('Denne handlingen krever administratortilgang.', 403);
+            throw new UserError('This action requires administrator access.', 403);
         if (['skip', 'seek', 'remove', 'move', 'jump'].includes(action) && typeof input.queueRevision === 'string' && input.queueRevision !== e.revision())
-            throw new UserError('Køen er endret. Oppdater og prøv igjen.', 409);
+            throw new UserError('The queue has changed. Refresh and try again.', 409);
         if (['pause', 'resume', 'skip', 'enqueue', 'seek'].includes(action) && !e.connected)
-            throw new UserError('Start boten i en talekanal i Discord først.', 409);
+            throw new UserError('Start the bot in a Discord voice channel first.', 409);
         switch (action) {
             case 'enqueue': {
                 if (scope === 'public' && (typeof input.videoId !== 'string' || !/^[\w-]{11}$/.test(input.videoId)))
-                    throw new UserError('Velg en YouTube-video.');
+                    throw new UserError('Choose a YouTube video.');
                 await this.add(String(input.query ?? input.videoId ?? ''), author, {next:Boolean(input.next),immediate:Boolean(input.immediate),shuffle:Boolean(input.shuffle),moderated:scope==='public',concert:scope==='public'||input.concert===true});
                 break;
             }
             case 'pause':
                 if (!e.current)
-                    throw new UserError('Ingen sang spiller.');
+                    throw new UserError('No song is playing.');
                 if (!e.paused)
                     e.pause();
                 break;
@@ -86,7 +86,7 @@ export class Commands {
                 break;
             case 'diagnostic':
                 if (scope !== 'admin' || !this.diagnostic)
-                    throw new UserError('Ingen tilgang.', 403);
+                    throw new UserError('Access denied.', 403);
                 return this.diagnostic();
             case 'replay':
                 await e.seek(e.current?.offset ?? 0);
@@ -94,7 +94,7 @@ export class Commands {
             case 'unskip': {
                 const previous = e.historyEntries.at(-2);
                 if (!previous)
-                    throw new UserError('Ingen tidligere sang å gå tilbake til.');
+                    throw new UserError('There is no previous song to return to.');
                 if (e.current)
                     e.queue.unshift(replayTrack(e.current));
                 await e.startTrack(replayTrack(previous));
@@ -132,7 +132,7 @@ export class Commands {
             case 'sleep': {
                 const minutes = Number(input.minutes);
                 if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440)
-                    throw new UserError('Velg en stopptimer fra 1 til 1440 minutter.');
+                    throw new UserError('Choose a stop timer from 1 to 1440 minutes.');
                 if (this.sleep)
                     clearTimeout(this.sleep);
                 this.sleepUntil = Date.now() + minutes * 60000;
@@ -156,7 +156,7 @@ export class Commands {
             case 'snapshot-load': {
                 const s = e.store.get<SavedQueue[]>('snapshots', []).find(s => s.id === input.id);
                 if (!s)
-                    throw new UserError('Fant ikke spillelisten.');
+                    throw new UserError('Playlist not found.');
                 if (input.replace)
                     e.clear();
                 e.enqueue(s.tracks.map(replayTrack));
@@ -175,10 +175,10 @@ export class Commands {
                 e.changed();
                 break;
             }
-            default: throw new UserError('Ukjent spillerhandling.');
+            default: throw new UserError('Unknown player action.');
         }
-        this.note(action === 'pause' ? 'Avspillingen ble satt på pause' : action === 'resume' ? 'Avspillingen fortsatte' : action === 'skip' ? 'Hoppet til neste sang' : 'Utførte ' + action);
-        return 'Utført av Afterparty-boten.';
+        this.note(action === 'pause' ? 'Playback paused' : action === 'resume' ? 'Playback resumed' : action === 'skip' ? 'Skipped to the next song' : 'Performed ' + action);
+        return 'Done by the Afterparty bot.';
     }
     updateSettings(input: Record<string, unknown>) { const bounds: Record<string, [
         number,
@@ -189,10 +189,10 @@ export class Commands {
         const value = input[key];
         if (key in bounds) {
             if (!Number.isInteger(value) || Number(value) < bounds[key][0] || Number(value) > bounds[key][1])
-                throw new UserError('Ugyldig verdi for ' + key);
+                throw new UserError('Invalid value for ' + key);
         }
         else if (typeof value !== 'boolean')
-            throw new UserError('Ugyldig verdi for ' + key);
+            throw new UserError('Invalid value for ' + key);
         (next as Record<string, unknown>)[key] = value;
     } this.engine.setSettings(next); return { ...this.engine.settings, updatedAt: new Date().toISOString() }; }
     close() { if (this.sleep)

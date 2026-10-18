@@ -277,3 +277,57 @@ in both language settings at both widths), the party browser workflow,
 zero-warning lint, website types, 112 website unit tests, release validation
 and the production build. Required `check:all` again reached the same four
 Windows `fcntl` import failures; the PR records Linux CI for the final head.
+
+### Queue visibility, English defaults and TV follow-up
+
+The focused `scripts/queue-add.browser.ts` reproduced the reported symptom in
+both immediate and polled Discord command-confirmation paths: the addition
+succeeded but the rendered social queue retained its old snapshot. Browser-room
+additions passed the same baseline. Confirmation now refreshes both the room
+and the authoritative concert queue. A failed queue read is reported separately
+from a successfully confirmed addition, avoiding a misleading retry prompt.
+Generation and request-order checks preserve other servers and newer errors.
+Review also reproduced both directions of overlapping queue-management/add
+operations. Snapshot refresh waits for an in-flight management response, then
+retains its failure message if that operation failed. The focused tests cover
+both successful and rejected management, plus late replies after guild changes.
+
+The website document, metadata and initial language context now use English.
+Explicit saved Norwegian/English choices remain supported, and invalid or blocked
+storage falls back to English. `scripts/language.browser.ts` first failed on the
+old Norwegian server document, then passed ten desktop/mobile cases including
+saved choices, reload and blocked storage.
+
+Discord command descriptions, help, player controls, presence and standard
+Core errors are English. `/help`, `/concert url` and `/history count` are the
+canonical forms, with existing aliases retained. Four advertised controls had
+no implementation: two `split` options and two announcement/config options.
+New registration omits those controls, while stale calls receive an unsupported
+response before mutation. Existing stored fields, button IDs and permissions
+are preserved. See [installation](INSTALLATION.md#8-play-your-first-track).
+Twelve new Discord cases exercise registration through a synthetic client,
+aliases, valid command routing, unsupported inputs and access denials. No real
+Discord login, voice session or production command registration was performed.
+Historical stored results, user-authored metadata and unexpected external error
+messages are not translated retroactively.
+
+TV mode now separates a large video/track area from a compact public QR panel,
+with an explicit exit control and a responsive mobile arrangement. The nickname
+field explains its request-label purpose and lack of access privileges.
+`scripts/tv-mode.browser.ts` verifies 1920x1080 and 1280x720 fit without scrolling,
+390 px horizontal fit, QR rendering and exit/re-entry while retaining the same
+source player. Its video surface is a synthetic player, not a live-media check.
+A TV URL without a selected room previously hid all welcome actions; a separate
+red/green regression now keeps the normal welcome page available in that case.
+
+Final local validation passed all eight queue browser cases, ten language cases,
+three TV layouts, 27 playback/start cases including local Core/FFmpeg, four sync
+cases, party/service-page/concert-queue workflows, zero-warning lint, website
+and Core types, 112 website unit tests, release validation and the production
+build. The seven current patch-note bullets and versioned footer link were
+rendered at both widths. [Desktop](assets/tv-layout-desktop-20261018.png) and
+[mobile](assets/tv-layout-mobile-20261018.png) TV evidence is retained with
+[provenance](assets/README.md). Core passed 393/394 locally; the sole failure is
+the existing POSIX stalled-decoder executable on Windows. Required `check:all`
+stopped at the same four Windows `fcntl` imports. Final-head Linux CI is recorded
+in the PR rather than treating these local platform limits as passing tests.

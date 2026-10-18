@@ -110,7 +110,7 @@ export class DiscordBot {
             void this.updateMessage();if(this.ownsClient)this.activity();
             if(!this.engine.current&&this.engine.connected){if(this.engine.settings.secondsToWaitAfterQueueEmpties>0&&Date.now()-this.idleSince>this.engine.settings.secondsToWaitAfterQueueEmpties*1000)this.disconnect();}else this.idleSince=Date.now();
         },3000);
-        await this.restore(guild);if(this.engine.current)await this.playerMessage.update(true,true).catch(()=>console.warn('Spillermeldingen kunne ikke flyttes.'));
+        await this.restore(guild);if(this.engine.current)await this.playerMessage.update(true,true).catch(()=>console.warn('The player message could not be moved.'));
     }
     async restore(guild: Guild) { const id = this.engine.store.get<string | null>('voice-channel', null), recovery = this.engine.store.get<{
         paused: boolean;
@@ -121,36 +121,36 @@ export class DiscordBot {
             await this.join(channel);
         } catch (error) {
             if (!(error instanceof UserError)) throw error;
-            this.engine.lastError = 'Kunne ikke gjenopprette taletilkoblingen. Bruk /play for å prøve igjen.';
+            this.engine.lastError = 'Could not restore the voice connection. Use /play to try again.';
             this.engine.changed();
             return;
         }
         await this.engine.startNext(); if (recovery?.paused && this.engine.current)
         this.engine.pause(); }
     async diagnostic() { if (this.engine.current || this.engine.queue.length || this.engine.connected)
-        throw new UserError('Testen krever en tom bot.'); const guild = await this.client.guilds.fetch(this.guildId); const channels = await guild.channels.fetch(); const channel = channels.find(c => c?.type === ChannelType.GuildVoice && !c.members.some(m => !m.user.bot) && c.permissionsFor(guild.members.me!).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])); if (!channel?.isVoiceBased())
-        throw new UserError('Fant ingen tom talekanal for testen.'); this.testing = true; const settings = this.engine.settings; try {
+        throw new UserError('The test requires an idle bot with an empty queue.'); const guild = await this.client.guilds.fetch(this.guildId); const channels = await guild.channels.fetch(); const channel = channels.find(c => c?.type === ChannelType.GuildVoice && !c.members.some(m => !m.user.bot) && c.permissionsFor(guild.members.me!).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])); if (!channel?.isVoiceBased())
+        throw new UserError('No empty voice channel is available for the test.'); this.testing = true; const settings = this.engine.settings; try {
         this.engine.setSettings({ radio: false, crossfade: 0 });
         await this.join(channel);
         await this.commands.add('K4DyBUG242c', 'diagnostic');
         const deadline = Date.now() + 45000;
         while (this.engine.snapshot().position < 5 && Date.now() < deadline) {
             if (!this.engine.current && !this.engine.loading)
-                throw new UserError(this.engine.lastError || 'Testlyden stoppet.');
+                throw new UserError(this.engine.lastError || 'The test audio stopped.');
             await new Promise(r => setTimeout(r, 100));
         }
         const before = this.engine.snapshot();
         if (!before.playing || before.position < 5)
-            throw new UserError('Discord mottok ikke nok lydpakker.');
+            throw new UserError('Discord did not receive enough audio packets.');
         this.engine.pause();
         const paused = this.engine.snapshot().position;
         await new Promise(r => setTimeout(r, 300));
         if (Math.abs(this.engine.snapshot().position - paused) > .04)
-            throw new UserError('Lydklokken stoppet ikke ved pause.');
+            throw new UserError('The audio clock did not stop when paused.');
         this.engine.resume();
         await new Promise(r => setTimeout(r, 500));
         if (this.engine.snapshot().position < paused + .3)
-            throw new UserError('Lydklokken startet ikke igjen.');
+            throw new UserError('The audio clock did not resume.');
         return JSON.stringify({ voiceReady: true, audioSeconds: before.position, pauseClockFrozen: true, resumeClockAdvanced: true, engine: 'gutta-krutt-core' });
     }
     finally {
@@ -161,7 +161,7 @@ export class DiscordBot {
     } }
     async join(channel:VoiceBasedChannel){
         if(this.voiceJoin){
-            if(this.voiceJoin.channelId!==channel.id)throw new UserError('Boten kobler allerede til en annen talekanal. Prøv igjen.');
+            if(this.voiceJoin.channelId!==channel.id)throw new UserError('The bot is already joining another voice channel. Try again.');
             return this.voiceJoin.task;
         }
         if(this.connection?.joinConfig.channelId===channel.id&&this.engine.connected)return;
@@ -174,15 +174,15 @@ export class DiscordBot {
     }
     async connectVoice(channel: VoiceBasedChannel) { if (this.connection?.joinConfig.channelId === channel.id && this.engine.connected)
         return; const me = channel.guild.members.me; if (!me || !channel.permissionsFor(me).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]))
-        throw new UserError('Boten mangler tilgang til å bli med og spille lyd.'); this.connection?.destroy(); this.connection = joinVoiceChannel({ guildId: this.guildId, channelId: channel.id, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: !this.engine.settings.turnDownVolumeWhenPeopleSpeak }); const connection = this.connection; this.watchVoiceErrors(connection); try {
+        throw new UserError('The bot needs permission to connect and speak in this voice channel.'); this.connection?.destroy(); this.connection = joinVoiceChannel({ guildId: this.guildId, channelId: channel.id, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: !this.engine.settings.turnDownVolumeWhenPeopleSpeak }); const connection = this.connection; this.watchVoiceErrors(connection); try {
         await entersState(connection, VoiceConnectionStatus.Ready, 20000);
     }
     catch {
         if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
         if (this.connection === connection) this.connection = null;
-        throw new UserError('Kunne ikke koble til talekanalen. Prøv igjen.');
+        throw new UserError('Could not connect to the voice channel. Try again.');
     }
-    if (this.connection !== connection) throw new UserError('Taletilkoblingen ble avbrutt. Prøv igjen.');
+    if (this.connection !== connection) throw new UserError('The voice connection was interrupted. Try again.');
     this.engine.store.set('voice-channel', channel.id); this.connection.subscribe(this.sink.player); this.engine.channelBitrate = channel.bitrate; this.engine.setConnection(true); let disconnectedAt:number|null=null;this.connection.on(VoiceConnectionStatus.Ready,()=>{if(disconnectedAt!==null){this.engine.diagnostics.note("voice-reconnected",performance.now()-disconnectedAt);disconnectedAt=null;}});this.connection.on(VoiceConnectionStatus.Disconnected, () => { disconnectedAt=performance.now();this.engine.diagnostics.note("voice-disconnected"); const connection = this.connection; if (!connection)
         return; void Promise.race([entersState(connection, VoiceConnectionStatus.Signalling, 5000), entersState(connection, VoiceConnectionStatus.Connecting, 5000)]).catch(() => { if (this.connection === connection)
         this.disconnect(); }); }); this.connection.receiver.speaking.on('start', id => { if (id === this.client.user?.id)
@@ -192,20 +192,20 @@ export class DiscordBot {
         // Keep its reconnect state machine alive without an unhandled error event.
         connection.on('error', () => {
             if (this.connection !== connection) return;
-            this.engine.lastError = 'Discord-taletilkoblingen ble avbrutt. Venter på ny tilkobling.';
+            this.engine.lastError = 'The Discord voice connection was interrupted. Waiting to reconnect.';
             this.engine.diagnostics.note('voice-error');
             this.engine.changed();
         });
     }
     disconnect() { const connection=this.connection;this.connection=null;this.voiceJoin=null;this.joining=false;if(connection&&connection.state.status!==VoiceConnectionStatus.Destroyed)connection.destroy();this.talking.clear();this.engine.ducking=false;this.engine.setConnection(false); }
     async sameVoice(interaction: ChatInputCommandInteraction | ButtonInteraction, join = false) { const member = await interaction.guild!.members.fetch(interaction.user.id), channel = member.voice.channel; if (!channel)
-        throw new UserError('Bli med i en talekanal først.'); if (this.connection && channel.id !== this.connection.joinConfig.channelId)
-        throw new UserError('Du må være i samme talekanal som boten.'); if (join)
+        throw new UserError('Join a voice channel first.'); if (this.connection && channel.id !== this.connection.joinConfig.channelId)
+        throw new UserError('You must be in the same voice channel as the bot.'); if (join)
         await this.join(channel);
     else if (!this.connection)
-        throw new UserError('Start musikken med /play først.'); return member; }
+        throw new UserError('Start playback with /play first.'); return member; }
     async manager(interaction: ChatInputCommandInteraction) { const member = await interaction.guild!.members.fetch(interaction.user.id); if (!member.permissions.has(PermissionFlagsBits.ManageGuild))
-        throw new UserError('Du må kunne administrere serveren for å endre denne innstillingen.', 403); }
+        throw new UserError('You need Manage Server permission to change this setting.', 403); }
     async interaction(interaction: ChatInputCommandInteraction | ButtonInteraction) {
         try {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -213,20 +213,20 @@ export class DiscordBot {
                 await this.sameVoice(interaction);
                 const id = playerAction(interaction.customId);
                 const e = this.engine;
-                if(id==='more'){await interaction.editReply({content:'Flere valg',components:playerMoreComponents(this)});return;}
+                if(id==='more'){await interaction.editReply({content:'More controls',components:playerMoreComponents(this)});return;}
                 if (id === 'favorite') {
                     if (!e.current)
-                        throw new UserError('Ingen sang spiller.');
+                        throw new UserError('No track is playing.');
                     e.store.favorite(interaction.user.id, e.current.title, e.current.url ?? 'https://www.youtube.com/watch?v=' + e.current.id);
-                    await interaction.editReply('Sangen er lagret som favoritt.');
+                    await interaction.editReply('The track was saved to your favorites.');
                     return;
                 }
                 if(id==='queue'){
-                    await interaction.editReply(e.queue.map((t,i)=>`${i+1}. ${t.title}`).join('\n').slice(0,1900)||'Køen er tom.');
+                    await interaction.editReply(e.queue.map((t,i)=>`${i+1}. ${t.title}`).join('\n').slice(0,1900)||'The queue is empty.');
                     return;
                 }
                 if(id==='back10'||id==='forward30'){
-                    if(!e.current||e.current.live)throw new UserError('Denne sangen kan ikke spoles.');
+                    if(!e.current||e.current.live)throw new UserError('This track cannot be seeked.');
                     await this.commands.execute({action:'seek',seconds:Math.max(0,Math.min(e.current.duration-.1,e.snapshot().position+(id==='back10'?-10:30)))},'discord',interaction.user.id);
                     await this.updateMessage(true);await interaction.deleteReply();return;
                 }
@@ -241,6 +241,7 @@ export class DiscordBot {
             const number = (key: string, fallback: number) => interaction.options.getInteger(key) ?? fallback;
             const boolean = (key: string) => interaction.options.getBoolean(key) ?? false;
             if (['play', 'play-next', 'play-advanced'].includes(name)) {
+                if (boolean('split')) throw new UserError('Chapter splitting is not supported. Leave split off and try again.');
                 await this.sameVoice(interaction, true);
                 if(!this.musicChannelId&&interaction.guild){const target=interaction.guild!.channels.cache.find(c=>c.isTextBased()&&c.name==='musikk')??interaction.channel;if(target?.isTextBased()&&'send'in target){this.musicChannelId=target.id;e.store.set('music-channel',target.id);}}
                 const count = await this.commands.add(text('query', true), interaction.user.id, {next:name === 'play-next' || boolean('immediate') || boolean('skip'),immediate:boolean('skip'),shuffle:boolean('shuffle')});
@@ -251,17 +252,19 @@ export class DiscordBot {
             }
             if (name === 'config') {
                 const sub = interaction.options.getSubcommand();
+                if (['set-queue-add-response-hidden', 'set-auto-announce-next-song'].includes(sub))
+                    throw new UserError('This legacy setting has no effect and is no longer offered.');
                 if (sub === 'get') {
                     await interaction.editReply('```json\n' + JSON.stringify(e.settings, null, 2) + '\n```');
                     return;
                 }
                 await this.manager(interaction);
-                const names: Record<string, string> = { 'set-audio-quality': 'audioBitrateKbps', 'set-playlist-limit': 'playlistLimit', 'set-wait-after-queue-empties': 'secondsToWaitAfterQueueEmpties', 'set-leave-if-no-listeners': 'leaveIfNoListeners', 'set-queue-add-response-hidden': 'queueAddResponseEphemeral', 'set-reduce-vol-when-voice': 'turnDownVolumeWhenPeopleSpeak', 'set-reduce-vol-when-voice-target': 'turnDownVolumeWhenPeopleSpeakTarget', 'set-auto-announce-next-song': 'autoAnnounceNextSong', 'set-default-volume': 'defaultVolume', 'set-default-queue-page-size': 'defaultQueuePageSize' };
+                const names: Record<string, string> = { 'set-audio-quality': 'audioBitrateKbps', 'set-playlist-limit': 'playlistLimit', 'set-wait-after-queue-empties': 'secondsToWaitAfterQueueEmpties', 'set-leave-if-no-listeners': 'leaveIfNoListeners', 'set-reduce-vol-when-voice': 'turnDownVolumeWhenPeopleSpeak', 'set-reduce-vol-when-voice-target': 'turnDownVolumeWhenPeopleSpeakTarget', 'set-default-volume': 'defaultVolume', 'set-default-queue-page-size': 'defaultQueuePageSize' };
                 const option = interaction.options.data[0]?.options?.[0];
                 if (!names[sub] || !option)
-                    throw new UserError('Ukjent innstilling.');
+                    throw new UserError('Unknown setting.');
                 this.commands.updateSettings({ [names[sub]]: option.value });
-                await interaction.editReply('Innstillingen er lagret.');
+                await interaction.editReply('The setting was saved.');
                 return;
             }
             if (name === 'crossfade') {
@@ -270,19 +273,19 @@ export class DiscordBot {
                     await this.manager(interaction);
                     this.commands.updateSettings({ crossfade: sub === 'off' ? 0 : number('seconds', 6) });
                 }
-                await interaction.editReply(`Crossfade: ${e.settings.crossfade} sekunder.`);
+                await interaction.editReply(`Crossfade: ${e.settings.crossfade} seconds.`);
                 return;
             }
-            if (name === 'hjelp') {
-                await interaction.editReply('**Afterparty**\n/play: YouTube-, Spotify- og SoundCloud-lenker. Bruk sc: foran et SoundCloud-søk. /play-next: legg fremst. /pause og /resume: felles avspilling. /skip: neste sang. /queue, /history og /favorites: musikken din. /konsert lenke: spill konserten i Discord og Afterparty. /crossfade og /config: innstillinger.\n' + this.site);
+            if (name === 'help' || name === 'hjelp') {
+                await interaction.editReply('**Afterparty**\n/play: YouTube, Spotify and SoundCloud links or track searches. Use sc: for SoundCloud search.\n/play-next: queue next. /play-advanced: shuffle, queue next or play immediately.\n/pause, /resume, /skip, /stop and /disconnect: playback controls.\n/queue, /history count and /favorites: your tracks. /vote-skip: listener voting.\n/concert url: share a YouTube concert in Discord and Afterparty. Ordinary /play stays private to Discord.\n/crossfade and /config: server settings. /hjelp and /konsert are legacy aliases.\n' + this.site);
                 return;
             }
-            if (name === 'konsert') {
-                const link = text('lenke').trim();
+            if (name === 'concert' || name === 'konsert') {
+                const link = text(name === 'concert' ? 'url' : 'lenke').trim();
                 if (link) {
                     const id = youtubeId(link);
                     if (!id)
-                        throw new UserError('Bruk en gyldig YouTube-lenke.');
+                        throw new UserError('Use a valid YouTube URL.');
                     await this.sameVoice(interaction, true);
                     const count=await this.commands.add(id, interaction.user.id, {concert:true});
                     await this.playerMessage.confirmQueue(count,true);
@@ -290,28 +293,29 @@ export class DiscordBot {
                     await interaction.deleteReply();
                 }
                 else
-                    await interaction.editReply('Se den felles konserten i Afterparty: ' + this.site + '/?room='+this.roomCode);
+                    await interaction.editReply('Watch the shared concert in Afterparty: ' + this.site + '/?room='+this.roomCode);
                 return;
             }
             if (name === 'favorites') {
                 const sub = interaction.options.getSubcommand(), favorites = e.store.favorites(interaction.user.id);
+                if (sub === 'use' && boolean('split')) throw new UserError('Chapter splitting is not supported. Leave split off and try again.');
                 if (sub === 'list') {
-                    await interaction.editReply(favorites.length ? favorites.map(f => f.name).join('\n').slice(0, 1900) : 'Ingen favoritter ennå.');
+                    await interaction.editReply(favorites.length ? favorites.map(f => f.name).join('\n').slice(0, 1900) : 'No favorites saved yet.');
                     return;
                 }
                 if (sub === 'create') {
                     e.store.favorite(interaction.user.id, text('name', true), text('query', true));
-                    await interaction.editReply('Favoritten er lagret.');
+                    await interaction.editReply('The favorite was saved.');
                     return;
                 }
                 if (sub === 'remove') {
                     e.store.removeFavorite(interaction.user.id, text('name', true));
-                    await interaction.editReply('Favoritten er fjernet.');
+                    await interaction.editReply('The favorite was removed.');
                     return;
                 }
                 const favorite = favorites.find(f => f.name === text('name', true));
                 if (!favorite)
-                    throw new UserError('Fant ikke favoritten.');
+                    throw new UserError('Favorite not found.');
                 await this.sameVoice(interaction, true);
                 const count=await this.commands.add(favorite.query, interaction.user.id, {next:boolean('immediate') || boolean('skip'),immediate:boolean('skip'),shuffle:boolean('shuffle')});
                 await this.playerMessage.confirmQueue(count,false);
@@ -320,18 +324,18 @@ export class DiscordBot {
             }
             if (name === 'grab') {
                 if (!e.current)
-                    throw new UserError('Ingen sang spiller.');
+                    throw new UserError('No track is playing.');
                 await interaction.editReply(e.current.url ?? 'https://www.youtube.com/watch?v=' + e.current.id);
                 return;
             }
             if (name === 'history') {
-                const history = e.store.history(number('antall', 10));
-                await interaction.editReply(history.length ? history.map((h, i) => `${i + 1}. ${h.video.artist} · ${h.video.title}`).join('\n').slice(0, 1950) : 'Ingen avspillinger ennå.');
+                const history = e.store.history(number('count', number('antall', 10)));
+                await interaction.editReply(history.length ? history.map((h, i) => `${i + 1}. ${h.video.artist} · ${h.video.title}`).join('\n').slice(0, 1950) : 'No playback history yet.');
                 return;
             }
             if (name === 'queue') {
                 const page = number('page', 1), size = number('page-size', e.settings.defaultQueuePageSize);
-                await interaction.editReply(e.queue.slice((page - 1) * size, page * size).map((t, i) => `${(page - 1) * size + i + 1}. ${t.artist} · ${t.title}`).join('\n').slice(0, 1950) || 'Køen er tom.');
+                await interaction.editReply(e.queue.slice((page - 1) * size, page * size).map((t, i) => `${(page - 1) * size + i + 1}. ${t.artist} · ${t.title}`).join('\n').slice(0, 1950) || 'The queue is empty.');
                 return;
             }
             if (name === 'now-playing') {
@@ -342,7 +346,7 @@ export class DiscordBot {
             const member = await this.sameVoice(interaction);
             if (name === 'vote-skip') {
                 if (!e.current)
-                    throw new UserError('Ingen sang spiller.');
+                    throw new UserError('No track is playing.');
                 const sub = interaction.options.getSubcommand();
                 const listeners = member.voice.channel!.members.filter(m => !m.user.bot);
                 for (const id of this.votes)
@@ -356,10 +360,10 @@ export class DiscordBot {
                 if (this.votes.size >= needed && sub === 'vote') {
                     await e.skip();
                     this.votes.clear();
-                    await interaction.editReply('Flertallet stemte for neste sang.');
+                    await interaction.editReply('A majority voted to skip to the next track.');
                     return;
                 }
-                await interaction.editReply(`${this.votes.size}/${needed} stemmer for å hoppe over.`);
+                await interaction.editReply(`${this.votes.size}/${needed} votes to skip.`);
                 return;
             }
             if (name === 'cleanup') {
@@ -372,7 +376,7 @@ export class DiscordBot {
                     e.persist();
                     e.changed();
                 }
-                await interaction.editReply('Køen er ryddet.');
+                await interaction.editReply('The queue was cleaned up.');
                 return;
             }
             let action = name;
@@ -395,10 +399,10 @@ export class DiscordBot {
                 input.seconds = parseTime(text('time', true)) + (name === 'fseek' ? e.snapshot().position : 0);
             }
             await this.commands.execute(input, 'discord', interaction.user.id);
-            await interaction.editReply('Utført.');
+            await interaction.editReply('Done.');
         }
         catch (error) {
-            const message = error instanceof UserError ? error.message : 'Handlingen kunne ikke fullføres. Prøv igjen.';
+            const message = error instanceof UserError ? error.message : 'The action could not be completed. Try again.';
             if (interaction.deferred || interaction.replied)
                 await interaction.editReply(message).catch(() => { });
             else
@@ -418,4 +422,4 @@ export class DiscordBot {
 }
 export function parseTime(text: string) { if (/^\d+(?::\d{1,2}){0,2}$/.test(text))
     return text.split(':').reduce((n, v) => n * 60 + Number(v), 0); const match = text.match(/^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?$/); if (match && match.slice(1).some(Boolean))
-    return Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0); throw new UserError('Bruk sekunder eller minutt:sekund.'); }
+    return Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0); throw new UserError('Use seconds or minutes:seconds.'); }

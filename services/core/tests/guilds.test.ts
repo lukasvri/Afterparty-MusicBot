@@ -5,7 +5,7 @@ const A='100000000000000001',B='100000000000000002';
 test('Discord permissions and sealed grants reject missing rights, tampering and expired sessions',async()=>{
  assert(canManageGuild({permissions:'32'}));assert(canManageGuild({permissions:'8'}));assert(canManageGuild({owner:true}));assert(!canManageGuild({permissions:'16'}));assert(!canManageGuild({permissions:'broken'}));
  const oauth=new DiscordOAuth('key','app','secret','https://site.example',async()=>Response.json([{id:A,name:'A',permissions:'32'},{id:B,name:'B',permissions:'16'}]));
- const grant=oauth.seal({access:'token',expiresAt:Date.now()+60000,user:{id:A,name:'User'}});assert.equal((await oauth.require(grant,A)).id,A);await assert.rejects(oauth.require(grant,B),/ikke administrasjonstilgang/);assert.throws(()=>oauth.open(grant.slice(0,-5)+'wrong'),/utløpt/);assert.throws(()=>oauth.open(oauth.seal({access:'token',expiresAt:0,user:{id:A,name:'User'}})),/utløpt/);
+ const grant=oauth.seal({access:'token',expiresAt:Date.now()+60000,user:{id:A,name:'User'}});assert.equal((await oauth.require(grant,A)).id,A);await assert.rejects(oauth.require(grant,B),/do not have administrator access/);assert.throws(()=>oauth.open(grant.slice(0,-5)+'wrong'),/expired/);assert.throws(()=>oauth.open(oauth.seal({access:'token',expiresAt:0,user:{id:A,name:'User'}})),/expired/);
 });
 test('guilds isolate state, queue, settings, favorites, commands and streams while old admin can be disabled',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'gutta-guild-')),guilds=new Guilds(A);const resources: Array<{store:Store;engine:Engine;commands:Commands}>=[];
@@ -28,6 +28,6 @@ test('guilds isolate state, queue, settings, favorites, commands and streams whi
   assert.equal((await queueCall({guildId:B,action:'clear',admin:true,revision:two.commands.concertQueue.revision()})).status,403);
   assert.equal((await queueCall({guildId:A,action:'clear',isHost:true,revision:one.commands.concertQueue.revision()})).status,403);
   const allowed=await queueCall({guildId:A,action:'approval',admin:true,tokenCipher:grant,enabled:true,revision:one.commands.concertQueue.revision()});assert.equal(allowed.status,200);assert(one.commands.concertQueue.read().approvalRequired);assert(!two.commands.concertQueue.read().approvalRequired);
-  assert.throws(()=>guilds.get('999953157932843050'),/ikke lagt til/);assert.notEqual(guilds.roomCode(A),guilds.roomCode(B));
+  assert.throws(()=>guilds.get('999953157932843050'),/has not been added/);assert.notEqual(guilds.roomCode(A),guilds.roomCode(B));
  }finally{await server.close();for(const r of resources){r.commands.close();r.engine.close();r.store.close();}rmSync(dir,{recursive:true,force:true});}
 });

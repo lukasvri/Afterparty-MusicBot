@@ -111,7 +111,7 @@ for (const [name, change] of [
     const f = await fixture();
     try {
       change(f.api);
-      await assert.rejects(f.renewed.matchSong({ ...song, artistCredit: captured.artist }), /sikker lydmatch/);
+      await assert.rejects(f.renewed.matchSong({ ...song, artistCredit: captured.artist }), /reliable audio match/);
     } finally { f.store.db.close(); }
   });
 }

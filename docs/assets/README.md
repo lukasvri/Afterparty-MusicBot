@@ -11,6 +11,7 @@
 | `admin-mobile-before-20261018.png`, `admin-mobile-after-20261018.png` | Matching 390 px synthetic admin-login previews showing navigation and shared-interface changes. |
 | `stage-pa-lighting-after-20261018.png` | Follow-up 1440 px English welcome-stage crop: opaque concert PA arrays, subwoofers, red/white lighting and a halo contained inside the LED screen, with motion switched off. Compare with the earlier `dj-console-after-20261018.png` scene above. |
 | `welcome-footer-mobile-20261018.png` | Follow-up 390 px English welcome-page screenshot: the top patch-notes banner is removed and the current-version link is in the footer. |
+| `tv-layout-desktop-20261018.png`, `tv-layout-mobile-20261018.png` | TV follow-up screenshots at 1280x720 and 390x844, with synthetic room data and a clearly labelled synthetic source player. The QR code points only to the local public room URL. These images demonstrate layout, not live media playback. |
 
 The screenshots use synthetic room and bot API responses and block external media requests. They show the welcome interface without real accounts, Discord IDs, credentials or listening data. They do not establish live production connectivity or playback.
 

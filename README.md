@@ -20,7 +20,7 @@ Play music in a Discord voice channel, share a concert with video, or open a pri
 
 | Discord music | Shared concerts | Your own rooms |
 | --- | --- | --- |
-| Search or paste a link with `/play` | Use `/konsert` for Discord audio and website video | Start a private room and invite friends with a link or QR code |
+| Search or paste a link with `/play` | Use `/concert` for Discord audio and website video | Start a private room and invite friends with a link or QR code |
 | Radio, favorites and saved queues | Requests, votes and moderated queues | Host controls, cohosts and ownership transfer |
 | Pause, seek, skip and crossfade | Playback follows Core's audio clock | Save evenings locally, import/export and use TV mode |
 | Separate settings and storage for each server | Ordinary Discord music stays private | Browser rooms work without a Discord connection |
@@ -131,7 +131,7 @@ Rust testing continues with the [offline Rust mixer on `dev`](https://github.com
 | Prepare an update or release | [Operations](services/core/PUBLIC_RELEASE.md) · [Release policy](docs/RELEASING.md) |
 | Use the visual identity | [Branding and assets](docs/BRANDING.md) |
 
-Some slash commands and application messages use Norwegian. Spotify matching can differ from the original recording; chapter splitting and SponsorBlock are not implemented. Independent clients have different buffering and network delays, so synchronization is approximate.
+New website sessions default to English and retain saved language choices. Discord command descriptions, help, controls and standard replies use English; `/help` and `/concert url` are canonical, with `/hjelp` and `/konsert lenke` retained as aliases. Spotify matching can differ from the original recording; chapter splitting and SponsorBlock are not implemented. Independent clients have different buffering and network delays, so synchronization is approximate.
 
 ## Contribute, report, remix
 

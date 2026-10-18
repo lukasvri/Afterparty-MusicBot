@@ -24,7 +24,7 @@ test("oversized extractor output is rejected and releases admission for the next
     setInterval(() => {}, 1000);
   `,
     ]),
-    /for stort svar/,
+    /response was too large/,
   );
   assert.deepEqual(
     await runJson(process.execPath, ["-e", "process.stdout.write('{}')"]),
@@ -39,7 +39,7 @@ test("deadline kills a hung extractor before its slot becomes available again", 
       "-e",
       "setInterval(() => {}, 1000)",
     ]);
-    const rejected = assert.rejects(job, /innen fristen/);
+    const rejected = assert.rejects(job, /did not respond in time/);
     await new Promise((resolve) => setImmediate(resolve));
     t.mock.timers.tick(30000);
     await rejected;
@@ -60,7 +60,7 @@ test("running extractor cancellation and spawn failure do not exhaust the pool",
       ["-e", "setInterval(() => {}, 1000)"],
       controller.signal,
     );
-    const rejected = assert.rejects(job, /avbrutt/);
+    const rejected = assert.rejects(job, /cancelled/);
     await new Promise((resolve) => setImmediate(resolve));
     controller.abort();
     await rejected;

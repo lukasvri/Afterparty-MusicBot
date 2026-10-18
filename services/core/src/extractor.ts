@@ -9,13 +9,13 @@ let active = 0;
 const waiting: Waiter[] = [];
 
 async function acquire(signal?: AbortSignal, priority = false) {
-  if (signal?.aborted) throw new UserError("Forespørselen ble avbrutt.");
+  if (signal?.aborted) throw new UserError("The request was cancelled.");
   if (active < MAX_ACTIVE) {
     active++;
     return;
   }
   if (waiting.length >= MAX_WAITING)
-    throw new UserError("Musikkilden er opptatt. Prøv igjen om litt.", 503);
+    throw new UserError("The music source is busy. Try again shortly.", 503);
   await new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       clearTimeout(timer);
@@ -29,8 +29,8 @@ async function acquire(signal?: AbortSignal, priority = false) {
       reject(
         new UserError(
           signal?.aborted
-            ? "Forespørselen ble avbrutt."
-            : "Musikkilden er opptatt. Prøv igjen om litt.",
+            ? "The request was cancelled."
+            : "The music source is busy. Try again shortly.",
           503,
         ),
       );
@@ -58,7 +58,7 @@ function spawnJson<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   if (signal?.aborted)
-    return Promise.reject(new UserError("Forespørselen ble avbrutt."));
+    return Promise.reject(new UserError("The request was cancelled."));
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
     const chunks: Buffer[] = [];
@@ -68,9 +68,9 @@ function spawnJson<T>(
       failure ??= error;
       child.kill("SIGKILL");
     };
-    const cancel = () => stop(new UserError("Forespørselen ble avbrutt."));
+    const cancel = () => stop(new UserError("The request was cancelled."));
     const timer = setTimeout(
-      () => stop(new UserError("Mediekilden svarte ikke innen fristen.", 504)),
+      () => stop(new UserError("The media source did not respond in time.", 504)),
       30000,
     );
     signal?.addEventListener("abort", cancel, { once: true });
@@ -78,7 +78,7 @@ function spawnJson<T>(
       if (failure) return;
       bytes += chunk.length;
       if (bytes > MAX_OUTPUT_BYTES)
-        stop(new UserError("Mediekilden ga et for stort svar.", 502));
+        stop(new UserError("The media source response was too large.", 502));
       else chunks.push(chunk);
     });
     // Drain stderr without retaining private source URLs or redundant log buffers.
@@ -96,14 +96,14 @@ function spawnJson<T>(
       if (code !== 0)
         return reject(
           new UserError(
-            "Mediekilden kunne ikke lastes. Prøv en annen lenke.",
+            "Could not load the media source. Try another link.",
             502,
           ),
         );
       try {
         resolve(JSON.parse(Buffer.concat(chunks, bytes).toString("utf8")));
       } catch {
-        reject(new UserError("Mediekilden ga et ugyldig svar.", 502));
+        reject(new UserError("The media source returned an invalid response.", 502));
       }
     });
   });

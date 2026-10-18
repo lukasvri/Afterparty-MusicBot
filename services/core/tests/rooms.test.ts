@@ -180,11 +180,11 @@ test("guest and stale room-radio requests cannot spend a provider lookup", async
     };
     await assert.rejects(
       rooms.control("TESTROOM", { ...input, actorHash: "guest" }),
-      /verten/,
+      /host/,
     );
     await assert.rejects(
       rooms.control("TESTROOM", { ...input, version: 0 }),
-      /endret/,
+      /changed/,
     );
     assert.equal(calls, 0);
   } finally {
@@ -206,7 +206,7 @@ test("a late own-room radio result cannot replace a newer queue or pause", async
         enabled: false,
       });
       pending.resolve([next]);
-      await assert.rejects(result, /endret/);
+      await assert.rejects(result, /changed/);
       const state = rooms.snapshot("TESTROOM");
       assert.equal(state.current?.id, seed.id);
       if (action === "add") assert.equal(state.queue[0]?.id, next.id);
@@ -371,7 +371,7 @@ test("moderation, participant votes and queue undo never expose identities", () 
           version: 3,
           actorHash: "guest",
         }),
-      /verten/,
+      /host/,
     );
     act("approve", { videoId: next.id });
     assert.equal(
@@ -477,7 +477,7 @@ test("radio falls back to a second artist search and can restart after the last 
   const { store, rooms, input } = setup();
   try {
     rooms.search = async () => [];
-    await assert.rejects(rooms.control("TESTROOM", input), /Radioen fann ikkje/);
+    await assert.rejects(rooms.control("TESTROOM", input), /Radio could not find/);
     const ended = rooms.mutate("TESTROOM", { ...input, version: rooms.snapshot("TESTROOM").version });
     assert.equal(ended.current, null);
     const queries: string[] = [];
@@ -563,7 +563,7 @@ test('an unsuccessful early skip keeps the current song and allows retry',async(
  const {rooms,store,input}=setup();
  try {
   rooms.search=async()=>[];
-  await assert.rejects(rooms.control('TESTROOM',input),/Radioen fann ikkje/);
+  await assert.rejects(rooms.control('TESTROOM',input),/Radio could not find/);
   assert.equal(rooms.snapshot('TESTROOM').current?.id,seed.id);
   assert.equal(rooms.snapshot('TESTROOM').playing,true);
   rooms.search=async()=>[next];assert.equal((await rooms.control('TESTROOM',{...input,version:rooms.snapshot('TESTROOM').version})).current?.id,next.id);
@@ -623,7 +623,7 @@ test("an empty current-track radio retry reports an actionable failure and persi
   try {
     rooms.search = async () => { calls++; return []; };
     await assert.rejects(rooms.control("TESTROOM", { ...input, action: "radio", enabled: true }),
-      error => error instanceof Error && "status" in error && error.status === 422 && /Prøv radio igjen/.test(error.message));
+      error => error instanceof Error && "status" in error && error.status === 422 && /Try radio again/.test(error.message));
     const saved = rooms.load("TESTROOM");
     assert.equal(saved.state.current?.id, seed.id);
     assert.equal(saved.state.position, 100);

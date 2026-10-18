@@ -109,7 +109,7 @@ export class Providers {
     const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!response.ok)
       throw new UserError(
-        "YouTube-søket er midlertidig utilgjengelig.",
+        "YouTube search is temporarily unavailable.",
         response.status === 403 || response.status === 429 ? 429 : 502,
       );
     return response.json() as Promise<YouTubeResponses[K]>;
@@ -120,7 +120,7 @@ export class Providers {
   async video(ids: string[], skipUnavailable = false): Promise<Track[]> {
     if (!ids.length) return [];
     if (ids.some((id) => !/^[\w-]{11}$/.test(id)))
-      throw new UserError("Ugyldig video-ID.");
+      throw new UserError("Invalid video ID.");
     const found = new Map<string, Track>(),
       missing: string[] = [];
     for (const id of ids) {
@@ -152,7 +152,7 @@ export class Providers {
         let lookup = this.videoLookups.get(id);
         if (!lookup) {
           if (this.videoLookups.size >= 128) {
-            pending.push([id, Promise.reject(new UserError("Musikkilden er opptatt. Prøv igjen om litt.", 503))]);
+            pending.push([id, Promise.reject(new UserError("The music source is busy. Try again shortly.", 503))]);
             continue;
           }
           const shared = new Promise<Track | undefined>((resolve, reject) => {
@@ -286,7 +286,7 @@ export class Providers {
   async resolve(query: string): Promise<Track[]> {
     query = query.trim();
     if (!query || query.length > 2000)
-      throw new UserError("Skriv et søk eller en gyldig musikklenke.");
+      throw new UserError("Enter a search or a valid music link.");
     if (/^https:\/\/spotify\.link\//i.test(query))
       query = await expandSpotifyLink(query);
     const id = youtubeId(query);
@@ -344,12 +344,12 @@ export class Providers {
         (args) => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args),
       );
     if (/^https?:\/\//.test(query))
-      throw new UserError("Bruk en YouTube-, Spotify- eller SoundCloud-lenke.");
+      throw new UserError("Use a YouTube, Spotify or SoundCloud link.");
     const audio = /\b(live|video|konsert|concert)\b/i.test(query)
       ? query
       : query + " audio";
     const found = await this.search(audio, 5);
-    if (!found[0]) throw new UserError("Ingen treff. Prøv et annet søk.");
+    if (!found[0]) throw new UserError("No results. Try another search.");
     return [found[0]];
   }
   async stream(track: Track, signal: AbortSignal) {
@@ -377,9 +377,9 @@ export class Providers {
       data.is_preview ||
       (data.full_duration && Number(data.duration) < data.full_duration - 2)
     )
-      throw new UserError("Kilden tilbyr bare en forhåndsvisning.");
+      throw new UserError("The source only offers a preview.");
     if (typeof data.url !== "string" || !/^https?:\/\//.test(data.url))
-      throw new UserError("Mediekilden har ingen lydstrøm.", 502);
+      throw new UserError("The media source has no audio stream.", 502);
     const headers = Object.entries(data.http_headers ?? {})
       .filter(([k, v]) => typeof v === "string" && !/[\r\n]/.test(k + v))
       .map(([k, v]) => `${k}: ${v}\r\n`)
@@ -438,7 +438,7 @@ export class Providers {
     }
     if (!ranked[0])
       throw new UserError(
-        `Fant ikke en sikker lydmatch for ${song.artist} - ${song.title}.`,
+        `Could not find a reliable audio match for ${song.artist} - ${song.title}.`,
       );
     const track = { ...ranked[0].track, catalog: matchedCatalog(song, ranked[0].track), entryId: randomUUID() };
     this.store.set(key, { at: Date.now(), track });

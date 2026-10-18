@@ -324,29 +324,73 @@
   display: none !important;
 }
 [data-tv="true"] .content {
-  width: calc(100% - 40px);
-  padding: 20px 0;
+  width: calc(100% - 64px);
+  max-width: none;
+  min-height: 100svh;
+  padding: 32px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 248px;
+  gap: 28px;
+  align-content: center;
+  align-items: center;
 }
 [data-tv="true"] .studio-grid {
   display: block;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
 }
 [data-tv="true"] .main {
   margin: 0;
 }
 [data-tv="true"] .stage {
-  max-height: 80vh;
+  aspect-ratio: 16 / 9 !important;
+  max-height: calc(100svh - 180px);
 }
 [data-tv="true"] .tv-invite {
-  position: relative;
-  margin: 0 0 16px;
-  padding: 12px;
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  padding: 20px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  background: var(--panel);
+  border-color: var(--line);
 }
+[data-tv="true"] .tv-invite > div { display:grid; gap:12px; justify-content:stretch; }
+[data-tv="true"] .tv-room-heading h2 { font-size:24px; line-height:1.3; overflow-wrap:anywhere; }
+[data-tv="true"] .tv-exit { min-height:48px; order:3; width:100%; }
 [data-tv="true"] .tv-invite img {
-  width: 100px;
-  height: 100px;
+  width: 180px;
+  height: 180px;
+  max-width: 100%;
+  justify-self:center;
 }
+[data-tv="true"] .tv-join strong { font-size:19px; line-height:1.4; }
+[data-tv="true"] .tv-join p { color:var(--muted); font-size:14px; line-height:1.6; }
 [data-tv="true"] .tv-invite .share-url {
-  max-width: 450px;
+  min-width: 0;
+  max-width: 100%;
+  font-size:12px;
+}
+[data-tv="true"] .tv-invite input { min-width:0; width:100%; font-size:12px; }
+[data-tv="true"] .concert-stage-bar,[data-tv="true"] .guest-hint { display:none; }
+[data-tv="true"] .now-playing { min-height:100px; }
+[data-tv="true"] .track-details h2 { font-size:clamp(20px,2vw,32px); line-height:1.25; }
+[data-tv="true"] .track-details p { font-size:16px; }
+[data-tv="true"] .notice { grid-column:1 / -1; }
+@media(max-width:900px) {
+  [data-tv="true"] .content { width:calc(100% - 32px); padding:16px 0; grid-template-columns:minmax(0,1fr); gap:16px; align-content:start; }
+  [data-tv="true"] .studio-grid { grid-row:1; }
+  [data-tv="true"] .tv-invite { grid-column:1; grid-row:2; gap:16px; padding:16px; }
+  [data-tv="true"] .tv-invite .tv-join { grid-template-columns:100px minmax(0,1fr); column-gap:16px; }
+  [data-tv="true"] .tv-join img { grid-column:1; grid-row:1 / 4; width:100px; height:100px; }
+  [data-tv="true"] .tv-join strong,[data-tv="true"] .tv-join p,[data-tv="true"] .tv-join .share-url { grid-column:2; }
+  [data-tv="true"] .tv-join strong { font-size:16px; }
+  [data-tv="true"] .track-details h2 { font-size:20px; }
 }
 button,
 a,

@@ -55,7 +55,7 @@ test('favorite playback and listing select the requesting listener within the gu
         assert.deepEqual(t.replies, ['Evening']);
         await t.bot.interaction(t.interaction('use', 'Other favorite') as never);
         assert.deepEqual(t.added, ['my-selection']);
-        assert.match(t.replies.at(-1)!, /Fant ikke favoritten/);
+        assert.match(t.replies.at(-1)!, /Favorite not found/);
     } finally { t.close(); }
 });
 
@@ -146,7 +146,7 @@ test('invalid sleep replacement leaves the previous deadline and timer operation
     try {
         await commands.execute({ action: 'sleep-timer', minutes: 1 });
         assert.equal(commands.sleepUntil, 61_000);
-        await assert.rejects(commands.execute({ action: 'sleep-timer', minutes: 0 }), /1 til 1440/);
+        await assert.rejects(commands.execute({ action: 'sleep-timer', minutes: 0 }), /1 to 1440/);
         assert.equal(commands.sleepUntil, 61_000);
         context.mock.timers.tick(60_000);
         assert.equal(stopped, 1);

@@ -63,7 +63,7 @@ export async function body(request: IncomingMessage, maximum = 16384) {
   const parts: Buffer[] = [];
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > maximum) throw new UserError("Forespørselen er for stor.", 413);
+    if (size > maximum) throw new UserError("The request is too large.", 413);
     parts.push(chunk);
   }
   try {
@@ -72,7 +72,7 @@ export async function body(request: IncomingMessage, maximum = 16384) {
       throw new Error();
     return value as Record<string, unknown>;
   } catch {
-    throw new UserError("Ugyldig JSON.");
+    throw new UserError("Invalid JSON.");
   }
 }
 type Options = {
@@ -96,7 +96,7 @@ export async function createServers(
   commands: Commands,
   options: Options,
 ) {
-  if (!options.key) throw new Error("Brokoblingen mangler en hemmelighet.");
+  if (!options.key) throw new Error("The bridge connection is missing a secret.");
   const rooms = new Rooms(engine.store);
   rooms.search = (query) => engine.providers.search(query, 20, true);
   const roomClients = new Map<ServerResponse, string>();
@@ -123,7 +123,7 @@ export async function createServers(
       rate.set(key, v);
     }
     if (++v.count > max)
-      throw new UserError("For mange forespørsler. Prøv igjen senere.", 429);
+      throw new UserError("Too many requests. Try again later.", 429);
   };
   const authenticate = (request: IncomingMessage) => {
     const token = String(request.headers.authorization ?? "").replace(
@@ -131,7 +131,7 @@ export async function createServers(
       "",
     );
     if (!equalSecret(token, options.key))
-      throw new UserError("Ingen tilgang.", 403);
+      throw new UserError("Access denied.", 403);
   };
   const select = (id?: unknown) =>
     options.guilds
@@ -165,7 +165,7 @@ export async function createServers(
           target.engine.store.finishJob(
             id,
             "failed",
-            error instanceof Error ? error.message : "Kommandoen mislyktes.",
+            error instanceof Error ? error.message : "The command failed.",
           ),
         );
     }
@@ -184,7 +184,7 @@ export async function createServers(
         ["/events", "/v1/clock"].includes(url.pathname)
       ) {
         if (request.headers.origin !== options.origin)
-          throw new UserError("Ingen tilgang.", 403);
+          throw new UserError("Access denied.", 403);
         response.setHeader("Access-Control-Allow-Origin", options.origin);
         response.setHeader("Vary", "Origin");
         if (url.pathname === "/v1/clock") {
@@ -192,7 +192,7 @@ export async function createServers(
           return;
         }
         if (eventClients.size + roomClients.size >= 128)
-          throw new UserError("For mange tilkoblinger.", 503);
+          throw new UserError("Too many connections.", 503);
         const code = url.searchParams.get("room");
         const target = code ? null : select(url.searchParams.get("guildId"));
         const initial = code
@@ -221,7 +221,7 @@ export async function createServers(
       }
       if (url.pathname === "/v1/ticket") {
         if (request.headers.origin !== options.origin)
-          throw new UserError("Ingen tilgang.", 403);
+          throw new UserError("Access denied.", 403);
         response.setHeader("Access-Control-Allow-Origin", options.origin);
         response.setHeader("Vary", "Origin");
         if (request.method === "OPTIONS") {
@@ -232,7 +232,7 @@ export async function createServers(
           return;
         }
         if (request.method !== "POST")
-          throw new UserError("Metoden er ikke tillatt.", 405);
+          throw new UserError("Method not allowed.", 405);
         const input = verifyTicket((await body(request)).ticket, options.key);
         const target = select(input.guildId);
         const id = String(input.id);
@@ -289,9 +289,9 @@ export async function createServers(
         const query = url.searchParams.get("q"),
           ids = url.searchParams.get("ids");
         if (query && (query.length < 2 || query.length > 120))
-          throw new UserError("Skriv mellom 2 og 120 tegn.");
+          throw new UserError("Enter between 2 and 120 characters.");
         if (ids && !/^[\w,-]{11,600}$/.test(ids))
-          throw new UserError("Ugyldige video-ID-er.");
+          throw new UserError("Invalid video IDs.");
         const tracks = ids
           ? await engine.providers.video(ids.split(",").slice(0, 50))
           : query
@@ -313,7 +313,7 @@ export async function createServers(
       if (url.pathname === "/v1/oauth") {
         authenticate(request);
         if (request.method !== "POST" || !options.oauth)
-          throw new UserError("Discord-innlogging er ikke konfigurert.", 503);
+          throw new UserError("Discord sign-in is not configured.", 503);
         const input = await body(request);
         json(
           response,
@@ -335,11 +335,11 @@ export async function createServers(
             : await body(request, 65536);
         const target = select(input.guildId);
         if (input.tokenCipher) {
-          if (!options.oauth) throw new UserError("Ingen tilgang.", 403);
+          if (!options.oauth) throw new UserError("Access denied.", 403);
           await options.oauth.require(input.tokenCipher, target.id);
         } else if (options.guilds && target.id !== options.guilds.defaultId)
           throw new UserError(
-            "Discord-innlogging kreves for denne serveren.",
+            "Discord sign-in is required for this server.",
             403,
           );
         if (request.method === "GET") {
@@ -384,7 +384,7 @@ export async function createServers(
             .get(target.id)
             ?.channels.cache.get(String(input.channelId));
           if (!channel?.isVoiceBased())
-            throw new UserError("Velg en talekanal på denne serveren.");
+            throw new UserError("Choose a voice channel on this server.");
           await target.bot!.join(channel);
           json(response, 200, { ok: true });
           return;
@@ -394,7 +394,7 @@ export async function createServers(
             .get(target.id)
             ?.channels.cache.get(String(input.channelId));
           if (!channel?.isTextBased() || !("send" in channel))
-            throw new UserError("Velg en tekstkanal på denne serveren.");
+            throw new UserError("Choose a text channel on this server.");
           target.bot!.musicChannelId = channel.id;
           target.engine.store.set("music-channel", channel.id);
           json(response, 200, { ok: true });
@@ -403,7 +403,7 @@ export async function createServers(
         if (input.operation === "command") {
           const id = String(input.commandId ?? "");
           if (!/^[a-f0-9-]{36}$/.test(id))
-            throw new UserError("Ugyldig kommando-ID.");
+            throw new UserError("Invalid command ID.");
           const command = {
             ...(input.command as Record<string, unknown>),
             guildId: target.id,
@@ -411,7 +411,7 @@ export async function createServers(
           json(response, 200, execute(id, command, "admin"));
           return;
         }
-        throw new UserError("Ukjent administrasjonshandling.");
+        throw new UserError("Unknown administration action.");
       }
       if (url.pathname === "/v1/concert-queue") {
         authenticate(request);
@@ -420,11 +420,11 @@ export async function createServers(
         const admin = input.admin === true;
         if (admin) {
           if (input.tokenCipher) {
-            if (!options.oauth) throw new UserError("Ingen tilgang.", 403);
+            if (!options.oauth) throw new UserError("Access denied.", 403);
             await options.oauth.require(input.tokenCipher, target.id);
           } else if (options.guilds && target.id !== options.guilds.defaultId)
             throw new UserError(
-              "Discord-innlogging kreves for denne serveren.",
+              "Discord sign-in is required for this server.",
               403,
             );
         }
@@ -439,7 +439,7 @@ export async function createServers(
       if (url.pathname === "/v1/rooms") {
         authenticate(request);
         if (request.method !== "POST")
-          throw new UserError("Metoden er ikke tillatt.", 405);
+          throw new UserError("Method not allowed.", 405);
         const input = await body(request, 1048576),
           code = String(input.code ?? "");
         if (input.operation === "import") {
@@ -459,10 +459,10 @@ export async function createServers(
           json(response, 200, { room: await rooms.control(code, input) });
           return;
         }
-        throw new UserError("Ukjent romhandling.");
+        throw new UserError("Unknown room action.");
       }
       if (!["/v1/command", "/v1/jobs"].includes(url.pathname)) {
-        json(response, 404, { error: "Fant ikke endepunktet." });
+        json(response, 404, { error: "Endpoint not found." });
         return;
       }
       authenticate(request);
@@ -470,13 +470,13 @@ export async function createServers(
         const input = await body(request);
         const id = String(input.id ?? "");
         if (!/^(?:public:)?[a-f0-9-]{36}$/.test(id))
-          throw new UserError("Ugyldig kommando-ID.");
+          throw new UserError("Invalid command ID.");
         const scope = input.scope === "public" ? "public" : "admin";
         if (
           scope === "public" &&
           !["enqueue", "skip", "pause", "resume"].includes(String(input.action))
         )
-          throw new UserError("Ingen tilgang til handlingen.", 403);
+          throw new UserError("Access to this action is denied.", 403);
         json(response, 200, execute(id, input, scope));
         return;
       }
@@ -507,13 +507,13 @@ export async function createServers(
         );
         return;
       }
-      json(response, 405, { error: "Metoden er ikke tillatt." });
+      json(response, 405, { error: "Method not allowed." });
     } catch (error) {
       json(response, error instanceof UserError ? error.status : 500, {
         error:
           error instanceof UserError
             ? error.message
-            : "Tjenesten kunne ikke fullføre forespørselen.",
+            : "The service could not complete the request.",
       });
     }
   });
@@ -734,19 +734,19 @@ export async function createServers(
     try {
       const host = String(request.headers.host ?? "").split(":")[0];
       if (!options.hosts.includes(host))
-        throw new UserError("Ugyldig vert.", 403);
+        throw new UserError("Invalid host.", 403);
       const url = new URL(request.url ?? "/", "http://" + request.headers.host);
       if (!["GET", "HEAD"].includes(request.method ?? "GET")) {
         const origin = request.headers.origin;
         if (origin && new URL(origin).host !== request.headers.host)
-          throw new UserError("Ugyldig opprinnelse.", 403);
+          throw new UserError("Invalid origin.", 403);
         if (
           request.headers["content-type"] &&
           !String(request.headers["content-type"]).startsWith(
             "application/json",
           )
         )
-          throw new UserError("Bruk JSON.");
+          throw new UserError("Use JSON.");
       }
       const cookie =
         request.headers.cookie
@@ -769,7 +769,7 @@ export async function createServers(
             typeof input.password !== "string" ||
             !(await verifyPassword(input.password, options.passwordHash))
           )
-            throw new UserError("Feil passord.", 401);
+            throw new UserError("Incorrect password.", 401);
           const token = randomBytes(32).toString("hex");
           sessions.set(
             createHash("sha256").update(token).digest("hex"),
@@ -800,7 +800,7 @@ export async function createServers(
         return;
       }
       if (url.pathname.startsWith("/api/") && !authenticated)
-        throw new UserError("Logg inn med adminpassordet.", 401);
+        throw new UserError("Sign in with the administrator password.", 401);
       if (url.pathname === "/api/state" && request.method === "GET") {
         json(response, 200, options.privateState());
         return;
@@ -827,7 +827,7 @@ export async function createServers(
             typeof input.code !== "string" ||
             !/^[A-Z0-9]{8}$/.test(input.code)
           )
-            throw new UserError("Ugyldig romkode.");
+            throw new UserError("Invalid room code.");
           json(response, 200, await options.siteFetch("DELETE", input.code));
           return;
         }
@@ -855,13 +855,13 @@ export async function createServers(
         response.end(file);
         return;
       }
-      json(response, 404, { error: "Fant ikke endepunktet." });
+      json(response, 404, { error: "Endpoint not found." });
     } catch (error) {
       json(response, error instanceof UserError ? error.status : 500, {
         error:
           error instanceof UserError
             ? error.message
-            : "Forespørselen kunne ikke fullføres.",
+            : "Could not complete the request.",
       });
     }
   });

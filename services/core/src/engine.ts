@@ -109,14 +109,14 @@ export class Engine extends EventEmitter {
     };
     sink.onError = (error, id) => {
       if (id !== this.runId) return;
-      this.lastError = "Lydstrømmen stoppet.";
+      this.lastError = "The audio stream stopped.";
       this.emit("audioError", error);
       this.diagnostics.note(
         error.message === "stream-stall"
           ? "stream-stall"
-          : error.message.includes("dekoding")
+          : error.message.includes("decoding")
             ? "decoder-failure"
-            : error.message.includes("koding")
+            : error.message.includes("encoding")
               ? "encoder-failure"
               : "stream-error",
       );
@@ -291,7 +291,7 @@ export class Engine extends EventEmitter {
     this.changed();
   }
   enqueue(tracks: Track[], next = false, immediate = false) {
-    if (!tracks.length) throw new UserError("Fant ingen sanger.");
+    if (!tracks.length) throw new UserError("No songs found.");
     const key = (t: Track) => JSON.stringify([t.concert === true, t.id]);
     const manual = this.queue.filter((t) => !t.radio);
     const seen = new Set([
@@ -304,9 +304,9 @@ export class Engine extends EventEmitter {
       seen.add(id);
       return true;
     });
-    if (!fresh.length) throw new UserError("Sangen ligger allerede i køen.");
+    if (!fresh.length) throw new UserError("This song is already in the queue.");
     if (manual.length + fresh.length > this.settings.playlistLimit)
-      throw new UserError("Køen er full.");
+      throw new UserError("The queue is full.");
     this.queue = next ? [...fresh, ...manual] : [...manual, ...fresh];
     this.mixer?.invalidateNext();
     this.persist();
@@ -321,7 +321,7 @@ export class Engine extends EventEmitter {
     signal: AbortSignal,
   ): Promise<Prepared> {
     const source = await this.providers.stream(track, signal);
-    if (signal.aborted) throw new Error("Avbrutt avspilling.");
+    if (signal.aborted) throw new Error("Playback cancelled.");
     return {
       track: { ...track, duration: source.duration || track.duration },
       decoder: new PcmDecoder(source, offset, signal),
@@ -383,12 +383,12 @@ export class Engine extends EventEmitter {
           this.persist();
           this.changed();
         } else {
-          this.radioError = "Radioen fant ingen nye sanger. Prøv en annen låt.";
+          this.radioError = "Radio found no new songs. Try another song.";
           this.radioRetryAt = Date.now() + 15000;
         }
       } catch {
         if (valid()) {
-          this.radioError = "Radioen fant ikke neste sang. Prøv /play.";
+          this.radioError = "Radio could not find the next song. Try /play.";
           this.radioRetryAt = Date.now() + 15000;
         }
       }
@@ -495,7 +495,7 @@ export class Engine extends EventEmitter {
       this.current = null;
       this.segments = [];
       this.lastError =
-        error instanceof Error ? error.message : "Kunne ikke starte sangen.";
+        error instanceof Error ? error.message : "Could not start the song.";
       this.emit("playbackFailure", this.lastError);
       this.persist();
       this.changed();
@@ -598,24 +598,24 @@ export class Engine extends EventEmitter {
     await this.startNext();
   }
   pause() {
-    if (!this.current) throw new UserError("Ingen sang spiller.");
+    if (!this.current) throw new UserError("No song is playing.");
     this.paused = true;
     this.sink.pause();
     this.changed();
   }
   resume() {
     if (!this.connected)
-      throw new UserError("Start boten i en talekanal først.");
+      throw new UserError("Start the bot in a voice channel first.");
     if (this.current) {
       this.paused = false;
       this.sink.resume();
       this.changed();
     } else if (this.queue.length) void this.startNext();
-    else throw new UserError("Det er ingen sang å fortsette med.");
+    else throw new UserError("There is no song to resume.");
   }
   async skip(count = 1) {
     if (!Number.isInteger(count) || count < 1 || count > this.queue.length + 1)
-      throw new UserError("Ugyldig antall sanger.");
+      throw new UserError("Invalid number of songs.");
     // Capture the user's requested target before removing old unsafe entries.
     // Filtering must never shift a numbered skip onto a later manual song.
     const requested = this.queue.slice(0, count);
@@ -667,7 +667,7 @@ export class Engine extends EventEmitter {
       seconds < 0 ||
       seconds >= this.current.duration
     )
-      throw new UserError("Ugyldig posisjon.");
+      throw new UserError("Invalid position.");
     await this.startTrack(this.current, seconds, this.paused);
   }
   clear() {
@@ -679,7 +679,7 @@ export class Engine extends EventEmitter {
   }
   remove(index: number, count = 1) {
     if (!Number.isInteger(index) || index < 0 || index >= this.queue.length)
-      throw new UserError("Køen er endret. Oppdater og prøv igjen.");
+      throw new UserError("The queue has changed. Refresh and try again.");
     this.rejectRadio(this.queue.splice(index, count));
     this.mixer?.invalidateNext();
     this.persist();
@@ -694,7 +694,7 @@ export class Engine extends EventEmitter {
       to < 0 ||
       to >= this.queue.length
     )
-      throw new UserError("Ugyldig køposisjon.");
+      throw new UserError("Invalid queue position.");
     this.queue.splice(to, 0, this.queue.splice(from, 1)[0]);
     this.mixer?.invalidateNext();
     this.persist();
@@ -711,7 +711,7 @@ export class Engine extends EventEmitter {
   }
   setVolume(level: number) {
     if (!Number.isFinite(level) || level < 0 || level > 100)
-      throw new UserError("Volum må være fra 0 til 100.");
+      throw new UserError("Volume must be between 0 and 100.");
     this.volume = level;
     this.changed();
   }
