@@ -1,0 +1,3121 @@
+{
+  "scope": "offline PCM arrival scheduling; no encoder, provider or Discord output",
+  "config": {
+    "frames": 250,
+    "repeats": 3,
+    "guilds": [
+      1,
+      4
+    ],
+    "intervalMs": 20
+  },
+  "capturedAt": "2026-10-18T16:08:44.278Z",
+  "command": [
+    "node",
+    "experiments/rust-audio/paced-benchmark.ts",
+    "250",
+    "3",
+    "1,4"
+  ],
+  "sourceCommit": "093e247e75754f190bec745b05ed95881571c3f0",
+  "sourceDirty": false,
+  "node": "v24.19.0",
+  "os": "win32",
+  "osRelease": "10.0.26300",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+  "logicalCpus": 16,
+  "rustVersion": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "sourceSha256": {
+    "paced-client.ts": "b47ec17dce566d385aab34aa456bef095e116fc1ce33337002f6a8e83317ff0a",
+    "paced-benchmark.ts": "bc7791c54653da3201c92e1c035d14e73404731016149ffd5e107f0cc9aed4fa",
+    "worker-client.ts": "44676be8ae0ae4b44523246032028bfeaa0d1cc160cdc84930cdc5cc699e7cc6",
+    "batch-client.ts": "52ba49c62f4724eadfa3fe9abf15be1b2757778ec0ad747d6ec9397c144daf97",
+    "batch-benchmark.ts": "57302e9dbd79070f3dde7690ae4d49dcac5542d0667b947a3dee42d565678191",
+    "benchmark-suite.ts": "f383046aabb34df8f064f84be2866017a0f7537647fd79bed56321b51e4307a6",
+    "benchmark-process.ts": "3c883148c8df78c8031d56f8ecbb5ebae1bd8356492df5187b6bcac1e9090d49",
+    "process-cpu.ts": "9d0a816a03a2922280cfd3db6880dd2856f40c2a8834674334da560bf0ce16e8",
+    "../../services/core/src/audio.ts": "da6abd75a978588db837cad40777d01dd6c8def0dcbdaabc8ba96792057a2bb3",
+    "src/lib.rs": "fc68fc55da5d2e2f464aa3ad7d470b509a2f18a7d1e1cfe2322215d1d7667d17",
+    "src/stream.rs": "faffc2d28733be7e9e48b1117ba24ac7634f1ce8f32110cc992d943b872c7076",
+    "src/stream/batch.rs": "c6a06a80ca1d33c02a982e9faff92bd94ee803a39cd4737398e4eaee4040e336",
+    "Cargo.lock": "a65927d9a158039b5afba1db87bbda8a62822525218c13b8a1e037b090b983de"
+  },
+  "rustExecutableSha256": "f60f4737c9d6c7915bc7d3527c404c260b8d7ed3a669bd847ffcf69bd01c8125",
+  "runs": [
+    {
+      "repeat": 1,
+      "mode": "typescript",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "typescript",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4985.4998,
+      "lastArrivalMs": 4985.2788,
+      "finalDrainMs": 0.2209999999995489,
+      "parentCpuMs": 93,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 93,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 84160512,
+      "firstSingleFrameReplyMs": [],
+      "arrivalLateness": {
+        "p50Ms": 7.852699999999459,
+        "p95Ms": 14.737199999999802,
+        "p99Ms": 15.412599999999884,
+        "maxMs": 15.810799999999745
+      },
+      "queueWait": {
+        "p50Ms": 0.08609999999998763,
+        "p95Ms": 0.24690000000009604,
+        "p99Ms": 0.4254000000000815,
+        "maxMs": 0.4758000000000493
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.03510000000005675,
+        "p95Ms": 0.10800000000017462,
+        "p99Ms": 0.26279999999997017,
+        "maxMs": 1.8523999999999887
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.13009999999985666,
+        "p95Ms": 0.34940000000005966,
+        "p99Ms": 0.5187000000000808,
+        "maxMs": 2.328200000000038
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 7.974099999999453,
+        "p95Ms": 14.916799999999967,
+        "p99Ms": 15.544399999999996,
+        "maxMs": 15.997699999999895
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.13009999999985666,
+        "p95Ms": 0.34760000000005675,
+        "p99Ms": 0.5185999999999922,
+        "maxMs": 0.5460000000000491
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 0,
+      "requestProtocolBytes": 0,
+      "replyProtocolBytes": 0,
+      "replyDataEvents": 0,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 1,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "rust-v1",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "rust-v1",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4991.9592,
+      "lastArrivalMs": 4991.5285,
+      "finalDrainMs": 0.43069999999988795,
+      "parentCpuMs": 31,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 31,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 84824064,
+      "firstSingleFrameReplyMs": [
+        17.76910000000001
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.905300000000352,
+        "p95Ms": 14.890800000000013,
+        "p99Ms": 15.45430000000033,
+        "maxMs": 15.713600000000042
+      },
+      "queueWait": {
+        "p50Ms": 0.06610000000000582,
+        "p95Ms": 0.13869999999951688,
+        "p99Ms": 0.2523000000001048,
+        "maxMs": 0.44360000000000355
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.27680000000009386,
+        "p95Ms": 0.4085000000004584,
+        "p99Ms": 0.4773000000000138,
+        "maxMs": 0.6154999999998836
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.3537000000005719,
+        "p95Ms": 0.4955999999999676,
+        "p99Ms": 0.6200999999991836,
+        "maxMs": 0.8009000000000128
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 8.261599999999817,
+        "p95Ms": 15.287000000000035,
+        "p99Ms": 15.876700000000028,
+        "maxMs": 16.202800000000025
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.3537000000005719,
+        "p95Ms": 0.49479999999994106,
+        "p99Ms": 0.6093000000000757,
+        "maxMs": 0.6960999999996602
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 250,
+      "requestProtocolBytes": 1567040,
+      "replyProtocolBytes": 964000,
+      "replyDataEvents": 253,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 1,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "batch-4",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-4",
+        "batchSize": 4,
+        "maxWaitMs": 80
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4990.5695000000005,
+      "lastArrivalMs": 4989.7168,
+      "finalDrainMs": 0.8527000000003682,
+      "parentCpuMs": 16,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 16,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 86441984,
+      "firstSingleFrameReplyMs": [
+        18.0779
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.997400000000198,
+        "p95Ms": 14.747699999999895,
+        "p99Ms": 15.942300000000046,
+        "maxMs": 16.112600000000157
+      },
+      "queueWait": {
+        "p50Ms": 30.802999999999884,
+        "p95Ms": 63.14139999999952,
+        "p99Ms": 63.60010000000011,
+        "maxMs": 73.55570000000006
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.3926000000001295,
+        "p95Ms": 0.5684000000001106,
+        "p99Ms": 0.6206999999999425,
+        "maxMs": 0.6307999999999083
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 31.28099999999995,
+        "p95Ms": 63.56190000000015,
+        "p99Ms": 63.977600000000166,
+        "maxMs": 74.10859999999997
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 35.39559999999983,
+        "p95Ms": 72.4378999999999,
+        "p99Ms": 74.85590000000002,
+        "maxMs": 75.4689000000003
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 31.28099999999995,
+        "p95Ms": 63.53839999999991,
+        "p99Ms": 63.928100000000086,
+        "maxMs": 64.24240000000009
+      },
+      "batchHistogram": {
+        "1": 2,
+        "4": 62
+      },
+      "logicalMixCalls": 64,
+      "ipcRequests": 64,
+      "requestProtocolBytes": 1568064,
+      "replyProtocolBytes": 963024,
+      "replyDataEvents": 64,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        187
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "batch-8",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8",
+        "batchSize": 8,
+        "maxWaitMs": 160
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4996.9451,
+      "lastArrivalMs": 4996.3071,
+      "finalDrainMs": 0.63799999999992,
+      "parentCpuMs": 126,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 126,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 88109056,
+      "firstSingleFrameReplyMs": [
+        17.560699999999997
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.964399999999841,
+        "p95Ms": 15.14509999999973,
+        "p99Ms": 15.65249999999969,
+        "maxMs": 16.24789999999939
+      },
+      "queueWait": {
+        "p50Ms": 62.98219999999992,
+        "p95Ms": 140.25930000000017,
+        "p99Ms": 141.04579999999987,
+        "maxMs": 141.57760000000007
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.5684999999998581,
+        "p95Ms": 0.7039000000004307,
+        "p99Ms": 0.7285999999994601,
+        "maxMs": 0.7332999999998719
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 63.564099999999826,
+        "p95Ms": 140.8684000000003,
+        "p99Ms": 141.53510000000006,
+        "maxMs": 142.1663000000001
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 74.26119999999992,
+        "p95Ms": 149.01949999999988,
+        "p99Ms": 153.92020000000002,
+        "maxMs": 156.33409999999958
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 63.564099999999826,
+        "p95Ms": 140.86429999999928,
+        "p99Ms": 141.53510000000006,
+        "maxMs": 142.1663000000001
+      },
+      "batchHistogram": {
+        "1": 2,
+        "8": 31
+      },
+      "logicalMixCalls": 33,
+      "ipcRequests": 33,
+      "requestProtocolBytes": 1567568,
+      "replyProtocolBytes": 962528,
+      "replyDataEvents": 33,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        218
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 8,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "batch-8-deadline-10",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8-deadline-10",
+        "batchSize": 8,
+        "maxWaitMs": 10
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4996.1623,
+      "lastArrivalMs": 4995.6861,
+      "finalDrainMs": 0.4762000000000626,
+      "parentCpuMs": 31,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 31,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 84738048,
+      "firstSingleFrameReplyMs": [
+        18.484099999999984
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.3881999999999834,
+        "p95Ms": 14.667300000000068,
+        "p99Ms": 15.051899999999932,
+        "maxMs": 15.665099999999256
+      },
+      "queueWait": {
+        "p50Ms": 15.539200000000164,
+        "p95Ms": 16.208999999999833,
+        "p99Ms": 16.58010000000013,
+        "maxMs": 16.710399999999936
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.27880000000004657,
+        "p95Ms": 0.4297999999998865,
+        "p99Ms": 0.5699000000000183,
+        "maxMs": 0.7031000000001768
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 15.821999999999662,
+        "p95Ms": 16.584699999999884,
+        "p99Ms": 16.89800000000014,
+        "maxMs": 16.98849999999993
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 23.157300000000077,
+        "p95Ms": 30.544000000000324,
+        "p99Ms": 31.28740000000016,
+        "maxMs": 31.940400000000068
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 15.821999999999662,
+        "p95Ms": 16.57009999999991,
+        "p99Ms": 16.89800000000014,
+        "maxMs": 16.98849999999993
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 250,
+      "requestProtocolBytes": 1571040,
+      "replyProtocolBytes": 966000,
+      "replyDataEvents": 252,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        177
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 2,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "rust-v1",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "rust-v1",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4988.7192,
+      "lastArrivalMs": 4988.3081,
+      "finalDrainMs": 0.411099999999351,
+      "parentCpuMs": 359,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 359,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 84639744,
+      "firstSingleFrameReplyMs": [
+        17.03309999999999
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.9090000000001055,
+        "p95Ms": 15.210499999999683,
+        "p99Ms": 15.425600000000031,
+        "maxMs": 15.586700000000064
+      },
+      "queueWait": {
+        "p50Ms": 0.06420000000002801,
+        "p95Ms": 0.11810000000002674,
+        "p99Ms": 0.19179999999960273,
+        "maxMs": 0.47460000000000946
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.25919999999996435,
+        "p95Ms": 0.3931000000002314,
+        "p99Ms": 0.48050000000012005,
+        "maxMs": 0.8359000000000378
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.3305999999993219,
+        "p95Ms": 0.4855000000000018,
+        "p99Ms": 0.6277999999999793,
+        "maxMs": 0.9369000000001506
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 8.347199999999702,
+        "p95Ms": 15.5320999999999,
+        "p99Ms": 15.825599999999667,
+        "maxMs": 16.014400000000023
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.3305999999993219,
+        "p95Ms": 0.48099999999999454,
+        "p99Ms": 0.5928000000003522,
+        "maxMs": 0.9369000000001506
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 250,
+      "requestProtocolBytes": 1567040,
+      "replyProtocolBytes": 964000,
+      "replyDataEvents": 251,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 1,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "batch-4",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-4",
+        "batchSize": 4,
+        "maxWaitMs": 80
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4992.8756,
+      "lastArrivalMs": 4991.9557,
+      "finalDrainMs": 0.9198999999998705,
+      "parentCpuMs": 15,
+      "childCpuMs": 15.625,
+      "wholeOwnedCpuMs": 30.625,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 86380544,
+      "firstSingleFrameReplyMs": [
+        17.254500000000007
+      ],
+      "arrivalLateness": {
+        "p50Ms": 8.533099999999877,
+        "p95Ms": 14.958300000000008,
+        "p99Ms": 15.670699999999897,
+        "maxMs": 16.41710000000012
+      },
+      "queueWait": {
+        "p50Ms": 31.0654999999997,
+        "p95Ms": 62.858299999999986,
+        "p99Ms": 63.82950000000028,
+        "maxMs": 74.8648
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.43380000000024665,
+        "p95Ms": 0.6307999999999652,
+        "p99Ms": 0.7595000000001164,
+        "maxMs": 0.7628999999997177
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 31.456199999999626,
+        "p95Ms": 63.399099999999635,
+        "p99Ms": 64.34220000000005,
+        "maxMs": 75.41449999999998
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 35.74409999999989,
+        "p95Ms": 73.23189999999977,
+        "p99Ms": 75.54539999999997,
+        "maxMs": 75.89969999999994
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 31.456199999999626,
+        "p95Ms": 63.33479999999963,
+        "p99Ms": 63.97970000000032,
+        "maxMs": 64.43190000000004
+      },
+      "batchHistogram": {
+        "1": 2,
+        "4": 62
+      },
+      "logicalMixCalls": 64,
+      "ipcRequests": 64,
+      "requestProtocolBytes": 1568064,
+      "replyProtocolBytes": 963024,
+      "replyDataEvents": 64,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        187
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "batch-8",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8",
+        "batchSize": 8,
+        "maxWaitMs": 160
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4985.4655,
+      "lastArrivalMs": 4984.9037,
+      "finalDrainMs": 0.5618000000004031,
+      "parentCpuMs": 0,
+      "childCpuMs": 15.625,
+      "wholeOwnedCpuMs": 15.625,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 86884352,
+      "firstSingleFrameReplyMs": [
+        16.875499999999988
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.626800000000003,
+        "p95Ms": 14.67790000000059,
+        "p99Ms": 15.654700000000048,
+        "maxMs": 15.947300000000268
+      },
+      "queueWait": {
+        "p50Ms": 63.294200000000274,
+        "p95Ms": 140.39080000000013,
+        "p99Ms": 142.42290000000003,
+        "maxMs": 155.3064999999997
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.5720000000001164,
+        "p95Ms": 0.8546999999999798,
+        "p99Ms": 0.8781000000000176,
+        "maxMs": 0.884200000000078
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 63.83309999999983,
+        "p95Ms": 141.0398,
+        "p99Ms": 143.2601999999997,
+        "maxMs": 155.98859999999968
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 75.5121999999999,
+        "p95Ms": 149.8436999999999,
+        "p99Ms": 154.90449999999998,
+        "maxMs": 156.1925000000001
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 63.83309999999983,
+        "p95Ms": 140.91100000000006,
+        "p99Ms": 142.05269999999996,
+        "maxMs": 155.98859999999968
+      },
+      "batchHistogram": {
+        "1": 2,
+        "8": 31
+      },
+      "logicalMixCalls": 33,
+      "ipcRequests": 33,
+      "requestProtocolBytes": 1567568,
+      "replyProtocolBytes": 962528,
+      "replyDataEvents": 33,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        218
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 8,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "batch-8-deadline-10",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8-deadline-10",
+        "batchSize": 8,
+        "maxWaitMs": 10
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4981.999900000001,
+      "lastArrivalMs": 4981.4784,
+      "finalDrainMs": 0.5215000000007421,
+      "parentCpuMs": 187,
+      "childCpuMs": 31.25,
+      "wholeOwnedCpuMs": 218.25,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 84156416,
+      "firstSingleFrameReplyMs": [
+        17.967299999999994
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.29030000000057,
+        "p95Ms": 14.635200000000168,
+        "p99Ms": 15.290899999999965,
+        "maxMs": 15.407000000000153
+      },
+      "queueWait": {
+        "p50Ms": 15.491100000000188,
+        "p95Ms": 16.155800000000454,
+        "p99Ms": 16.274399999999787,
+        "maxMs": 24.899900000000002
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.2985999999998512,
+        "p95Ms": 0.42990000000008877,
+        "p99Ms": 0.5206000000000586,
+        "maxMs": 0.5593999999991865
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 15.794300000000476,
+        "p95Ms": 16.480400000000373,
+        "p99Ms": 16.715299999999843,
+        "maxMs": 25.297300000000007
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 23.163299999999936,
+        "p95Ms": 30.472099999999955,
+        "p99Ms": 31.118100000000027,
+        "maxMs": 31.355000000000473
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 15.794300000000476,
+        "p95Ms": 16.446300000000065,
+        "p99Ms": 16.64409999999998,
+        "maxMs": 16.734899999999925
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 250,
+      "requestProtocolBytes": 1571040,
+      "replyProtocolBytes": 966000,
+      "replyDataEvents": 250,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        182
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 2,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "typescript",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "typescript",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4990.7936,
+      "lastArrivalMs": 4990.5693,
+      "finalDrainMs": 0.2242999999998574,
+      "parentCpuMs": 109,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 109,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 83742720,
+      "firstSingleFrameReplyMs": [],
+      "arrivalLateness": {
+        "p50Ms": 7.2496000000001,
+        "p95Ms": 14.442700000000059,
+        "p99Ms": 15.384000000000015,
+        "maxMs": 15.48759999999993
+      },
+      "queueWait": {
+        "p50Ms": 0.06539999999995416,
+        "p95Ms": 0.1383999999999901,
+        "p99Ms": 0.24249999999938154,
+        "maxMs": 0.38850000000002183
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.03040000000009968,
+        "p95Ms": 0.07200000000011642,
+        "p99Ms": 0.10849999999936699,
+        "maxMs": 1.4017000000000053
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.09899999999970532,
+        "p95Ms": 0.19529999999986103,
+        "p99Ms": 0.28369999999995343,
+        "maxMs": 1.790200000000027
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 7.339200000000346,
+        "p95Ms": 14.528200000000197,
+        "p99Ms": 15.488200000000234,
+        "maxMs": 15.675900000000183
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.09899999999970532,
+        "p95Ms": 0.18830000000025393,
+        "p99Ms": 0.240099999999984,
+        "maxMs": 0.4431999999999334
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 0,
+      "requestProtocolBytes": 0,
+      "replyProtocolBytes": 0,
+      "replyDataEvents": 0,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 1,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "batch-4",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-4",
+        "batchSize": 4,
+        "maxWaitMs": 80
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4983.1096,
+      "lastArrivalMs": 4982.4042,
+      "finalDrainMs": 0.7053999999998268,
+      "parentCpuMs": 171,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 171,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 86302720,
+      "firstSingleFrameReplyMs": [
+        17.24000000000001
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.537999999999556,
+        "p95Ms": 14.589399999999841,
+        "p99Ms": 15.549599999999373,
+        "maxMs": 15.747899999999845
+      },
+      "queueWait": {
+        "p50Ms": 31.246099999999842,
+        "p95Ms": 63.035999999999945,
+        "p99Ms": 63.69060000000013,
+        "maxMs": 63.93129999999928
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.4256000000000313,
+        "p95Ms": 0.6041999999997643,
+        "p99Ms": 0.7036999999999694,
+        "maxMs": 0.7299999999999613
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 31.695800000000077,
+        "p95Ms": 63.36149999999998,
+        "p99Ms": 64.17759999999998,
+        "maxMs": 64.32290000000012
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 35.253099999999904,
+        "p95Ms": 73.70859999999993,
+        "p99Ms": 75.23720000000003,
+        "maxMs": 75.61470000000008
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 31.695800000000077,
+        "p95Ms": 63.3143,
+        "p99Ms": 64.17759999999998,
+        "maxMs": 64.32290000000012
+      },
+      "batchHistogram": {
+        "1": 2,
+        "4": 62
+      },
+      "logicalMixCalls": 64,
+      "ipcRequests": 64,
+      "requestProtocolBytes": 1568064,
+      "replyProtocolBytes": 963024,
+      "replyDataEvents": 65,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        187
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "batch-8",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8",
+        "batchSize": 8,
+        "maxWaitMs": 160
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4996.1141,
+      "lastArrivalMs": 4995.4412999999995,
+      "finalDrainMs": 0.6728000000002794,
+      "parentCpuMs": 62,
+      "childCpuMs": 15.625,
+      "wholeOwnedCpuMs": 77.625,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 87453696,
+      "firstSingleFrameReplyMs": [
+        17.41579999999999
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.801200000000108,
+        "p95Ms": 14.703499999999622,
+        "p99Ms": 15.42319999999927,
+        "maxMs": 16.38020000000006
+      },
+      "queueWait": {
+        "p50Ms": 63.283500000000004,
+        "p95Ms": 140.91309999999976,
+        "p99Ms": 142.14759999999978,
+        "maxMs": 154.56279999999992
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.5054000000000087,
+        "p95Ms": 0.8275000000003274,
+        "p99Ms": 0.8660000000000991,
+        "maxMs": 0.8697000000000799
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 64.14730000000009,
+        "p95Ms": 141.2835,
+        "p99Ms": 142.60570000000007,
+        "maxMs": 155.1821
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 75.19719999999961,
+        "p95Ms": 149.13300000000004,
+        "p99Ms": 154.9694000000004,
+        "maxMs": 155.71770000000015
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 64.14730000000009,
+        "p95Ms": 141.25380000000018,
+        "p99Ms": 142.3162000000002,
+        "maxMs": 155.1821
+      },
+      "batchHistogram": {
+        "1": 2,
+        "8": 31
+      },
+      "logicalMixCalls": 33,
+      "ipcRequests": 33,
+      "requestProtocolBytes": 1567568,
+      "replyProtocolBytes": 962528,
+      "replyDataEvents": 33,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        218
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 8,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "batch-8-deadline-10",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8-deadline-10",
+        "batchSize": 8,
+        "maxWaitMs": 10
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4986.3631000000005,
+      "lastArrivalMs": 4985.7585,
+      "finalDrainMs": 0.6046000000005733,
+      "parentCpuMs": 328,
+      "childCpuMs": 15.625,
+      "wholeOwnedCpuMs": 343.625,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 83857408,
+      "firstSingleFrameReplyMs": [
+        18.380600000000015
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.483300000000327,
+        "p95Ms": 14.147500000000036,
+        "p99Ms": 14.758799999999837,
+        "maxMs": 16.16070000000036
+      },
+      "queueWait": {
+        "p50Ms": 15.514599999999518,
+        "p95Ms": 16.306899999999928,
+        "p99Ms": 16.628900000000158,
+        "maxMs": 23.76619999999997
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.28530000000000655,
+        "p95Ms": 0.4197000000000344,
+        "p99Ms": 0.48369999999977153,
+        "maxMs": 0.566899999999805
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 15.786799999999857,
+        "p95Ms": 16.603300000000218,
+        "p99Ms": 16.891999999999825,
+        "maxMs": 24.160500000000013
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 23.17320000000018,
+        "p95Ms": 30.31560000000036,
+        "p99Ms": 30.64810000000034,
+        "maxMs": 32.25460000000021
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 15.786799999999857,
+        "p95Ms": 16.593200000000024,
+        "p99Ms": 16.84109999999987,
+        "maxMs": 16.930600000000595
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 250,
+      "requestProtocolBytes": 1571040,
+      "replyProtocolBytes": 966000,
+      "replyDataEvents": 252,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        180
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 2,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "typescript",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "typescript",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4989.5932999999995,
+      "lastArrivalMs": 4989.3121,
+      "finalDrainMs": 0.2811999999994441,
+      "parentCpuMs": 234,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 234,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 83521536,
+      "firstSingleFrameReplyMs": [],
+      "arrivalLateness": {
+        "p50Ms": 7.561599999999771,
+        "p95Ms": 14.451599999999416,
+        "p99Ms": 15.219499999999698,
+        "maxMs": 15.438699999999926
+      },
+      "queueWait": {
+        "p50Ms": 0.1103000000002794,
+        "p95Ms": 0.2411999999994805,
+        "p99Ms": 0.41609999999991487,
+        "maxMs": 0.495900000000006
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.04010000000016589,
+        "p95Ms": 0.1346000000000913,
+        "p99Ms": 0.2375000000001819,
+        "maxMs": 1.8713000000000193
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.15650000000005093,
+        "p95Ms": 0.3401000000003478,
+        "p99Ms": 0.5438999999996668,
+        "maxMs": 2.3672000000000253
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 7.8604999999997744,
+        "p95Ms": 14.647799999999961,
+        "p99Ms": 15.59849999999983,
+        "maxMs": 15.690499999999702
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.15650000000005093,
+        "p95Ms": 0.3306999999999789,
+        "p99Ms": 0.45640000000003056,
+        "maxMs": 0.5479999999997744
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 0,
+      "requestProtocolBytes": 0,
+      "replyProtocolBytes": 0,
+      "replyDataEvents": 0,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 1,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "rust-v1",
+      "guilds": 1,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "rust-v1",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 250,
+      "elapsedMs": 4994.9159,
+      "lastArrivalMs": 4993.8003,
+      "finalDrainMs": 1.1156000000000859,
+      "parentCpuMs": 234,
+      "childCpuMs": 15.625,
+      "wholeOwnedCpuMs": 249.625,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 84582400,
+      "firstSingleFrameReplyMs": [
+        22.676800000000014
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.549600000000282,
+        "p95Ms": 14.596799999999803,
+        "p99Ms": 15.475199999999859,
+        "maxMs": 15.681300000000192
+      },
+      "queueWait": {
+        "p50Ms": 0.10819999999966967,
+        "p95Ms": 0.21970000000055734,
+        "p99Ms": 0.47330000000056316,
+        "maxMs": 0.6408999999999878
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.36220000000002983,
+        "p95Ms": 0.6397999999999229,
+        "p99Ms": 0.8278999999999996,
+        "maxMs": 0.9200000000000728
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.4805999999998676,
+        "p95Ms": 0.8879000000000588,
+        "p99Ms": 1.07720000000063,
+        "maxMs": 1.1297000000000708
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 7.87119999999959,
+        "p95Ms": 15.073799999999665,
+        "p99Ms": 16.1558,
+        "maxMs": 16.635400000000004
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.4805999999998676,
+        "p95Ms": 0.8292000000001281,
+        "p99Ms": 1.07720000000063,
+        "maxMs": 1.1297000000000708
+      },
+      "batchHistogram": {
+        "1": 250
+      },
+      "logicalMixCalls": 250,
+      "ipcRequests": 250,
+      "requestProtocolBytes": 1567040,
+      "replyProtocolBytes": 964000,
+      "replyDataEvents": 250,
+      "completedPerGuild": [
+        250
+      ],
+      "missed20MsPerGuild": [
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 1,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "typescript",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "typescript",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4982.9504,
+      "lastArrivalMs": 4982.525900000001,
+      "finalDrainMs": 0.42449999999917054,
+      "parentCpuMs": 235,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 235,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 87285760,
+      "firstSingleFrameReplyMs": [],
+      "arrivalLateness": {
+        "p50Ms": 7.770299999999224,
+        "p95Ms": 14.660899999999856,
+        "p99Ms": 16.092499999999745,
+        "maxMs": 16.320400000000063
+      },
+      "queueWait": {
+        "p50Ms": 0.12809999999990396,
+        "p95Ms": 0.3362999999999374,
+        "p99Ms": 0.5340000000001055,
+        "maxMs": 1.2156999999999698
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.08539999999993597,
+        "p95Ms": 0.24240000000008877,
+        "p99Ms": 0.4958999999998923,
+        "maxMs": 1.9657999999999447
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.21879999999998745,
+        "p95Ms": 0.51299999999992,
+        "p99Ms": 1.0311000000001513,
+        "maxMs": 2.603599999999915
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 8.023400000000038,
+        "p95Ms": 15.008699999999862,
+        "p99Ms": 16.295399999999063,
+        "maxMs": 16.743499999999926
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.21790000000009968,
+        "p95Ms": 0.5052000000000589,
+        "p99Ms": 0.9652999999998428,
+        "maxMs": 1.4540999999999258
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 0,
+      "requestProtocolBytes": 0,
+      "replyProtocolBytes": 0,
+      "replyDataEvents": 0,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "rust-v1",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "rust-v1",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4990.2264000000005,
+      "lastArrivalMs": 4989.349300000001,
+      "finalDrainMs": 0.8770999999997002,
+      "parentCpuMs": 297,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 297,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 91058176,
+      "firstSingleFrameReplyMs": [
+        20.188000000000017,
+        19.495599999999996,
+        19.8767,
+        20.119200000000006
+      ],
+      "arrivalLateness": {
+        "p50Ms": 8.024199999999837,
+        "p95Ms": 15.016599999999926,
+        "p99Ms": 15.406600000000253,
+        "maxMs": 15.687099999999873
+      },
+      "queueWait": {
+        "p50Ms": 0.1847000000002481,
+        "p95Ms": 0.42359999999962383,
+        "p99Ms": 0.6327000000001135,
+        "maxMs": 1.0253000000000156
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.29759999999987485,
+        "p95Ms": 0.7187999999998738,
+        "p99Ms": 1.2273999999997613,
+        "maxMs": 2.574800000000323
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.4937999999999647,
+        "p95Ms": 1.0871000000001914,
+        "p99Ms": 1.5889000000001943,
+        "maxMs": 3.2859000000003107
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 8.539300000000367,
+        "p95Ms": 15.481400000000122,
+        "p99Ms": 16.053399999999783,
+        "maxMs": 16.345299999999952
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.49220000000013897,
+        "p95Ms": 1.092200000000048,
+        "p99Ms": 1.5966000000003078,
+        "maxMs": 3.2859000000003107
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 1000,
+      "requestProtocolBytes": 6268160,
+      "replyProtocolBytes": 3856000,
+      "replyDataEvents": 1000,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "batch-4",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-4",
+        "batchSize": 4,
+        "maxWaitMs": 80
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4993.2438999999995,
+      "lastArrivalMs": 4991.1792,
+      "finalDrainMs": 2.0646999999999025,
+      "parentCpuMs": 421,
+      "childCpuMs": 31.25,
+      "wholeOwnedCpuMs": 452.25,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 89788416,
+      "firstSingleFrameReplyMs": [
+        19.910899999999998,
+        22.1601,
+        19.454099999999983,
+        22.78920000000005
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.498999999999796,
+        "p95Ms": 14.592899999999645,
+        "p99Ms": 15.088999999999942,
+        "maxMs": 15.880699999999933
+      },
+      "queueWait": {
+        "p50Ms": 31.302599999999984,
+        "p95Ms": 62.86920000000009,
+        "p99Ms": 63.878999999999905,
+        "maxMs": 64.48159999999984
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.5122999999998683,
+        "p95Ms": 1.184700000000248,
+        "p99Ms": 1.4773999999997613,
+        "maxMs": 1.6643000000001393
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 31.92430000000013,
+        "p95Ms": 63.51330000000007,
+        "p99Ms": 64.39359999999988,
+        "maxMs": 65.64539999999988
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 35.96090000000004,
+        "p95Ms": 73.13279999999986,
+        "p99Ms": 75.60809999999992,
+        "maxMs": 76.58649999999989
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 31.879500000000007,
+        "p95Ms": 63.52439999999979,
+        "p99Ms": 64.4176,
+        "maxMs": 65.64539999999988
+      },
+      "batchHistogram": {
+        "1": 8,
+        "4": 248
+      },
+      "logicalMixCalls": 256,
+      "ipcRequests": 256,
+      "requestProtocolBytes": 6272256,
+      "replyProtocolBytes": 3852096,
+      "replyDataEvents": 256,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        187,
+        187,
+        187,
+        187
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 16,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "batch-8",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8",
+        "batchSize": 8,
+        "maxWaitMs": 160
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4996.5115,
+      "lastArrivalMs": 4993.7600999999995,
+      "finalDrainMs": 2.7514000000001033,
+      "parentCpuMs": 109,
+      "childCpuMs": 31.25,
+      "wholeOwnedCpuMs": 140.25,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 90914816,
+      "firstSingleFrameReplyMs": [
+        22.838600000000014,
+        23.680200000000013,
+        21.03729999999996,
+        23.292500000000018
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.862899999999627,
+        "p95Ms": 14.903699999999844,
+        "p99Ms": 15.876199999999699,
+        "maxMs": 16.096799999999348
+      },
+      "queueWait": {
+        "p50Ms": 64.36770000000001,
+        "p95Ms": 140.7451000000001,
+        "p99Ms": 142.2240999999999,
+        "maxMs": 143.19999999999993
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.7020999999999731,
+        "p95Ms": 1.1114999999999782,
+        "p99Ms": 1.310500000000502,
+        "maxMs": 1.5765000000001237
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 64.97899999999981,
+        "p95Ms": 141.51650000000018,
+        "p99Ms": 142.83880000000045,
+        "maxMs": 144.03519999999992
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 75.99669999999969,
+        "p95Ms": 149.6409000000001,
+        "p99Ms": 155.49119999999994,
+        "maxMs": 156.58269999999993
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 64.85500000000002,
+        "p95Ms": 141.4381999999996,
+        "p99Ms": 142.7882000000002,
+        "maxMs": 143.47929999999997
+      },
+      "batchHistogram": {
+        "1": 8,
+        "8": 124
+      },
+      "logicalMixCalls": 132,
+      "ipcRequests": 132,
+      "requestProtocolBytes": 6270272,
+      "replyProtocolBytes": 3850112,
+      "replyDataEvents": 132,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        218,
+        218,
+        218,
+        218
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 32,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 1,
+      "mode": "batch-8-deadline-10",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8-deadline-10",
+        "batchSize": 8,
+        "maxWaitMs": 10
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4985.5025000000005,
+      "lastArrivalMs": 4983.8918,
+      "finalDrainMs": 1.610700000000179,
+      "parentCpuMs": 47,
+      "childCpuMs": 15.625,
+      "wholeOwnedCpuMs": 62.625,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 87298048,
+      "firstSingleFrameReplyMs": [
+        18.723600000000005,
+        21.8014,
+        20.363200000000006,
+        20.3801
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.247400000000198,
+        "p95Ms": 14.558099999999968,
+        "p99Ms": 15.240400000000136,
+        "maxMs": 16.22479999999996
+      },
+      "queueWait": {
+        "p50Ms": 15.56230000000005,
+        "p95Ms": 16.327600000000075,
+        "p99Ms": 16.66150000000016,
+        "maxMs": 22.38519999999994
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.3221000000003187,
+        "p95Ms": 0.6882999999997992,
+        "p99Ms": 1.0470000000000255,
+        "maxMs": 1.4780000000000655
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 15.919600000000173,
+        "p95Ms": 16.813100000000304,
+        "p99Ms": 17.247200000000703,
+        "maxMs": 23.04589999999996
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 23.364199999999983,
+        "p95Ms": 30.751500000000078,
+        "p99Ms": 31.52410000000009,
+        "maxMs": 32.04039999999986
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 15.914999999999964,
+        "p95Ms": 16.795599999999922,
+        "p99Ms": 17.203199999999924,
+        "maxMs": 17.672700000000077
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 1000,
+      "requestProtocolBytes": 6284160,
+      "replyProtocolBytes": 3864000,
+      "replyDataEvents": 1000,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        181,
+        181,
+        181,
+        181
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 8,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "rust-v1",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "rust-v1",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4996.3189999999995,
+      "lastArrivalMs": 4995.0747,
+      "finalDrainMs": 1.2442999999993845,
+      "parentCpuMs": 312,
+      "childCpuMs": 31.25,
+      "wholeOwnedCpuMs": 343.25,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 90615808,
+      "firstSingleFrameReplyMs": [
+        18.715300000000013,
+        19.580000000000013,
+        18.747899999999987,
+        20.517599999999987
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.712799999999788,
+        "p95Ms": 14.799999999999727,
+        "p99Ms": 15.533599999999751,
+        "maxMs": 17.13220000000001
+      },
+      "queueWait": {
+        "p50Ms": 0.19329999999990832,
+        "p95Ms": 0.4283999999997832,
+        "p99Ms": 0.5788999999995212,
+        "maxMs": 0.8740999999999985
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.3003000000001066,
+        "p95Ms": 0.6919000000007145,
+        "p99Ms": 1.3011999999998807,
+        "maxMs": 3.7608000000000175
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.4958000000001448,
+        "p95Ms": 1.0376000000001113,
+        "p99Ms": 1.5429999999996653,
+        "maxMs": 4.447700000000168
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 8.182299999999941,
+        "p95Ms": 15.382000000000062,
+        "p99Ms": 16.192299999999705,
+        "maxMs": 18.570600000000013
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.49510000000009313,
+        "p95Ms": 1.0545000000001892,
+        "p99Ms": 1.5518000000001848,
+        "maxMs": 4.447700000000168
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 1000,
+      "requestProtocolBytes": 6268160,
+      "replyProtocolBytes": 3856000,
+      "replyDataEvents": 1001,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "batch-4",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-4",
+        "batchSize": 4,
+        "maxWaitMs": 80
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4992.5784,
+      "lastArrivalMs": 4991.5163,
+      "finalDrainMs": 1.0621000000001004,
+      "parentCpuMs": 359,
+      "childCpuMs": 31.25,
+      "wholeOwnedCpuMs": 390.25,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 89800704,
+      "firstSingleFrameReplyMs": [
+        24.582400000000007,
+        24.90439999999998,
+        25.719300000000004,
+        25.477299999999957
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.686100000000351,
+        "p95Ms": 15.186400000000503,
+        "p99Ms": 16.06580000000031,
+        "maxMs": 16.54410000000007
+      },
+      "queueWait": {
+        "p50Ms": 31.237100000000282,
+        "p95Ms": 63.23049999999989,
+        "p99Ms": 64.58820000000014,
+        "maxMs": 67.59709999999995
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.5315999999997985,
+        "p95Ms": 1.4439000000002125,
+        "p99Ms": 1.800599999999804,
+        "maxMs": 1.9098999999998796
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 31.66899999999987,
+        "p95Ms": 64.09259999999995,
+        "p99Ms": 65.51289999999972,
+        "maxMs": 69.23599999999999
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 36.72429999999986,
+        "p95Ms": 72.94509999999991,
+        "p99Ms": 76.47320000000036,
+        "maxMs": 79.06980000000021
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 31.64350000000013,
+        "p95Ms": 64.04899999999998,
+        "p99Ms": 65.34830000000011,
+        "maxMs": 66.66120000000001
+      },
+      "batchHistogram": {
+        "1": 8,
+        "4": 248
+      },
+      "logicalMixCalls": 256,
+      "ipcRequests": 256,
+      "requestProtocolBytes": 6272256,
+      "replyProtocolBytes": 3852096,
+      "replyDataEvents": 256,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        187,
+        187,
+        187,
+        187
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 16,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "batch-8",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8",
+        "batchSize": 8,
+        "maxWaitMs": 160
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4989.713299999999,
+      "lastArrivalMs": 4987.2199,
+      "finalDrainMs": 2.493399999999383,
+      "parentCpuMs": 78,
+      "childCpuMs": 15.625,
+      "wholeOwnedCpuMs": 93.625,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 91328512,
+      "firstSingleFrameReplyMs": [
+        17.054699999999997,
+        17.208200000000005,
+        20.487799999999993,
+        19.190799999999967
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.510999999999967,
+        "p95Ms": 14.637700000000223,
+        "p99Ms": 15.819899999999961,
+        "maxMs": 16.03819999999996
+      },
+      "queueWait": {
+        "p50Ms": 63.814000000000306,
+        "p95Ms": 140.88290000000006,
+        "p99Ms": 142.4362000000001,
+        "maxMs": 149.7052
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.6222000000002481,
+        "p95Ms": 1.5824000000002343,
+        "p99Ms": 2.285399999999754,
+        "maxMs": 2.359599999999773
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 65.07529999999952,
+        "p95Ms": 141.48180000000002,
+        "p99Ms": 143.48209999999995,
+        "maxMs": 150.64509999999996
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 74.7172999999998,
+        "p95Ms": 150.3590999999999,
+        "p99Ms": 154.44840000000022,
+        "maxMs": 155.3649999999999
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 64.75759999999991,
+        "p95Ms": 141.37909999999965,
+        "p99Ms": 143.3064000000004,
+        "maxMs": 144.3177999999998
+      },
+      "batchHistogram": {
+        "1": 8,
+        "8": 124
+      },
+      "logicalMixCalls": 132,
+      "ipcRequests": 132,
+      "requestProtocolBytes": 6270272,
+      "replyProtocolBytes": 3850112,
+      "replyDataEvents": 132,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        218,
+        218,
+        218,
+        218
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 32,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "batch-8-deadline-10",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8-deadline-10",
+        "batchSize": 8,
+        "maxWaitMs": 10
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4994.4216,
+      "lastArrivalMs": 4993.082899999999,
+      "finalDrainMs": 1.3387000000002445,
+      "parentCpuMs": 547,
+      "childCpuMs": 171.875,
+      "wholeOwnedCpuMs": 718.875,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 87486464,
+      "firstSingleFrameReplyMs": [
+        24.436999999999983,
+        23.639999999999986,
+        22.331699999999955,
+        24.68829999999997
+      ],
+      "arrivalLateness": {
+        "p50Ms": 6.9172000000000935,
+        "p95Ms": 14.241799999999785,
+        "p99Ms": 14.784099999999853,
+        "maxMs": 15.269799999999577
+      },
+      "queueWait": {
+        "p50Ms": 15.567700000000059,
+        "p95Ms": 16.434699999999793,
+        "p99Ms": 16.833599999999933,
+        "maxMs": 17.515400000000227
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.5442000000000462,
+        "p95Ms": 1.0617999999999483,
+        "p99Ms": 1.575800000000072,
+        "maxMs": 2.323699999999917
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 16.157200000000103,
+        "p95Ms": 17.147899999999936,
+        "p99Ms": 17.644600000000082,
+        "maxMs": 17.901500000000397
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 23.128999999999905,
+        "p95Ms": 30.636599999999817,
+        "p99Ms": 31.491399999999885,
+        "maxMs": 32.19539999999961
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 16.158100000000104,
+        "p95Ms": 17.148400000000038,
+        "p99Ms": 17.6546000000003,
+        "maxMs": 17.901500000000397
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 1000,
+      "requestProtocolBytes": 6284160,
+      "replyProtocolBytes": 3864000,
+      "replyDataEvents": 1000,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        174,
+        174,
+        175,
+        179
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 8,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 2,
+      "mode": "typescript",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "typescript",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4984.525799999999,
+      "lastArrivalMs": 4983.593000000001,
+      "finalDrainMs": 0.9327999999986787,
+      "parentCpuMs": 485,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 485,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 87076864,
+      "firstSingleFrameReplyMs": [],
+      "arrivalLateness": {
+        "p50Ms": 7.430900000000065,
+        "p95Ms": 14.654999999999973,
+        "p99Ms": 15.436999999999898,
+        "maxMs": 16.25550000000021
+      },
+      "queueWait": {
+        "p50Ms": 0.2074999999999818,
+        "p95Ms": 0.41849999999976717,
+        "p99Ms": 0.580600000000004,
+        "maxMs": 1.22199999999998
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.1426000000001295,
+        "p95Ms": 0.32220000000052096,
+        "p99Ms": 0.4716000000007625,
+        "maxMs": 2.4098000000000184
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.380500000000211,
+        "p95Ms": 0.6618000000000848,
+        "p99Ms": 1.0430999999998676,
+        "maxMs": 3.0813000000000557
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 7.6591000000007625,
+        "p95Ms": 15.042799999999943,
+        "p99Ms": 15.958399999999983,
+        "maxMs": 16.644600000000082
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.3801000000003114,
+        "p95Ms": 0.6539000000002488,
+        "p99Ms": 0.901299999999992,
+        "maxMs": 1.5141999999998461
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 0,
+      "requestProtocolBytes": 0,
+      "replyProtocolBytes": 0,
+      "replyDataEvents": 0,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "batch-4",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-4",
+        "batchSize": 4,
+        "maxWaitMs": 80
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4992.278499999999,
+      "lastArrivalMs": 4989.4445,
+      "finalDrainMs": 2.8339999999998327,
+      "parentCpuMs": 281,
+      "childCpuMs": 46.875,
+      "wholeOwnedCpuMs": 327.875,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 90501120,
+      "firstSingleFrameReplyMs": [
+        23.469600000000014,
+        24.346300000000014,
+        22.600300000000004,
+        23.630300000000034
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.851400000000012,
+        "p95Ms": 14.846599999999853,
+        "p99Ms": 15.491099999999733,
+        "maxMs": 15.873299999999745
+      },
+      "queueWait": {
+        "p50Ms": 31.18159999999989,
+        "p95Ms": 63.174400000000105,
+        "p99Ms": 64.13830000000007,
+        "maxMs": 73.88220000000001
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.8905999999997221,
+        "p95Ms": 1.878500000000031,
+        "p99Ms": 3.959600000000137,
+        "maxMs": 4.0733000000000175
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 32.09049999999979,
+        "p95Ms": 64.17389999999978,
+        "p99Ms": 65.24240000000009,
+        "maxMs": 75.61840000000007
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 36.470800000000054,
+        "p95Ms": 73.48109999999997,
+        "p99Ms": 75.8474,
+        "maxMs": 76.74339999999984
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 32.084100000000035,
+        "p95Ms": 64.09609999999975,
+        "p99Ms": 65.19219999999996,
+        "maxMs": 65.53760000000011
+      },
+      "batchHistogram": {
+        "1": 8,
+        "4": 248
+      },
+      "logicalMixCalls": 256,
+      "ipcRequests": 256,
+      "requestProtocolBytes": 6272256,
+      "replyProtocolBytes": 3852096,
+      "replyDataEvents": 256,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        187,
+        187,
+        187,
+        187
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 4,
+          "maxInFlightObserved": 4
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 16,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "batch-8",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8",
+        "batchSize": 8,
+        "maxWaitMs": 160
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4988.9655999999995,
+      "lastArrivalMs": 4987.9343,
+      "finalDrainMs": 1.0312999999996464,
+      "parentCpuMs": 156,
+      "childCpuMs": 31.25,
+      "wholeOwnedCpuMs": 187.25,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 91271168,
+      "firstSingleFrameReplyMs": [
+        22.717000000000013,
+        20.4658,
+        24.79249999999999,
+        22.51709999999997
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.8604999999997744,
+        "p95Ms": 14.783599999999751,
+        "p99Ms": 15.494899999999689,
+        "maxMs": 15.569399999999405
+      },
+      "queueWait": {
+        "p50Ms": 64.38900000000001,
+        "p95Ms": 140.61180000000058,
+        "p99Ms": 141.74160000000006,
+        "maxMs": 149.50979999999993
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.6956000000000131,
+        "p95Ms": 1.9524000000001251,
+        "p99Ms": 2.292099999999664,
+        "maxMs": 2.44629999999961
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 66.31809999999996,
+        "p95Ms": 141.49350000000004,
+        "p99Ms": 142.7275000000002,
+        "maxMs": 151.47609999999997
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 76.2536,
+        "p95Ms": 150.27459999999974,
+        "p99Ms": 155.15470000000005,
+        "maxMs": 158.52620000000024
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 65.94949999999972,
+        "p95Ms": 141.42799999999988,
+        "p99Ms": 142.58939999999984,
+        "maxMs": 144.5233000000003
+      },
+      "batchHistogram": {
+        "1": 8,
+        "8": 124
+      },
+      "logicalMixCalls": 132,
+      "ipcRequests": 132,
+      "requestProtocolBytes": 6270272,
+      "replyProtocolBytes": 3850112,
+      "replyDataEvents": 132,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        218,
+        218,
+        218,
+        218
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 8,
+          "maxInFlightObserved": 8
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 32,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "batch-8-deadline-10",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "batch-8-deadline-10",
+        "batchSize": 8,
+        "maxWaitMs": 10
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4991.5327,
+      "lastArrivalMs": 4990.4172,
+      "finalDrainMs": 1.1154999999998836,
+      "parentCpuMs": 547,
+      "childCpuMs": 156.25,
+      "wholeOwnedCpuMs": 703.25,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 87367680,
+      "firstSingleFrameReplyMs": [
+        17.201699999999988,
+        17.101400000000012,
+        18.185000000000002,
+        18.035800000000023
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.52350000000024,
+        "p95Ms": 14.858800000000883,
+        "p99Ms": 15.46480000000065,
+        "maxMs": 15.984500000000025
+      },
+      "queueWait": {
+        "p50Ms": 15.541400000000067,
+        "p95Ms": 16.303499999999985,
+        "p99Ms": 16.633899999999812,
+        "maxMs": 21.498000000000047
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.2390000000004875,
+        "p95Ms": 0.4854000000000269,
+        "p99Ms": 0.8940999999999804,
+        "maxMs": 1.3422999999997955
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 15.811500000000251,
+        "p95Ms": 16.663800000000265,
+        "p99Ms": 17.160300000000007,
+        "maxMs": 22.101099999999974
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 23.560500000000047,
+        "p95Ms": 30.622600000000148,
+        "p99Ms": 31.759599999999864,
+        "maxMs": 32.58550000000014
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 15.806900000000041,
+        "p95Ms": 16.6413,
+        "p99Ms": 16.990099999999984,
+        "maxMs": 17.721299999999246
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 1000,
+      "requestProtocolBytes": 6284160,
+      "replyProtocolBytes": 3864000,
+      "replyDataEvents": 1001,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        181,
+        181,
+        182,
+        182
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 2,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 8,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "typescript",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "typescript",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4984.6531,
+      "lastArrivalMs": 4984.292600000001,
+      "finalDrainMs": 0.36049999999977445,
+      "parentCpuMs": 312,
+      "childCpuMs": 0,
+      "wholeOwnedCpuMs": 312,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 87138304,
+      "firstSingleFrameReplyMs": [],
+      "arrivalLateness": {
+        "p50Ms": 7.739900000000489,
+        "p95Ms": 14.833099999999831,
+        "p99Ms": 15.441499999999905,
+        "maxMs": 15.88970000000063
+      },
+      "queueWait": {
+        "p50Ms": 0.10060000000021319,
+        "p95Ms": 0.2359999999998763,
+        "p99Ms": 0.3994999999999891,
+        "maxMs": 0.602900000000318
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.07430000000022119,
+        "p95Ms": 0.2074999999999818,
+        "p99Ms": 0.2832000000003063,
+        "maxMs": 1.5049000000000206
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.17609999999990578,
+        "p95Ms": 0.39889999999968495,
+        "p99Ms": 0.6779999999998836,
+        "maxMs": 1.9621999999999957
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 7.9827000000000226,
+        "p95Ms": 15.048800000000028,
+        "p99Ms": 15.735499999999774,
+        "maxMs": 16.197700000000623
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.17519999999967695,
+        "p95Ms": 0.3941999999997279,
+        "p99Ms": 0.6345000000001164,
+        "maxMs": 0.8545999999996639
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 0,
+      "requestProtocolBytes": 0,
+      "replyProtocolBytes": 0,
+      "replyDataEvents": 0,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    },
+    {
+      "repeat": 3,
+      "mode": "rust-v1",
+      "guilds": 4,
+      "framesPerGuild": 250,
+      "warmupSingleFramesPerGuild": 16,
+      "intervalMs": 20,
+      "policy": {
+        "mode": "rust-v1",
+        "batchSize": 1,
+        "maxWaitMs": 0
+      },
+      "verifiedFrames": 1000,
+      "elapsedMs": 4990.9263,
+      "lastArrivalMs": 4990.1792,
+      "finalDrainMs": 0.7471000000005006,
+      "parentCpuMs": 110,
+      "childCpuMs": 46.875,
+      "wholeOwnedCpuMs": 156.875,
+      "childCpuCounter": {
+        "source": "Windows Get-Process TotalProcessorTime",
+        "counterUnitMs": 0.0001,
+        "error": null
+      },
+      "parentLifetimePeakRssBytes": 91090944,
+      "firstSingleFrameReplyMs": [
+        16.50710000000001,
+        16.239899999999977,
+        16.80619999999999,
+        15.948099999999982
+      ],
+      "arrivalLateness": {
+        "p50Ms": 7.572400000000016,
+        "p95Ms": 14.624899999999798,
+        "p99Ms": 15.597799999999552,
+        "maxMs": 15.978500000000167
+      },
+      "queueWait": {
+        "p50Ms": 0.11710000000005039,
+        "p95Ms": 0.3043999999999869,
+        "p99Ms": 0.47420000000010987,
+        "maxMs": 0.5558000000000902
+      },
+      "dispatchToReply": {
+        "p50Ms": 0.25280000000020664,
+        "p95Ms": 0.5048999999999069,
+        "p99Ms": 0.7452000000002954,
+        "maxMs": 1.3365999999996347
+      },
+      "frameArrivalToReply": {
+        "p50Ms": 0.38479999999981374,
+        "p95Ms": 0.7247999999999593,
+        "p99Ms": 0.9900000000000091,
+        "maxMs": 1.754399999999805
+      },
+      "scheduledArrivalToReply": {
+        "p50Ms": 7.952099999999859,
+        "p95Ms": 15.040500000000065,
+        "p99Ms": 15.932999999999993,
+        "maxMs": 16.461099999999533
+      },
+      "changedVolumeFrameToReply": {
+        "p50Ms": 0.3842000000001917,
+        "p95Ms": 0.7192000000000007,
+        "p99Ms": 1.0778999999997723,
+        "maxMs": 1.754399999999805
+      },
+      "batchHistogram": {
+        "1": 1000
+      },
+      "logicalMixCalls": 1000,
+      "ipcRequests": 1000,
+      "requestProtocolBytes": 6268160,
+      "replyProtocolBytes": 3856000,
+      "replyDataEvents": 1000,
+      "completedPerGuild": [
+        250,
+        250,
+        250,
+        250
+      ],
+      "missed20MsPerGuild": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "queueBounds": [
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        },
+        {
+          "queued": 0,
+          "inFlight": 0,
+          "maxQueuedObserved": 1,
+          "maxInFlightObserved": 1
+        }
+      ],
+      "maxOutstandingAcrossGuilds": 4,
+      "maxAllowedPerGuild": 16
+    }
+  ],
+  "limitations": [
+    "All paths use the same bounded offline parent queue; production Core does not import it.",
+    "Input and volume controls become available per scheduled 20ms frame, not as a pre-ready block. Delayed event loops can create catch-up bursts, reported as arrival lateness.",
+    "maxWait is a dispatch policy, not a hard completion guarantee: event-loop delay and an in-flight backend can add delay.",
+    "Control metric measures completion of new per-frame volume snapshots; it does not undo submitted audio or measure audible/packet latency.",
+    "CPU covers the timed parent and owned Rust counters, excludes startup/probes/encoding/provider/Discord; practical counter precision is not established.",
+    "Fresh-process repeats and rotated order limit history bias; observed ranges are not confidence intervals or intended-host evidence."
+  ]
+}

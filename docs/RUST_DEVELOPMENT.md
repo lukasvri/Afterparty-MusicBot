@@ -855,8 +855,9 @@ The report keeps scheduled-to-actual arrival lateness, actual arrival-to-dispatc
 queue time, dispatch-to-validated-reply time and scheduled/actual arrival-to-reply
 latency separate. It records actual 1/4/8 request counts, protocol bytes, Node
 reply-data events, queue peaks, completed frames and missed 20 ms scheduled
-completion targets per guild. Completion includes PCM verification and parent
-dispatch bookkeeping, with no encoder, provider or Discord output. The supplied
+completion targets per guild. Completion is a validated PCM reply through parent
+dispatch; byte parity is checked immediately afterward for every frame in the
+timed run. There is no encoder, provider or Discord output. The supplied
 50 frames/s is offered load, not measured maximum throughput. Volume timing
 measures completion of a new per-frame control snapshot; it cannot undo audio
 already submitted and is not audible response latency.
@@ -882,3 +883,71 @@ exploratory observations with uncontrolled host scheduling and thermal state.
   are unchanged by this experimental step. Adoption still requires a separate
   owner decision and reviewed PR. No listening assistance, production account,
   merge, publication or deployment is part of this work.
+
+### Paced PCM observations, 2026-10-18
+
+The [30-run capture](../experiments/rust-audio/measurements/2026-10-18-paced-arrivals.json)
+used clean implementation commit `093e247e75754f190bec745b05ed95881571c3f0`,
+250 frames per guild, three fresh-process repeats and one/four guilds. It records
+13 source hashes and the actual executable hash. All matched the measured files;
+each run completed and verified every PCM frame, drained its queues, and stayed
+within eight queued plus eight active frames per guild. A separate 100-frame
+batch-8 smoke check completed before this capture and is not pooled into it.
+
+The machine was Windows 10.0.26300, Intel Core Ultra 7 255H, 16 logical CPUs,
+Node 24.19.0 and Rust 1.99.1 GNU. Other agents paused heavy work during capture;
+host scheduling, power and thermal state were not controlled. Values below are
+the minimum/maximum of three per-run values, not pooled percentiles or confidence
+intervals. The scheduled input interval is 20 ms. CPU sums the timed parent and
+owned Rust counters and excludes encoders and provider work.
+
+Four guilds, 1,000 total verified frames per run:
+
+| Condition | Actual arrival-to-reply p99 ms | Scheduled arrival-to-reply p99 ms | Owned CPU ms | IPC requests | Frames over 20 ms scheduled completion |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| TypeScript | 0.68–1.04 | 15.74–16.30 | 235.00–485.00 | 0 | 0 |
+| Rust v1 | 0.99–1.59 | 15.93–16.19 | 156.88–343.25 | 1,000 | 0 |
+| Batch 4, 80 ms collection limit | 64.39–65.51 | 75.61–76.47 | 327.88–452.25 | 256 | 748 |
+| Batch 8, 160 ms collection limit | 142.73–143.48 | 154.45–155.49 | 93.63–187.25 | 132 | 872 |
+| Batch 8, 10 ms collection limit | 17.16–17.64 | 31.49–31.76 | 62.63–718.88 | 1,000 | 702–726 |
+
+Each full-batch-4 run used 248 four-frame requests and eight single tail
+requests across four guilds. Batch 8 used 124 eight-frame requests and eight
+singles. The 10 ms policy used only singles in all six one/four-guild runs:
+it did not amortize any IPC crossing. At one guild, actual-arrival reply p99
+was 0.28–0.54 ms for TypeScript, 0.62–1.08 for Rust v1, 63.98–64.34 for
+batch 4, 141.54–143.26 for batch 8 and 16.72–16.90 for the 10 ms policy.
+
+Four-guild batch-8 dispatch-to-reply p99 was only 1.31–2.29 ms; most of its
+observed delay was collection. The volume-snapshot reply p99 was 142.59–143.31
+ms, compared with TypeScript's 0.63–0.97 ms. Scheduled/actual latency differences
+also expose Windows timer scheduling: arrival-lateness p99 was roughly 15–16 ms,
+and the 10 ms policy's queue-wait p99 was 16.63–16.83 ms. A nominal collection
+limit must not be sold as a hard scheduler or completion guarantee.
+
+Batch 8 had lower observed owned CPU than TypeScript in this four-guild cohort,
+at the cost of about 140 ms accumulation. The shorter policy retained full
+crossing count and still delayed delivery. Other CPU ranges are wide or overlap;
+individual low-load counters can read zero. Counter granularity, scheduling and
+five-second samples preclude precise savings or a general capacity claim. There
+is no encoder, decoder or Discord/network transport in this experiment, and these values must
+not be compared directly with the earlier saturated ready-block cohort.
+
+Retain TypeScript in production. The new evidence establishes that a naive
+short batch timer adds latency without batching this 50 Hz input, while larger
+batches explicitly trade control/PCM responsiveness for fewer crossings. A
+different integration design would need separately measured cost and latency
+limits, longer observations and intended-host validation, not automatic adoption.
+
+Local validation passed Rust fmt, zero-warning Clippy with incremental caching
+disabled, the locked release build, 26 library tests, six CLI tests and all 50
+Node experiment tests with zero skips, including real FFmpeg. Lint, the harness
+and both application typechecks, all 108 website tests, release validation and
+production build passed. The generated changelog needed local LF normalization
+after checkout; regeneration made the three release tests pass without changing
+tracked release content. The first experiment run omitted FFmpeg from PATH and
+skipped two codec tests; the complete 50/50 rerun included it. Required
+`check:all` stops at four existing Windows `fcntl` import errors. Independently
+run Core tests passed 345/346, with the existing POSIX stalled-decoder fixture
+unable to spawn on Windows. Exact submitted-PR Linux/Windows CI is reported in
+the PR rather than inferred from these local limitations.
