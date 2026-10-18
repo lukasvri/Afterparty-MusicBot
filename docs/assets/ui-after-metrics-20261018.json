@@ -1,0 +1,696 @@
+{
+  "sourceCommit": "c9f41efefa9f685562dd2ba4a6fe495565eca24b",
+  "environment": "Linux cloud Chromium, synthetic local APIs and iframe, no production access",
+  "observations": [
+    {
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "checks": [
+        {
+          "stage": {
+            "x": 33,
+            "y": 70.5625,
+            "width": 2110,
+            "height": 1186.875
+          },
+          "panel": {
+            "x": 32,
+            "y": 69.5625,
+            "width": 2112,
+            "height": 1300.875
+          },
+          "frame": {
+            "x": 33,
+            "y": 70.5625,
+            "width": 2110,
+            "height": 1186.875
+          },
+          "parent": {
+            "x": 33,
+            "y": 70.5625,
+            "width": 2110,
+            "height": 1186.875
+          },
+          "card": {
+            "x": 2168,
+            "y": 393.703125,
+            "width": 360,
+            "height": 652.59375
+          },
+          "qr": {
+            "x": 2228,
+            "y": 522.703125,
+            "width": 240,
+            "height": 240
+          }
+        },
+        {
+          "inputWidth": 360,
+          "inputTop": 1219.34375,
+          "inputBottom": 1263.34375,
+          "buttonTop": 1218.34375,
+          "buttonBottom": 1263.34375,
+          "buttonHeight": 45,
+          "fontSize": 14,
+          "overflow": false
+        },
+        {
+          "bottom": 1352,
+          "viewport": 1440,
+          "panelLeft": 997.4921875,
+          "panelRight": 1437.4921875,
+          "panelTop": 1017.625
+        },
+        {
+          "composition": "welcome",
+          "screen": {
+            "left": 1376.42822265625,
+            "right": 2112.47802734375,
+            "top": 353.99017333984375,
+            "bottom": 881.7239379882812
+          },
+          "halo": {
+            "left": 1666.681884765625,
+            "right": 1822.224365234375,
+            "top": 372.0442199707031,
+            "bottom": 527.5867919921875
+          },
+          "mark": {
+            "left": 1647.239013671875,
+            "right": 1841.667236328125,
+            "top": 347.0462951660156,
+            "bottom": 541.4745483398438
+          },
+          "head": {
+            "left": 1694.110107421875,
+            "right": 1796.5321044921875,
+            "top": 548.4183959960938,
+            "bottom": 668.2000732421875
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 6.94384765625,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        },
+        {
+          "composition": "room",
+          "screen": {
+            "left": 1034.199951171875,
+            "right": 1548.300048828125,
+            "top": 405.14373779296875,
+            "bottom": 773.7437744140625
+          },
+          "halo": {
+            "left": 1215.590087890625,
+            "right": 1366.909912109375,
+            "top": 423.57373046875,
+            "bottom": 574.8937377929688
+          },
+          "mark": {
+            "left": 1203.949951171875,
+            "right": 1378.550048828125,
+            "top": 408.0537414550781,
+            "bottom": 582.6537475585938
+          },
+          "head": {
+            "left": 1263.1199951171875,
+            "right": 1320.3499755859375,
+            "top": 588.4737548828125,
+            "bottom": 655.4037475585938
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 5.82000732421875,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "viewport": {
+        "width": 2560,
+        "height": 1080
+      },
+      "checks": [
+        {
+          "stage": {
+            "x": 286.21875,
+            "y": 33,
+            "width": 1603.546875,
+            "height": 901.984375
+          },
+          "panel": {
+            "x": 285.21875,
+            "y": 32,
+            "width": 1605.546875,
+            "height": 1015.984375
+          },
+          "frame": {
+            "x": 286.21875,
+            "y": 33,
+            "width": 1603.546875,
+            "height": 901.984375
+          },
+          "parent": {
+            "x": 286.21875,
+            "y": 33,
+            "width": 1603.546875,
+            "height": 901.984375
+          },
+          "card": {
+            "x": 1914.765625,
+            "y": 213.6875,
+            "width": 360,
+            "height": 652.59375
+          },
+          "qr": {
+            "x": 1974.765625,
+            "y": 342.6875,
+            "width": 240,
+            "height": 240
+          }
+        },
+        {
+          "inputWidth": 360,
+          "inputTop": 834.34375,
+          "inputBottom": 878.34375,
+          "buttonTop": 833.34375,
+          "buttonBottom": 878.34375,
+          "buttonHeight": 45,
+          "fontSize": 14,
+          "overflow": false
+        },
+        {
+          "bottom": 992,
+          "viewport": 1080,
+          "panelLeft": 997.4921875,
+          "panelRight": 1437.4921875,
+          "panelTop": 657.625
+        },
+        {
+          "composition": "welcome",
+          "screen": {
+            "left": 1376.42822265625,
+            "right": 2112.47802734375,
+            "top": 328.70892333984375,
+            "bottom": 856.4426879882812
+          },
+          "halo": {
+            "left": 1666.681884765625,
+            "right": 1822.224365234375,
+            "top": 346.7629699707031,
+            "bottom": 502.3055419921875
+          },
+          "mark": {
+            "left": 1647.239013671875,
+            "right": 1841.667236328125,
+            "top": 321.7650451660156,
+            "bottom": 516.1932983398438
+          },
+          "head": {
+            "left": 1694.110107421875,
+            "right": 1796.5321044921875,
+            "top": 523.1371459960938,
+            "bottom": 642.9188232421875
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 6.94384765625,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        },
+        {
+          "composition": "room",
+          "screen": {
+            "left": 1034.199951171875,
+            "right": 1548.300048828125,
+            "top": 405.14373779296875,
+            "bottom": 773.7437744140625
+          },
+          "halo": {
+            "left": 1215.590087890625,
+            "right": 1366.909912109375,
+            "top": 423.57373046875,
+            "bottom": 574.8937377929688
+          },
+          "mark": {
+            "left": 1203.949951171875,
+            "right": 1378.550048828125,
+            "top": 408.0537414550781,
+            "bottom": 582.6537475585938
+          },
+          "head": {
+            "left": 1263.1199951171875,
+            "right": 1320.3499755859375,
+            "top": 588.4737548828125,
+            "bottom": 655.4037475585938
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 5.82000732421875,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "checks": [
+        {
+          "stage": {
+            "x": 33,
+            "y": 50.3125,
+            "width": 1542,
+            "height": 867.375
+          },
+          "panel": {
+            "x": 32,
+            "y": 49.3125,
+            "width": 1544,
+            "height": 981.375
+          },
+          "frame": {
+            "x": 33,
+            "y": 50.3125,
+            "width": 1542,
+            "height": 867.375
+          },
+          "parent": {
+            "x": 33,
+            "y": 50.3125,
+            "width": 1542,
+            "height": 867.375
+          },
+          "card": {
+            "x": 1600,
+            "y": 245.46875,
+            "width": 288,
+            "height": 589.0625
+          },
+          "qr": {
+            "x": 1648,
+            "y": 365.65625,
+            "width": 192,
+            "height": 192
+          }
+        },
+        {
+          "inputWidth": 360,
+          "inputTop": 834.34375,
+          "inputBottom": 878.34375,
+          "buttonTop": 833.34375,
+          "buttonBottom": 878.34375,
+          "buttonHeight": 45,
+          "fontSize": 14,
+          "overflow": false
+        },
+        {
+          "bottom": 992,
+          "viewport": 1080,
+          "panelLeft": 666.8125,
+          "panelRight": 1106.8125,
+          "panelTop": 657.625
+        },
+        {
+          "composition": "welcome",
+          "screen": {
+            "left": 1039.47509765625,
+            "right": 1586.54052734375,
+            "top": 287.702880859375,
+            "bottom": 679.9385375976562
+          },
+          "halo": {
+            "left": 1255.20458984375,
+            "right": 1370.81103515625,
+            "top": 301.1214599609375,
+            "bottom": 416.727783203125
+          },
+          "mark": {
+            "left": 1240.75390625,
+            "right": 1385.26171875,
+            "top": 282.5419006347656,
+            "bottom": 427.0497741699219
+          },
+          "head": {
+            "left": 1275.590576171875,
+            "right": 1351.71533203125,
+            "top": 432.21075439453125,
+            "bottom": 521.2379150390625
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 5.160980224609375,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        },
+        {
+          "composition": "room",
+          "screen": {
+            "left": 714.2000122070312,
+            "right": 1228.300048828125,
+            "top": 405.14373779296875,
+            "bottom": 773.7437744140625
+          },
+          "halo": {
+            "left": 895.5900268554688,
+            "right": 1046.909912109375,
+            "top": 423.57373046875,
+            "bottom": 574.8937377929688
+          },
+          "mark": {
+            "left": 883.9500122070312,
+            "right": 1058.550048828125,
+            "top": 408.0537414550781,
+            "bottom": 582.6537475585938
+          },
+          "head": {
+            "left": 943.1199951171875,
+            "right": 1000.3499755859375,
+            "top": 588.4737548828125,
+            "bottom": 655.4037475585938
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 5.82000732421875,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "checks": [
+        {
+          "stage": {
+            "x": 33,
+            "y": 48.0625,
+            "width": 910,
+            "height": 511.875
+          },
+          "panel": {
+            "x": 32,
+            "y": 47.0625,
+            "width": 912,
+            "height": 625.875
+          },
+          "frame": {
+            "x": 33,
+            "y": 48.0625,
+            "width": 910,
+            "height": 511.875
+          },
+          "parent": {
+            "x": 33,
+            "y": 48.0625,
+            "width": 910,
+            "height": 511.875
+          },
+          "card": {
+            "x": 968,
+            "y": 72.90625,
+            "width": 280,
+            "height": 574.1875
+          },
+          "qr": {
+            "x": 1018,
+            "y": 191.90625,
+            "width": 180,
+            "height": 180
+          }
+        },
+        {
+          "inputWidth": 360,
+          "inputTop": 685.375,
+          "inputBottom": 729.375,
+          "buttonTop": 684.375,
+          "buttonBottom": 729.375,
+          "buttonHeight": 45,
+          "fontSize": 14,
+          "overflow": false
+        },
+        {
+          "bottom": 632,
+          "viewport": 720,
+          "panelLeft": 346.8125,
+          "panelRight": 786.8125,
+          "panelTop": 297.625
+        },
+        {
+          "composition": "welcome",
+          "screen": {
+            "left": 693.25439453125,
+            "right": 1057.43310546875,
+            "top": 248.0198974609375,
+            "bottom": 509.1291809082031
+          },
+          "halo": {
+            "left": 836.864501953125,
+            "right": 913.822998046875,
+            "top": 256.95257568359375,
+            "bottom": 333.9111328125
+          },
+          "mark": {
+            "left": 827.2446899414062,
+            "right": 923.4428100585938,
+            "top": 244.58425903320312,
+            "bottom": 340.78240966796875
+          },
+          "head": {
+            "left": 850.435302734375,
+            "right": 901.111083984375,
+            "top": 344.2180480957031,
+            "bottom": 403.48297119140625
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 3.435638427734375,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        },
+        {
+          "composition": "room",
+          "screen": {
+            "left": 426.0666809082031,
+            "right": 782.933349609375,
+            "top": 356.308349609375,
+            "bottom": 612.1749877929688
+          },
+          "halo": {
+            "left": 551.97998046875,
+            "right": 657.02001953125,
+            "top": 369.1016845703125,
+            "bottom": 474.14166259765625
+          },
+          "mark": {
+            "left": 543.9000244140625,
+            "right": 665.0999755859375,
+            "top": 358.3283386230469,
+            "bottom": 479.5283203125
+          },
+          "head": {
+            "left": 584.9733276367188,
+            "right": 624.7000122070312,
+            "top": 483.5683288574219,
+            "bottom": 530.0283203125
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 4.040008544921875,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        {
+          "stage": {
+            "x": 17,
+            "y": 17,
+            "width": 356,
+            "height": 200.25
+          },
+          "panel": {
+            "x": 16,
+            "y": 16,
+            "width": 358,
+            "height": 314.25
+          },
+          "frame": {
+            "x": 17,
+            "y": 17,
+            "width": 356,
+            "height": 200.25
+          },
+          "parent": {
+            "x": 17,
+            "y": 17,
+            "width": 356,
+            "height": 200.25
+          },
+          "card": {
+            "x": 16,
+            "y": 346.25,
+            "width": 358,
+            "height": 355.390625
+          },
+          "qr": {
+            "x": 33,
+            "y": 486.9375,
+            "width": 100,
+            "height": 100
+          }
+        },
+        {
+          "inputWidth": 330,
+          "inputTop": 816.640625,
+          "inputBottom": 860.640625,
+          "buttonTop": 915.015625,
+          "buttonBottom": 960.015625,
+          "buttonHeight": 45,
+          "fontSize": 14,
+          "overflow": false
+        },
+        {
+          "bottom": 764,
+          "viewport": 844,
+          "panelLeft": 15,
+          "panelRight": 375,
+          "panelTop": 384.625
+        },
+        {
+          "composition": "welcome",
+          "screen": {
+            "left": 90.37407684326172,
+            "right": 299.6259078979492,
+            "top": 550.4193115234375,
+            "bottom": 700.448974609375
+          },
+          "halo": {
+            "left": 172.89036560058594,
+            "right": 217.10963439941406,
+            "top": 555.5519409179688,
+            "bottom": 599.7711791992188
+          },
+          "mark": {
+            "left": 167.3629608154297,
+            "right": 222.6370391845703,
+            "top": 548.4452514648438,
+            "bottom": 603.7193603515625
+          },
+          "head": {
+            "left": 180.68795776367188,
+            "right": 209.80555725097656,
+            "top": 605.6934204101562,
+            "bottom": 639.7462158203125
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 1.97406005859375,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        },
+        {
+          "composition": "room",
+          "screen": {
+            "left": 183.13333129882812,
+            "right": 340.3666687011719,
+            "top": 587.5697631835938,
+            "bottom": 700.3031005859375
+          },
+          "halo": {
+            "left": 238.61000061035156,
+            "right": 284.8900146484375,
+            "top": 593.2064819335938,
+            "bottom": 639.4864501953125
+          },
+          "mark": {
+            "left": 235.0500030517578,
+            "right": 288.45001220703125,
+            "top": 588.4597778320312,
+            "bottom": 641.8598022460938
+          },
+          "head": {
+            "left": 253.14666748046875,
+            "right": 270.6499938964844,
+            "top": 643.6397705078125,
+            "bottom": 664.1098022460938
+          },
+          "copyClear": true,
+          "copyContained": true,
+          "copyTextVisible": true,
+          "performerGap": 1.77996826171875,
+          "haloContained": true,
+          "cabinetCounts": [
+            7,
+            7
+          ],
+          "cabinetSeams": true
+        }
+      ],
+      "failures": []
+    }
+  ]
+}

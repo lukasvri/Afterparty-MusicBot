@@ -1,4 +1,4 @@
-# UI and admin settings continuation
+# UI and admin settings continuation and cloud validation
 
 The owner requested cloud continuation before shutting down the local computer
 on 18 October 2026. This is a checkpoint, not a finished or deployed release.
@@ -51,8 +51,9 @@ on 18 October 2026. This is a checkpoint, not a finished or deployed release.
 - Selected synthetic baseline screenshots/metrics are in `docs/assets/`.
   Owner screenshots are not needed to reproduce the defects.
 
-**No combined production build, green after-browser test, after-render inspection
-or complete final suite has run for this checkpoint. Do not claim otherwise.**
+**At the checkpoint, no combined production build, green after-browser test,
+after-render inspection or complete final suite had run. The cloud completion
+below records the subsequent verification.**
 
 ## Required cloud work
 
@@ -86,3 +87,73 @@ Windows-only historical failures (`fcntl` imports and a POSIX decoder fixture)
 are not reasons to skip Linux cloud tests. Local output folders and all local
 computer tools may be unavailable after shutdown; source/tests and the selected
 baseline evidence in GitHub are sufficient to continue.
+
+
+## Cloud completion, 18 October 2026
+
+The checkpoint was recovered in a separate cloud worktree. Existing checkouts
+were preserved. Main was fetched and rechecked at
+`c92a91f6f1c3c33ba8f4e972c6808d6b2567ccc6`; no newer main required integration.
+The final implementation is recorded by source commit
+`c9f41efefa9f685562dd2ba4a6fe495565eca24b` on the same PR branch. CI status for
+the final submitted head is tracked in [PR #68](https://github.com/lukasvri/Afterparty-MusicBot/pull/68).
+
+Actual after-render review reproduced and corrected three remaining issues:
+
+- Mobile empty-room copy overlapped the logo and performer. Text now has its own
+  area above the 16:9 illustration; current media, TV and fullscreen retain their
+  own layout rules.
+- The fixed empty-room heading was line-clamped at 1280x720. It now remains
+  complete while long song titles keep their existing clamp.
+- New admin groups, help and save messages ignored a saved Norwegian preference.
+  They now follow the selected language, including existing confirmations and
+  errors, without changing drafts or submitting settings during language changes.
+
+All three failures were observed with red browser assertions before their fixes.
+The lead reviewed the combined work; independent subagents handled UI geometry
+and admin/Discord validation with non-overlapping file ownership. Rust remained
+paused and no Rust code was changed.
+
+### Completed validation
+
+- Node 24.19.0, Python 3.12, FFmpeg and cloud Chromium 154 on Linux.
+- `npm run setup:cloud` and `npm run check:all` passed: zero-warning lint,
+  website/Core typechecks, 56 Python tests, 113 website unit tests, 399 Core tests
+  including real FFmpeg audio, and a production build. The final heading-only
+  layout change was followed by successful lint, typecheck and a fresh build.
+- `UI_PHASE=after node scripts/tv-mode.browser.ts` passed all five viewport
+  sizes, ten welcome/empty-room scene geometries and player-identity checks.
+  All 25 generated UI images were opened and reviewed. At 2560x1080, iframe and
+  stage were 1603.55x901.98, the complete panel was 1605.55px wide including its
+  two borders, and the invitation card was 360x652.59 with a 240px QR image.
+  The desktop nickname was bounded to 360px with zero bottom-alignment error.
+- `ADMIN_SETTINGS_PHASE=after node scripts/admin-settings.browser.ts` passed
+  English/Norwegian at 1440px and 390px, including live language changes,
+  confirmed and unconfirmed saves, persistent errors, polling, unauthorized deep
+  links and per-guild draft isolation. Real Core/SQL/OAuth tests verify all ten
+  fields, atomic bounds and preservation of omitted compatibility settings.
+- Existing party, admin, admin-seek, concert-queue, queue-add (8), language (10
+  contexts), video-start (27), sync (4) and service-page workflows passed.
+  The final 27 video tests also passed on the final implementation build.
+- The broad design audit passed 36 contexts across nine pages, two languages
+  and desktop/mobile. The versioned footer link and all canonical 2.2.6 title,
+  version and note bullets were rendered and visually checked at 1440/390.
+- Release consistency and diff checks passed. Version remains the checkpoint's
+  synchronized 2.2.6; 2.2.5 and older history are preserved.
+
+Selected synthetic after screenshots and measured geometry are committed in
+[the evidence index](assets/README.md), including
+[wide TV](assets/ui-tv-after-20261018.png),
+[mobile fullscreen](assets/ui-fullscreen-mobile-after-20261018.png),
+[mobile empty-room composition](assets/ui-stage-mobile-after-20261018.png),
+[English admin](assets/admin-settings-after-20261018.png),
+[Norwegian mobile admin](assets/admin-settings-mobile-after-20261018.png) and
+[measured geometry](assets/ui-after-metrics-20261018.json).
+
+These checks use isolated local fixtures and synthetic accounts, grants and
+media surfaces. They do not establish real Discord playback, source availability
+or production OAuth/hosting connectivity. No production login, registration,
+data access, merge, auto-merge, release publication or deployment was performed.
+Release-draft creation remains unavailable; the exact generated 2.2.6 body is
+included in PR #68 instead. Production slash registration remains an owner-run
+operation after review; it was never invoked by this validation.
