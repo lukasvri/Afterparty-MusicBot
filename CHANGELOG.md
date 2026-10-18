@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.2: Manual requests replace radio at queue capacity
+
+2026-10-18
+
+- Manual songs and approved concert requests can replace automatic radio suggestions when the resulting queue fits the configured limit. Duplicate filtering and play-next ordering are preserved.
+- Requests that would exceed the retained queue limit still fail without changing the queue or removing pending approvals. Request-only moderation limits and private server boundaries remain unchanged.
+
 ## v2.2.1: Fresh saved browser state across tabs
 
 2026-10-18

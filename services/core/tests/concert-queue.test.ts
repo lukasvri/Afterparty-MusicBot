@@ -341,3 +341,35 @@ test("concert move and undo preserve rejection history for entries that were nev
     assert.equal(a.e.radioGeneration, generation);
   } finally { a.close(); }
 });
+
+test('approval replaces radio at capacity and preserves other pending requests and servers',async()=>{
+ const a=setup(),b=setup();clearInterval(a.e.timer);clearInterval(b.e.timer);
+ try{
+  a.e.settings.playlistLimit=2;a.e.queue=[];
+  const act=(action:string,extra={})=>a.q.apply({action,revision:a.q.revision(),...extra},true);
+  await act('approval',{enabled:true});
+  assert(a.q.request([track('requested'),track('waiting')]));
+  const privateTrack=track('private',false);
+  a.e.queue=[privateTrack,{...track('radio'),radio:true}];a.e.persist();
+  const other={queue:[...b.e.queue],saved:b.q.read(),revision:b.q.revision()};
+  await act('approve',{videoId:'requested'});
+  assert.deepEqual(a.e.queue.map(t=>t.entryId),['private','requested']);
+  assert.deepEqual(a.q.read().requests.map(t=>t.entryId),['waiting']);
+  const before={queue:[...a.e.queue],saved:a.q.read(),revision:a.q.revision()};
+  await assert.rejects(act('approve',{videoId:'waiting'}),/Køen er full/);
+  assert.deepEqual({queue:a.e.queue,saved:a.q.read(),revision:a.q.revision()},before);
+  assert.deepEqual({queue:b.e.queue,saved:b.q.read(),revision:b.q.revision()},other);
+ }finally{a.close();b.close();}
+});
+
+test('pending request admission still counts radio that remains queued',async()=>{
+ const a=setup();clearInterval(a.e.timer);
+ try{
+  a.e.settings.playlistLimit=2;a.e.queue=[{...track('radio'),radio:true}];
+  await a.q.apply({action:'approval',enabled:true,revision:a.q.revision()},true);
+  assert(a.q.request([track('waiting')]));
+  const before={queue:[...a.e.queue],saved:a.q.read(),revision:a.q.revision()};
+  assert.throws(()=>a.q.request([track('overflow')]),/Køen er full/);
+  assert.deepEqual({queue:a.e.queue,saved:a.q.read(),revision:a.q.revision()},before);
+ }finally{a.close();}
+});
