@@ -8,7 +8,7 @@ See [release policy](docs/RELEASING.md).
 
 2026-10-18
 
-- Owner-password sessions can open a configured private updater from the control room. The link is hidden from anonymous visitors, Discord-only administrators and bridge-key callers. The updater keeps its own authorization and still requires access to its private network.
+- Owner-password sessions can open a configured private updater from a discreet icon beside Sign out in the control room. The icon has a localized tooltip and accessible name, with no separate panel or explanation text. It stays hidden from anonymous visitors, Discord-only administrators and bridge-key callers; the updater keeps its own authorization.
 - Operators can configure the optional HTTPS address through the OWNER_UPDATE_URL runtime secret without publishing private hostnames in source. Existing deployments are unchanged when it is unset.
 
 ## v2.2.6: Consistent playback layouts and simpler server controls

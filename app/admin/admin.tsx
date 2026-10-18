@@ -316,6 +316,18 @@ export default function Admin() {
           <span className="breadcrumb">
             <ShieldCheck size={16} /> {t("Kontrollrom")}
           </span>
+          {authenticated && ownerUpdateUrl && (
+            <a
+              className="owner-update-button"
+              href={ownerUpdateUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={t("Update bot and website")}
+              aria-label={t("Update bot and website")}
+            >
+              <RefreshCw size={16} aria-hidden="true" />
+            </a>
+          )}
           {authenticated && (
             <button className="button subtle" onClick={() => void logout()}>
               <LogOut size={16} /> {t("Logg ut")}
@@ -396,17 +408,6 @@ export default function Admin() {
                   <RefreshCw size={16} /> {t("Oppdater servere")}
                 </button>
               </section>
-              {ownerUpdateUrl && (
-                <section className="admin-card owner-update-card" aria-label={t("Software updates")}>
-                  <div>
-                    <h2>{t("Software updates")}</h2>
-                    <p>{t("Open the private updater. Requires Tailscale on this device.")}</p>
-                  </div>
-                  <a className="button subtle" href={ownerUpdateUrl} target="_blank" rel="noopener noreferrer">
-                    {t("Update bot and website")} <ArrowUpRight size={16} />
-                  </a>
-                </section>
-              )}
               <label className="guild-select">
                 {t("Discord-server")}
                 <select

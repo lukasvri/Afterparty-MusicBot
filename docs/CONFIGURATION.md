@@ -62,8 +62,8 @@ unset afterparty_admin_password
 Store only the resulting hash as `ADMIN_PASSWORD_HASH` in the website's secret settings. Keep it private. Rotating the hash invalidates existing password sessions. Password access is limited to the initial owner server; administration of other servers requires Discord sign-in.
 
 Optionally set `OWNER_UPDATE_URL` as a website runtime secret to an existing private
-HTTPS update page. The control room shows an external "Update bot and website"
-link only to valid owner-password sessions. Anonymous visitors, Discord-only
+HTTPS update page. The control room shows a discreet update icon beside Sign out only to valid
+owner-password sessions. Its localized tooltip is "Update bot and website". Anonymous visitors, Discord-only
 administrators and bridge-key callers do not receive the address. Keep private
 hostnames out of tracked files. The updater retains its own access controls;
 the website link does not grant update rights. A Tailscale-hosted updater still
