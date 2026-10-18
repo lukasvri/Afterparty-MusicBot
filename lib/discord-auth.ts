@@ -1,5 +1,7 @@
 import {db,hash,fail,isAdmin,limit} from './server';
 import {coreRequest} from './core-server';
+import {ownerUpdateUrl} from './owner-update';
+import {hasPasswordSession} from './admin-session';
 export type GuildChoice={id:string;name:string;roomCode:string;installed:boolean};
 type Application={clientId:string;defaultGuildId:string;oauthReady:boolean;guilds:GuildChoice[]};
 const cookie=(request:Request,name:string)=>request.headers.get('cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='))?.slice(name.length+1)??'';
@@ -7,9 +9,20 @@ const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toStr
 const header=(name:string,value:string,seconds:number)=>`${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${seconds}`;
 export async function application(){return coreRequest<Application>('/v1/application');}
 export async function discordSession(request:Request){const value=cookie(request,'gk-discord');if(!/^[a-f0-9]{64}$/.test(value))return null;return db().prepare('SELECT token_cipher FROM discord_admin_sessions WHERE token_hash=? AND expires_at>?').bind(await hash(value),Date.now()).first<{token_cipher:string}>();}
-export async function adminGuilds(request:Request){const app=await application(),session=await discordSession(request);const permissions=3230720;const invite=`https://discord.com/oauth2/authorize?client_id=${app.clientId}&scope=bot%20applications.commands&permissions=${permissions}`;
- if(session){const access=await coreRequest<{user:{name:string};guilds:Array<{id:string;name:string}>}>('/v1/oauth','POST',{operation:'guilds',tokenCipher:session.token_cipher});return {authenticated:true,method:'discord',globalAdmin:await isAdmin(request),user:access.user,guilds:access.guilds.map(g=>({...g,roomCode:app.guilds.find(s=>s.id===g.id)?.roomCode??'',installed:app.guilds.some(s=>s.id===g.id)})),invite,oauthReady:app.oauthReady};}
- const owner=await isAdmin(request);return {authenticated:owner,globalAdmin:owner,method:owner?'owner':'discord',guilds:owner?app.guilds.filter(s=>s.id===app.defaultGuildId).map(g=>({...g,installed:true})):[],invite,oauthReady:app.oauthReady};
+export async function adminGuilds(request:Request){
+ // Recovery access is independent of Core, but never implies a guild grant.
+ // Recheck the password session after the failed request, including when a
+ // Discord cookie is also present. Bridge credentials cannot use this path.
+ const ownerRecovery=async(error:unknown)=>{
+  if(!await hasPasswordSession(request))throw error;
+  const updateUrl=await ownerUpdateUrl(request);
+  return {authenticated:true,method:'owner',globalAdmin:true,guilds:[] as GuildChoice[],invite:'',oauthReady:false,coreUnavailable:true,...(updateUrl?{ownerUpdateUrl:updateUrl}:{})};
+ };
+ let app:Application;try{app=await application();}catch(error){return ownerRecovery(error);}
+ const session=await discordSession(request);const permissions=3230720;const invite=`https://discord.com/oauth2/authorize?client_id=${app.clientId}&scope=bot%20applications.commands&permissions=${permissions}`;
+ const updateUrl=await ownerUpdateUrl(request),ownerUpdate=updateUrl?{ownerUpdateUrl:updateUrl}:{};
+ if(session){let access:{user:{name:string};guilds:Array<{id:string;name:string}>};try{access=await coreRequest<typeof access>('/v1/oauth','POST',{operation:'guilds',tokenCipher:session.token_cipher});}catch(error){return ownerRecovery(error);}return {authenticated:true,method:'discord',globalAdmin:await isAdmin(request),user:access.user,guilds:access.guilds.map(g=>({...g,roomCode:app.guilds.find(s=>s.id===g.id)?.roomCode??'',installed:app.guilds.some(s=>s.id===g.id)})),invite,oauthReady:app.oauthReady,...ownerUpdate};}
+ const owner=await isAdmin(request);return {authenticated:owner,globalAdmin:owner,method:owner?'owner':'discord',guilds:owner?app.guilds.filter(s=>s.id===app.defaultGuildId).map(g=>({...g,installed:true})):[],invite,oauthReady:app.oauthReady,...ownerUpdate};
 }
 export async function adminContext(request:Request,value:unknown){
  const explicit=typeof value==='string'&&value?value:undefined;

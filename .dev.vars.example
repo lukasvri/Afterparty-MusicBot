@@ -5,3 +5,5 @@ GUTTA_CORE_SITE_ORIGIN=https://afterparty.example.com
 YOUTUBE_API_KEY=
 # Optional owner-password fallback. Store a PBKDF2 hash, never a plaintext password.
 ADMIN_PASSWORD_HASH=
+# Optional private HTTPS updater link, shown only during owner-password sessions.
+OWNER_UPDATE_URL=

@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.7: Private owner update shortcut
+
+2026-10-18
+
+- Owner-password sessions can open a configured private updater from a discreet icon beside Sign out in the control room. The icon has a localized tooltip and accessible name, with no separate panel or explanation text. It stays hidden from anonymous visitors, Discord-only administrators and bridge-key callers; the updater keeps its own authorization.
+- Operators can configure the optional HTTPS address through the OWNER_UPDATE_URL runtime secret without publishing private hostnames in source. Existing deployments are unchanged when it is unset.
+- The owner shortcut remains available when Core is unreachable or unconfigured, without granting access to any additional Discord server. The control room revalidates the local password session independently of Core and removes the shortcut and owner access after session expiry or password rotation. Separate Discord server permissions remain independent.
+
 ## v2.2.6: Consistent playback layouts and simpler server controls
 
 2026-10-18
