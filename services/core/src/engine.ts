@@ -293,9 +293,10 @@ export class Engine extends EventEmitter {
   enqueue(tracks: Track[], next = false, immediate = false) {
     if (!tracks.length) throw new UserError("Fant ingen sanger.");
     const key = (t: Track) => JSON.stringify([t.concert === true, t.id]);
+    const manual = this.queue.filter((t) => !t.radio);
     const seen = new Set([
       ...(this.current ? [key(this.current)] : []),
-      ...this.queue.filter((t) => !t.radio).map(key),
+      ...manual.map(key),
     ]);
     const fresh = tracks.filter((t) => {
       const id = key(t);
@@ -304,9 +305,8 @@ export class Engine extends EventEmitter {
       return true;
     });
     if (!fresh.length) throw new UserError("Sangen ligger allerede i køen.");
-    if (this.queue.length + fresh.length > this.settings.playlistLimit)
+    if (manual.length + fresh.length > this.settings.playlistLimit)
       throw new UserError("Køen er full.");
-    const manual = this.queue.filter((t) => !t.radio);
     this.queue = next ? [...fresh, ...manual] : [...manual, ...fresh];
     this.mixer?.invalidateNext();
     this.persist();
@@ -366,7 +366,10 @@ export class Engine extends EventEmitter {
       !this.queue.length;
     this.radioTask = (async () => {
       try {
-        const next = await this.providers.radio(original, [original.id, seed.id]);
+        // tick records a consumed entry before discovery. Only supply extra
+        // current context while that exact entry is not yet in played history.
+        const next = await this.providers.radio(original, [original.id, seed.id],
+          seed.entryId === this.lastEntry ? [] : [seed]);
         if (!valid()) return;
         if (next && this.validRadioTrack(original, next)) {
           this.radioError = "";

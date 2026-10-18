@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import { registerHooks, stripTypeScriptTypes } from "node:module";
@@ -21,7 +21,7 @@ type FixtureEnvironment = {
   ADMIN_BRIDGE_KEY?: string;
   OWNER_EMAIL?: string;
 };
-const context: { env: FixtureEnvironment; coreCalls: unknown[][] } = { env: {}, coreCalls: [] };
+const context: { env: FixtureEnvironment; coreCalls: unknown[][]; rejectAdmin: boolean } = { env: {}, coreCalls: [], rejectAdmin: false };
 const globals = globalThis as typeof globalThis & { __afterpartyAuthTest: typeof context };
 globals.__afterpartyAuthTest = context;
 const root = new URL("../", import.meta.url);
@@ -42,6 +42,11 @@ const hooks = registerHooks({
             guilds:[{id:'222222222222222222',name:'Owner test guild',roomCode:'TESTROOM'},
               {id:'333333333333333333',name:'Other test guild',roomCode:'OTHERONE'}]
           };
+          if(args[0].startsWith('/v1/admin?')){
+            if(globalThis.__afterpartyAuthTest.rejectAdmin)throw Object.assign(new Error('Synthetic Core permission rejection'),{status:403});
+            return {guildId:new URL(args[0],'https://core.example').searchParams.get('guildId')};
+          }
+          if(args[0]==='/v1/concert-queue')return {state:{queue:[],revision:'synthetic'},canManage:args[2].admin===true};
           throw new Error('Unexpected upstream call');
         };
       `), shortCircuit: true,
@@ -62,9 +67,10 @@ const hooks = registerHooks({
 });
 const { isAdmin, hash } = await import("../lib/server.ts");
 const { login, hasPasswordSession } = await import("../lib/admin-session.ts");
-const { adminGuilds, adminContext } = await import("../lib/discord-auth.ts");
+const { adminGuilds, adminContext, adminState } = await import("../lib/discord-auth.ts");
 const session = await import("../app/api/admin/session/route.ts");
 const me = await import("../app/api/me/route.ts");
+const queue = await import("../app/api/discord/queue/route.ts");
 hooks.deregister();
 
 function fixture() {
@@ -78,6 +84,7 @@ const env = context.env;
 function setup() {
   for (const key of Object.keys(env)) Reflect.deleteProperty(env, key);
   context.coreCalls.length = 0;
+  context.rejectAdmin = false;
   const sqlite = fixture();
   const prepare = (sql: string, args: SQLInputValue[] = []): FixtureStatement => ({
     bind(...values) { return prepare(sql, values); },
@@ -118,6 +125,19 @@ test("hosting identity headers cannot create an owner session", async () => {
     assert.equal(await isAdmin(new Request(request, { headers: { Authorization: "Bearer wrong" } })), false);
     assert.equal(await isAdmin(new Request(request, { headers: { Authorization: "Bearer synthetic-bridge" } })), true);
   } finally { f.sqlite.close(); }
+});
+
+test("anonymous admin checks skip bridge hashing while supplied credentials are still verified", async () => {
+  const f = setup();
+  const digest = mock.method(crypto.subtle, "digest");
+  try {
+    assert.equal(await isAdmin(f.request()), false);
+    assert.equal(digest.mock.callCount(), 0);
+    assert.equal(await isAdmin(new Request(f.request().url, { headers: { Authorization: "Bearer wrong" } })), false);
+    assert.equal(digest.mock.callCount(), 2);
+    assert.equal(await isAdmin(new Request(f.request().url, { headers: { Authorization: "Bearer synthetic-bridge" } })), true);
+    assert.equal(digest.mock.callCount(), 4);
+  } finally { digest.mock.restore(); f.sqlite.close(); }
 });
 
 test("password sessions authenticate handlers and lose access after expiry or rotation", async () => {
@@ -168,5 +188,69 @@ test("owner-password access remains limited to the initial guild", async () => {
     assert.deepEqual(access.guilds.map(g => g.id), ["222222222222222222"]);
     assert.deepEqual(await adminContext(request, "222222222222222222"), { guildId: "222222222222222222" });
     await assert.rejects(adminContext(request, "333333333333333333"), (error: unknown) => error instanceof Error && "status" in error && error.status === 403);
+  } finally { f.sqlite.close(); }
+});
+
+test("explicit anonymous guild polling needs only the public queue Core request", async () => {
+  const f = setup();
+  try {
+    const request = new Request(f.request().url + "?guildId=333333333333333333");
+    const response = await queue.GET(request);
+    assert.equal(response.status, 200);
+    assert.deepEqual(context.coreCalls.map(call => call[0]), ["/v1/concert-queue"]);
+    const payload = context.coreCalls[0][2] as { guildId: string; admin: boolean; tokenCipher?: string };
+    assert.equal(payload.guildId, "333333333333333333");
+    assert.equal(payload.admin, false);
+    assert.equal(payload.tokenCipher, undefined);
+  } finally { f.sqlite.close(); }
+});
+
+test("explicit Discord grant skips application lookup but Core still checks access on every call", async () => {
+  const f = setup();
+  try {
+    const token = "d4".repeat(32), grant = "synthetic-encrypted-grant";
+    f.sqlite.prepare("INSERT INTO discord_admin_sessions VALUES(?,?,?)")
+      .run(await hash(token), grant, Date.now() + 60000);
+    const request = f.request("gk-discord=" + token);
+    assert.deepEqual(await adminContext(request, "333333333333333333"), {
+      guildId: "333333333333333333", tokenCipher: grant,
+    });
+    assert.equal(context.coreCalls.length, 0);
+    assert.deepEqual(await adminState(request, "333333333333333333"), { guildId: "333333333333333333" });
+    assert.deepEqual(context.coreCalls.map(call => call[0]), ["/v1/admin?guildId=333333333333333333"]);
+    assert.deepEqual(context.coreCalls[0][3], { "X-Discord-Grant": grant });
+    context.rejectAdmin = true;
+    await assert.rejects(adminState(request, "333333333333333333"),
+      error => error instanceof Error && "status" in error && error.status === 403);
+    assert.equal(context.coreCalls.length, 2, "permission responses must not be cached");
+  } finally { f.sqlite.close(); }
+});
+
+test("invalid and expired explicit guild sessions fail before any Core lookup", async () => {
+  const f = setup();
+  try {
+    const token = "e5".repeat(32);
+    f.sqlite.prepare("INSERT INTO discord_admin_sessions VALUES(?,?,?)")
+      .run(await hash(token), "synthetic-expired-grant", Date.now() - 1);
+    await assert.rejects(adminContext(f.request("gk-discord=" + token), "333333333333333333"),
+      error => error instanceof Error && "status" in error && error.status === 403);
+    await assert.rejects(adminContext(f.request(), "invalid-guild"),
+      error => error instanceof Error && "status" in error && error.status === 400);
+    assert.equal(context.coreCalls.length, 0);
+  } finally { f.sqlite.close(); }
+});
+
+test("implicit guild selection still reads the configured default for Discord and owner sessions", async () => {
+  const f = setup();
+  try {
+    const token = "f6".repeat(32);
+    f.sqlite.prepare("INSERT INTO discord_admin_sessions VALUES(?,?,?)")
+      .run(await hash(token), "synthetic-encrypted-grant", Date.now() + 60000);
+    assert.equal((await adminContext(f.request("gk-discord=" + token), undefined)).guildId, "222222222222222222");
+    assert.deepEqual(context.coreCalls.map(call => call[0]), ["/v1/application"]);
+    context.coreCalls.length = 0;
+    const owner = await f.signIn();
+    assert.deepEqual(await adminContext(f.request(owner), undefined), { guildId: "222222222222222222" });
+    assert.deepEqual(context.coreCalls.map(call => call[0]), ["/v1/application"]);
   } finally { f.sqlite.close(); }
 });

@@ -66,7 +66,7 @@ const hooks = registerHooks({
     return next(url, context);
   },
 });
-const { mutate: mutateHandler, hash, publicRoom } = await import("../lib/server.ts");
+const { mutate: mutateHandler, hash, publicRoom, search: searchHandler } = await import("../lib/server.ts");
 hooks.deregister();
 const mutate = async (...args: Parameters<typeof mutateHandler>) => {
   const result = await mutateHandler(...args);
@@ -301,7 +301,7 @@ test("D1 radio refreshes old search metadata and excludes explicit non-music cat
       })) });
     };
     const { room } = await mutate(f.request, "TESTROOM", { action: "radio-prefetch", version: 1 });
-    assert.deepEqual(stages, ["search", "metadata"]);
+    assert.deepEqual(stages, ["search", "metadata", "search"], "Both discovery pools reuse fresh music-category metadata");
     assert.deepEqual(room.queue.map((video) => video.id), [next.id]);
     assert.equal(room.queue[0].music, true);
     assert(!JSON.stringify(room).includes("radioRelatedTo"));
@@ -504,6 +504,7 @@ test("D1 current-track radio retry preserves playback and sets a future cooldown
   const f = fixture();
   const now = Date.now;
   let time = now();
+  const startedAt = time;
   Date.now = () => time;
   try {
     await f.save("TESTROOM", { current: seed, queue: [], playing: true, position: 20,
@@ -514,7 +515,7 @@ test("D1 current-track radio retry preserves playback and sets a future cooldown
     assert.equal(room.current?.id, seed.id);
     assert.equal(room.playbackKey, "same-playback");
     assert.equal(room.playing, true);
-    assert.equal(room.position, 25);
+    assert.equal(room.position, 20 + (time - startedAt) / 1000);
     assert.deepEqual(room.queue.map(video => video.id), [next.id]);
     assert.equal(f.roomState().radioRetryAt, time + 15000);
   } finally { Date.now = now; f.close(); }
@@ -618,5 +619,137 @@ test("D1 empty early next cannot overwrite a concurrent radio-off command", asyn
     assert.equal(f.roomState().playbackKey, "same-playback");
     assert.deepEqual(f.roomState().queue, []);
     assert.equal(f.roomRow().version, 2);
+  } finally { f.close(); }
+});
+
+test("D1 Radio 2.0 compares discovery pools without restarting current playback", async () => {
+  const f = fixture();
+  const originalNow = Date.now;
+  let time = originalNow();
+  const startedAt = time;
+  Date.now = () => time;
+  try {
+    const sameArtist = { ...seed, id: "same1234567", title: "Syn Cole - Another Song | Future House" };
+    const differentArtist = { ...seed, id: "other123456", title: "Another Artist - New Song | Future House" };
+    const videos = new Map([sameArtist, differentArtist].map(video => [video.id, video]));
+    const queries: string[] = [];
+    await f.save("TESTROOM", { current: seed, queue: [], radio: false, playing: true,
+      position: 20, playbackKey: "unchanged-playback" });
+    globalThis.fetch = async target => {
+      time += 250;
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search")) {
+        const query = url.searchParams.get("q") ?? "";
+        queries.push(query);
+        const id = query.includes("future house") ? sameArtist.id : differentArtist.id;
+        return Response.json({ items: [{ id: { videoId: id } }] });
+      }
+      return Response.json({ items: (url.searchParams.get("id") ?? "").split(",").flatMap(id => {
+        const video = videos.get(id);
+        return video ? [{ id, snippet: { title: video.title, channelTitle: video.artist, categoryId: "10" },
+          contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] : [];
+      }) });
+    };
+    const { room } = await mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 });
+    assert.equal(room.queue[0]?.id, differentArtist.id, "Compare eligible pools before choosing a repeat artist");
+    assert.equal(room.current?.id, seed.id);
+    assert.equal(room.playbackKey, "unchanged-playback");
+    assert.equal(room.position, 20 + (time - startedAt) / 1000, "Preparing radio preserves the advancing clock");
+    assert.equal(f.roomState().radioSeed?.id, seed.id);
+    assert.equal(f.roomState().queue[0]?.radioRelatedTo, seed.id);
+    assert(!("radioRelatedTo" in room.queue[0]), "Recommendation evidence stays private");
+    assert(queries.length <= 3, "Discovery has a bounded request budget");
+  } finally { Date.now = originalNow; f.close(); }
+});
+
+// Real catalog names, with controlled API responses and IDs. No live provider
+// or claim about audible similarity: see docs/RADIO_REAL_CATALOG.md for sources.
+for (const title of ["Live Forever", "Hello"]) {
+  test(`D1 real-name radio admits Oasis ${title} without restarting playback`, async () => {
+    const f = fixture();
+    try {
+      const original = { ...seed, title: "Oasis - Supersonic (Official Audio)", artist: "Oasis", radio: false };
+      const candidate = { ...next, title: `Oasis - ${title} (Official Audio)`, artist: "Oasis", music: true };
+      const heard = { ...seed, id: "heard123456", title: "Adele - Hello (Official Audio)", artist: "Adele" };
+      await f.save("TESTROOM", { current: original, queue: [], playing: true, position: 20,
+        playbackKey: "real-name-playback", history: [heard] });
+      globalThis.fetch = async target => {
+        const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+        assert.equal(url.origin, "https://www.googleapis.com");
+        if (url.pathname.endsWith("/search"))
+          return Response.json({ items: [{ id: { videoId: candidate.id } }] });
+        return Response.json({ items: [{ id: candidate.id,
+          snippet: { title: candidate.title, channelTitle: candidate.artist, categoryId: "10" },
+          contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] });
+      };
+      const { room } = await mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 });
+      assert.equal(room.queue[0]?.id, candidate.id);
+      assert.equal(room.current?.id, original.id);
+      assert.equal(room.playbackKey, "real-name-playback");
+      assert(room.position >= 20 && room.position < 22, "Prefetch preserves the active clock");
+      assert.equal(f.roomState().radioSeed?.id, original.id);
+      assert.equal(f.roomState().queue[0]?.radioRelatedTo, original.id);
+      assert(!JSON.stringify(room).includes("radioRelatedTo"), "Recording proof stays private");
+    } finally { f.close(); }
+  });
+}
+
+test("D1 refreshes both cached search and video genres after the free-form tag correction", async () => {
+  const f = fixture();
+  try {
+    const query = "The Weeknd Starboy";
+    const old = { ...next, id: "Rif-RTvmmss", title: "The Weeknd - Starboy (Audio) ft. Daft Punk",
+      artist: "The Weeknd", genres: ["punk"] };
+    for (const key of [`search:v2:${query.toLowerCase()}`, `videos:v2:${old.id}`])
+      f.sqlite.prepare("INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)")
+        .run(key, JSON.stringify([old]), Date.now() + 3600000);
+    const calls: string[] = [];
+    globalThis.fetch = async target => {
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search")) {
+        calls.push("search");
+        return Response.json({ items: [{ id: { videoId: old.id } }] });
+      }
+      calls.push("videos");
+      // Isolate cache invalidation from the separately tested tag parser.
+      return Response.json({ items: [{ id: old.id,
+        snippet: { title: old.title, channelTitle: old.artist, categoryId: "10" },
+        contentDetails: { duration: "PT3M50S" }, status: { embeddable: true } }] });
+    };
+    const result = await searchHandler(f.request, query);
+    assert.deepEqual(result.videos[0]?.genres, []);
+    assert.deepEqual(calls, ["search", "videos"]);
+    assert.deepEqual(JSON.parse(String(f.sqlite.prepare("SELECT data FROM cached WHERE key=?")
+      .get(`videos:v2:${old.id}`)?.data))[0].genres, ["punk"], "Old cache is bypassed, not destructively migrated");
+  } finally { f.close(); }
+});
+
+test("D1 compound genre labels retain specific cross-artist discovery and private proof", async () => {
+  const f = fixture();
+  try {
+    const original = { ...seed, title: "Seed Artist - Synthetic Original", artist: "Seed Artist",
+      genres: ["Drum & Bass/Jungle"], radio: false };
+    const candidate = { ...next, title: "Different Artist - Synthetic Next", artist: "Different Artist" };
+    await f.save("TESTROOM", { current: original, queue: [], playing: true, position: 20,
+      playbackKey: "compound-genre-playback" });
+    globalThis.fetch = async target => {
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search"))
+        return Response.json({ items: [{ id: { videoId: candidate.id } }] });
+      return Response.json({ items: [{ id: candidate.id,
+        snippet: { title: candidate.title, channelTitle: candidate.artist, categoryId: "10", tags: ["Drum & Bass/Jungle"] },
+        contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] });
+    };
+    const { room } = await mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 });
+    assert.equal(room.queue[0]?.id, candidate.id);
+    assert.deepEqual(room.queue[0]?.genres, ["drum and bass"]);
+    assert.equal(room.current?.id, original.id);
+    assert.equal(room.playbackKey, "compound-genre-playback");
+    assert(room.position >= 20 && room.position < 22);
+    assert.equal(f.roomState().queue[0]?.radioRelatedTo, original.id);
+    assert(!JSON.stringify(room).includes("radioRelatedTo"));
   } finally { f.close(); }
 });

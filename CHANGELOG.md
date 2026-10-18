@@ -4,6 +4,44 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.3: Radio fixes from real catalog testing
+
+2026-10-18
+
+- Radio recognizes artist prefixes with colons and preserves names with commas. Structured collaborator credits no longer block valid Oasis songs. Studio titles such as Live Forever and Cover Me remain eligible, while explicit live, cover, demo and instructional upload labels are excluded, including live or cover labels followed by Official Video or HD.
+- Featured credits and demo or promo annotations no longer let another version of the starting song reappear as a new recommendation. Different known artists can share a title, while same-artist alternate uploads and remasters stay excluded as repeats. Existing playback history still blocks repeats after artist credits are refined, including when cached metadata refreshes for the same verified recording.
+- Radio recognizes explicit R&B and DnB genre aliases and compound tags such as Hip-Hop/Rap and Drum & Bass/Jungle without treating free-form artist tags such as Daft Punk as genre evidence. Broad genres still require stronger relationship evidence. Core and website metadata caches refresh under the corrected interpretation.
+
+## v2.2.2: Manual requests replace radio at queue capacity
+
+2026-10-18
+
+- Manual songs and approved concert requests can replace automatic radio suggestions when the resulting queue fits the configured limit. Duplicate filtering and play-next ordering are preserved.
+- Requests that would exceed the retained queue limit still fail without changing the queue or removing pending approvals. Request-only moderation limits and private server boundaries remain unchanged.
+
+## v2.2.1: Fresh saved browser state across tabs
+
+2026-10-18
+
+- Saved room ownership and device preferences read the latest stored value after another tab changes them, including when a settings view is reopened. Successful saves no longer leave a stale in-memory copy.
+- Browsers that block saving still retain changes for the current page. Observed settings continue to share cached reads and receive same-page and cross-tab updates.
+
+## v2.2.0: Radio 2.0: shared discovery and safer recovery
+
+2026-10-17
+
+- Radio uses one shared selection pipeline for Discord, browser rooms and the website fallback. It compares bounded recommendation and search pools before selecting, preserving the original song, matching style, manual queue priority and private server boundaries.
+- Known played or rejected recordings are filtered before catalog matching, so duplicate results no longer consume the limited playback lookups. Sparse results can fall back to the original artist, and empty recommendation caches expire sooner so a later retry can recover.
+- Automatic choices still reject unsafe content, conflicting styles and repeated recordings. Structured diagnostics distinguish empty providers, rejected candidates and lookup failures without recording song titles, room identifiers or credentials. Existing playback clocks, revision checks and cooldowns remain in effect.
+
+## v2.1.6: Less repeated work in settings, queues and radio
+
+2026-10-17
+
+- Saved device settings reuse an observed value until a local change or another tab invalidates it. Changing a nickname or motion preference writes once, and evening libraries keep the same first recording and order with a single deduplication pass.
+- Queue requests and Discord administration with an explicitly selected server avoid an extra Core metadata request. Discord permissions and session expiry are still checked on each operation, and owner access remains limited to the configured default server.
+- Core radio queue validation prepares recording history once per selection pass and reuses title parsing. Manual choices, exclusion rules, suggestion order and the shared playback clock are preserved.
+
 ## v2.1.5: Accessible settings tabs and consistent radio backoff
 
 2026-10-17

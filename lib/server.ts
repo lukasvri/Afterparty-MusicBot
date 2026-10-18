@@ -51,10 +51,11 @@ const secret = () =>
 const bearer = (request: Request) =>
   (request.headers.get("authorization") ?? "").replace(/^Bearer /, "");
 export const isAdmin = async (request?: Request) => {
+  const provided = request ? bearer(request) : "";
   if (
-    request &&
+    provided &&
     env().ADMIN_BRIDGE_KEY &&
-    (await hash(bearer(request))) === (await hash(env().ADMIN_BRIDGE_KEY!))
+    (await hash(provided)) === (await hash(env().ADMIN_BRIDGE_KEY!))
   )
     return true;
   if (request && (await hasPasswordSession(request))) return true;
@@ -266,7 +267,7 @@ export async function videos(
   ids: string[],
 ): Promise<Video[]> {
   if (!ids.length) return [];
-  return cached(`videos:v2:${ids.join(",")}`, async () => {
+  return cached(`videos:v3:${ids.join(",")}`, async () => {
     if (coreUrl()) {
       try {
         return (
@@ -303,7 +304,7 @@ export async function search(request: Request, query: string) {
   await limit(request, "search-visitor", 20, 600000);
   if (/^https?:\/\//.test(query))
     return { videos: await videos(request, [videoId(query)]) };
-  const result = await cached(`search:v2:${query.toLowerCase()}`, async () => {
+  const result = await cached(`search:v3:${query.toLowerCase()}`, async () => {
     if (coreUrl()) {
       try {
         return (

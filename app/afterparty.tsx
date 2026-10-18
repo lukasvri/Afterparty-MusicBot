@@ -1477,7 +1477,6 @@ export default function Afterparty() {
                     placeholder={t("Gjest")}
                     onChange={(e) => {
                       setDisplayName(e.target.value);
-                      storage.set("afterparty-display-name", e.target.value);
                     }}
                   />
                 </label>
@@ -1564,7 +1563,6 @@ export default function Afterparty() {
               aria-pressed={motion}
               onClick={() => {
                 setMotion(!motion);
-                storage.set("afterparty-motion", motion ? "off" : "on");
               }}
             >
               <Sparkles size={17} />

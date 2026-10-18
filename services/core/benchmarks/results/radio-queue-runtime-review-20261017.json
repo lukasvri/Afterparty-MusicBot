@@ -1,0 +1,63 @@
+{
+  "scope": "Synthetic synchronous queue filtering only, not provider latency, audio quality or Discord capacity.",
+  "baseline": "43763193185df799c5f59739f5c1fcc09d1c4791",
+  "command": "node services/core/benchmarks/radio-queue.ts --baseline-ref=43763193185df799c5f59739f5c1fcc09d1c4791",
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 7 255H",
+    "coordination": "Other task agents explicitly quiescent during this final paired run. Earlier contended exploratory runs are excluded."
+  },
+  "workload": { "iterations": 30, "rounds": 5, "warmup": 10, "order": "Alternating baseline and current across rounds" },
+  "results": [
+    {
+      "name": "empty queue", "automatic": 0, "manual": 0, "history": 100, "selected": 0, "checksum": 0,
+      "baselineMedianMs": 0.1107, "currentMedianMs": 0.0695,
+      "baselineSamplesMs": [0.5523, 0.0757, 0.1107, 0.0916, 0.3073],
+      "currentSamplesMs": [0.0587, 0.0695, 0.0943, 0.1105, 0.0554]
+    },
+    {
+      "name": "manual queue", "automatic": 0, "manual": 20, "history": 100, "selected": 20, "checksum": 6000,
+      "baselineMedianMs": 0.1047, "currentMedianMs": 0.1090,
+      "baselineSamplesMs": [0.1047, 0.1186, 0.1317, 0.0936, 0.0790],
+      "currentSamplesMs": [0.1228, 0.1090, 0.2289, 0.0747, 0.0869]
+    },
+    {
+      "name": "usual single suggestion, no history", "automatic": 1, "manual": 0, "history": 0, "selected": 1, "checksum": 300,
+      "baselineMedianMs": 0.8497, "currentMedianMs": 0.7571,
+      "baselineSamplesMs": [0.9986, 0.8496, 0.8941, 0.8333, 0.8497],
+      "currentSamplesMs": [0.9637, 0.6951, 0.7571, 0.8442, 0.6683]
+    },
+    {
+      "name": "usual single suggestion, full history", "automatic": 1, "manual": 0, "history": 100, "selected": 1, "checksum": 300,
+      "baselineMedianMs": 11.6776, "currentMedianMs": 6.6473,
+      "baselineSamplesMs": [15.1328, 11.6776, 14.9392, 11.5779, 11.5502],
+      "currentSamplesMs": [6.6473, 6.2764, 7.4428, 7.2619, 6.4258]
+    },
+    {
+      "name": "manual priority with one suggestion", "automatic": 1, "manual": 20, "history": 100, "selected": 21, "checksum": 6300,
+      "baselineMedianMs": 13.7143, "currentMedianMs": 7.1518,
+      "baselineSamplesMs": [14.5180, 14.2767, 13.7143, 13.4734, 13.5863],
+      "currentSamplesMs": [11.5856, 8.8475, 7.1518, 7.0401, 7.1028]
+    },
+    {
+      "name": "stress: twenty automatic suggestions, no history", "automatic": 20, "manual": 0, "history": 0, "selected": 20, "checksum": 6000,
+      "baselineMedianMs": 36.7623, "currentMedianMs": 9.6629,
+      "baselineSamplesMs": [36.7623, 46.5033, 39.8648, 34.7503, 34.7531],
+      "currentSamplesMs": [10.0996, 10.8241, 9.6629, 9.4910, 9.6294]
+    },
+    {
+      "name": "stress: twenty automatic suggestions, full history", "automatic": 20, "manual": 0, "history": 100, "selected": 20, "checksum": 6000,
+      "baselineMedianMs": 259.5992, "currentMedianMs": 16.0094,
+      "baselineSamplesMs": [254.2040, 259.3720, 259.5992, 273.1849, 264.8250],
+      "currentSamplesMs": [15.3806, 16.0094, 16.3075, 16.5962, 15.6032]
+    }
+  ],
+  "limitations": [
+    "Five timing rounds on one Windows host; these are microbenchmark medians, not confidence intervals or end-to-end measurements.",
+    "Twenty automatic suggestions is a stress case. Normal rooms usually prepare one suggestion.",
+    "Sub-millisecond totals for empty, manual-only and history-free cases are too small for strong speedup claims.",
+    "Output arrays were compared before timing, and selected lengths were checked in every timed iteration.",
+    "The benchmark baseline uses the exact old radio implementation from a local Git object; the old per-entry queue orchestration is retained in a test fixture."
+  ]
+}

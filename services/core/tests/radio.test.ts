@@ -18,7 +18,7 @@ test('radio excludes history, alternate uploads, blocked IDs and livestreams',()
 test('real NCS naming variants cannot recommend the same song again',()=>{
  const original=track('seed','Cartoon, Jéja - On & On (feat. Daniel Levi) | Electronic Pop | NCS - Copyright Free Music');
  const duplicate=track('dup','Cartoon & Jéja - On & On 🎵 (feat. Daniel Levi) | Official Audio | By Audio PM');
- assert.equal(radioArtist(original),'Cartoon');assert.deepEqual(rankRadio(original,[duplicate],[],[]),[]);
+ assert.equal(radioArtist(original),'Cartoon, Jéja');assert.deepEqual(rankRadio(original,[duplicate],[],[]),[]);
 });
 
 test('radio search excludes the seed song before ranking',()=>{assert.equal(radioQuery(seed),'Cartoon audio -\"On & On\"');});

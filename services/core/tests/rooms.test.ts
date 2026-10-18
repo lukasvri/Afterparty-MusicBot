@@ -497,7 +497,7 @@ test("radio queues the next song before the end, preserves the clock, and yields
   rooms.import({code:"TESTROOM",name:"Preview radio",owner_hash:"a".repeat(64),state:{current:seed,queue:[],position:169,playing:true},version:1,updated_at:now,expires_at:100000});
   rooms.search=async()=>{searches++;return [next];};
   try {
-    await rooms.tick(); assert.equal(searches,1);
+    await rooms.tick(); assert.equal(searches,2);
     now+=1000;
     await rooms.tick();
     const prepared=rooms.snapshot("TESTROOM");
@@ -505,11 +505,11 @@ test("radio queues the next song before the end, preserves the clock, and yields
     assert.equal(prepared.position,170);
     assert.equal(prepared.queue[0]?.id,next.id);
     assert.equal(prepared.queue[0]?.radio,true);
-    await rooms.tick(); assert.equal(searches,1);
+    await rooms.tick(); assert.equal(searches,2);
     now+=30000;
     await rooms.tick();
     assert.equal(rooms.snapshot("TESTROOM").current?.id,next.id);
-    assert.equal(searches,1,'the next track is already resolved before transition');
+    assert.equal(searches,2,'the bounded pools are already resolved before transition');
   } finally { rooms.dispose();store.close(); }
 });
 
@@ -556,7 +556,7 @@ test('skip shares an in-flight radio lookup and takes priority over prefetch',as
   const skip=rooms.control('TESTROOM',input);
   gate.resolve([next]);
   await preload;const result=await skip;
-  assert.equal(result.current?.id,next.id);assert.equal(result.queue.length,0);assert.equal(calls,1);
+  assert.equal(result.current?.id,next.id);assert.equal(result.queue.length,0);assert.equal(calls,2);
  }finally{store.close();}
 });
 test('an unsuccessful early skip keeps the current song and allows retry',async()=>{
