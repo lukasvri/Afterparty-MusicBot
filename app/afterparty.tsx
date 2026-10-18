@@ -64,6 +64,7 @@ import { LanguageSwitch, useLanguage } from "@/components/language";
 import { OpenRooms } from "@/components/open-rooms";
 import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
+import releases from "@/lib/releases.json";
 
 export default function Afterparty() {
   const { t, language } = useLanguage();
@@ -2273,7 +2274,9 @@ export default function Afterparty() {
                 {language === "en" ? "Privacy" : "Personvern"}
               </a>
               <a href="/support">Support</a>
-              <a href="/patch-notes">{t("Patch notes")}</a>
+              <a href="/patch-notes" data-latest-release>
+                {t("Patch notes")} · v{releases[0].version}
+              </a>
               <a href="/admin" target="_top">
                 Admin <ArrowUpRight size={13} />
               </a>

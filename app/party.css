@@ -501,9 +501,6 @@ button:disabled {
 
 /* The welcome artwork owns its layers and never sits above interactive content. */
 .start-evening { padding: 0; background: transparent; border: 0; border-radius: 0; margin-bottom: 38px; }
-.welcome-release { display:flex; align-items:center; gap:12px; padding:12px 0 18px; color:#c7bdc7; font-size:12px; border-bottom:1px solid #ffffff19; }
-.welcome-release > span:first-child { color:#ff8a9a; background:#ff536715; border:1px solid #ff536740; border-radius:5px; padding:5px 8px; font-weight:700; }
-.release-link { margin-left:auto; display:flex; align-items:center; gap:6px; color:#fff; }
 .welcome-hero { display:grid; grid-template-columns:1fr 1.15fr; gap:20px; align-items:center; padding:44px 0; }
 .welcome-copy { position:relative; min-width:0; container-type:inline-size; }
 .welcome-copy h1 { font-family:var(--font-display); font-size:clamp(52px,5.6vw,88px); font-weight:800; line-height:1.02; letter-spacing:-1px; margin:18px 0 22px; }
@@ -525,7 +522,7 @@ button:disabled {
 .welcome-discord > svg:last-child { margin-left:auto; flex-shrink:0; }
 .welcome-discord:hover { border-color:#ff536780; background:#21171b; }
 .welcome-offline { padding-top:16px; font-size:13px; }
-.welcome-join:hover,.welcome-release:hover .release-link { color:#ff8a9a; }
+.welcome-join:hover { color:#ff8a9a; }
 .start-evening :is(button,a):focus-visible { outline:2px solid var(--focus-ring); outline-offset:5px; }
 .concert-shell[data-empty="true"] .stage:not([data-current="true"]) { aspect-ratio:16/9; min-height:0; }
 .concert-shell .stage .concert-venue { width:100%; height:100%; left:0; overflow:hidden; }
@@ -535,9 +532,6 @@ button:disabled {
   .welcome-steps { gap:15px; }
 }
 @media(max-width:650px) {
-  .welcome-release { font-size:11px; gap:8px; }
-  .welcome-release > span:first-child { padding:4px 6px; }
-  .release-link { gap:3px; }
   .welcome-hero { display:flex; flex-direction:column; align-items:stretch; padding:28px 0 24px; gap:24px; }
   .welcome-copy h1 { font-size:clamp(45px,12vw,68px); margin:12px 0 15px; }
   .welcome-copy > p { font-size:14px; margin-bottom:20px; }

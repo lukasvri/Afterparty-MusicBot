@@ -137,7 +137,7 @@ try {
   assert.equal(await sceneAnimations(), 0, "The site's motion control must stop all stage animation");
   await page.locator(".motion-toggle").click();
   assert((await sceneAnimations()) > 0, "The site's motion control must restore stage animation");
-  await page.locator(".welcome-release").click();
+  await page.locator("[data-latest-release]").click();
   await page.getByRole("heading", { name: releases[0].title }).waitFor();
   assert(!(await page.locator("body").innerText()).includes("This build uses semantic versioning"));
   await page.goto(base);

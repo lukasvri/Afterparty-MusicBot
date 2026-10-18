@@ -10,8 +10,8 @@ See [release policy](docs/RELEASING.md).
 
 - Radio fetches its two bounded discovery pools concurrently while preserving selection order and music safeguards. Overlapping cold video lookups share metadata work, retain independent playback entries and can recover after failures.
 - Core cleans up listeners, timers and any already opened server when startup fails to bind a port. Closing the service remains safe to repeat.
-- The stage has two matching DJ decks, a centered four-channel mixer and controls and hands aligned to one consistent perspective.
-- Shared dark surfaces, red accents, navigation proportions and keyboard focus make music, rooms, administration, support and patch notes more consistent on desktop and mobile.
+- The stage has matching DJ decks and a centered four-channel mixer, flown concert PA arrays with subwoofers, and improved red and white stage lighting. Opaque speaker cabinets block rear beams, and the animated backdrop ring stays inside its LED screen.
+- Shared dark surfaces, red accents, navigation proportions and keyboard focus make music, rooms, administration, support and patch notes more consistent on desktop and mobile. The welcome page's top patch-notes banner is removed; the current version remains linked in the footer.
 
 ## v2.2.4: Radio venue and artist-alias safeguards
 

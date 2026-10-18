@@ -97,8 +97,10 @@ try {
           await page.screenshot({ path: screenshot, fullPage: name !== "patch-notes", animations: "disabled" });
           if (name === "home") {
             await page.locator(".welcome-art").screenshot({ path: resolve(output, `dj-${language}-${viewport.width}.png`), animations: "disabled" });
-            assert.equal(await page.locator(".welcome-release").getAttribute("href"), "/patch-notes");
             if (phase === "after") {
+              assert.equal(await page.locator(".start-evening a[href='/patch-notes']").count(), 0);
+              assert.equal(await page.locator("[data-latest-release]").getAttribute("href"), "/patch-notes");
+              assert((await page.locator("[data-latest-release]").innerText()).includes(`v${releases[0].version}`));
               const decks = await page.locator(".welcome-art [data-dj-deck]").evaluateAll(elements => elements.map(element => {
                 const box = element.getBoundingClientRect(); return { width: box.width, height: box.height };
               }));

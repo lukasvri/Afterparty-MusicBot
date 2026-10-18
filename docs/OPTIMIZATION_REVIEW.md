@@ -243,3 +243,37 @@ Worker-only server route. That preview has no Cloudflare bindings: browser API
 responses were intercepted fixtures, and D1 handlers were checked separately
 through the isolated SQL adapter. The visual checks do not validate real Worker
 routes, OAuth or a deployed website backend.
+
+### Stage and welcome-page review follow-up
+
+The previous speaker group used 90 percent opacity, allowing rear beams to
+show through the cabinets. It now has opaque flown PA modules, rigging,
+grille faces and ground subwoofers, painted after the rear lighting. Narrower
+red/neutral-white beams keep their origins at the fixtures. The halo radius
+fits the LED display and its complete graphic group is clipped inside the
+screen, including while the rings rotate. Matching decks and mixer geometry
+remain unchanged.
+
+The broad patch-notes banner above the welcome hero is removed at the owner's
+request. The footer retains a versioned link from canonical release data;
+the `/patch-notes` page and release history remain available. Updated notes
+are part of the same unmerged 2.2.5 patch.
+
+An isolated local browser rendered 20 stage frames across welcome/room,
+390/1440 px, application motion off, system reduced motion, and enabled motion
+at 0/3500/7000 ms. Representative frames were visually inspected independently
+by the lead and both review agents. PA faces have no rear-light bleed and the
+halo stays inside the screen. Off/reduced-motion frames have no running stage
+animations; their corresponding images are byte-identical. Enabled-motion
+frames retain animation. No horizontal overflow, uncaught browser error or API
+write occurred. The versioned footer link and all four updated release bullets
+were rendered at both widths. New sanitized [stage](assets/stage-pa-lighting-after-20261018.png)
+and [mobile welcome](assets/welcome-footer-mobile-20261018.png) screenshots
+preserve the earlier images for comparison. These are decorative local-preview
+checks with synthetic API responses, not production or listening validation.
+
+The follow-up also passed 16 design contexts (home, room, admin and patch notes
+in both language settings at both widths), the party browser workflow,
+zero-warning lint, website types, 112 website unit tests, release validation
+and the production build. Required `check:all` again reached the same four
+Windows `fcntl` import failures; the PR records Linux CI for the final head.

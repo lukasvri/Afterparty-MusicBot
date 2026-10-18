@@ -72,7 +72,7 @@ body::before{background:radial-gradient(ellipse at 60% 0,#6f17251a,transparent 6
 .concert-venue{display:block;width:100%;height:100%;position:absolute;inset:0}
 .rig-beam{transform-origin:0 0;animation:rig-sweep 14s ease-in-out infinite}
 .rig-beam-even{animation-direction:reverse}.rig-beam-odd{animation-delay:-7s}
-.laser-fan{transform-origin:0 0;opacity:.45;animation:laser-sweep 9s ease-in-out infinite alternate}
+.laser-fan{transform-origin:0 0;opacity:.3;animation:laser-sweep 12s ease-in-out infinite alternate}
 .laser-fan-right{animation-direction:alternate-reverse;animation-delay:-4.5s}
 .stage-led-bars rect{transform-box:fill-box;transform-origin:center bottom;animation:led-dance 2.4s ease-in-out infinite alternate;opacity:.55}
 .dj-head{transform-origin:0 -35px;animation:dj-nod 2.4s ease-in-out infinite}
@@ -95,8 +95,8 @@ body::before{background:radial-gradient(ellipse at 60% 0,#6f17251a,transparent 6
 .directory-heading{display:flex;align-items:start;justify-content:space-between;gap:24px;padding-bottom:24px;border-bottom:1px solid #303034}.directory-heading h2{font:800 clamp(26px,3vw,40px)/1.2 var(--font-display);letter-spacing:.1px;margin:14px 0 10px}.directory-heading p{color:#b7b7bd;font-size:14px;max-width:520px}.directory-symbol{color:#ff263e}.directory-heading>.button{flex-shrink:0}
 .directory-empty{padding:45px 20px;text-align:center}.directory-empty>svg{color:#ff263e;margin-bottom:15px}.directory-empty h3{font-size:20px;margin-bottom:10px}.directory-empty p{color:#b7b7bd;font-size:14px}.room-directory>footer{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding-top:22px;border-top:1px solid #303034}.room-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:24px 0}.open-room-card{display:flex;align-items:center;gap:15px;padding:20px;border:1px solid #53364b;background:#171719;border-radius:7px;min-width:0;flex-wrap:wrap}.room-card-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:6px;background:#331419;color:#ff596c;flex-shrink:0}.room-card-copy{flex:1;min-width:100px}.room-card-copy h3{font-size:17px;overflow-wrap:anywhere;font-weight:600}.room-card-copy p{display:flex;align-items:center;gap:6px;font-size:12px;color:#b7b7bd;margin:6px 0}.room-card-copy small{font-size:11px;color:#b8a0b2}.open-room-card>.button{margin-left:auto;font-size:12px}.directory-loading{display:flex;align-items:center;justify-content:center;gap:12px;min-height:200px;color:#b7b7bd}
 .admin-shell .topbar{gap:18px}.patch-shell .topbar{gap:18px}
-@keyframes rig-sweep{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
-@keyframes laser-sweep{from{transform:rotate(-5deg);opacity:.3}to{transform:rotate(10deg);opacity:.65}}
+@keyframes rig-sweep{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes laser-sweep{from{transform:rotate(-4deg);opacity:.18}to{transform:rotate(4deg);opacity:.35}}
 @keyframes led-dance{from{transform:scaleY(.3);opacity:.3}to{transform:scaleY(1);opacity:.7}}
 @keyframes dj-nod{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(5deg) translateY(3px)}}
 @keyframes dj-wave{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(12deg)}}

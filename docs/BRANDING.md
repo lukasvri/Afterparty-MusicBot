@@ -37,6 +37,13 @@ and honor reduced motion when changing the scene. This is an illustration,
 not a photograph or a claim of real hardware operation. Existing player,
 permission and playback-clock components remain independent of the artwork.
 
+Use opaque concert PA modules with rigging, grilles and ground subwoofers,
+not exposed hi-fi driver towers. Keep rear light behind their cabinets and
+anchor each beam to its fixture. Restrained red and neutral white lighting
+shares the interface palette. Backdrop graphics, including the rotating halo,
+must stay inside the LED screen in both scene compositions and at every
+animation angle. Both reduced motion and the in-app motion switch apply.
+
 ## Compatibility
 
 Internal identifiers are stored or exchanged by existing installations. Changing a display name does not rename them.
