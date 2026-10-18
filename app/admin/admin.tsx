@@ -60,7 +60,7 @@ async function api<T>(
     signal: AbortSignal.timeout(35000),
   });
   const d = (await r.json()) as T & {error?: string};
-  if (!r.ok) throw Error(d.error ?? "Tjenesten svarer ikke.");
+  if (!r.ok) throw Object.assign(Error(d.error ?? "Tjenesten svarer ikke."), {status: r.status});
   return d;
 }
 type SettingField = {key: string; label: string; help: string; min?: number; max?: number; toggle?: boolean};
@@ -110,23 +110,62 @@ export default function Admin() {
   const [globalAdmin, setGlobalAdmin] = useState(false),
     [rooms, setRooms] = useState<Room[]>([]);
   const volumeDirty = useRef(false);
+  const authMethod = useRef("owner"), accessGeneration = useRef(0);
+  const ownerCheck = useRef<Promise<void> | null>(null);
   const requestedGuild = useRef("");
   const generation = useRef(0),
     refreshing = useRef(false),
     alive = useRef(true),
     actionBusy = useRef(false);
   const selected = guilds.find((g) => g.id === guildId);
+  const clearOwnerAccess = useCallback(() => {
+    accessGeneration.current++;
+    setOwnerUpdateUrl("");
+    setGlobalAdmin(false);
+    setRooms([]);
+    setTab(previous => previous === "rooms" ? "player" : previous);
+    // A separate Discord grant can remain valid after the password session ends.
+    if (authMethod.current !== "discord") {
+      generation.current++;
+      setAuthenticated(false);
+      setGuilds([]);
+      setGuildId("");
+      setDetail(null);
+    }
+  }, []);
+  const validateOwnerSession = useCallback(() => {
+    if (!ownerUpdateUrl) return;
+    if (ownerCheck.current) return ownerCheck.current;
+    const version = accessGeneration.current;
+    ownerCheck.current = api<{authenticated: boolean; method: string}>("/api/admin/session").then(session => {
+      if (alive.current && version === accessGeneration.current && (!session.authenticated || session.method !== "password")) clearOwnerAccess();
+    }, error => {
+      if (alive.current && version === accessGeneration.current && [401, 403].includes(error.status)) clearOwnerAccess();
+    }).finally(() => {ownerCheck.current = null;});
+    return ownerCheck.current;
+  }, [ownerUpdateUrl, clearOwnerAccess]);
+  useEffect(() => {
+    if (!ownerUpdateUrl) return;
+    const check = () => {if (!document.hidden) void validateOwnerSession();};
+    check();
+    const timer = setInterval(check, 5000);
+    document.addEventListener("visibilitychange", check);
+    return () => {clearInterval(timer); document.removeEventListener("visibilitychange", check);};
+  }, [ownerUpdateUrl, validateOwnerSession]);
   function loadGuilds() {
+      const version = accessGeneration.current;
       const requested = new URLSearchParams(location.search).get("guildId");
       if (requested && /^\d{14,22}$/.test(requested)) requestedGuild.current = requested;
       return api<{
         authenticated: boolean;
+        method?: string;
         globalAdmin: boolean;
         guilds: Guild[];
         invite: string;
         ownerUpdateUrl?: string;
       }>("/api/admin/guilds").then(r => {
-      if (!alive.current) return;
+      if (!alive.current || version !== accessGeneration.current) return;
+      authMethod.current = r.method ?? "owner";
       setAuthenticated(r.authenticated);
       setGlobalAdmin(r.globalAdmin);
       setGuilds(r.guilds);
@@ -152,9 +191,12 @@ export default function Admin() {
         setError("");
       }
     }, e => {
-      if (alive.current && version === generation.current) setError((e as Error).message);
+      if (alive.current && version === generation.current) {
+        setError((e as Error).message);
+        if ([401, 403].includes((e as Error & {status: number}).status)) void validateOwnerSession();
+      }
     }).finally(() => { refreshing.current = false; });
-  }, [guildId]);
+  }, [guildId, validateOwnerSession]);
   const invalidate = useCallback(() => { generation.current++; }, []);
   const clientReady = useClientReady();
   const [checkedLogin, setCheckedLogin] = useState(false);
@@ -242,6 +284,7 @@ export default function Admin() {
       return result;
     } catch (e) {
       if (version === generation.current) {
+        if ([401, 403].includes((e as Error & {status: number}).status)) void validateOwnerSession();
         if (operation === "settings") setSettingsError((e as Error).message);
         else setError((e as Error).message);
       }
@@ -256,9 +299,10 @@ export default function Admin() {
       command: { action, queueRevision: detail?.state.queueRevision, ...extra },
     });
   function loadRooms() {
+    const version = accessGeneration.current;
     return api<{rooms: Room[]}>("/api/admin/rooms").then(r => {
-      if(alive.current) setRooms(r.rooms);
-    }, e => { if(alive.current) setError((e as Error).message); });
+      if(alive.current && version === accessGeneration.current) setRooms(r.rooms);
+    }, e => { if(alive.current && version === accessGeneration.current) setError((e as Error).message); });
   }
   useEffect(() => {
     if (tab === "rooms" && globalAdmin) void loadRooms();

@@ -22,7 +22,7 @@ type FixtureEnvironment = {
   OWNER_EMAIL?: string;
   OWNER_UPDATE_URL?: string;
 };
-const context: { env: FixtureEnvironment; coreCalls: unknown[][]; rejectAdmin: boolean } = { env: {}, coreCalls: [], rejectAdmin: false };
+const context: { env: FixtureEnvironment; coreCalls: unknown[][]; rejectAdmin: boolean; coreFailure: "none" | "offline" | "unconfigured" | "oauth-rejected" } = { env: {}, coreCalls: [], rejectAdmin: false, coreFailure: "none" };
 const globals = globalThis as typeof globalThis & { __afterpartyAuthTest: typeof context };
 globals.__afterpartyAuthTest = context;
 const root = new URL("../", import.meta.url);
@@ -38,6 +38,10 @@ const hooks = registerHooks({
         export const commandTicket=async()=>({});
         export const coreRequest=async(...args)=>{
           globalThis.__afterpartyAuthTest.coreCalls.push(args);
+          const failure=globalThis.__afterpartyAuthTest.coreFailure;
+          if(failure==='offline')throw Object.assign(new Error('Synthetic Core unavailable'),{status:503});
+          if(failure==='unconfigured')throw new Error('Synthetic Core configuration missing');
+          if(failure==='oauth-rejected' && args[0]==='/v1/oauth')throw Object.assign(new Error('Synthetic Discord grant rejected'),{status:403});
           if(args[0]==='/v1/application')return {
             clientId:'111111111111111111',defaultGuildId:'222222222222222222',oauthReady:true,
             guilds:[{id:'222222222222222222',name:'Owner test guild',roomCode:'TESTROOM'},
@@ -78,6 +82,7 @@ const { isAdmin, hash } = await import("../lib/server.ts");
 const { login, hasPasswordSession } = await import("../lib/admin-session.ts");
 const { adminGuilds, adminContext, adminState } = await import("../lib/discord-auth.ts");
 const session = await import("../app/api/admin/session/route.ts");
+const guilds = await import("../app/api/admin/guilds/route.ts");
 const me = await import("../app/api/me/route.ts");
 const queue = await import("../app/api/discord/queue/route.ts");
 const control = await import("../app/api/admin/control/route.ts");
@@ -95,6 +100,7 @@ function setup() {
   for (const key of Object.keys(env)) Reflect.deleteProperty(env, key);
   context.coreCalls.length = 0;
   context.rejectAdmin = false;
+  context.coreFailure = "none";
   const sqlite = fixture();
   const prepare = (sql: string, args: SQLInputValue[] = []): FixtureStatement => ({
     bind(...values) { return prepare(sql, values); },
@@ -162,10 +168,12 @@ test("password sessions authenticate handlers and lose access after expiry or ro
     assert.equal(authenticated.method, "password");
     f.sqlite.prepare("UPDATE admin_sessions SET expires_at=?").run(Date.now() - 1);
     assert.equal(await hasPasswordSession(f.request(cookie)), false);
+    assert.deepEqual(await (await session.GET(f.request(cookie))).json(), { authenticated: false, method: "owner" });
     const rotated = await f.signIn();
     assert(env.ADMIN_PASSWORD_HASH);
     env.ADMIN_PASSWORD_HASH = env.ADMIN_PASSWORD_HASH.replace(/a1/g, "b2");
     assert.equal(await isAdmin(f.request(rotated)), false);
+    assert.deepEqual(await (await session.GET(f.request(rotated))).json(), { authenticated: false, method: "owner" });
   } finally { f.sqlite.close(); }
 });
 
@@ -198,6 +206,88 @@ test("unconfigured or unsafe updater URLs do not render a link", async () => {
       env.OWNER_UPDATE_URL = value;
       assert.equal((await adminGuilds(f.request(cookie))).ownerUpdateUrl, undefined);
     }
+  } finally { f.sqlite.close(); }
+});
+
+test("owner updater access survives unavailable and unconfigured Core without granting any guild", async () => {
+  const f = setup();
+  try {
+    env.OWNER_UPDATE_URL = "https://private-updater.example.test/afterparty-update/";
+    const cookie = await f.signIn();
+    for (const failure of ["offline", "unconfigured"] as const) {
+      context.coreFailure = failure;
+      const response = await guilds.GET(f.request(cookie));
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), {
+        authenticated: true, method: "owner", globalAdmin: true, guilds: [], invite: "", oauthReady: false,
+        coreUnavailable: true, ownerUpdateUrl: env.OWNER_UPDATE_URL,
+      });
+      assert.deepEqual(await (await session.GET(f.request(cookie))).json(), { authenticated: true, method: "password" });
+      for (const id of ["222222222222222222", "333333333333333333"])
+        await assert.rejects(adminState(f.request(cookie), id));
+      assert.equal(context.coreCalls.some(call => String(call[0]).startsWith("/v1/admin")), false,
+        "An updater fallback cannot manufacture guild authorization");
+    }
+    delete env.OWNER_UPDATE_URL;
+    assert.equal((await adminGuilds(f.request(cookie))).authenticated, true,
+      "Independent owner authentication must not depend on an optional updater URL");
+    assert.equal((await adminGuilds(f.request(cookie))).ownerUpdateUrl, undefined);
+  } finally { f.sqlite.close(); }
+});
+
+test("both cookies retain owner recovery access when Discord Core lookup fails", async () => {
+  const f = setup();
+  try {
+    env.OWNER_UPDATE_URL = "https://private-updater.example.test/afterparty-update/";
+    const owner = await f.signIn(), discordToken = "cd".repeat(32);
+    f.sqlite.prepare("INSERT INTO discord_admin_sessions VALUES(?,?,?)")
+      .run(await hash(discordToken), "synthetic-encrypted-grant", Date.now() + 60000);
+    const request = f.request(owner + "; gk-discord=" + discordToken);
+    for (const failure of ["offline", "unconfigured", "oauth-rejected"] as const) {
+      context.coreFailure = failure;
+      const response = await guilds.GET(request);
+      assert.equal(response.status, 200);
+      const access = await response.json() as Record<string, unknown>;
+      assert.equal(access.ownerUpdateUrl, env.OWNER_UPDATE_URL);
+      assert.equal(access.authenticated, true);
+      assert.equal(access.method, "owner");
+      assert.deepEqual(access.guilds, []);
+      assert.equal(access.coreUnavailable, true);
+    }
+    context.coreFailure = "none";
+    const recovered = await adminGuilds(request);
+    assert.equal(recovered.method, "discord");
+    assert.deepEqual(recovered.guilds.map(g => g.id), ["333333333333333333"]);
+  } finally { f.sqlite.close(); }
+});
+
+test("Core failure cannot expose updater access to anonymous, bridge, Discord-only or expired owners", async () => {
+  const f = setup();
+  try {
+    env.OWNER_UPDATE_URL = "https://private-updater.example.test/afterparty-update/";
+    const expiredOwner = await f.signIn(), discordToken = "de".repeat(32);
+    f.sqlite.prepare("INSERT INTO discord_admin_sessions VALUES(?,?,?)")
+      .run(await hash(discordToken), "synthetic-encrypted-grant", Date.now() + 60000);
+    f.sqlite.prepare("UPDATE admin_sessions SET expires_at=?").run(Date.now() - 1);
+    const requests = [f.request(),
+      new Request(f.request().url, {headers: {Authorization: "Bearer synthetic-bridge"}}),
+      f.request("gk-discord=" + discordToken), f.request(expiredOwner),
+      f.request(expiredOwner + "; gk-discord=" + discordToken)];
+    for (const failure of ["offline", "unconfigured"] as const) {
+      context.coreFailure = failure;
+      for (const request of requests) {
+        const response = await guilds.GET(request);
+        assert.equal(response.status, failure === "offline" ? 503 : 500);
+        const payload = await response.json() as Record<string, unknown>;
+        assert.equal(payload.ownerUpdateUrl, undefined);
+        assert.equal(JSON.stringify(payload).includes(env.OWNER_UPDATE_URL), false);
+      }
+    }
+    context.coreFailure = "none";
+    const rotated = await f.signIn();
+    env.ADMIN_PASSWORD_HASH = env.ADMIN_PASSWORD_HASH!.replace(/a1/g, "b2");
+    context.coreFailure = "offline";
+    assert.equal((await guilds.GET(f.request(rotated))).status, 503);
   } finally { f.sqlite.close(); }
 });
 
