@@ -51,6 +51,8 @@ Older browser rooms can recover the last explicitly marked manual song from hist
 
 An uploader label, including `Official`, `Topic` or `VEVO`, cannot override a different artist in an explicit `Artist - Song` title. A specific Topic or VEVO channel can supply the artist when the title contains only the song or a recognized recording suffix such as `2024 Remaster`. Shared publishers such as NCS and Various Artists are not artist evidence. Unknown upload channels need an explicit artist title, specific genre or validated catalog relationship. Ambiguous title separators remain a metadata limitation. Old unfiltered Last.fm cache entries are not reused by the updated selection policy.
 
+An `Artist: Song` prefix can also identify the artist when it matches the named uploader or catalog artist. A colon inside an ordinary song title is preserved. Featuring, feat. and ft. share composition identity for repeat exclusion; exact-recording refinement still compares the featured credits so a guest version cannot silently replace the solo recording.
+
 ## Music filtering
 
 Automatic candidates must be finite, non-live songs between 90 and 600 seconds. YouTube video metadata and the yt-dlp fallback retain explicit music-category evidence. A known non-music category excludes automatic selection, including on the website fallback; absent category metadata remains unknown and can use the other evidence above. Search and metadata cache versions prevent older results from bypassing this check. Manual playback remains available for non-music videos.
@@ -58,6 +60,8 @@ Automatic candidates must be finite, non-live songs between 90 and 600 seconds. 
 Searches, metadata learning, catalog matches and prepared radio entries reject instructional and non-song titles, including tutorials, procedural how-to phrases, production lessons, DAW projects, step-by-step videos, reactions, interviews, vlogs, gameplay, covers, remakes and long sets. Filtering uses the song portion after a recognized artist prefix, so an artist name such as The Trailer Park Troubadours is not mistaken for a trailer. Real song names such as Music, How To Love, Live Forever and Cover Me remain usable, including Topic uploads. Live and cover upload labels are checked in their format context; the provider's actual live flag still excludes a candidate.
 
 Provider genre evidence uses complete genre tags, optionally followed by `music`, or explicit Genre:/Style: description lines. A free-form artist tag such as `Daft Punk` is not a punk genre label. R&B and DnB aliases normalize to the existing R&B and drum and bass categories; broad R&B still does not prove cross-artist relevance. Updated Core and website cache versions bypass older parsed genres.
+
+Explicit demo upload labels are excluded from automatic selection. Demo and promotional annotations do not turn the original composition into a new song for repeat detection. Dated live-performance suffixes remain unsafe even when the provider reports `live: false` for a previously recorded video. Manual playback is unaffected.
 
 Older queued automatic entries are checked again before playback or crossfade preparation. Manual selections are preserved. Title and metadata filtering is conservative and can reject a valid upload; incomplete or misleading provider metadata can still affect selection. When no safe candidate is found, existing cooldown, retry and playback-preservation rules apply instead of choosing an unrelated result.
 

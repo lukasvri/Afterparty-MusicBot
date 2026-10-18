@@ -68,15 +68,60 @@ complete stereo 48 kHz, 20 ms frames with nonzero samples.
 | --- | --- | --- |
 | Blinding Lights | 250 frames | Not needed |
 | Levitating | 250 frames | Not needed |
-| Enter Sandman | Zero frames before decoder timeout | Same check: 250 frames |
+| Enter Sandman | Zero frames, unknown decoder reason | Same check: 250 frames |
 | I Walk the Line | 250 frames | Not needed |
 | Three Little Birds | 250 frames | Not needed |
 
 This used official yt-dlp 2026.08.19 with its published SHA-256 verified and
 FFmpeg 9.0.2. Local config, cookies and API credentials were disabled. No media
-files, signed playback URLs, headers, lyrics or provider descriptions are stored
+files, signed playback URLs, headers, lyrics or full provider descriptions are stored
 in the repository. The one transient decode failure is retained as a limitation;
 one successful repeat does not establish sustained availability or audible quality.
+
+## Live discovery capture and corrections
+
+The first two-seed check on the original radio policy completed 31 extractor calls
+and reproduced exactly offline. A subsequent ten-seed check on clean commit
+`8ae629d835ed215e4681e3609a43717f0fe481a1` completed 145 extractor calls in about
+361 seconds. All ten seed metadata lookups succeeded; nine selections were made.
+One later candidate returned invalid JSON and was skipped while selection continued.
+There were no recorded provider-blocked or network failures. Offline replay
+matched the full captured result and consumed all 145 recorded calls.
+The retained full snapshot's SHA-256 is
+`e8d9cf8eb52ed4b7bc7dd13d434aceae2ac38c5cc64ed81c582afc498aad17f8`.
+
+| Seed | Captured initial selection | Assessment |
+| --- | --- | --- |
+| Blinding Lights | The Weeknd, Out Of Time | Eligible different song |
+| Levitating (solo) | Levitating Featuring DaBaby | Bug: seed composition returned as another song |
+| One More Time | Daft Punk, Crescendolls | Eligible different song |
+| Sky High | Elektronomia, Energy | Eligible explicit progressive-house song |
+| Enter Sandman | None | Bug: uploader-confirmed colon artist prefix was unknown |
+| My Favorite Things | John Coltrane, My Ideal | Eligible shorter candidate; a long manual seed is allowed |
+| I Walk the Line | Johnny Cash, Folsom Prison Blues | Eligible different song |
+| Lose Yourself | Eminem, The Real Slim Shady | Eligible different song |
+| Three Little Birds | Bob Marley & The Wailers, Stiff Necked Fools | Eligible different song |
+| Live Forever | Live Forever (Demo), rare promo upload | Bug: demo/promo annotations hid the repeated song |
+
+Eligibility here is a metadata/policy verdict, not a musical-taste assessment.
+Search ranking varied between captures, so live before/after order alone does not
+prove a code effect. The three actual problematic input pairs, capture time,
+source hashes and public video URLs are retained in
+[the minimal provider regression fixture](../services/core/tests/fixtures/radio-provider-regressions.json).
+Four of its first six tests failed before the colon/Featuring/live-year fixes;
+two additional demo-format tests then failed before their correction.
+
+Colon splitting now requires the prefix to match a named uploader or catalog
+artist, preserving colons inside song names and excluding generic publishers.
+Featuring, feat. and ft. share song identity, while featured recording credits
+remain distinct during metadata refinement. Explicit demo formats are rejected,
+and promotional upload annotations cannot create a new composition. Dated live
+performance labels remain excluded even if the video is no longer streaming live.
+
+The diagnostic interruption path was exercised separately using a programmatic
+SIGINT event: it aborted the single active metadata request, retained an
+`interrupted` checkpoint, returned exit 130 and rejected full replay with exit 1.
+This checks the handler lifecycle, not delivery of an operating-system console signal.
 
 ## Repeating metadata checks
 
