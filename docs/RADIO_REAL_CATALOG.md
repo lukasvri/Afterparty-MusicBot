@@ -118,6 +118,25 @@ remain distinct during metadata refinement. Explicit demo formats are rejected,
 and promotional upload annotations cannot create a new composition. Dated live
 performance labels remain excluded even if the video is no longer streaming live.
 
+A three-seed live retest on clean `31f88e3100d324dcb24860e9b59afe897a4eabac`
+completed 51 calls in 121.731 seconds without provider failures. Dua Lipa then
+selected Training Season, and Metallica selected Halo On Fire. Both actual
+recommendations also supplied 250 nonzero PCM frames in the short decoder check.
+Oasis stopped selecting the demo, but returned a filtered result. Offline replay
+again matched exactly with no unconsumed calls. That filtered result was not
+treated as successful coverage: its five ordinary Oasis suggestions exposed a
+further artist-credit parsing error.
+
+A public Wonderwall capture at 15:08:54 UTC reports `artists: ["Oasis", "Noel
+Gallagher"]`, the display string `Oasis, Noel Gallagher`, and uploader `Oasis`.
+The [minimal credit fixture](../services/core/tests/fixtures/radio-artist-credits.json)
+reproduced the same-artist fallback failure through actual Providers parsing.
+Validated structured credits now supply a private catalog artist only when there
+is one listed artist, or the named uploader confirms an exact list member. The
+full public display credit stays intact. Missing, malformed, oversized or
+unconfirmed multi-artist lists keep the original string. An actual comma inside
+one name, such as Tyler, The Creator, is never blindly split.
+
 The diagnostic interruption path was exercised separately using a programmatic
 SIGINT event: it aborted the single active metadata request, retained an
 `interrupted` checkpoint, returned exit 130 and rejected full replay with exit 1.

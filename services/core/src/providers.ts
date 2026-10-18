@@ -8,6 +8,7 @@ import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
 import {
   scoreMatch,
+  normalized,
   mapLimited,
   type CatalogSong,
 } from "./matching.ts";
@@ -15,6 +16,17 @@ export { normalized, scoreMatch } from "./matching.ts";
 import { selectRadio } from "./radio-pipeline.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
+function extractedCatalogArtist(media: ExtractedMedia) {
+  const original = media.artist ?? media.uploader ?? "YouTube";
+  const artists = media.artists;
+  if (!Array.isArray(artists) || !artists.length || artists.length > 16 ||
+    !artists.every(artist => typeof artist === "string" && Boolean(artist.trim()) && artist.length <= 200)) return original;
+  if (artists.length === 1) return artists[0].trim();
+  const uploader = (media.uploader ?? "").replace(/(?:\s*-\s*Topic|VEVO)$/i, "").trim();
+  // A list distinguishes collaborators from a comma inside one artist name.
+  // Do not guess a lead from list order: require the named uploader to agree.
+  return artists.find(artist => normalized(artist) === normalized(uploader))?.trim() ?? original;
+}
 export function youtubeId(query: string) {
   if (/^[\w-]{11}$/.test(query)) return query;
   try {
@@ -143,7 +155,7 @@ export class Providers {
               embeddable: v.playable_in_embed === true,
               source: "youtube",
               entryId: randomUUID(),
-              ...(v.artist && v.track ? { catalog: { artist: v.artist, title: v.track, duration: Number(v.duration) || 0 } } : {}),
+              ...(v.artist && v.track ? { catalog: { artist: extractedCatalogArtist(v), title: v.track, duration: Number(v.duration) || 0 } } : {}),
             });
           } catch (error) {
             if (!skipUnavailable) throw error;

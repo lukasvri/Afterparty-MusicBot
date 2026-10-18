@@ -38,6 +38,8 @@ export function smallMetadata(raw: ExtractedMedia): ExtractedMedia {
     const value = raw[key];
     if (typeof value === 'string') result[key] = clean(value);
   }
+  if (Array.isArray(raw.artists) && raw.artists.length <= 16 && raw.artists.every(artist =>
+    typeof artist === 'string' && Boolean(artist.trim()) && artist.length <= 200)) result.artists = [...raw.artists];
   if (typeof raw.duration === 'number') result.duration = raw.duration;
   if (typeof raw.is_live === 'boolean') result.is_live = raw.is_live;
   if (typeof raw.playable_in_embed === 'boolean') result.playable_in_embed = raw.playable_in_embed;
