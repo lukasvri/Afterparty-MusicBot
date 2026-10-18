@@ -753,3 +753,34 @@ test("D1 compound genre labels retain specific cross-artist discovery and privat
     assert(!JSON.stringify(room).includes("radioRelatedTo"));
   } finally { f.close(); }
 });
+
+for (const candidateTitle of ["Oasis - Song Live Wembley", "Oasis - Song Live Glastonbury", "Oasis - Song Live BBC Radio 1", "The Beatles - Hey Jude"]) {
+  test(`D1 radio excludes reviewed unsafe or repeated candidate: ${candidateTitle}`, async () => {
+    const f = fixture();
+    try {
+      const alias = candidateTitle.startsWith("The Beatles");
+      const original = { ...seed, title: alias ? "Beatles - Hey Jude" : "Oasis - Supersonic",
+        artist: alias ? "Beatles" : "Oasis", genres: ["indie pop"], radio: false };
+      const candidate = { ...next, title: candidateTitle, artist: alias ? "The Beatles" : "Oasis" };
+      await f.save("TESTROOM", { current: original, queue: [], playing: true, position: 20,
+        playbackKey: "review-playback" });
+      globalThis.fetch = async target => {
+        const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+        assert.equal(url.origin, "https://www.googleapis.com");
+        if (url.pathname.endsWith("/search"))
+          return Response.json({ items: [{ id: { videoId: candidate.id } }] });
+        return Response.json({ items: [{ id: candidate.id,
+          snippet: { title: candidate.title, channelTitle: candidate.artist, categoryId: "10", tags: ["indie pop"] },
+          contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] });
+      };
+      await assert.rejects(mutate(f.request, "TESTROOM", { action: "radio", enabled: true, version: 1 }),
+        error => error instanceof Error && "status" in error && error.status === 422);
+      const room = await publicRoom(f.request, f.roomRow());
+      assert.deepEqual(room.queue, []);
+      assert.equal(room.current?.id, original.id);
+      assert.equal(room.playbackKey, "review-playback");
+      assert(room.position >= 20 && room.position < 22);
+      assert(!JSON.stringify(room).includes("radioRelatedTo"));
+    } finally { f.close(); }
+  });
+}
