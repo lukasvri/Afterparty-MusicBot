@@ -3,7 +3,7 @@ import { test } from "node:test";
 import captured from "./fixtures/radio-artist-credits.json" with { type: "json" };
 import { Providers } from "../src/providers.ts";
 import { Store } from "../src/store.ts";
-import { radioArtist, sameRadioSong } from "../src/radio.ts";
+import { radioArtist, radioRelated, sameRadioRecording, sameRadioSong } from "../src/radio.ts";
 import type { Track } from "../src/types.ts";
 
 const seed: Track = { id: "TDe1DqxwJoc", title: "Oasis - Live Forever (Official HD Remastered Video)",
@@ -50,4 +50,45 @@ test("missing structured credits and an unconfirmed multi-artist list retain the
       assert.equal(radioArtist((await providers.video([captured.id]))[0]), "Oasis, Noel Gallagher");
     } finally { store.db.close(); }
   }
+});
+
+test("older persisted combined credits still exclude another upload after artist refinement", async () => {
+  const store = new Store(":memory:");
+  try {
+    const providers = new Providers(store, {});
+    providers.youtube = async () => { throw new Error("API capability disabled in isolated fixture"); };
+    providers.extract = async () => ({ ...captured, duration: 259, categories: ["Music"],
+      is_live: false, playable_in_embed: true });
+    const [candidate] = await providers.video([captured.id]);
+    // Prior code persisted the extractor's combined artist string in catalog.
+    // A controlled old ID makes this exercise recording identity, not ID exclusion.
+    const legacy = { ...candidate, id: "legacy00001", catalog: { ...candidate.catalog!, artist: captured.artist } };
+    providers.rememberRadioTrack(legacy);
+    const afterUpgrade = new Providers(store, {});
+    afterUpgrade.search = async () => [candidate];
+    assert.equal(await afterUpgrade.radio(seed, [seed.id]), null,
+      "Retained private history must not replay the same composition under its refined artist identity");
+  } finally { store.db.close(); }
+});
+
+test("a legacy combined-credit seed can use verified complete credits without trusting one shared collaborator", async () => {
+  const store = new Store(":memory:");
+  try {
+    const providers = new Providers(store, {});
+    providers.youtube = async () => { throw new Error("API capability disabled in isolated fixture"); };
+    providers.extract = async () => ({ ...captured, duration: 259, categories: ["Music"],
+      is_live: false, playable_in_embed: true });
+    const [candidate] = await providers.video([captured.id]);
+    providers.search = async () => [candidate];
+    // Controlled persisted seed shaped like the captured label-delivered upload.
+    const legacySeed = { ...seed, id: "485CSGur7YE", title: "Live Forever (Remastered)",
+      artist: captured.artist, duration: 277,
+      catalog: { artist: captured.artist, title: "Live Forever (Remastered)", duration: 277 } };
+    assert.equal((await providers.radio(legacySeed, [legacySeed.id]))?.id, candidate.id);
+    const unrelated = { ...candidate, artist: "Noel Gallagher",
+      catalog: { artist: "Noel Gallagher", title: candidate.catalog!.title, duration: candidate.duration } };
+    assert.equal(radioRelated(unrelated, candidate), false, "One shared collaborator is not the same artist identity");
+    assert.equal(sameRadioSong(unrelated, candidate), false);
+    assert.equal(sameRadioRecording(unrelated, candidate), false);
+  } finally { store.db.close(); }
 });

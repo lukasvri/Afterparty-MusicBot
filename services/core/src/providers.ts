@@ -19,13 +19,27 @@ import { UserError, publicTrack, type Track } from "./types.ts";
 function extractedCatalogArtist(media: ExtractedMedia) {
   const original = media.artist ?? media.uploader ?? "YouTube";
   const artists = media.artists;
+  const unchanged = { artist: original };
   if (!Array.isArray(artists) || !artists.length || artists.length > 16 ||
-    !artists.every(artist => typeof artist === "string" && Boolean(artist.trim()) && artist.length <= 200)) return original;
-  if (artists.length === 1) return artists[0].trim();
+    !artists.every(artist => typeof artist === "string" && Boolean(artist.trim()) && artist.length <= 200)) return unchanged;
   const uploader = (media.uploader ?? "").replace(/(?:\s*-\s*Topic|VEVO)$/i, "").trim();
   // A list distinguishes collaborators from a comma inside one artist name.
   // Do not guess a lead from list order: require the named uploader to agree.
-  return artists.find(artist => normalized(artist) === normalized(uploader))?.trim() ?? original;
+  const artist = artists.length === 1 ? artists[0].trim()
+    : artists.find(artist => normalized(artist) === normalized(uploader))?.trim();
+  if (!artist) return unchanged;
+  // Retain a private exact alias for older persisted combined credits. A
+  // contradictory/free-form artist string is never evidence for this alias.
+  return { artist, ...(normalized(original) !== normalized(artist) &&
+    normalized(original) === normalized(artists.join(", ")) ? { artistCredit: original } : {}) };
+}
+function matchedCatalog(song: CatalogSong, track: Track): CatalogSong {
+  const catalog = { ...song };
+  delete catalog.artistCredit;
+  const evidence = track.catalog;
+  if (typeof evidence?.artistCredit === "string" && evidence.artistCredit.trim() &&
+    normalized(evidence.artist) === normalized(song.artist)) catalog.artistCredit = evidence.artistCredit;
+  return catalog;
 }
 export function youtubeId(query: string) {
   if (/^[\w-]{11}$/.test(query)) return query;
@@ -155,7 +169,7 @@ export class Providers {
               embeddable: v.playable_in_embed === true,
               source: "youtube",
               entryId: randomUUID(),
-              ...(v.artist && v.track ? { catalog: { artist: extractedCatalogArtist(v), title: v.track, duration: Number(v.duration) || 0 } } : {}),
+              ...(v.artist && v.track ? { catalog: { ...extractedCatalogArtist(v), title: v.track, duration: Number(v.duration) || 0 } } : {}),
             });
           } catch (error) {
             if (!skipUnavailable) throw error;
@@ -363,7 +377,7 @@ export class Providers {
     if (cached && Date.now() - cached.at < 7 * 86400000) {
       const fresh = (await this.video([cached.track.id]))[0];
       if (fresh && scoreMatch(song, fresh) >= 0.85)
-        return { ...fresh, catalog: song, entryId: randomUUID() };
+        return { ...fresh, catalog: matchedCatalog(song, fresh), entryId: randomUUID() };
     }
     let candidates: Track[] = [];
     if (song.isrc && /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/i.test(song.isrc))
@@ -387,7 +401,7 @@ export class Providers {
       throw new UserError(
         `Fant ikke en sikker lydmatch for ${song.artist} - ${song.title}.`,
       );
-    const track = { ...ranked[0].track, catalog: song, entryId: randomUUID() };
+    const track = { ...ranked[0].track, catalog: matchedCatalog(song, ranked[0].track), entryId: randomUUID() };
     this.store.set(key, { at: Date.now(), track });
     return track;
   }

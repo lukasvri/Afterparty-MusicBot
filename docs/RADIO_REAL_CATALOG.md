@@ -137,6 +137,33 @@ full public display credit stays intact. Missing, malformed, oversized or
 unconfirmed multi-artist lists keep the original string. An actual comma inside
 one name, such as Tyler, The Creator, is never blindly split.
 
+The final Oasis live retest on clean
+`7083fc96e170b765796d6828324dec2a4d3f7963` completed sixteen calls in 39.844
+seconds without provider failures, using the same five-result search limit.
+It selected Champagne Supernova (`VGfDg7wju6M`, 448 seconds), retaining music,
+non-live and embedding checks. Relationship rejections fell from six to zero;
+content, excluded-ID and repeated-recording rejections remained active. Offline
+replay matched and consumed every call. The snapshot SHA-256 is
+`bdd368eb39dd9c6e1b5ed6bf4e9532cc4b82dc9bfa0339299338717bf1888151`.
+That actual recommendation also decoded 250 nonzero frames in the five-second
+window. Together with the five original-seed windows and two earlier corrected
+recommendations, eight distinct real recordings passed short local decoding.
+These bounded tests do not establish sustained playback or audible transitions.
+
+An additional upgrade regression used a controlled older private-history shape
+with the captured combined artist string. It demonstrated an unwanted replay
+after refinement, and a second test demonstrated a blocked legacy seed. Both
+were observed failing before the compatibility correction. A private exact
+full-credit alias now preserves those identities only when validated structured
+credits agree with the original full string. Controls retain unrelated artists'
+same-title songs and reject identity based on one overlapping collaborator. No
+existing history is rewritten, and private catalog proof remains absent from
+public playback state.
+Fresh and cached catalog hydration retain that proof only when the freshly
+validated primary artist exactly matches the requested catalog artist. Incoming
+catalog aliases and contradictory artists cannot supply it. This boundary also
+has an observed failing-then-passing regression.
+
 The diagnostic interruption path was exercised separately using a programmatic
 SIGINT event: it aborted the single active metadata request, retained an
 `interrupted` checkpoint, returned exit 130 and rejected full replay with exit 1.

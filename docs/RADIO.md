@@ -55,6 +55,8 @@ An `Artist: Song` prefix can also identify the artist when it matches the named 
 
 The yt-dlp fallback distinguishes a structured artist list from a comma inside one artist name. It uses one validated listed artist, or an exact named-uploader match in a multi-artist list, for private catalog identity. Public display credits stay intact. Missing, malformed or unconfirmed lists retain the original artist string rather than guessing a lead artist.
 
+When validated complete credits match the original combined artist string, private catalog metadata retains that exact full-credit alias. Older persisted originals and recording history can still match it after artist refinement. One overlapping collaborator or a shared credit list does not establish artist identity. This requires no history migration, and catalog aliases stay out of public state.
+
 ## Music filtering
 
 Automatic candidates must be finite, non-live songs between 90 and 600 seconds. YouTube video metadata and the yt-dlp fallback retain explicit music-category evidence. A known non-music category excludes automatic selection, including on the website fallback; absent category metadata remains unknown and can use the other evidence above. Search and metadata cache versions prevent older results from bypassing this check. Manual playback remains available for non-music videos.

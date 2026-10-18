@@ -1,8 +1,33 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isRadioTitle, metadataGenres } from "../src/radio.ts";
+import { isRadioTitle, metadataGenres, sameRadioSong } from "../src/radio.ts";
 import { Providers } from "../src/providers.ts";
 import { Store } from "../src/store.ts";
+import capturedCredits from "./fixtures/radio-artist-credits.json" with { type: "json" };
+
+test("fresh and cached catalog matches preserve only the same artist's verified legacy credit", async () => {
+  const store = new Store(":memory:");
+  try {
+    const providers = new Providers(store, {});
+    providers.youtube = async () => { throw new Error("No external API capability in the isolated fixture"); };
+    providers.extract = async () => ({ ...capturedCredits, duration: 259, categories: ["Music"],
+      is_live: false, playable_in_embed: true });
+    const [fresh] = await providers.video([capturedCredits.id]);
+    const legacy = { ...fresh, id: "legacy00001", catalog: { artist: capturedCredits.artist,
+      title: capturedCredits.track, duration: 259 } };
+    assert.equal(sameRadioSong(legacy, fresh), true);
+    providers.search = async () => [fresh];
+    const song = { artist: "Oasis", title: capturedCredits.track, duration: 259 };
+    for (const path of ["fresh", "cached"]) {
+      const matched = await providers.matchSong(song);
+      assert.equal(matched.catalog?.artistCredit, capturedCredits.artist, path);
+      assert.equal(sameRadioSong(legacy, matched), true, `${path} catalog replacement must retain duplicate exclusion`);
+    }
+    const otherArtist = await providers.matchSong({ ...song, artist: "Noel Gallagher", artistCredit: capturedCredits.artist });
+    assert.equal(otherArtist.catalog?.artistCredit, undefined, "A contradictory catalog artist cannot acquire the alias, including from input");
+    assert.equal(sameRadioSong(legacy, otherArtist), false);
+  } finally { store.db.close(); }
+});
 
 test("public Starboy artist tag is not explicit punk genre evidence", () => {
   // yt-dlp 2026.08.19, 2026-10-18T14:45:24Z, source

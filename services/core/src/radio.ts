@@ -274,17 +274,25 @@ function songTitleIdentity(rawTitle: string) {
   // cleaned value must not turn them into invalid radio entries.
   return identity || (/^(?:music|audio|video|remix|instrumental|acoustic)$/i.test(title.trim()) ? normalize(title) : "");
 }
+function artistIdentity(track: RadioTrack) {
+  return { artist: normalize(radioArtist(track)),
+    credit: typeof track.catalog?.artistCredit === "string" ? normalize(track.catalog.artistCredit) : "" };
+}
+function sameArtistIdentity(a: ReturnType<typeof artistIdentity>, b: ReturnType<typeof artistIdentity>) {
+  return a.artist === b.artist || Boolean(a.artist && b.artist &&
+    ((a.credit && a.credit === b.artist) || (b.credit && b.credit === a.artist)));
+}
 function recordingIdentity(track: RadioTrack) {
   const title = radioTitle(track);
   return {
     song: songTitleIdentity(title),
-    artist: normalize(radioArtist(track)),
+    ...artistIdentity(track),
     title: normalize(title),
     variant: /\b(?:remix|instrumental|acoustic|remaster(?:ed)?|radio edit|extended)(?:\s+(?:version|mix|\d{4}))*\s*$/i.test(title),
   };
 }
 function duplicateRecording(a: ReturnType<typeof recordingIdentity>, b: ReturnType<typeof recordingIdentity>) {
-  if (a.artist && b.artist && a.artist !== b.artist) return false;
+  if (a.artist && b.artist && !sameArtistIdentity(a, b)) return false;
   if (a.song === b.song) return true;
   // A named remix without delimiters cannot be split reliably in isolation.
   // Compare it with the known original instead of treating the remixer as a
@@ -299,17 +307,17 @@ export function sameRadioSong(a: RadioTrack, b: RadioTrack) {
 }
 /** A vetted catalog relationship may fill missing metadata, never a conflicting style. */
 export function radioRelated(seed: RadioTrack, track: RadioTrack, relatedRecording = false) {
-  const artist = normalize(radioArtist(seed));
+  const artist = artistIdentity(seed);
   const specific = specificRadioGenre(seed);
   return radioStyleCompatible(seed, track) && (
-    Boolean(artist && normalize(radioArtist(track)) === artist) ||
+    Boolean(artist.artist && sameArtistIdentity(artist, artistIdentity(track))) ||
     Boolean(specific && radioGenre(track) === specific) ||
     relatedRecording
   );
 }
 export function sameRadioRecording(seed: RadioTrack, candidate: RadioTrack) {
   if (
-    normalize(radioArtist(seed)) !== normalize(radioArtist(candidate)) ||
+    !sameArtistIdentity(artistIdentity(seed), artistIdentity(candidate)) ||
     songIdentity(seed) !== songIdentity(candidate)
   )
     return false;

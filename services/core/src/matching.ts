@@ -1,5 +1,5 @@
 import type {Track} from './types.ts';
-export type CatalogSong={id?:string;isrc?:string;title:string;artist:string;duration:number};
+export type CatalogSong={id?:string;isrc?:string;title:string;artist:string;artistCredit?:string;duration:number};
 export const normalized=(value:string)=>value.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const versions=['remix','live','acoustic','instrumental','karaoke','cover','sped up','slowed','remaster','radio edit','extended'];
 export function scoreMatch(source:CatalogSong,track:Track){
