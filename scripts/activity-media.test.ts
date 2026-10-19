@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {artworkUrl,youtubeArtwork} from '../lib/artwork.ts';
-import {openActivityVideo,stageDisplayMode} from '../lib/activity-media.ts';
+import {openActivityVideo} from '../lib/activity-media.ts';
 
 const id='synthetic01',jpeg=new Uint8Array([0xff,0xd8,0xff,0xe0,0,1]);
 test('YouTube discovery, queue and stage artwork use the same origin; SoundCloud keeps its source',()=>{
@@ -39,7 +39,4 @@ test('Activity opens only a validated video through Discord and surfaces rejecti
  assert.equal(await openActivityVideo(commands,'https://other.example'),false);assert.equal(urls.length,1);
  assert.equal(await openActivityVideo({openExternalLink:async()=>({opened:false})},id),false);
  assert.equal(await openActivityVideo({openExternalLink:async()=>{throw Error('denied');}},id),false);
- assert.equal(stageDisplayMode(true).embeddedVideo,false);assert.equal(stageDisplayMode(true).viewportOnly,true);
- assert.equal(stageDisplayMode(true).expand,'Utvid scena');assert.equal(stageDisplayMode(false).embeddedVideo,true);
- assert.equal(stageDisplayMode(false).viewportOnly,false);
 });

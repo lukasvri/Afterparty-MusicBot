@@ -155,63 +155,118 @@ for server use until the real-client gates pass. Disconnect test clients and sto
 only the separate test services when finished; preserve test data for review.
 
 
-## Media capabilities and release gate (beta.6)
+## Media routing and release gate (beta.6)
 
-The Activity and standalone website have different media capabilities. Discord
-serves an Activity through its own proxy and applies a sandbox CSP. Direct
-`i.ytimg.com` thumbnails, `youtube.com/iframe_api` scripts and YouTube frames
-are outside the observed policy. Changing the website frame-ancestors policy
-cannot override Discord's restrictions. See [Discord networking](https://docs.discord.com/developers/activities/development-guides/networking)
-and [the Embedded App SDK reference](https://docs.discord.com/developers/developer-tools/embedded-app-sdk).
+The owner's real Console error confirms that direct
+`https://www.youtube.com/iframe_api` is blocked by the Activity CSP. This does
+not prove that mapped playback is impossible or that a particular video refuses
+embedding. [Discord URL mappings](https://docs.discord.com/developers/activities/development-guides/local-development)
+are the supported routing mechanism; no policy relaxation or media relay is used.
 
-- Artwork uses `/api/artwork/youtube/<11-character-id>` on the existing app
-  origin. The endpoint fetches only a fixed YouTube JPEG path, refuses redirects
-  and non-JPEG/oversized output, uses a five-second deadline, forwards no caller
-  credentials, and sets public cache headers. It does not relay video or scripts.
-  No extra Portal URL mapping is required for this same-origin route.
-- Only an internally verified Activity request selects flat discovery. Search
-  previews have their own cache and cannot certify playability or populate the
-  verified metadata cache. Choosing an ID still uses the existing full resolver.
-  Ordinary website, metadata-ID reads and radio retain their prior full path.
-- Activity audio remains in the server's Discord concert. The stage shows artwork
-  and title, and an explicit YouTube action uses `sdk.commands.openExternalLink`.
-  A cancelled/failed external opening does not navigate the Activity or change
-  playback. The Activity does not attempt a blocked YouTube iframe. This is an
-  honest fallback, not restored in-Activity video playback.
-- The installed SDK has no fullscreen request command. Activity **Expand stage**
-  fills the Activity viewport only, with a visible restore control, Escape and
-  focus restoration. It cannot enlarge Discord's outer iframe or the device
-  screen. Standalone website native fullscreen and its viewport fallback remain.
-  Missing native fullscreen cannot be attributed to a particular client permission
-  without checking that client; an HTTP proxy header alone does not prove it.
+The Activity keeps the official YouTube API, its ready/state events and existing
+synchronization. Before mounting it, a scoped head-script observer uses the SDK's
+`attemptRemap` URL function for official API/widget script paths only, following
+its documented src-rewriting pattern. It disconnects and removes owned nodes on
+Activity teardown. It never patches fetch, XHR, WebSocket or a nested frame's
+content. The app-owned initial loader is mapped before insertion to avoid its
+blocked-node onerror racing an asynchronous rewrite. The official API's
+[pre-created iframe mode](https://developers.google.com/youtube/iframe_api_reference#Loading_a_video_player)
+receives a mapped frame with `enablejsapi=1`, the actual parent origin, proper
+referrer policy and fullscreen permission. No custom postMessage handlers,
+forged origin, player HTML rewriting or stream endpoints are introduced.
 
-Do not map a full YouTube player behind an ad hoc proxy or weaken CSP. A
-`/youtube -> www.youtube.com` mapping alone is not a verified player solution:
-subsequent script URLs, frame origins, media requests and provider identification
-still need supported behavior. No such mapping is part of beta.6. Restoring a
-fully synchronized YouTube player inside the Activity is an open compatibility
-requirement, not a claim of this PR. YouTube also has per-video embedding and
-referrer restrictions, separate from a script being blocked before player setup.
-See [YouTube IFrame API](https://developers.google.com/youtube/iframe_api_reference).
+### Owner-approved test-app mappings, not configured by this PR
 
-### Required real-client acceptance before publication
+Keep production applications and the existing root route unchanged. Initial
+bootstrap mapping in Activities > URL Mappings:
 
-Node/HTTP fixtures and a local Worker preview do not establish Discord behavior.
-On an explicitly authorized beta candidate, record client/platform and verify:
+| Prefix | Target | Purpose |
+| --- | --- | --- |
+| `/youtube` | `www.youtube.com` | Initial API, widget script and official embed frame |
 
-1. Search result, queue and stage artwork load through the app origin; source
-   failure shows the Afterparty mark. No blocked external thumbnail requests.
-2. A cold search gives four previews with title, channel and duration/live badge;
-   a repeat uses cache. Select a test ID only in an owner-approved playback test
-   and confirm full metadata/availability validation remains in place.
-3. The stage explains Discord audio and external video. Explicitly open/cancel
-   the SDK link and confirm shared playback, Activity navigation and session stay
-   unchanged. In-Activity video remains an open requirement.
-4. Expand/restore the stage with pointer and keyboard, Escape, focus restoration
-   and visible controls on desktop and mobile. Confirm it is labelled as stage
-   expansion, not device fullscreen. Discord's own window expansion stays under
-   client control. Retest standalone video/fullscreen separately.
-5. Preserve one-job/50-second cancellation and the isolated Core resource cap.
+Use no protocol in Target; put the specific prefix before the existing `/` route.
+This is the minimum initial routing experiment, not a proven complete player
+configuration. The public demo embed HTML also referenced root-relative `/s/...`
+scripts. A subsequent trace may require `/s` -> `www.youtube.com/s`, before `/`,
+but that additional same-origin third-party script mapping needs separate
+review/approval and a real trace. Parent-document rewriting does not automatically
+patch a nested iframe realm. Do not guess wildcard video/CDN/internal-API mappings.
+Stop and diagnose the next blocked URL or origin error instead of relaying media
+or weakening CSP. Standard proxy mapping itself has not been established as
+prohibited, but provider restrictions and official-player identification remain.
 
-If no permitted browser/Discord client is available, leave these gates pending.
-Do not publish merely to call unit tests an end-to-end result.
+Mapping a third-party frame under the Activity origin changes its same-origin
+trust boundary. Activity cookies remain scoped to `/api/activity`, but that alone
+is not proof that a same-origin frame cannot reach authenticated app APIs. Review
+this boundary with the test-app mapping approval; do not treat transport mapping
+as a security guarantee or grant it on production. No credentials are added to
+the script/frame URLs by this adapter.
+
+The pre-created iframe and API use actual origins; whether the mapped frame's
+postMessage ready/state/control handshake works through Discord is unverified.
+No local/mock event is evidence of that handshake. Keep YouTube error101/150
+(owner embedding refusal),153 (client identification), loading/CSP failures and
+autoplay denial distinct. Do not bypass a provider refusal.
+
+Artwork remains a separate fixed-ID same-origin JPEG endpoint with a5-second
+combined cancellation deadline,256KiB cap, no redirects/caller credentials and
+cache headers. Activity flat discovery retains independent preview/verified
+caches; selected IDs still resolve full metadata. One-job admission, total50s
+catalog deadline, cancellation and extraction resource limits remain unchanged.
+
+### Fullscreen capability, not an Activity-wide disable
+
+The SDK has no fullscreen request command. This does not mean the browser API
+cannot work. Activity and standalone both request native fullscreen from the
+user gesture when allowed; otherwise the accessible fallback fills only the
+current viewport and is labelled Restore stage. Escape, focus restoration and
+visible exit controls remain. The Activity cannot grant a capability denied by
+Discord's enclosing iframe. Inspect `document.fullscreenEnabled`, the client's
+iframe delegation and an actual rejection before attributing a fullscreen bug.
+SDK orientation/PiP settings are not fullscreen grants. See the
+[Fullscreen Standard](https://fullscreen.spec.whatwg.org/#permissions-policy-integration).
+
+### Required real Discord checks before merge/publication
+
+1. Confirm the approved initial mapping loads `/youtube/iframe_api` and the
+   mapped widget script, without the direct initial-script CSP failure.
+2. Record the actual iframe request, subsequent blocked URL/status/directive,
+   parent/frame origins and YouTube error code if any. Never record nonces,
+   session cookies, OAuth tokens or complete HAR files in public GitHub.
+3. Establish actual API onReady/state events and synchronized time/control in
+   the mapped iframe before claiming embedded video works. Use an owner-approved
+   existing test concert; automation must not alter live audio/queues to test it.
+4. Verify cold/warm search, artwork in results/queue/stage, selected-ID validation,
+   and unchanged Activity transport cancellation/session isolation.
+5. Test native fullscreen where permitted and a denied case, plus fallback label,
+   Escape, focus restoration and visible controls on desktop/mobile. Retest normal
+   website video/fullscreen; do not label viewport expansion device fullscreen.
+
+Without a permitted browser/client these gates remain pending. The code and
+mocked DOM tests are review material, not a successful Discord integration test.
+
+
+### Activity audio output and queue controls
+
+The embedded player must play synchronized video **with audio** inside Activity.
+The external link is only a failure fallback. A listener explicitly chooses local
+Activity audio or Discord voice audio; until then the local player stays muted.
+Local Activity audio requires the listener to confirm muting the bot for themselves
+in Discord, then uses the existing local volume preference, an explicit unmute
+and user gesture. The SDK has no supported per-user bot mute command, so the app
+cannot verify this confirmation or automatically prevent a listener from leaving
+their separate voice audio audible. It must never claim that it muted the bot.
+Switching to voice output mutes the local player and asks the listener to unmute
+the bot locally. No server voice, bot volume or other user's audio is changed.
+Native iframe unmute while the voice/undecided policy is active is re-muted by
+the local playback loop; policy mute is not saved as the user's volume preference.
+Validate real autoplay recovery and absence of double audio in the target client.
+
+Search/add and the queue remain inside the Activity view. Add still submits the
+selected ID to the existing authoritative concert command. Queue reads preserve
+per-guild permissions, revisions and filtered ordinary Discord music. Loading or
+failed queue reads must not say the queue is empty; read-only retry is separate
+from mutation. A generic Console thumbnail CSP error does not establish an order,
+missing-item, moderation or stale-update queue bug. Capture the actual queue pane
+and relevant read status after the owner's operation before claiming that defect
+resolved. No live queue/playback mutation is part of source validation.
