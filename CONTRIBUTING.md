@@ -6,7 +6,7 @@ Start with a concrete problem: what happened, how to reproduce it and what you e
 
 ## Set up a current checkout
 
-Fork the repository and create a focused branch from the latest upstream `main` for normal development. Rust experiments follow the branch strategy below. Before reviewing or editing code, fetch upstream and ensure the working branch includes the latest remote `main`. Before submitting your PR, fetch `main` and the target branch again, incorporate any newer `main` and rerun affected checks. Preserve local work when incorporating updates.
+Fork the repository and create a focused branch from the latest upstream `beta` for beta development, or `main` for a stable-only fix. Rust experiments follow the branch strategy below. Before reviewing or editing code, fetch upstream and ensure the working branch includes the latest remote `main`. Before submitting your PR, fetch `main` and the target branch again, incorporate any newer `main` and rerun affected checks. Preserve local work when incorporating updates.
 
 Use Node.js 24.17+, Python 3.11+ and FFmpeg. From the repository root:
 
@@ -19,7 +19,9 @@ These commands install the locked website and Core dependency trees, run deploym
 
 ## Branch strategy
 
-- `main` remains the default branch for active TypeScript development, fixes and new application features. Submit focused task branches as reviewed PRs targeting `main`.
+- `main` remains the default branch and stable release source. Stable-only fixes use focused PRs from refreshed `main`; bring accepted stable fixes into `beta` as well.
+- `beta` is the combined TypeScript prerelease development branch. Create focused task branches from refreshed `beta`, include the latest stable `main`, and submit reviewed PRs targeting `beta`. Keep prerelease notes and validation with the source. Existing beta PRs may remain as review history; do not merge the same change twice.
+- Promotion from `beta` to `main` is a separate, reviewed owner decision after the beta acceptance gates pass. A draft promotion PR is review material only. No separate `release` branch, automatic promotion, release publication or deployment is introduced. Branch selection does not bypass the production boundary or any required check.
 - `dev` is a separate branch for isolated Rust testing, initially created from the latest `main`. It is not a general staging branch for TypeScript features. Keep experiments offline and separate from production accounts, data and deployment.
 - For a Rust task, fetch the latest remote `main` and `dev`, create a focused `experiment/rust-*` branch from `dev`, and incorporate the latest `main` into the task branch before reviewing or editing code. Before submitting the PR to `dev`, fetch both branches again, incorporate any newer `main` and rerun affected checks on the combined result. Preserve existing Rust work when incorporating updates.
 - Keep `nightly` and earlier Rust experiment branches as existing work. Do not merge them into `main` as part of this strategy. Any future adoption of Rust in `main` requires a separate owner decision, focused review and relevant validation; it is not an automatic promotion from `dev` or `nightly`.

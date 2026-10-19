@@ -7,6 +7,16 @@ omit the `v` prefix; Git tags and GitHub Releases include it, for example packag
 labels are historical identifiers, not semantic major versions. Never rename or
 renumber those entries or move existing tags.
 
+## Stable and beta channels
+
+`main` remains the default branch and stable release source. `beta` contains the
+combined prerelease source and its canonical notes. Beta feature PRs target
+`beta`; stable-only fixes target `main`. Promoting beta to stable requires a
+separate reviewed owner decision and the acceptance gates, not just a branch
+copy or a passing test. Keep numbered prerelease versions until that decision.
+No separate `release` branch, automatic release or deployment is configured by
+this workflow. See [branch strategy](../CONTRIBUTING.md#branch-strategy).
+
 ## Choose the next version
 
 - Bug fix: increment PATCH by one, for example `1.4.9` to `1.4.10`.

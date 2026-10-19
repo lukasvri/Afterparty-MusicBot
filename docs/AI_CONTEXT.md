@@ -2,7 +2,7 @@
 
 [Documentation](README.md) · [AI workflow](AI_WORKFLOW.md) · [Architecture](ARCHITECTURE.md) · [Branding](BRANDING.md)
 
-This is a **small, durable decision record** for assistants working on Afterparty. It was checked against the repository on **18 October 2026**. Refresh `main`, related PRs and the specific source files before making claims about current implementation. This is not a live deployment dashboard or an exhaustive description of the code.
+This is a **small, durable decision record** for assistants working on Afterparty. It was checked against the repository on **19 October 2026**. Refresh `main`, related PRs and the specific source files before making claims about current implementation. This is not a live deployment dashboard or an exhaustive description of the code.
 
 ## Product and identity
 
@@ -15,7 +15,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 
 ## Architectural boundaries
 
-- GitHub repository: `lukasvri/Afterparty-MusicBot`; normal TypeScript development, fixes and new application features target the latest remote `main` through reviewed PRs.
+- GitHub repository: `lukasvri/Afterparty-MusicBot`; the owner separated combined TypeScript beta development onto `beta` on 19 October 2026. `main` stays the default branch and stable release source. Beta feature PRs target refreshed `beta` and include the latest stable `main`; stable-only fixes target `main`. Reviewed promotion, release publication and deployment remain separate owner decisions. No separate `release` branch or automatic deployment is implied.
 - `dev` is reserved for isolated Rust testing, initially based on the latest `main`. It is not the staging branch for normal features. Existing `nightly` and Rust branches remain separate from `main`; future Rust adoption requires a separate owner decision and review. Follow the [branch strategy](../CONTRIBUTING.md#branch-strategy).
 - Rust evaluation is paused at the owner's request on 18 October 2026; [research task #51](https://github.com/lukasvri/Afterparty-MusicBot/issues/51) and [PR #66](https://github.com/lukasvri/Afterparty-MusicBot/pull/66) are closed. Prioritize TypeScript/Node.js and FFmpeg performance and stability. Preserve Rust source, measurements and branch history, and resume Rust work only on an explicit owner request.
 - Website: `app/`, `components/`, `hooks/`, `lib/`; hosted separately from Core.

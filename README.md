@@ -102,6 +102,14 @@ Run these from `services/core/`:
 
 Back up the complete `/data` volume, including `guilds/`, before an update. `docker compose down -v` deletes the data volume. [Operations and recovery](services/core/PUBLIC_RELEASE.md) covers safe updates; [host readiness](docs/HOST_READINESS.md) covers live backups, restore checks and health reports. [Remote deployment](docs/REMOTE_DEPLOY.md) keeps credentials and production data on the bot host.
 
+## Stable and beta source
+
+- [`main`](https://github.com/lukasvri/Afterparty-MusicBot/tree/main) is the stable release source and remains the default branch.
+- [`beta`](https://github.com/lukasvri/Afterparty-MusicBot/tree/beta) combines the TypeScript prerelease work for controlled testing. A beta commit is not a stable release or a deployed service.
+- New beta work uses focused PRs into `beta`. Promotion to `main`, release publication and deployment each require separate owner approval and validation. There is no separate `release` branch.
+
+The [branch strategy](CONTRIBUTING.md#branch-strategy) explains stable fixes and the preserved Rust branches.
+
 ## Work on the project
 
 With Node.js 24.17+, Python 3.11+ and FFmpeg installed:
@@ -138,8 +146,8 @@ The [offline mixer on `dev`](https://github.com/lukasvri/Afterparty-MusicBot/tre
 its [development notes](https://github.com/lukasvri/Afterparty-MusicBot/blob/dev/docs/RUST_DEVELOPMENT.md)
 and [earlier experiment](https://github.com/lukasvri/Afterparty-MusicBot/tree/experiment/rust-audio-nightly-20261016/experiments/rust-audio)
 remain preserved. They are not part of the production audio engine. Resuming or
-adopting Rust requires an explicit owner decision and review. Normal development
-targets refreshed `main` through focused PRs; see the
+adopting Rust requires an explicit owner decision and review. Normal beta development
+targets `beta` through focused PRs while stable releases stay on `main`; see the
 [branch strategy](CONTRIBUTING.md#branch-strategy).
 
 ## Explore further

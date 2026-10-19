@@ -53,7 +53,9 @@ documentation in English. Do not use em dashes.
   historical entries. Verify relevant notes reach the website's `/patch-notes`
   and latest-release link. Do not create a competing changelog.
 - Follow [branch strategy](CONTRIBUTING.md#branch-strategy): focused branches
-  from refreshed `main` target `main`; isolated Rust branches target `dev`.
+  from refreshed `beta` target `beta`; stable-only fixes from refreshed `main`
+  target `main`. Include latest `main` in beta tasks. Promotion to stable `main`
+  requires a separate reviewed owner decision; isolated Rust branches target `dev`.
   Open a draft PR with actual checks, notes and limitations. Owner approval is
   required before merging, enabling auto-merge, publishing or deploying.
 
