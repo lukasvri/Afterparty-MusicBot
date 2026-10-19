@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.2.8",
+    "date": "2026-10-19",
+    "title": "Safer connections and server channel lists",
+    "items": [
+      "Core rejects malformed WebSocket upgrade URLs without terminating the process. Valid live connections and existing origin and server permission checks are preserved.",
+      "The control room discards delayed channel lists after the selected server changes, so a refreshed server selection cannot display channels from the previous server."
+    ]
+  },
+  {
     "version": "2.2.7",
     "date": "2026-10-18",
     "title": "Private owner update shortcut",

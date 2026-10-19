@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.8: Safer connections and server channel lists
+
+2026-10-19
+
+- Core rejects malformed WebSocket upgrade URLs without terminating the process. Valid live connections and existing origin and server permission checks are preserved.
+- The control room discards delayed channel lists after the selected server changes, so a refreshed server selection cannot display channels from the previous server.
+
 ## v2.2.7: Private owner update shortcut
 
 2026-10-18
