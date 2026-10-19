@@ -525,9 +525,17 @@ export async function createServers(
   publicServer.on("upgrade", (request, socket, head) => {
     const origin = String(request.headers.origin ?? "missing").slice(0, 200);
     if (upgradeOrigins.size < 10) upgradeOrigins.add(origin);
-    const path = new URL(request.url ?? "/", "http://core").pathname;
+    let url: URL;
+    try {
+      url = new URL(request.url ?? "/", "http://core");
+    } catch {
+      rejectedUpgrades++;
+      socket.write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
     if (
-      path !== "/live" ||
+      url.pathname !== "/live" ||
       request.headers.origin !== options.origin ||
       wss.clients.size >= 128
     ) {
@@ -544,9 +552,7 @@ export async function createServers(
     }
     let target;
     try {
-      target = select(
-        new URL(request.url ?? "/", "http://core").searchParams.get("guildId"),
-      );
+      target = select(url.searchParams.get("guildId"));
     } catch {
       socket.destroy();
       return;

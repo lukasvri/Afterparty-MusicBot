@@ -341,9 +341,10 @@ export default function Admin() {
     }
   }
   async function readChannels() {
+    const version = generation.current;
     try {
       const result = await control("channels");
-      if (result?.channels) setChannels(result.channels);
+      if (alive.current && version === generation.current && result?.channels) setChannels(result.channels);
     } catch (e) {
       setError((e as Error).message);
     }

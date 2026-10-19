@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHmac,randomUUID} from 'node:crypto';
 import {once} from 'node:events';
+import {spawnSync} from 'node:child_process';
 import WebSocket from 'ws';
 import {Store} from '../src/store.ts';
 import {Providers} from '../src/providers.ts';
@@ -13,6 +14,43 @@ import {Engine} from '../src/engine.ts';
 import {Commands} from '../src/commands.ts';
 import {createServers} from '../src/server.ts';
 import type {Sink} from '../src/audio.ts';
+test('malformed WebSocket upgrade targets cannot crash Core before origin validation',()=>{
+ // A child isolates an uncaught upgrade-listener exception from the test runner.
+ const source=new URL('../src/',import.meta.url).href;
+ const probe=spawnSync(process.execPath,['--input-type=module','--eval',`
+  import assert from 'node:assert/strict';
+  import net from 'node:net';
+  import {once} from 'node:events';
+  import WebSocket from ${JSON.stringify(import.meta.resolve('ws'))};
+  import {Store} from ${JSON.stringify(source+'store.ts')};
+  import {Providers} from ${JSON.stringify(source+'providers.ts')};
+  import {Engine} from ${JSON.stringify(source+'engine.ts')};
+  import {Commands} from ${JSON.stringify(source+'commands.ts')};
+  import {createServers} from ${JSON.stringify(source+'server.ts')};
+  const store=new Store(':memory:');
+  const sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
+  const engine=new Engine(store,new Providers(store,{}),sink),commands=new Commands(engine);
+  const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',passwordHash:'',hosts:[],publicPort:0,adminPort:false,host:'127.0.0.1',privateState:()=>({private:true})});
+  const port=servers.publicServer.address().port;
+  try {
+   for(const origin of ['https://site.example','https://other.example']) {
+    const response=await new Promise((resolve,reject)=>{
+     const socket=net.connect(port,'127.0.0.1');let received='';
+     socket.setTimeout(3000,()=>socket.destroy(new Error('Upgrade rejection timed out')));
+     socket.on('error',reject);socket.on('data',chunk=>received+=chunk);socket.on('close',()=>resolve(received));
+     socket.on('connect',()=>socket.write('GET //[ HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nOrigin: '+origin+'\\r\\n\\r\\n'));
+    });
+    assert(response.startsWith('HTTP/1.1 400 '));
+   }
+   assert.equal((await fetch('http://127.0.0.1:'+port+'/v1/jobs')).status,403);
+   const ws=new WebSocket('ws://127.0.0.1:'+port+'/live',{origin:'https://site.example'});
+   try {
+    const [message]=await once(ws,'message');assert.equal(JSON.parse(String(message)).type,'state');
+   } finally {ws.terminate();await once(ws,'close');}
+  } finally {await servers.close();commands.close();engine.close();store.close();}
+ `],{encoding:'utf8',timeout:15000});
+ assert.equal(probe.status,0,probe.stderr||String(probe.error??'Probe failed'));
+});
 test('public transport is read only, admin stays private, commands are acknowledged once',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'gutta-api-')),store=new Store(join(dir,'db.sqlite'));
  const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
