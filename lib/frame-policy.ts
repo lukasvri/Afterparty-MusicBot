@@ -1,4 +1,6 @@
-/** Only the exact Activity document opts into Discord framing. API origins and
+import { isActivityLaunchDocument, type ActivityLaunchSettings } from './activity-launch.ts';
+
+/** Only Activity documents, including an enabled launch root, permit Discord framing. API origins and
  * authorization are separate checks; these hosts never grant API access.
  * Discord's SDK lists the stable, PTB and canary Discord parent origins:
  * https://github.com/discord/embedded-app-sdk/blob/main/src/Discord.ts
@@ -9,9 +11,9 @@ export const activityFramePolicy = "frame-ancestors https://discord.com https://
 /** Apply after framework headers so inherited DENY cannot block the Activity,
  * and framework case/trailing-slash matching cannot widen the exception.
  */
-export function applyFramePolicy(request: Request, response: Response): Response {
+export function applyFramePolicy(request: Request, response: Response, settings: ActivityLaunchSettings = {}): Response {
   const headers = new Headers(response.headers);
-  if (new URL(request.url).pathname === '/activity') {
+  if (new URL(request.url).pathname === '/activity' || isActivityLaunchDocument(request, settings)) {
     headers.delete('X-Frame-Options');
     headers.set('Content-Security-Policy', activityFramePolicy);
   } else {

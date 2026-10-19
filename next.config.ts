@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 import { standaloneFramePolicy } from './lib/frame-policy.ts';
 
-// The request-time worker applies the exact /activity exception after framework
+// The request-time worker applies Activity document exceptions after framework
 // matching. Keep this baseline restrictive, including development/fallback hosts.
 const nextConfig: NextConfig = {
   async headers() {

@@ -10,3 +10,5 @@ OWNER_UPDATE_URL=
 # Optional isolated Discord Activity test mode. Off unless explicitly enabled.
 DISCORD_ACTIVITY_ENABLED=false
 DISCORD_ACTIVITY_CLIENT_ID=
+# Optional root launch document on a dedicated Activity test website only.
+DISCORD_ACTIVITY_LAUNCH_ROOT=false

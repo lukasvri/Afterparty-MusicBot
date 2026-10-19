@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { matchHeaders, requestContextFromRequest } from 'vinext/config/config-matchers';
 import config from '../next.config.ts';
 import { applyFramePolicy, activityFramePolicy, standaloneFramePolicy } from '../lib/frame-policy.ts';
+import { activityLaunchRootEnabled, type ActivityLaunchSettings } from '../lib/activity-launch.ts';
 
 async function rendered(path: string) {
   const request = new Request('https://afterparty.example' + path);
@@ -39,14 +40,73 @@ test('framing decisions ignore caller supplied origins and forwarded paths', asy
   assert.equal(response.headers.get('Set-Cookie'), 'synthetic=1; HttpOnly; Secure');
 });
 
+const rootSettings: ActivityLaunchSettings = {
+  DISCORD_ACTIVITY_LAUNCH_ROOT: 'true',
+  DISCORD_ACTIVITY_ENABLED: 'true',
+  DISCORD_ACTIVITY_CLIENT_ID: '123456789012345678',
+};
+
+test('root launch requires all exact server settings and never trusts caller headers', () => {
+  assert.equal(activityLaunchRootEnabled(rootSettings), true);
+  for (const settings of [
+    {}, { ...rootSettings, DISCORD_ACTIVITY_LAUNCH_ROOT: 'false' },
+    { ...rootSettings, DISCORD_ACTIVITY_LAUNCH_ROOT: 'TRUE' },
+    { ...rootSettings, DISCORD_ACTIVITY_ENABLED: 'false' },
+    { ...rootSettings, DISCORD_ACTIVITY_CLIENT_ID: '' },
+    { ...rootSettings, DISCORD_ACTIVITY_CLIENT_ID: 'not-an-application' },
+  ]) {
+    assert.equal(activityLaunchRootEnabled(settings), false);
+    const request = new Request('https://test.example/', { headers: {
+      Origin: 'https://discord.com', 'X-Forwarded-Uri': '/activity',
+    } });
+    const response = applyFramePolicy(request, new Response(null), settings);
+    assert.equal(response.headers.get('X-Frame-Options'), 'DENY');
+    assert.equal(response.headers.get('Content-Security-Policy'), standaloneFramePolicy);
+  }
+});
+
+test('opt-in root framing is limited to GET/HEAD launch documents and preserves query and cookies', () => {
+  for (const method of ['GET', 'HEAD']) {
+    const request = new Request('https://test.example/?frame_id=test&instance_id=test', { method });
+    const response = applyFramePolicy(request, new Response(null, { headers: {
+      'Set-Cookie': 'synthetic=1; Secure; HttpOnly', 'X-Frame-Options': 'DENY',
+    } }), rootSettings);
+    assert.equal(response.headers.get('X-Frame-Options'), null);
+    assert.equal(response.headers.get('Content-Security-Policy'), activityFramePolicy);
+    assert.equal(response.headers.get('Set-Cookie'), 'synthetic=1; Secure; HttpOnly');
+    assert.equal(new URL(request.url).searchParams.get('frame_id'), 'test');
+  }
+  for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) {
+    const response = applyFramePolicy(new Request('https://test.example/', { method }), new Response(null), rootSettings);
+    assert.equal(response.headers.get('X-Frame-Options'), 'DENY', method);
+  }
+  for (const path of ['/admin', '/api/activity', '/api/admin/session', '/api/social', '//', '/%2f', '/Activity', '/activity/']) {
+    const response = applyFramePolicy(new Request('https://test.example' + path), new Response(null), rootSettings);
+    assert.equal(response.headers.get('Content-Security-Policy'), standaloneFramePolicy, path);
+  }
+});
+
 // Optional check against an actual locally built worker, never a production URL.
 if (process.env.ACTIVITY_HEADER_PREVIEW_URL) test('local built worker sends the expected Activity and standalone headers', async () => {
   const base = new URL(process.env.ACTIVITY_HEADER_PREVIEW_URL!);
   assert(['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname), 'Only local preview verification is allowed');
-  for (const path of ['/activity', '/', '/admin', '/Activity', '/activity/', '/activity/admin', '/api/activity/auth']) {
+  const launchRoot = process.env.ACTIVITY_HEADER_PREVIEW_LAUNCH_ROOT === 'true';
+  for (const path of ['/activity', '/', '/?frame_id=synthetic&instance_id=synthetic', '/admin', '/Activity', '/activity/', '/activity/admin', '/api/activity/auth']) {
     const response = await fetch(new URL(path, base), { redirect: 'manual', signal: AbortSignal.timeout(15000) });
-    assert.equal(response.headers.get('Content-Security-Policy'), path === '/activity' ? activityFramePolicy : standaloneFramePolicy, path);
-    assert.equal(response.headers.get('X-Frame-Options'), path === '/activity' ? null : 'DENY', path);
-    await response.body?.cancel();
+    const root = path === '/' || path.startsWith('/?');
+    const activity = path === '/activity' || (launchRoot && root);
+    assert.equal(response.headers.get('Content-Security-Policy'), activity ? activityFramePolicy : standaloneFramePolicy, path);
+    assert.equal(response.headers.get('X-Frame-Options'), activity ? null : 'DENY', path);
+    if (root) {
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      assert.equal(html.includes('data-activity-phase="idle"'), launchRoot, path);
+      if (launchRoot) assert(html.includes('Connect with Discord'));
+    } else await response.body?.cancel();
   }
+  const notes = await fetch(new URL('/patch-notes', base), { signal: AbortSignal.timeout(15000) });
+  assert.equal(notes.status, 200);
+  const html = await notes.text();
+  assert(html.includes('Dedicated Activity launch root'));
+  assert(html.includes('3.0.0-beta.3'));
 });

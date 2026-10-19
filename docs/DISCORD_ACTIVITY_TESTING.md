@@ -48,6 +48,7 @@ existing machine, test HTTPS origins and approved proxy/tunnel before any setup.
 | Website | `GUTTA_CORE_SITE_ORIGIN` | Test website HTTPS origin |
 | Website | `DISCORD_ACTIVITY_ENABLED` | `true` only for the isolated test website |
 | Website | `DISCORD_ACTIVITY_CLIENT_ID` | Same exact test application ID |
+| Website | `DISCORD_ACTIVITY_LAUNCH_ROOT` | `true` only on a dedicated test website to serve the Activity at `/`; requires Activity enabled and a valid application ID |
 | Website | `DB` binding | Separate test D1 database |
 
 `MUSIC_TEXT_CHANNEL_ID` and `MAX_ACTIVE_VOICE_SESSIONS` can restrict the test's
@@ -76,13 +77,17 @@ performed by this PR:
 3. Enable Activities. Keep Discord's default Launch entry-point handler; the
    current source does not add a custom Activity launch interaction to the bot.
 4. Map `/` to the approved test HTTPS host. Discord's guide demonstrates root
-   mapping, not a guaranteed custom launch-path field. The test reverse proxy
-   must rewrite only the launch document `/` to upstream `/activity`, preserving
-   its query string, while forwarding assets and `/api/activity/*` unchanged.
-   Alternatively use a verified launch-path setting if the current Portal offers
-   one. Confirm the upstream document is exactly `/activity`; other documents
-   intentionally reject framing. This routing is an explicit owner configuration
-   gate, not a claim that a Portal toggle alone launches this source.
+   mapping, not a guaranteed custom launch-path field. On a dedicated test website,
+   set `DISCORD_ACTIVITY_LAUNCH_ROOT=true` together with the matching Activity
+   configuration. The root renders the same Activity entry without a redirect or
+   path rewrite, so the SDK launch query remains in the browser URL and hydration
+   uses the root route. Only root GET/HEAD documents get Activity framing; API,
+   admin and other documents retain their existing protection. With the root flag
+   absent, false, or Activity disabled, `/` stays the ordinary website.
+   Alternatively use a reviewed launch-document reverse proxy or a verified
+   launch-path setting if the Portal offers one. Assets and `/api/activity/*` must
+   remain unchanged. This is an explicit owner configuration gate, not a claim
+   that a Portal toggle alone launches this source.
 5. Add the SDK OAuth redirect placeholder described by Discord's Activity guide
    (`https://127.0.0.1`). The SDK flow exchanges codes without a website redirect.
    If testing ordinary website login too, retain its separate exact test-website
@@ -108,7 +113,7 @@ user, channel and instance data alone never grants permission. This iteration
 selects the verified guild's existing concert, not a separate channel/instance
 concert. It does not claim to verify voice-channel attendance.
 
-Only `/activity` permits Discord framing. Activity traffic uses a fixed API bridge
+Only `/activity` and an explicitly enabled root launch document permit Discord framing. Activity traffic uses a fixed API bridge
 allowlist, with server-owned scope and participant identity. The standalone app's
 OAuth cookies/origin policies remain unchanged. Room creation, directory and admin
 navigation are excluded. Playback commands require a verified server manager;

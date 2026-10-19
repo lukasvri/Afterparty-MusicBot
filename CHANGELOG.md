@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-beta.3: Dedicated Activity launch root
+
+2026-10-19
+
+- Dedicated Activity test websites can opt in to serving the existing Activity entry at the root URL used by Discord Launch. The setting is off by default and also requires Activity mode and a valid configured application ID.
+- Root launch keeps the SDK query in place without redirects or path rewrites. Only configured root GET/HEAD documents permit Discord framing; admin, API and other routes retain their existing protections. Ordinary websites keep their current homepage.
+- This remains source for an isolated integration test. Owner-approved test hosting, Portal setup, a separate bot and real desktop/mobile and voice checks are still required. No production deployment or verified live Discord compatibility is implied.
+
 ## v3.0.0-beta.2: Isolated Discord Activity test mode
 
 2026-10-19

@@ -35,6 +35,7 @@ Local file: `.dev.vars` in the repository root. In production, use the hosting p
 | `GUTTA_CORE_PUBLIC_URL` | Yes for Core integration | Core's HTTPS origin, for example `https://core.example.com` |
 | `GUTTA_CORE_SITE_ORIGIN` | Recommended | Your website origin; otherwise derived from the request URL |
 | `YOUTUBE_API_KEY` | For website search | YouTube Data API key with access to the required API |
+| `DISCORD_ACTIVITY_LAUNCH_ROOT` | Dedicated Activity test website only | Default `false`. With Activity enabled and a valid configured Activity client ID, serves the Activity entry at `/` and permits Discord framing for root GET/HEAD documents. Never enable on the ordinary website. |
 
 Discord OAuth credentials belong in **Core's** environment. They are not browser configuration. The website calls Core to perform the token exchange.
 
