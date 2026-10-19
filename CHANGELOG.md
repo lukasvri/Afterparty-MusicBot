@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.9: TypeScript tooling and current setup guidance
+
+2026-10-19
+
+- ESLint and PostCSS configuration now lives in typechecked TypeScript, with small conventional loader adapters preserved. The maintained shell installer calls the TypeScript implementation directly; older installer entry points remain compatible.
+- The README clarifies setup and validation commands, implemented versus deployed status, and the paused Rust evaluation. Existing Rust research and legacy dashboard assets are preserved.
+
 ## v2.2.8: Safer connections and server channel lists
 
 2026-10-19

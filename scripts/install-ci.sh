@@ -170,7 +170,7 @@ timeout \
   --signal=TERM \
   --kill-after="${SITES_INSTALL_KILL_AFTER:-15s}" \
   "${SITES_INSTALL_TIMEOUT:-8m}" \
-  node "${script_dir}/npm-install.mjs" "${cache_seed_result}" npm "${npm_ci_args[@]}"
+  node "${script_dir}/npm-install.ts" "${cache_seed_result}" npm "${npm_ci_args[@]}"
 
 vinext="${SITES_PROJECT_ROOT}/node_modules/.bin/vinext"
 if [[ ! -x "${vinext}" ]]; then

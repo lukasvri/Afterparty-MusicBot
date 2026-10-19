@@ -109,17 +109,36 @@ npm run setup:cloud
 npm run check:all
 ```
 
-This installs both locked dependency trees, runs deployment recovery, website and Core tests, checks both TypeScript projects, and builds the website. Audio tests use real FFmpeg with synthetic tones. Browser automation uses simulated playback and isolated fixtures. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
+`setup:cloud` installs both locked dependency trees. `check:all` runs lint, deployment recovery tests, website unit tests, both TypeScript checks, Core tests and a website production build. Audio tests use real FFmpeg with synthetic tones. Separate Playwright browser suites, such as `npm run test:party` and `npm run test:sync`, use simulated playback and isolated fixtures; `check:all` does not launch them. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
 
 The validation command requires repository-wide lint with zero warnings. Automated checks do not establish live Discord audio quality or multi-server production capacity; the [release review](docs/RELEASE_REVIEW.md) records the remaining live checks.
 
-## Rust audio research (experimental)
+## TypeScript and project status
 
-Afterparty's current Discord Core runs on **TypeScript/Node.js and FFmpeg**. We are exploring **Rust** for a small, isolated PCM audio-mixing component, with a focus on volume control, crossfades and measurable performance under load. A prototype is **not** a replacement for the existing audio engine, and it has no production or Discord connection.
+The website (`app/`, `components/`, `hooks/`, `lib/`), Core
+(`services/core/src/`), tests and maintained Node scripts are written in
+TypeScript. Node.js 24.17+ runs the Node scripts directly using native type
+stripping. ESLint and PostCSS load typechecked TypeScript configuration through
+small `.mjs` adapters. Existing installer adapters remain compatible with older
+configured entry points. See [TypeScript boundaries](docs/TYPESCRIPT.md) for the
+retained legacy dashboard and Python, shell and container tooling.
 
-TypeScript development, fixes and new application features continue on `main` through reviewed PRs. The separate [`dev` branch](https://github.com/lukasvri/Afterparty-MusicBot/tree/dev), initially created from the latest `main`, is for isolated Rust testing. Existing `nightly` and Rust experiment branches are preserved separately; they are not merged into `main` as part of this setup. Any future adoption of Rust in `main` requires a separate decision and review. See the [branch strategy](CONTRIBUTING.md#branch-strategy).
+The README describes implemented source, not the currently deployed revision.
+Check [open PRs](https://github.com/lukasvri/Afterparty-MusicBot/pulls) for proposed
+changes and the [changelog](CHANGELOG.md) for source release notes. Deployment
+and live playback need separate host-side verification.
 
-Rust testing continues with the [offline Rust mixer on `dev`](https://github.com/lukasvri/Afterparty-MusicBot/tree/dev/experiments/rust-audio) and its [development notes](https://github.com/lukasvri/Afterparty-MusicBot/blob/dev/docs/RUST_DEVELOPMENT.md), transferred from `nightly` with its tests and latest rounding fix. The [earlier experimental source](https://github.com/lukasvri/Afterparty-MusicBot/tree/experiment/rust-audio-nightly-20261016/experiments/rust-audio) remains preserved. Rust will not appear in the GitHub language chart for `main` until Rust source files are actually merged there.
+### Rust research is paused
+
+Rust evaluation was paused at the owner's request on 18 October 2026. Current
+work prioritizes **TypeScript/Node.js and FFmpeg** performance and stability.
+The [offline mixer on `dev`](https://github.com/lukasvri/Afterparty-MusicBot/tree/dev/experiments/rust-audio),
+its [development notes](https://github.com/lukasvri/Afterparty-MusicBot/blob/dev/docs/RUST_DEVELOPMENT.md)
+and [earlier experiment](https://github.com/lukasvri/Afterparty-MusicBot/tree/experiment/rust-audio-nightly-20261016/experiments/rust-audio)
+remain preserved. They are not part of the production audio engine. Resuming or
+adopting Rust requires an explicit owner decision and review. Normal development
+targets refreshed `main` through focused PRs; see the
+[branch strategy](CONTRIBUTING.md#branch-strategy).
 
 ## Explore further
 
