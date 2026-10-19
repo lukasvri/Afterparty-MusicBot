@@ -52,8 +52,8 @@ export const ConcertScenery = memo(function ConcertScenery({
   const stageOffset = composition === "welcome" ? -225 : 0;
   // Lower the rear-screen emblem behind the DJ; SVG paint order keeps him in front.
   const emblemY = 280;
-  const emblemRadius = composition === "welcome" ? 56 : 78;
-  const markSize = composition === "welcome" ? 140 : 180;
+  const emblemRadius = composition === "welcome" ? 76 : 100;
+  const markSize = composition === "welcome" ? 190 : 230;
   return <div className="concert-scenery" data-composition={composition} aria-hidden="true">
     <svg className="concert-venue" viewBox="0 0 1200 675" preserveAspectRatio={composition === "welcome" ? "xMidYMid slice" : "xMidYMid meet"} focusable="false">
       <defs>

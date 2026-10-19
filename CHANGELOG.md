@@ -4,11 +4,11 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
-## v2.2.11: Lower DJ backdrop logo
+## v2.2.11: Larger, lower DJ backdrop logo
 
 2026-10-19
 
-- The AP emblem sits lower on the rear LED screen behind the DJ in welcome and empty-room scenes. The character, console and playback controls are unchanged.
+- The larger AP emblem sits lower on the rear LED screen behind the DJ in welcome and empty-room scenes. The character, console and playback controls are unchanged.
 
 ## v2.2.10: Retire the optional legacy Core dashboard
 

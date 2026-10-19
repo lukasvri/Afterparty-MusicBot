@@ -134,7 +134,7 @@ try {
         await scene.waitFor();
         const geometry=await scene.evaluate(el=>{
           const box=(selector:string)=>{const r=el.querySelector(selector)!.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
-          const screen=box('[data-led-screen]'),halo=box('[data-led-halo]'),mark=box('.stage-backdrop image'),head=box('.performer-head');
+          const screen=box('[data-led-screen]'),halo=box('[data-led-halo]'),mark=box('.stage-backdrop image'),head=box('.performer-head'),booth=box('.dj-booth');
           const intersects=(a:DOMRect,b:DOMRect)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
           const copy=Array.from(el.closest('.stage')?.querySelectorAll('.stage-intro h2,.stage-intro p,.stage-intro button')??[]);
           const subjects=[el.querySelector('.stage-backdrop image')!,el.querySelector('.performer-head')!].map(subject=>subject.getBoundingClientRect());
@@ -157,9 +157,12 @@ try {
           }));
           return {composition:el.getAttribute('data-composition'),screen,halo,mark,head,
             copyClear,copyContained,copyTextVisible,
-            emblemBehindHead: halo.top < head.top && halo.bottom > head.top && halo.bottom < head.bottom
+            emblemBehindHead: halo.top < head.top && halo.bottom > head.top && halo.bottom < booth.top
               && mark.top < head.top && mark.bottom > head.top
               && Math.abs((mark.left + mark.right - head.left - head.right) / 2) < 2,
+            markContained: mark.left >= screen.left && mark.right <= screen.right && mark.top >= screen.top && mark.bottom <= screen.bottom,
+            markScale: (mark.right - mark.left) / (screen.right - screen.left),
+            controlsClear: mark.bottom < booth.top,
             performerInFront: !!(el.querySelector(".stage-backdrop")!.compareDocumentPosition(el.querySelector(".stage-dj")!) & Node.DOCUMENT_POSITION_FOLLOWING),
             haloContained:halo.left>=screen.left&&halo.right<=screen.right&&halo.top>=screen.top&&halo.bottom<=screen.bottom,
             cabinetCounts:cabinets.map(array=>array.length),
@@ -170,7 +173,9 @@ try {
         check(geometry.copyTextVisible,`${composition}: the complete empty-room heading must stay readable`);
         check(geometry.copyContained,`${composition}: empty-room text and its action must fit inside the stage`);
         check(geometry.haloContained,`${composition}: the rotating halo stays inside the LED screen`);
-        check(geometry.emblemBehindHead,`${composition}: the lowered emblem sits behind the upper part of the DJ head`);
+        check(geometry.markContained && geometry.controlsClear,`${composition}: the larger mark stays inside the screen and above the controls`);
+        check(geometry.markScale > (composition === "welcome" ? .35 : .42),`${composition}: the AP mark has the enlarged visual scale`);
+        check(geometry.emblemBehindHead,`${composition}: the lowered emblem sits behind the DJ head`);
         check(geometry.performerInFront,`${composition}: the DJ paints in front of the backdrop emblem`);
         check(geometry.cabinetCounts.every(count=>count===7)&&geometry.cabinetSeams,`${composition}: both PA stacks retain seven aligned cabinets without overlapping seams`);
         const surface=composition==="room"?page.locator('.stage'):scene;
