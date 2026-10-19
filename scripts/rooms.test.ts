@@ -16,6 +16,8 @@ type FixtureEnvironment = {
     };
   };
   YOUTUBE_API_KEY?: string;
+  GUTTA_CORE_PUBLIC_URL?: string;
+  ADMIN_BRIDGE_KEY?: string;
 };
 const syntheticEnv: FixtureEnvironment = {};
 const globals = globalThis as typeof globalThis & { __roomTestEnv: FixtureEnvironment };
@@ -784,3 +786,28 @@ for (const candidateTitle of ["Oasis - Song Live Wembley", "Oasis - Song Live Gl
     } finally { f.close(); }
   });
 }
+
+test('catalog overload and deadlines do not amplify into direct API fallback',async()=>{
+ const f=fixture();
+ syntheticEnv.GUTTA_CORE_PUBLIC_URL='https://core.example';syntheticEnv.ADMIN_BRIDGE_KEY='synthetic-bridge';
+ try{
+  for(const status of [503,504]){
+   let calls=0;globalThis.fetch=async(target,init)=>{calls++;assert(String(target).startsWith('https://core.example/v1/catalog'));assert(init?.signal instanceof AbortSignal);return Response.json({error:'Synthetic bounded catalog error'},{status});};
+   await assert.rejects(searchHandler(new Request('https://site.example/api/search?q=synthetic-'+status),'synthetic-'+status),error=>error instanceof Error&&'status' in error&&error.status===status);
+   assert.equal(calls,1,'No extra source requests may follow busy or deadline errors');
+  }
+ }finally{delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
+});
+
+test('independent catalog readers preserve cancellation ownership',async()=>{
+ const f=fixture();syntheticEnv.GUTTA_CORE_PUBLIC_URL='https://core.example';syntheticEnv.ADMIN_BRIDGE_KEY='synthetic-bridge';
+ const requests:{signal:AbortSignal;finish:()=>void}[]=[];
+ const first=new AbortController(),second=new AbortController();
+ try{
+  globalThis.fetch=async(_target,init)=>new Promise<Response>((resolve,reject)=>{const signal=init!.signal!;signal.addEventListener('abort',()=>reject(signal.reason),{once:true});requests.push({signal,finish:()=>resolve(Response.json({videos:[next]}))});});
+  const a=searchHandler(new Request('https://site.example/api/search',{signal:first.signal}),'independent cold query');const rejected=assert.rejects(a);
+  const b=searchHandler(new Request('https://site.example/api/search',{signal:second.signal}),'independent cold query');
+  for(let i=0;i<10&&requests.length<2;i++)await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests.length,2);first.abort();await rejected;assert.equal(requests[1].signal.aborted,false);requests[1].finish();assert.equal((await b).videos.length,1);
+ }finally{first.abort();second.abort();delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
+});

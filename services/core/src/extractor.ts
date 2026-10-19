@@ -60,13 +60,16 @@ function spawnJson<T>(
   if (signal?.aborted)
     return Promise.reject(new UserError("The request was cancelled."));
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const grouped = process.platform !== "win32";
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], detached: grouped });
     const chunks: Buffer[] = [];
     let bytes = 0,
       failure: Error | undefined;
     const stop = (error: Error) => {
-      failure ??= error;
-      child.kill("SIGKILL");
+      if (failure) return;
+      failure = error;
+      // yt-dlp may start a JavaScript runtime. Kill its owned process group too.
+      try { if (grouped && child.pid) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { child.kill("SIGKILL"); }
     };
     const cancel = () => stop(new UserError("The request was cancelled."));
     const timer = setTimeout(

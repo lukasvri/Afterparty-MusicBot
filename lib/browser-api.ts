@@ -1,3 +1,4 @@
+import { browserRequestTimeoutMs } from "./request-timeouts.ts";
 import { browserStorage as storage } from "./browser-storage";
 export const headers = (code?: string) => ({
   "Content-Type": "application/json",
@@ -10,10 +11,17 @@ export async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(path, {
-    ...options,
-    signal: options.signal ?? AbortSignal.timeout(12000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      signal: options.signal ?? AbortSignal.timeout(browserRequestTimeoutMs(path)),
+    });
+  } catch (error) {
+    if (browserRequestTimeoutMs(path) === 75000 && error instanceof Error && error.name === "TimeoutError")
+      throw new Error("Music search timed out. Try a more specific search or a YouTube link.");
+    throw error;
+  }
   let data: T & { error?: string };
   try {
     data = await response.json();

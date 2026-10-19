@@ -138,7 +138,15 @@ cross-guild actions, role demotion, reactions/bingo/highlights, reconnect and ex
 Confirm only managers can issue playback controls and social actions never alter
 the playback revision. Open Search with empty history and submit a search; the
 Activity must stay connected on its original launch URL without SDK CLOSE or a
-new authorization. Activity history remains an isolated empty videos list. Listen
+new authorization. Activity history remains an isolated empty videos list.
+Music search and video metadata have a 75-second browser budget and a 60-second
+Core catalog bridge budget around one request-owned 50-second Core job. Cold
+interactive searches return at most four results with serial metadata extraction;
+overlap fails busy instead of building a queue. Disconnect and deadline cleanup
+must stop owned extractor helpers before another job is admitted. Busy/deadline
+errors must not fan out into direct-provider fallback. Ordinary state reads keep
+their short deadlines. A stopped or memory-starved Core still needs an authorized
+operational recovery; bounded work does not guarantee provider availability. Listen
 to real voice audio during these steps.
 
 Record the build SHA, client/device, pass/fail evidence and any provider/proxy

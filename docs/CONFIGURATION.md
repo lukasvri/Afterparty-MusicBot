@@ -95,3 +95,20 @@ See [isolated Activity testing](DISCORD_ACTIVITY_TESTING.md) for the exact Core
 and website variables, additive test database migration, root-document routing,
 Portal steps and real-client gates. Do not enable it on a production installation
 merely because the source contains an Activity route.
+
+## Catalog search resource limits
+
+HTTP catalog reads are separate from playback/radio lookups. Core admits one
+request-owned catalog job at a time with a total 50-second deadline, including
+provider calls, extractor admission and metadata. Cold search returns up to four
+results and hydrates one metadata item at a time. Concurrent catalog readers get
+a busy response instead of accumulating queued jobs. Completed metadata remains
+cached. A disconnected reader cancels only its own work; its slot stays occupied
+until owned extractor processes and POSIX helper groups have exited.
+
+The website uses a 60-second Core catalog bridge budget and a 75-second browser
+search/metadata budget. Busy and deadline responses do not trigger direct-source
+fallback; other supported fallback retains caller cancellation. Worker builds enable
+`enable_request_signal` so incoming disconnects can reach the bridge. Ordinary state
+reads keep their shorter deadlines. These bounds do not replace host capacity
+planning, monitoring or the real-client acceptance checks.
