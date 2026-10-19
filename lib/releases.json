@@ -1,5 +1,14 @@
 [
   {
+    "version": "3.0.0-beta.4",
+    "title": "Keep Activity Search inside Discord",
+    "date": "2026-10-19",
+    "items": [
+      "Fixes the Activity history response to provide the videos list expected by Search. Opening Search with empty history no longer triggers the render error that unmounted the interface and requested a silent Activity close.",
+      "Activity history remains empty and isolated from standalone history. Ordinary website navigation, framing, permissions and playback are unchanged. Source regression checks do not replace retesting Search in a real Discord client."
+    ]
+  },
+  {
     "version": "3.0.0-beta.3",
     "title": "Dedicated Activity launch root",
     "date": "2026-10-19",

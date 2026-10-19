@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-beta.4: Keep Activity Search inside Discord
+
+2026-10-19
+
+- Fixes the Activity history response to provide the videos list expected by Search. Opening Search with empty history no longer triggers the render error that unmounted the interface and requested a silent Activity close.
+- Activity history remains empty and isolated from standalone history. Ordinary website navigation, framing, permissions and playback are unchanged. Source regression checks do not replace retesting Search in a real Discord client.
+
 ## v3.0.0-beta.3: Dedicated Activity launch root
 
 2026-10-19

@@ -196,6 +196,19 @@ test('ordinary Activity members vote through the public queue with deterministic
   assert.equal(calls[0].participantHash,calls[1].participantHash);
  }finally{f.sqlite.close();}
 });
+test('Activity discovery history keeps the videos contract without exposing standalone history',async()=>{
+ const f=enabled();try{
+  const session=await signIn();
+  for(const sort of ['recent','popular']){
+   const response=await routed('/api/history?sort='+sort,session.cookie);
+   assert.equal(response.status,200);
+   const data=await response.json() as {videos:unknown[]};
+   assert.deepEqual(data,{videos:[]},'Search discovery expects videos, not a history property');
+   assert.equal(data.videos.length,0,'The initial Search panel must be able to render the history list');
+  }
+  assert.equal((await routed('/api/history?sort=recent','')).status,401);
+ }finally{f.sqlite.close();}
+});
 test('Activity logout requires exact origin, revokes only its session and clears its partitioned cookie',async()=>{
  const f=enabled();try{
   const s=await signIn(),other=await signIn(),admin=await f.signIn();

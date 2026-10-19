@@ -52,7 +52,7 @@ export async function activityBridge(request:Request){
  else if(pathname==='/api/me')return json({admin:false});
  else if(pathname==='/api/realtime')return json({url:null});
  else if(pathname==='/api/rooms')return json({rooms:[]});
- else if(pathname==='/api/history')return json({history:[]});
+ else if(pathname==='/api/history')return json({videos:[]});
  else return fail(405,'Unsupported Activity method.');
  // Tickets for direct Core access are not a supported proxy fallback in test mode.
  if(pathname==='/api/discord'&&request.method==='POST'&&response.ok){const data=await response.json() as Record<string,unknown>;delete data.ticket;delete data.url;return json(data);}

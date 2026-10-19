@@ -107,6 +107,6 @@ if (process.env.ACTIVITY_HEADER_PREVIEW_URL) test('local built worker sends the 
   const notes = await fetch(new URL('/patch-notes', base), { signal: AbortSignal.timeout(15000) });
   assert.equal(notes.status, 200);
   const html = await notes.text();
-  assert(html.includes('Dedicated Activity launch root'));
-  assert(html.includes('3.0.0-beta.3'));
+  assert(html.includes('Keep Activity Search inside Discord'));
+  assert(html.includes('3.0.0-beta.4'));
 });

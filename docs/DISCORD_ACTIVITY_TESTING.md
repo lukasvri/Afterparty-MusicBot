@@ -136,7 +136,10 @@ approved guild, then launch its Activity from Discord. Connect as a manager and
 as an ordinary member on desktop/mobile. Verify the correct guild concert, denied
 cross-guild actions, role demotion, reactions/bingo/highlights, reconnect and expiry.
 Confirm only managers can issue playback controls and social actions never alter
-the playback revision. Listen to real voice audio during these steps.
+the playback revision. Open Search with empty history and submit a search; the
+Activity must stay connected on its original launch URL without SDK CLOSE or a
+new authorization. Activity history remains an isolated empty videos list. Listen
+to real voice audio during these steps.
 
 Record the build SHA, client/device, pass/fail evidence and any provider/proxy
 failure without private identifiers or tokens. Do not label the Activity ready

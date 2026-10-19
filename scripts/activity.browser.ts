@@ -7,7 +7,9 @@ const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:8787";
 assert(["localhost", "127.0.0.1"].includes(new URL(base).hostname));
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, headless: true, args: ["--no-sandbox"] });
 const guildId = "111111111111111111", userId = "222222222222222222", clientId = "333333333333333333";
-const url = `${base}/activity?frame_id=synthetic-frame&instance_id=synthetic-instance&platform=desktop&guild_id=${guildId}&room=EVILROOM`;
+const launchPath = process.env.ACTIVITY_BROWSER_LAUNCH_PATH ?? "/activity";
+assert(["/", "/activity"].includes(launchPath));
+const url = `${base}${launchPath}?frame_id=synthetic-frame&instance_id=synthetic-instance&platform=desktop&guild_id=${guildId}&room=EVILROOM`;
 const output = process.env.SCREENSHOT_DIR ?? "/tmp/afterparty-activity-screenshots";
 await mkdir(output, { recursive: true });
 try {
@@ -63,6 +65,7 @@ try {
       if (route.request().method() === "POST" && (path.startsWith("/api/discord") || path.startsWith("/api/rooms"))) playbackPosts.push(path);
       assert(!path.includes("EVILROOM"), "The Activity must ignore a caller-supplied room");
       if (path === "/api/rooms/ACTIVITY") return route.fulfill({ json: room });
+      if (path.startsWith("/api/history")) return route.fulfill({ json: { videos: [] } });
       if (path.startsWith("/api/discord/queue")) return route.fulfill({ json: { state: { queue: [], requests: [], revision: "q1" }, canManage: false } });
       if (path.startsWith("/api/discord")) { assert(path.includes(guildId)); return route.fulfill({ json: { state: { guildId, ready: true, connected: true, playing: true, position: 120, volume: 100, current: room.current, queue: [], queueRevision: "q1", lastSeen: Date.now(), online: true } } }); }
       return route.fulfill({ json: { videos: [], state: null } });
@@ -88,6 +91,19 @@ try {
   assert.equal(playbackPosts.length, 0, "Signing in must not send any playback command");
   assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }).includes("synthetic-activity-token")), false);
   assert(!logs.some(text => text.includes("synthetic-activity-token") || text.includes("synthetic-auth-code")));
+  // Tab changes and an empty search must keep the SDK session mounted.
+  const connectedUrl = page.url();
+  const beforeSearchAuth = authRequests;
+  await page.getByRole("tab", { name: "Search", exact: true }).click();
+  await page.getByText("No tracks in your history yet.", { exact: true }).waitFor();
+  await page.locator(".search-form input").fill("synthetic search");
+  await page.getByRole("button", { name: "Search music", exact: true }).click();
+  await page.getByText("No results. Try another search.", { exact: true }).waitFor();
+  assert.equal(page.url(), connectedUrl, "Search must preserve the launch URL and SDK query");
+  assert.equal(await page.locator(".activity-root").getAttribute("data-activity-phase"), "connected");
+  assert.equal(authRequests, beforeSearchAuth, "Search must not restart authorization");
+  assert.equal(await page.evaluate(() => (window as unknown as { activityRpc: string[] }).activityRpc.includes("CLOSE")), false);
+  await page.getByRole("tab", { name: /Queue/, exact: false }).click();
   await page.screenshot({ path: `${output}/activity-desktop.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
