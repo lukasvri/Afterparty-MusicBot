@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0: Retire the optional legacy Core dashboard
+
+2026-10-19
+
+- Removed the obsolete optional Core dashboard assets and its separate local HTTP listener, including dashboard-only session, health, state, player, settings and public-room routes. Custom createServers integrations must remove adminPort, passwordHash, hosts, privateState and siteFetch options and stop using the returned adminServer. Use the supported website /admin for administration.
+- The regular Afterparty website, its APIs, Core /v1 bridge, live WebSocket and playback clock remain supported. Discord server isolation, private rooms, recovery tools and historical screenshots are preserved. Normal Core startup already disabled the old listener, and production images already excluded its assets.
+
 ## v2.2.8: Safer connections and server channel lists
 
 2026-10-19

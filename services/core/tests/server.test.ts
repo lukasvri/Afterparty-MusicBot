@@ -30,7 +30,7 @@ test('malformed WebSocket upgrade targets cannot crash Core before origin valida
   const store=new Store(':memory:');
   const sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
   const engine=new Engine(store,new Providers(store,{}),sink),commands=new Commands(engine);
-  const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',passwordHash:'',hosts:[],publicPort:0,adminPort:false,host:'127.0.0.1',privateState:()=>({private:true})});
+  const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',publicPort:0,host:'127.0.0.1'});
   const port=servers.publicServer.address().port;
   try {
    for(const origin of ['https://site.example','https://other.example']) {
@@ -55,11 +55,26 @@ test('public transport is read only, admin stays private, commands are acknowled
  const dir=mkdtempSync(join(tmpdir(),'gutta-api-')),store=new Store(join(dir,'db.sqlite'));
  const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
  const engine=new Engine(store,new Providers(store,{}),sink),commands=new Commands(engine);engine.connected=true;engine.ready=true;engine.current={id:'abcdefghijk',entryId:'entry',title:'Song',artist:'Artist',image:'',duration:100,live:false,embeddable:true,concert:true,requestedBy:'private-id'};
- const servers=await createServers(engine,commands,{key:'test-key',origin:'https://site.example',passwordHash:'',hosts:['127.0.0.1'],publicPort:0,adminPort:0,host:'127.0.0.1',privateState:()=>({private:true})});
- const publicPort=(servers.publicServer.address() as {port:number}).port,adminPort=(servers.adminServer.address() as {port:number}).port,base=`http://127.0.0.1:${publicPort}`;
+ const servers=await createServers(engine,commands,{key:'test-key',origin:'https://site.example',publicPort:0,host:'127.0.0.1'});
+ const publicPort=(servers.publicServer.address() as {port:number}).port,base=`http://127.0.0.1:${publicPort}`;
  try{
   assert.equal((await fetch(base+'/v1/jobs?diagnostics=1')).status,403);const diagnostics=await fetch(base+'/v1/jobs?diagnostics=1',{headers:{Authorization:'Bearer test-key'}});assert.equal(diagnostics.status,200);assert.equal((await diagnostics.json() as {clients:number}).clients,0);
-  assert.equal((await fetch(base+'/api/state')).status,404);assert.equal((await fetch(`http://127.0.0.1:${adminPort}/api/state`)).status,401);
+  assert.equal('adminServer' in servers,false);
+  // Removed dashboard paths stay unavailable even with valid bridge credentials.
+  for(const [path,methods] of [
+   ['/', ['GET']], ['/index.html', ['GET']], ['/app.js', ['GET']], ['/app.css', ['GET']],
+   ['/api/session', ['GET','POST','DELETE']], ['/api/health', ['GET']],
+   ['/api/state', ['GET']], ['/api/player', ['POST']], ['/api/settings', ['PUT']],
+   ['/api/public-rooms', ['GET','DELETE']],
+  ] as const) {
+   for(const method of methods) {
+    const response=await fetch(base+path,{method,headers:{Authorization:'Bearer test-key','Content-Type':'application/json'},...(method==='GET'?{}:{body:'{}'})});
+    assert.equal(response.status,404,method+' '+path);
+    assert.equal(response.headers.get('set-cookie'),null);
+   }
+  }
+  assert.equal((await fetch(base+'/health')).status,200);
+  const state=await fetch(base+'/v1/state');assert.equal(state.status,200);assert(!(await state.text()).includes('private-id'));
   const input={id:'public:'+randomUUID(),scope:'public',action:'pause',playbackKey:'core:entry'};
   assert.equal((await fetch(base+'/v1/command',{method:'POST',body:JSON.stringify(input)})).status,403);
   const request=()=>fetch(base+'/v1/command',{method:'POST',headers:{Authorization:'Bearer test-key','Content-Type':'application/json'},body:JSON.stringify(input)}).then(r=>r.json()) as Promise<{id:string}>;
@@ -84,7 +99,7 @@ test('the authenticated own-room bridge advances radio without a Discord connect
  const providers=new Providers(store,{}),engine=new Engine(store,providers,sink),commands=new Commands(engine);
  const seed={id:'seed1234567',title:'Syn Cole - Feel Good | Future House | NCS - Copyright Free',artist:'NCS',image:'',duration:200,live:false,embeddable:true};
  let lookups=0;providers.search=async(query,count,musicOnly)=>{lookups++;assert(['future house audio -"Feel Good"','Syn Cole music audio'].includes(query));assert.equal(count,20);assert.equal(musicOnly,true);return [{...seed,id:'next1234567',title:'Other Artist - Synthetic next | Future House',entryId:'synthetic'}];};
- const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',passwordHash:'',hosts:['127.0.0.1'],publicPort:0,adminPort:false,host:'127.0.0.1',privateState:()=>({})});
+ const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',publicPort:0,host:'127.0.0.1'});
  const base=`http://127.0.0.1:${(servers.publicServer.address() as {port:number}).port}`;
  const request=(input:unknown)=>fetch(base+'/v1/rooms',{method:'POST',headers:{Authorization:'Bearer synthetic-key','Content-Type':'application/json'},body:JSON.stringify(input)});
  try{

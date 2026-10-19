@@ -66,8 +66,12 @@ tests and attribution, not an engine dependency:
 - The upstream notice and license remain for retained player/command adaptations.
   The Core image now also contains that license.
 
-No API endpoint or provider integration was removed. Core's existing static admin
+The independence migration removed no API endpoint or provider integration. Core's then-existing static admin
 asset routes were retained, since they are referenced by the server. A pre-existing
 limitation is that this checkout lacks `services/core/public/index.html`, and the
 production image did not copy those assets. This change does not claim to repair
 or verify that legacy local admin page; the website `/admin` is retained.
+
+The optional legacy dashboard has since been retired: its assets, local listener
+and dashboard-only `/api/*` handlers are removed. The supported website `/admin`,
+website APIs and Core `/v1/*` bridge remain. See [release notes](../CHANGELOG.md).

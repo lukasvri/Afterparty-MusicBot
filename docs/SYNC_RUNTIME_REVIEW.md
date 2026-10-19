@@ -154,7 +154,7 @@ and `allowJs` is disabled. No strict-checking rules are disabled.
 The Rust experiment is preserved. Python deployment/backup/recovery tools,
 system shell entry points and configuration adapters retain their current
 languages. Two tiny JavaScript installer adapters preserve existing caller paths;
-the retired Core dashboard asset is unchanged. This is not a claim that every
+the obsolete optional Core dashboard has since been removed. This is not a claim that every
 file in the repository is TypeScript. Replacing installed Python deployment tools
 requires its own CLI, journal, backup and recovery compatibility validation and
 would not establish a playback performance improvement.

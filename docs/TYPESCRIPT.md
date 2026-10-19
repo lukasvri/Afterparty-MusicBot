@@ -20,9 +20,8 @@ These compatibility and system boundaries remain:
 - Two small JavaScript installer entry points forward to their TypeScript
   implementations for callers using the previous paths. ESLint and PostCSS
   retain their conventional JavaScript configuration adapters.
-- The inactive legacy Core dashboard asset in `services/core/public/app.js`
-  remains unchanged. It is not an active application source or included in the
-  current Core image; rebuilding that retired dashboard is outside this change.
+- The obsolete optional Core dashboard assets and their separate HTTP listener
+  have been removed. Administration remains on the website at `/admin`.
 - CSS describes presentation. Shell and Dockerfiles provide system and container
   entry points. They remain appropriate for those jobs.
 

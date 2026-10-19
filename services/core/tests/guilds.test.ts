@@ -7,14 +7,14 @@ test('Discord permissions and sealed grants reject missing rights, tampering and
  const oauth=new DiscordOAuth('key','app','secret','https://site.example',async()=>Response.json([{id:A,name:'A',permissions:'32'},{id:B,name:'B',permissions:'16'}]));
  const grant=oauth.seal({access:'token',expiresAt:Date.now()+60000,user:{id:A,name:'User'}});assert.equal((await oauth.require(grant,A)).id,A);await assert.rejects(oauth.require(grant,B),/do not have administrator access/);assert.throws(()=>oauth.open(grant.slice(0,-5)+'wrong'),/expired/);assert.throws(()=>oauth.open(oauth.seal({access:'token',expiresAt:0,user:{id:A,name:'User'}})),/expired/);
 });
-test('guilds isolate state, queue, settings, favorites, commands and streams while old admin can be disabled',async()=>{
+test('guilds isolate state, queue, settings, favorites, commands and streams with only the supported Core listener',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'gutta-guild-')),guilds=new Guilds(A);const resources: Array<{store:Store;engine:Engine;commands:Commands}>=[];
  for(const id of [A,B]){const store=new Store(join(dir,id,'db.sqlite'));const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};const engine=new Engine(store,new Providers(store,{}),sink),commands=new Commands(engine);engine.ready=true;engine.connected=true;engine.current={id:'abcdefghijk',entryId:id,title:'Song '+id,artist:'Artist',image:'',duration:100,live:false,embeddable:true,concert:true};resources.push({store,engine,commands});guilds.register({id,name:id,roomCode:guilds.roomCode(id),engine,commands,bot:{privateState:()=>({settings:engine.settings})} as never});}
  const [one,two]=resources;one.engine.setSettings({radio:false});one.store.favorite('person','favorite','query');assert(two.engine.settings.radio);assert.equal(two.store.favorites().length,0);one.engine.enqueue([{...one.engine.current!,id:'bcdefghijkl',entryId:randomUUID()}]);assert.equal(two.engine.queue.length,0);
  const oauth=new DiscordOAuth('key','app','secret','https://site.example',async()=>Response.json([{id:A,name:'A',permissions:'32'}]));const grant=oauth.seal({access:'token',expiresAt:Date.now()+60000,user:{id:A,name:'User'}});
- const server=await createServers(one.engine,one.commands,{key:'key',origin:'https://site.example',hosts:[],passwordHash:'',privateState:()=>({}),guilds,oauth,publicPort:0,adminPort:false,host:'127.0.0.1'});const base='http://127.0.0.1:'+(server.publicServer.address() as AddressInfo).port;
+ const server=await createServers(one.engine,one.commands,{key:'key',origin:'https://site.example',guilds,oauth,publicPort:0,host:'127.0.0.1'});const base='http://127.0.0.1:'+(server.publicServer.address() as AddressInfo).port;
  try{
-  assert.equal(server.adminServer.address(),null);const header={Authorization:'Bearer key','Content-Type':'application/json'};
+  assert.equal('adminServer' in server,false);const header={Authorization:'Bearer key','Content-Type':'application/json'};
   const state=await fetch(base+'/v1/state?guildId='+B).then(r=>r.json()) as {state:{guildId:string;current:{title:string};queue:unknown[]}};assert.equal(state.state.guildId,B);assert.equal(state.state.current.title,'Song '+B);assert.equal(state.state.queue.length,0);
   assert.equal((await fetch(base+'/v1/admin?guildId='+B,{headers:header})).status,403);
   assert.equal((await fetch(base+'/v1/admin?guildId='+B,{headers:{...header,'X-Discord-Grant':grant}})).status,403);

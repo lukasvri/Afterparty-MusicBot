@@ -21,7 +21,7 @@ test('all ten web-admin settings persist through real Core while bounds and guil
   });
   const oauth = new DiscordOAuth('synthetic-key', 'app', 'secret', 'https://site.example', async () => Response.json([{id: first, name: 'Synthetic A', permissions: '32'}]));
   const grant = oauth.seal({access: 'synthetic-access', expiresAt: Date.now() + 60000, user: {id: first, name: 'Synthetic manager'}});
-  const servers = await createServers(resources[0].engine, resources[0].commands, {key: 'synthetic-key', origin: 'https://site.example', hosts: [], passwordHash: '', privateState: () => ({}), guilds, oauth, publicPort: 0, adminPort: false, host: '127.0.0.1'});
+  const servers = await createServers(resources[0].engine, resources[0].commands, {key: 'synthetic-key', origin: 'https://site.example', guilds, oauth, publicPort: 0, host: '127.0.0.1'});
   const base = 'http://127.0.0.1:' + (servers.publicServer.address() as AddressInfo).port;
   const settings = {playlistLimit: 101, defaultQueuePageSize: 21, defaultVolume: 55, audioBitrateKbps: 256,
     crossfade: 4, secondsToWaitAfterQueueEmpties: 650, leaveIfNoListeners: false,
