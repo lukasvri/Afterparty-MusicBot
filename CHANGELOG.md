@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-beta.1: Concert activities beta test candidate
+
+2026-10-19
+
+- Concert activities now disable controls while offline, hidden or awaiting renewed authorization. Reconnection validates the current concert without replaying actions, with clearer English and Norwegian feedback and keyboard controls.
+- Unauthorized callers cannot exhaust the authenticated social request allowance. Host moderation has its own bounded durable reserve, and canceled membership checks cannot leave abandoned social streams. Existing playback protections remain in place.
+- This is source prepared for controlled beta testing, not a stable release or deployment. Matching website and Core builds are required. Real Discord listening, multi-server load, rollback rehearsal, public-live acceptance and music licensing remain open gates. Discord Activity embedding is a separate feasibility plan, not an included integration.
+
 ## v3.0.0-alpha.1: Concert activities preview
 
 2026-10-19

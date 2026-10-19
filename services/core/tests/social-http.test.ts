@@ -96,11 +96,17 @@ test('social pressure reserves the public socket budget and forged forwarding he
   const base = 'http://127.0.0.1:' + (server.publicServer.address() as { port: number }).port;
   const forged = (n: number) => ({ 'X-Forwarded-For': `192.0.2.${n % 250 + 1}`, 'X-Real-IP': `198.51.100.${n % 250 + 1}`, 'CF-Connecting-IP': `203.0.113.${n % 250 + 1}` });
   try {
+    // Unsigned traffic has a separate allowance and cannot starve participants.
+    for (let i = 0; i < 625; i++) {
+      const response = await fetch(base + '/v1/social', { method: 'POST', headers: forged(i), signal: AbortSignal.timeout(5000) });
+      assert.equal(response.status, i < 120 ? 403 : 429, `unsigned request ${i + 1}`);
+      await response.arrayBuffer();
+    }
     // Deliberately exceed the entire shared socket budget with social requests.
     // Only the first 120 may consume that budget; all later attempts shed early.
     for (let i = 0; i < 620; i++) {
-      const response = await fetch(base + '/v1/social', { method: 'POST', headers: forged(i), signal: AbortSignal.timeout(5000) });
-      assert.equal(response.status, i < 120 ? 403 : 429, `social request ${i + 1}`);
+      const response = await fetch(base + '/v1/social', { method: 'POST', headers: { ...forged(i), Authorization: 'Bearer synthetic-key', 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(5000) });
+      assert.equal(response.status, i < 120 ? 400 : 429, `social request ${i + 1}`);
       await response.arrayBuffer();
     }
     for (let i = 0; i < 480; i++) {
@@ -112,6 +118,49 @@ test('social pressure reserves the public socket budget and forged forwarding he
     assert.equal(exhausted.status, 429, 'changing untrusted forwarding headers must not reset the socket-IP budget');
     await exhausted.arrayBuffer();
   } finally {
+    await server.close(); commands.close(); engine.close(); store.close();
+  }
+});
+
+test('canceling a guild stream during OAuth cannot register a dead peer or leave cleanup timers', async () => {
+  const store = new Store(':memory:');
+  const sink: Sink = { onIdle: null, onError: null, play() {}, pause() {}, resume() {}, stop() {}, duration: () => 0, advancing: () => false, buffering: () => false };
+  const engine = new Engine(store, new Providers(store, {}), sink), commands = new Commands(engine);
+  clearInterval(engine.timer);
+  const guilds = new Guilds(A);
+  guilds.register({ id: A, name: 'Synthetic guild', roomCode: 'DISCORD1', engine, commands, bot: {} as never });
+  let block = false;
+  let release!: () => void, entered!: () => void;
+  const waiting = new Promise<void>(resolve => { entered = resolve; });
+  const oauth = new DiscordOAuth('synthetic-key', 'app', 'secret', 'https://site.example', async () => {
+    if (block) { entered(); await new Promise<void>(resolve => { release = resolve; }); }
+    return Response.json([{ id: A, permissions: '0' }]);
+  });
+  const tokenCipher = oauth.seal({ access: 'synthetic', expiresAt: Date.now() + 60000, user: { id: A, name: 'Test' } });
+  const server = await createServers(engine, commands, { key: 'synthetic-key', origin: 'https://site.example', guilds, oauth, publicPort: 0, host: '127.0.0.1' });
+  const url = 'http://127.0.0.1:' + (server.publicServer.address() as { port: number }).port + '/v1/social';
+  const input = { scope: 'guild', scopeId: A, tokenCipher };
+  const headers = { Authorization: 'Bearer synthetic-key', 'Content-Type': 'application/json' };
+  let peer: ServerResponse | undefined;
+  const abort = new AbortController();
+  try {
+    const joined = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ ...input, action: 'join' }) }).then(r => r.json()) as { token: string };
+    let closed!: () => void;
+    const close = new Promise<void>(resolve => { closed = resolve; });
+    server.publicServer.on('request', (_request, response) => { peer = response; response.once('close', closed); });
+    block = true;
+    const pending = fetch(url, { method: 'POST', headers, body: JSON.stringify({ ...input, action: 'stream', token: joined.token }), signal: abort.signal }).catch(() => undefined);
+    await waiting;
+    abort.abort(); await pending; await close;
+    release();
+    // Let the real asynchronous membership and request handlers finish.
+    await new Promise<void>(resolve => setImmediate(resolve));
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert(peer?.destroyed);
+    assert.equal(peer.listenerCount('close'), 0, 'no cleanup may be attached after the peer already closed');
+    assert.equal(peer.headersSent, false, 'a canceled request must never initialize an SSE response');
+  } finally {
+    abort.abort(); release?.(); peer?.emit('close');
     await server.close(); commands.close(); engine.close(); store.close();
   }
 });

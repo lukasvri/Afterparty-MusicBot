@@ -37,7 +37,7 @@ and shared timestamp notes below the player. The host calls bingo moments manual
 and can disable activities or remove notes. Timestamp links open YouTube separately;
 activities do not control playback or the queue. This preview requires Core and uses
 short-lived room-scoped guest sessions. Notes and cards reset with a new playback
-instance and have bounded retention. See the [activity architecture and limits](AFTERPARTY_EXPERIENCE.md#concert-activities-preview-300-alpha1).
+instance and have bounded retention. See the [activity architecture and limits](AFTERPARTY_EXPERIENCE.md#concert-activities-preview-300-beta1).
 
 Room state uses the existing JSON records and backward-compatible defaults for optional fields. Core and the website share queue rules, moderation, voting and undo behavior. Update both services together when changing these commands. Back up production data and follow [operations](../services/core/PUBLIC_RELEASE.md) before an update.
 

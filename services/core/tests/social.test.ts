@@ -126,7 +126,7 @@ test('guest receipt exhaustion preserves host disable and removal capacity', () 
     const result = f.action({ action: 'remove-highlight', highlightId: eventId, revision: initialRevision + 2 }, true);
     assert.equal(result.social.enabled, false);
     assert.equal(result.social.highlights.length, 0);
-    assert.equal(f.store.prepare("SELECT count(*) AS n FROM concert_social_receipts WHERE kind='host'").get()!.n, 2);
+    assert.equal(f.store.prepare("SELECT count(*) AS n FROM concert_social_receipts WHERE kind='moderation'").get()!.n, 2);
     f.tick(86400001);
     f.social.apply({ ...f.scope, action: 'join' }, playback, false);
     assert.equal(f.store.prepare('SELECT count(*) AS n FROM concert_social_receipts').get()!.n, 0);
@@ -147,5 +147,27 @@ test('retention expiry with unchanged playback key produces a newer persisted re
     const result = f.social.apply({ ...f.scope, action: 'configure', token: joined.token, playbackKey: playback.playbackKey, eventId: randomUUID(), revision, enabled: false }, playback, true);
     assert.equal(result.social.revision, revision + 1);
     assert.equal(result.social.enabled, false);
+  } finally { f.store.close(); }
+});
+
+test('normal host quota cannot consume bounded durable emergency moderation reserve', () => {
+  const f = fixture(); try {
+    const highlightId = randomUUID();
+    const before = f.action({ action: 'highlight', text: 'Remove after bingo quota', eventId: highlightId }).social;
+    const insert = f.store.prepare('INSERT INTO concert_social_receipts(scope,event_id,expires,kind) VALUES(?,?,?,?)');
+    for (let i = 0; i < 128; i++) insert.run('room:TESTROOM', randomUUID(), 86500000, 'host');
+    assert.throws(() => f.action({ action: 'bingo-start', cells: Array.from({ length: 9 }, (_, i) => 'Moment ' + i), revision: before.revision }, true), /Daily social action limit/);
+    const disabled = f.action({ action: 'configure', enabled: false, revision: before.revision }, true).social;
+    const eventId = randomUUID();
+    const removed = f.action({ action: 'remove-highlight', highlightId, eventId, revision: disabled.revision }, true).social;
+    assert.equal(removed.enabled, false); assert.equal(removed.highlights.length, 0);
+    assert.equal(f.store.prepare("SELECT count(*) AS n FROM concert_social_receipts WHERE kind='host'").get()!.n, 128);
+    assert.equal(f.store.prepare("SELECT count(*) AS n FROM concert_social_receipts WHERE kind='moderation'").get()!.n, 2);
+    const restarted = new Social(f.store, 'test-only-key', () => 100001);
+    assert.throws(() => restarted.apply({ ...f.scope, action: 'remove-highlight', token: f.joined.token, playbackKey: playback.playbackKey, revision: removed.revision, eventId, highlightId }, playback, true), /already received/);
+    for (let i = 2; i < 128; i++) insert.run('room:TESTROOM', randomUUID(), 86500000, 'moderation');
+    assert.throws(() => f.action({ action: 'bingo-stop', revision: removed.revision }, true), /Daily social action limit/);
+    assert.equal(f.store.prepare("SELECT count(*) AS n FROM concert_social_receipts WHERE kind='moderation'").get()!.n, 128);
+    assert.equal(f.action({ action: 'read' }).social.enabled, false);
   } finally { f.store.close(); }
 });

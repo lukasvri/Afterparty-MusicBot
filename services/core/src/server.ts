@@ -85,6 +85,7 @@ export async function createServers(
       (joining ? 1 : 0),
   });
   const rate = new Map<string, { until: number; count: number }>();
+  const socialUnauthorized = new Map<string, { until: number; count: number }>();
   let rejectedUpgrades = 0;
   const upgradeOrigins = new Set<string>();
   const eventClients = new Set<ServerResponse>();
@@ -155,7 +156,23 @@ export async function createServers(
     );
     try {
       const url = new URL(request.url ?? "/", "http://core");
-      if (url.pathname === "/v1/social") limit("social-global", 120);
+      if (url.pathname === "/v1/social") {
+        // Invalid bridge callers cannot consume the allowance reserved for social
+        // participants or playback. Keep their own bounded socket/global guard.
+        try { authenticate(request); } catch (error) {
+          limit("social-unauthorized-global", 600);
+          const now = Date.now(), peer = request.socket.remoteAddress ?? "unknown";
+          for (const [id, entry] of socialUnauthorized) if (entry.until <= now) socialUnauthorized.delete(id);
+          let entry = socialUnauthorized.get(peer);
+          if (!entry) {
+            if (socialUnauthorized.size >= 1024) throw new UserError("Too many requests. Try again later.", 429);
+            entry = { count: 0, until: now + 60000 }; socialUnauthorized.set(peer, entry);
+          }
+          if (++entry.count > 120) throw new UserError("Too many requests. Try again later.", 429);
+          throw error;
+        }
+        limit("social-global", 120);
+      }
       limit("public:" + request.socket.remoteAddress, 600);
       if (
         request.method === "GET" &&
@@ -434,6 +451,9 @@ export async function createServers(
           const state = snapshot(target);
           playback = { playbackKey: state.playbackKey, videoId: state.current?.id ?? null, position: state.position };
         } else throw new UserError("Invalid social scope.");
+        // OAuth membership can outlive a disconnected HTTP client. Do not create
+        // state, retain a dead stream, or attach cleanup after close already fired.
+        if (request.aborted || response.destroyed) return;
         const result = { ...social.apply(input, playback, host), canManage: host };
         if (input.action === "stream") {
           if (socialClients.size >= 64 || socialClients.size + eventClients.size + roomClients.size >= 128) throw new UserError("Social connections are busy.", 503);

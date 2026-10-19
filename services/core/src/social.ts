@@ -97,8 +97,11 @@ export class Social extends EventEmitter {
       this.reactions.set(reactionKey, state.reactions);
     } else {
       // Keep receipts for 24 hours; guest actions cannot consume the separate
-      // host moderation reserve. Reject at capacity instead of permitting replay.
-      const receiptKind = hostActions.has(String(input.action)) ? 'host' : 'guest';
+      // host controls and moderation reserves. Bingo cannot exhaust the ability
+      // to disable activities or remove captions. Each category stays bounded.
+      const moderation = input.action === 'remove-highlight' || input.action === 'bingo-stop' ||
+        (input.action === 'configure' && input.enabled === false);
+      const receiptKind = moderation ? 'moderation' : hostActions.has(String(input.action)) ? 'host' : 'guest';
       if (Number(this.store.prepare('SELECT count(*) AS n FROM concert_social_receipts WHERE scope=? AND kind=?').get(key, receiptKind)!.n) >= 128) throw new UserError('Daily social action limit reached. Try later.', 429);
       switch (input.action) {
         case 'highlight': {

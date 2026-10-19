@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.0.0-beta.1",
+    "title": "Concert activities beta test candidate",
+    "date": "2026-10-19",
+    "items": [
+      "Concert activities now disable controls while offline, hidden or awaiting renewed authorization. Reconnection validates the current concert without replaying actions, with clearer English and Norwegian feedback and keyboard controls.",
+      "Unauthorized callers cannot exhaust the authenticated social request allowance. Host moderation has its own bounded durable reserve, and canceled membership checks cannot leave abandoned social streams. Existing playback protections remain in place.",
+      "This is source prepared for controlled beta testing, not a stable release or deployment. Matching website and Core builds are required. Real Discord listening, multi-server load, rollback rehearsal, public-live acceptance and music licensing remain open gates. Discord Activity embedding is a separate feasibility plan, not an included integration."
+    ]
+  },
+  {
     "version": "3.0.0-alpha.1",
     "title": "Concert activities preview",
     "date": "2026-10-19",

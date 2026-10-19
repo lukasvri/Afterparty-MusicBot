@@ -12,7 +12,7 @@ await mkdir(shots, { recursive: true });
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, reducedMotion: "reduce" });
   await context.addInitScript(() => localStorage.setItem("gutta-language", "en"));
-  let manage = true, unavailable = false, joins = 0, streams = 0, staleOnce = true;
+  let manage = true, unavailable = false, joins = 0, streams = 0, staleOnce = true, expireNext = false, foreignFrame = false, denied = 0, socialRequests = 0;
   const playbackCommands: unknown[] = [], actions: string[] = [];
   const room: Room = { code: "TESTROOM", name: "The late show", current: { id: "seed1234567", title: "An evening together • Live concert", artist: "Afterparty sessions", image: "/afterparty-mark.svg", duration: 5400, live: false, embeddable: true, concert: true }, queue: [], playing: true, position: 245, version: 17, serverTime: Date.now(), viewers: 4, isHost: true, expiresAt: Date.now() + 86400000, playbackKey: "concert-one" };
   const social: SocialState = { scope: "room", scopeId: room.code, playbackKey: room.playbackKey!, revision: 0, enabled: true, reactions: [], highlights: [], bingo: null };
@@ -22,14 +22,18 @@ try {
     if (!url.pathname.startsWith("/api/")) return route.continue();
     const input = route.request().method() === "POST" ? route.request().postDataJSON() : null;
     let data: unknown = {};
+    if (url.pathname.startsWith("/api/social")) { socialRequests++; if (denied) return route.fulfill({ status: denied, json: { error: "Synthetic persistent denial" } }); }
     if (url.pathname === "/api/social/stream") {
       streams++;
-      return route.fulfill({ contentType: "text/event-stream", body: `data: ${JSON.stringify({ social, canManage: manage })}\n\n` });
+      const snapshot = foreignFrame ? { ...social, scopeId: "FOREIGN1", revision: social.revision + 100, highlights: [{ id: "foreign", text: "Foreign room should stay hidden", position: 1, videoId: "seed1234567", at: Date.now() }] } : social;
+      foreignFrame = false;
+      return route.fulfill({ contentType: "text/event-stream", body: `data: ${JSON.stringify({ social: snapshot, canManage: manage })}\n\n` });
     }
     if (url.pathname === "/api/social") {
       if (unavailable) return route.fulfill({ status: 503, json: { error: "Core unavailable" } });
-      assert.equal(input.scope, "room"); assert.equal(input.scopeId, "TESTROOM"); assert.equal(input.playbackKey, room.playbackKey);
+      assert.equal(input.scope, "room"); assert.equal(input.scopeId, room.code); assert.equal(input.playbackKey, room.playbackKey);
       actions.push(input.action);
+      if (expireNext && input.action === "reaction") { expireNext = false; return route.fulfill({ status: 401, json: { error: "Expired session" } }); }
       if (input.action === "bingo-mark" && staleOnce) { staleOnce = false; social.revision++; return route.fulfill({ status: 409, json: { error: "Social changed" } }); }
       if (input.action === "join") joins++;
       else assert.equal(input.token, "synthetic-session");
@@ -42,20 +46,43 @@ try {
       if (input.action === "configure") social.enabled = input.enabled;
       if (!["join", "read", "reaction"].includes(input.action)) social.revision++;
       data = { social, canManage: manage, ...(input.action === "join" ? { token: "synthetic-session" } : {}) };
-    } else if (url.pathname === "/api/rooms/TESTROOM") { if (input) playbackCommands.push(input); data = room; }
+    } else if (url.pathname === `/api/rooms/${room.code}`) { if (input) playbackCommands.push(input); data = room; }
     else if (url.pathname === "/api/rooms") data = { rooms: [] };
     else if (url.pathname === "/api/discord") data = { state: null };
     else if (url.pathname.includes("realtime")) return route.abort();
     return route.fulfill({ json: data });
   });
   await context.addInitScript(() => { const original = Date.now; Date.now = () => original() + 7200000; });
+  // Keep an SSE response open so explicit retry is tested against a live stream.
+  await context.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    const state = window as unknown as { holdSocialStream: boolean; socialStreamAborts: number };
+    state.holdSocialStream = false; state.socialStreamAborts = 0;
+    window.fetch = async (input, init) => {
+      const response = await originalFetch(input, init);
+      if (!state.holdSocialStream || !String(input).endsWith("/api/social/stream") || !response.ok) return response;
+      const data = await response.text();
+      return new Response(new ReadableStream({ start(controller) {
+        controller.enqueue(new TextEncoder().encode(data));
+        init?.signal?.addEventListener("abort", () => { state.socialStreamAborts++; try { controller.error(new DOMException("Aborted", "AbortError")); } catch {} }, { once: true });
+      } }), { headers: { "Content-Type": "text/event-stream" } });
+    };
+  });
   const page = await context.newPage();
   await page.goto(`${base}/?room=TESTROOM`);
   const panel = page.getByRole("region", { name: "Concert together" });
   await panel.waitFor();
   assert.equal(joins, 0, "Collapsed extras must not open a social connection");
   await panel.getByRole("button", { name: /Concert together/ }).click();
-  await panel.getByRole("button", { name: "Create card" }).click();
+  const create = panel.getByRole("button", { name: "Create card" });
+  await create.focus(); await page.keyboard.press("Enter");
+  assert.equal(await page.getByRole("textbox", { name: "Moment 1", exact: true }).evaluate(el => el === document.activeElement), true);
+  await page.getByRole("textbox", { name: "Moment 2", exact: true }).fill("Opening song");
+  assert(await panel.getByRole("button", { name: "Start card" }).isDisabled());
+  await panel.getByText("Enter nine different, non-empty moments without control characters.").waitFor();
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.waitForFunction(() => document.activeElement?.textContent === "Create card");
+  await create.click();
   await panel.getByRole("button", { name: "Start card" }).click();
   const refreshed = page.waitForResponse(response => response.url().endsWith("/api/social") && response.request().postDataJSON()?.action === "read");
   await panel.getByRole("button", { name: /Opening song/ }).click();
@@ -99,6 +126,75 @@ try {
   await panel.getByRole("button", { name: "New card" }).waitFor();
   assert(joins > beforeReconnect, "Reopening establishes a fresh social session");
   assert(streams > 0, "The panel consumes authenticated social SSE");
+  // Offline and hidden tabs must stop accepting actions until a fresh snapshot arrives.
+  await context.setOffline(true);
+  await panel.getByText("You are offline. Concert extras will reconnect when you return.").waitFor();
+  assert(await panel.getByRole("button", { name: "Fire", exact: true }).isDisabled());
+  assert(await panel.getByRole("button", { name: "Disable extras" }).isDisabled());
+  const offlineCount = actions.length;
+  await page.waitForTimeout(200);
+  assert.equal(actions.length, offlineCount);
+  await context.setOffline(false);
+  await page.waitForFunction(() => !(document.querySelector('[aria-label="Fire"]') as HTMLButtonElement)?.disabled);
+  await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" }); document.dispatchEvent(new Event("visibilitychange")); });
+  await panel.getByText("Concert extras are paused while this tab is hidden.").waitFor();
+  assert(await panel.getByRole("button", { name: "Fire", exact: true }).isDisabled());
+  await page.evaluate(() => { delete (document as unknown as { visibilityState?: string }).visibilityState; document.dispatchEvent(new Event("visibilitychange")); });
+  await page.waitForFunction(() => !(document.querySelector('[aria-label="Fire"]') as HTMLButtonElement)?.disabled);
+  const joinsBeforeExpiry = joins, reactionsBeforeExpiry = actions.filter(a => a === "reaction").length;
+  expireNext = true;
+  await panel.getByRole("button", { name: "Fire", exact: true }).click();
+  await panel.getByText("Your social session expired. Reconnecting…").waitFor();
+  assert(await panel.getByRole("button", { name: "Fire", exact: true }).isDisabled());
+  await page.waitForFunction(() => !(document.querySelector('[aria-label="Fire"]') as HTMLButtonElement)?.disabled);
+  assert(joins > joinsBeforeExpiry);
+  assert.equal(actions.filter(a => a === "reaction").length, reactionsBeforeExpiry + 1, "Expired actions must not be replayed after rejoining");
+  await page.evaluate(() => { (window as unknown as { holdSocialStream: boolean }).holdSocialStream = true; });
+  await panel.getByRole("button", { name: /Concert together/ }).click();
+  await panel.getByRole("button", { name: /Concert together/ }).click();
+  await page.waitForFunction(() => !(document.querySelector('[aria-label="Love"]') as HTMLButtonElement)?.disabled);
+  // Allow the already-authorized initial stream frame to arrive before denying writes.
+  await page.waitForTimeout(150);
+  denied = 429;
+  await panel.getByRole("button", { name: "Love", exact: true }).click();
+  await panel.getByText("The room is busy. Try again in a moment.").waitFor();
+  denied = 0;
+  await panel.getByRole("button", { name: "Reconnect extras" }).click();
+  await page.waitForFunction(() => (window as unknown as { socialStreamAborts: number }).socialStreamAborts > 0);
+  await page.waitForFunction(() => !(document.querySelector('[aria-label="Love"]') as HTMLButtonElement)?.disabled);
+  await page.evaluate(() => { (window as unknown as { holdSocialStream: boolean }).holdSocialStream = false; });
+  await panel.getByRole("button", { name: /Concert together/ }).click();
+  await panel.getByRole("button", { name: /Concert together/ }).click();
+  await page.waitForFunction(() => !(document.querySelector('[aria-label="Love"]') as HTMLButtonElement)?.disabled);
+  for (const status of [403, 409]) {
+    denied = status;
+    const beforeDenial = socialRequests;
+    await panel.getByRole("button", { name: "Love", exact: true }).click();
+    await page.waitForTimeout(1200);
+    assert(socialRequests - beforeDenial <= 4, "Permanent read failures must back off, never recurse");
+    assert(await panel.getByRole("button", { name: "Love", exact: true }).isDisabled());
+    denied = 0;
+    await panel.getByRole("button", { name: "Reconnect extras" }).click();
+    await page.waitForFunction(() => !(document.querySelector('[aria-label="Love"]') as HTMLButtonElement)?.disabled);
+  }
+  foreignFrame = true;
+  await panel.getByRole("button", { name: /Concert together/ }).click();
+  const rejectedFrameRead = page.waitForResponse(response => response.url().endsWith("/api/social") && response.request().postDataJSON()?.action === "read");
+  await panel.getByRole("button", { name: /Concert together/ }).click();
+  await rejectedFrameRead;
+  assert.equal(await panel.getByText("Foreign room should stay hidden").count(), 0);
+  await panel.getByText("This card has ended.").waitFor();
+  // Navigating to another room must replace, rather than carry over, the card.
+  room.code = "NEXTROOM"; room.playbackKey = "concert-two";
+  social.scopeId = room.code; social.playbackKey = room.playbackKey; social.bingo = null; social.highlights = []; social.reactions = []; social.revision = 0;
+  await page.goto(`${base}/?room=NEXTROOM`);
+  await panel.getByRole("button", { name: /Concert together/ }).click();
+  await panel.getByRole("button", { name: "Create card" }).waitFor();
+  assert.equal(await panel.getByText("This card has ended.").count(), 0);
+  await page.getByRole("button", { name: "Bokmål", exact: true }).click();
+  await page.getByRole("region", { name: "Konsert sammen" }).getByRole("button", { name: "Lag brett" }).waitFor();
+  await page.getByRole("button", { name: "English", exact: true }).click();
+  social.bingo = { cells: ["A","B","C","D","E","F","G","H","I"], marked: [], active: false };
   manage = false;
   await page.reload();
   await panel.getByRole("button", { name: /Concert together/ }).click();

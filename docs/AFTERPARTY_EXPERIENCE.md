@@ -34,7 +34,7 @@ Mobile controls keep player, search, queue and saved evenings reachable. Search 
 
 ## Validation
 
-### Concert activities preview (3.0.0-alpha.1)
+### Concert activities preview (3.0.0-beta.1)
 
 The optional **Concert together** panel offers reactions, a shared nine-square
 bingo card and timestamp highlights. Hosts create and manually mark bingo prompts;
@@ -60,22 +60,26 @@ Hosts can remove highlights even while activities are disabled.
 
 Authenticated POST streams carry snapshots separately from playback events. A
 stream starts with the current snapshot and closes after 60 seconds so reconnection
-rechecks access. Hiding or closing the panel stops the stream. Failed social writes
+rechecks access. Hiding or closing the panel stops the stream. Offline, hidden and expired-session
+states disable controls until fresh scoped state arrives. Failed social writes
 are never queued or replayed after reconnect. Reactions expire after six seconds
 and are memory-only; slow consumers lose reaction updates before durable updates.
 The fallback uses bounded reads and backoff. Core unavailability disables activities
 without introducing a second persistence authority.
 
 Limits deliberately favor playback: 64 social streams within the existing 128
-HTTP-stream ceiling; 120 social HTTP requests per minute globally before the
+HTTP-stream ceiling; 120 bridge-authenticated social HTTP requests per minute globally before the
 existing 600-per-peer request protection; 30 reaction events per scope and six per
 activity session per minute; three highlights per session per minute. Storage holds
 at most 128 active scopes, 30 highlights per scope, nine bingo prompts and 20 recent
 reactions. Durable social records expire after 24 hours without a durable write;
 rate-limit and deduplication maps are bounded. Durable event receipts survive
 Core restart for 24 hours, with 128 guest actions and a separate reserve of 128
-host-control actions per scope. Guest activity cannot consume that moderation
-reserve. Reaction receipts are intentionally ephemeral across a process restart. These are preview ceilings, not a
+host-control actions per scope, plus 128 moderation actions (disable, remove
+highlight or stop bingo). Ordinary bingo and enable actions cannot consume that
+moderation reserve; moderation itself still has a finite daily ceiling. Unauthorized
+bridge callers have separate bounded global and socket-peer abuse counters and
+cannot debit the authenticated allowance. Reaction receipts are intentionally ephemeral across a process restart. These are preview ceilings, not a
 claim of production capacity. A shared proxy peer can still couple playback clients
 under the existing global protection. No arbitrary forwarded headers are trusted
 by Core and that protection has not been removed.
@@ -158,3 +162,7 @@ suggestion. Failed lookups preserve a song that has not finished yet. The browse
 retries a stale skip once only if the track, playback instance and play state are
 unchanged. Genre labels can come from explicit provider tags or genre fields in
 descriptions; no audio classifier is implied.
+
+Source beta gates and outstanding environment checks are tracked in
+[V3 beta acceptance](V3_BETA_ACCEPTANCE.md). A possible embedded Discord client is
+scoped separately in the [Discord Activity plan](DISCORD_ACTIVITY_PLAN.md).
