@@ -1,7 +1,2 @@
-const config = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
-};
-
-export default config;
+// Conventional loader entry point; configuration is typechecked in TypeScript.
+export { default } from "./postcss.config.ts";

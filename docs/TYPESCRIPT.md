@@ -18,8 +18,11 @@ These compatibility and system boundaries remain:
   failure and active-playback tests. Replacing it needs a dedicated migration
   that preserves the installed command and recovery journal compatibility.
 - Two small JavaScript installer entry points forward to their TypeScript
-  implementations for callers using the previous paths. ESLint and PostCSS
-  retain their conventional JavaScript configuration adapters.
+  implementations for callers using the previous paths. The maintained shell
+  installer invokes `npm-install.ts` directly. ESLint and PostCSS retain their
+  conventional `.mjs` loader adapters, but configuration lives in typechecked
+  `eslint.config.ts` and `postcss.config.ts`. This uses native Node type stripping
+  without adding a separate TypeScript configuration loader dependency.
 - The obsolete optional Core dashboard assets and their separate HTTP listener
   have been removed. Administration remains on the website at `/admin`.
 - CSS describes presentation. Shell and Dockerfiles provide system and container
