@@ -1,5 +1,14 @@
 [
   {
+    "version": "3.0.0-beta.5",
+    "title": "Give music searches time to finish",
+    "date": "2026-10-19",
+    "items": [
+      "Music search and video-metadata reads now allow up to 75 seconds in the browser and 60 seconds through the Core catalog bridge. This prevents valid slower extractor results from being cut off by the former 12-second browser and 25-second bridge deadlines. Ordinary state reads retain their shorter limits and caller cancellation is preserved.",
+      "A browser search timeout now explains how to retry with a more specific query or YouTube link, without automatic retries. This does not restore a stopped or memory-starved Core, guarantee provider availability, or establish successful live Discord search."
+    ]
+  },
+  {
     "version": "3.0.0-beta.4",
     "title": "Keep Activity Search inside Discord",
     "date": "2026-10-19",
