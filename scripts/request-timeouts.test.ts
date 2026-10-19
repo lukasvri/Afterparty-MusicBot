@@ -83,3 +83,10 @@ test('catalog reads remain bounded with a browser margin and exact path matching
   assert.equal(signals[2].aborted, true); assert.equal(signals[3].aborted, true);
   time.advance(15000); assert.equal(signals[0].aborted, true);
 });
+
+test('Core catalog fetch follows its HTTP caller cancellation',async t=>{
+ const controller=new AbortController();let sent:AbortSignal|undefined;
+ t.mock.method(globalThis,'fetch',async(_input:RequestInfo|URL,init?:RequestInit)=>new Promise<Response>((_resolve,reject)=>{sent=init!.signal!;sent.addEventListener('abort',()=>reject(sent!.reason),{once:true});}));
+ const pending=assert.rejects(coreRequest('/v1/catalog?q=synthetic','GET',undefined,{},controller.signal));
+ controller.abort();await pending;assert.equal(sent!.aborted,true);
+});

@@ -200,7 +200,7 @@ export function videoId(input: string) {
   return id;
 }
 const inFlight = new Map<string, Promise<unknown>>();
-async function cached<T>(key: string, provider: () => Promise<T>): Promise<T> {
+async function cached<T>(key: string, provider: () => Promise<T>, sharePending = true): Promise<T> {
   const row = await db()
     .prepare("SELECT data FROM cached WHERE key=? AND expires_at>?")
     .bind(key, Date.now())
@@ -212,7 +212,7 @@ async function cached<T>(key: string, provider: () => Promise<T>): Promise<T> {
       /* refresh invalid cache */
     }
   }
-  const existing = inFlight.get(key);
+  const existing = sharePending ? inFlight.get(key) : undefined;
   if (existing) return existing as Promise<T>;
   const pending = (async () => {
     const result = await provider();
@@ -224,20 +224,25 @@ async function cached<T>(key: string, provider: () => Promise<T>): Promise<T> {
       .run();
     return result;
   })();
-  inFlight.set(key, pending);
+  if (sharePending) inFlight.set(key, pending);
   try {
     return await pending;
   } finally {
-    inFlight.delete(key);
+    if (sharePending && inFlight.get(key) === pending) inFlight.delete(key);
   }
 }
-async function youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) {
+function catalogFallback(error: unknown, request: Request) {
+  const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 0;
+  if (request.signal.aborted || [499, 503, 504].includes(status) || !env().YOUTUBE_API_KEY ||
+      (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name))) throw error;
+}
+async function youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>, signal?: AbortSignal) {
   const key = env().YOUTUBE_API_KEY;
   if (!key) fail(503, "Musikksøket er ikke konfigurert ennå.");
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`);
   for (const [k, v] of Object.entries({ ...params, key }))
     url.searchParams.set(k, v);
-  const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const response = await fetch(url, { signal: AbortSignal.any([AbortSignal.timeout(10000), ...(signal ? [signal] : [])]) });
   if (!response.ok)
     fail(
       response.status === 403 ? 429 : 502,
@@ -272,18 +277,18 @@ export async function videos(
       try {
         return (
           await coreRequest<{ videos: Video[] }>(
-            "/v1/catalog?ids=" + ids.join(","),
+            "/v1/catalog?ids=" + ids.join(","), "GET", undefined, {}, request.signal,
           )
         ).videos;
-      } catch {
-        /* retain the direct metadata API */
+      } catch (error) {
+        catalogFallback(error, request);
       }
     }
     await limit(request, "video-budget", 1200, 86400000, true);
     const data = await youtube("videos", {
       id: ids.join(","),
       part: "snippet,contentDetails,status",
-    });
+    }, request.signal);
     return data.items.map((v) => ({
       id: v.id,
       genres: metadataGenres(v.snippet.description, v.snippet.tags),
@@ -295,7 +300,7 @@ export async function videos(
       live: v.snippet.liveBroadcastContent === "live",
       embeddable: v.status.embeddable !== false,
     }));
-  });
+  }, false); // A cancelled HTTP reader must not cancel another cache waiter.
 }
 export async function search(request: Request, query: string) {
   query = query.trim();
@@ -309,11 +314,11 @@ export async function search(request: Request, query: string) {
       try {
         return (
           await coreRequest<{ videos: Video[] }>(
-            "/v1/catalog?q=" + encodeURIComponent(query),
+            "/v1/catalog?q=" + encodeURIComponent(query), "GET", undefined, {}, request.signal,
           )
         ).videos;
-      } catch {
-        /* retain the direct metadata API */
+      } catch (error) {
+        catalogFallback(error, request);
       }
     }
     await limit(request, "search-budget", 40, 86400000, true);
@@ -324,12 +329,12 @@ export async function search(request: Request, query: string) {
       maxResults: "8",
       videoEmbeddable: "true",
       safeSearch: "moderate",
-    });
+    }, request.signal);
     return videos(
       request,
       data.items.map((v) => v.id.videoId),
     );
-  });
+  }, false);
   return { videos: result };
 }
 type Row = {

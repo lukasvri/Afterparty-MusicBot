@@ -4,12 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
-## v3.0.0-beta.5: Give music searches time to finish
+## v3.0.0-beta.5: Bound music search work and cancellation
 
 2026-10-19
 
-- Music search and video-metadata reads now allow up to 75 seconds in the browser and 60 seconds through the Core catalog bridge. This prevents valid slower extractor results from being cut off by the former 12-second browser and 25-second bridge deadlines. Ordinary state reads retain their shorter limits and caller cancellation is preserved.
-- A browser search timeout now explains how to retry with a more specific query or YouTube link, without automatic retries. This does not restore a stopped or memory-starved Core, guarantee provider availability, or establish successful live Discord search.
+- Core catalog reads now admit one request-owned job with a total 50-second deadline. The Worker enables incoming request signals. Client disconnects and deadlines cancel provider HTTP requests and queued/running extractor work; POSIX extractor helpers are terminated with their owned process group before admission is released. Playback and radio lookups keep their independent ownership.
+- Cold interactive searches return up to four results and hydrate metadata serially. Busy and deadline responses do not trigger extra direct-source requests. Completed metadata caches remain reusable, while independent HTTP readers do not share a cancellable in-flight lookup.
+- Music search and video-metadata reads have a 75-second browser budget and a 60-second Core bridge budget around the bounded Core job. Ordinary state-read deadlines and caller cancellation remain intact; search timeouts provide a useful message without automatic retries. Availability, host memory and live Discord behavior still require operational verification.
 
 ## v3.0.0-beta.4: Keep Activity Search inside Discord
 

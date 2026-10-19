@@ -1,3 +1,4 @@
+import { Catalog } from "./catalog.ts";
 import {
   createServer,
   type IncomingMessage,
@@ -48,6 +49,7 @@ export async function body(request: IncomingMessage, maximum = 16384) {
 type Options = {
   key: string;
   origin: string;
+  catalog?: Catalog;
   publicPort?: number;
   guilds?: Guilds;
   oauth?: DiscordOAuth;
@@ -63,6 +65,7 @@ export async function createServers(
   options: Options,
 ) {
   if (!options.key) throw new Error("The bridge connection is missing a secret.");
+  const catalog = options.catalog ?? new Catalog(engine.store);
   const activity = options.activity;
   const activityReady = Boolean(activity?.enabled === true && /^\d{14,22}$/.test(activity.clientId) && activity.clientId === options.oauth?.clientId && options.oauth?.secret && options.guilds && activity.testGuildIds.length > 0 && activity.testGuildIds.length <= 20 && activity.testGuildIds.every(id => /^\d{14,22}$/.test(id)));
   const rooms = new Rooms(engine.store);
@@ -294,12 +297,19 @@ export async function createServers(
           throw new UserError("Enter between 2 and 120 characters.");
         if (ids && !/^[\w,-]{11,600}$/.test(ids))
           throw new UserError("Invalid video IDs.");
-        const tracks = ids
-          ? await engine.providers.video(ids.split(",").slice(0, 50))
-          : query
-            ? await engine.providers.search(query, 8)
-            : [];
-        json(response, 200, { videos: tracks.map((t) => publicTrack(t)) });
+        if (request.method !== "GET") throw new UserError("Method not allowed.", 405);
+        const controller = new AbortController();
+        const cancel = () => { if (!response.writableEnded) controller.abort(); };
+        request.once("aborted", cancel);
+        response.once("close", cancel);
+        try {
+          if (request.aborted || response.destroyed) controller.abort();
+          const tracks = query || ids ? await catalog.lookup(ids ? { ids: ids.split(",").slice(0, 50) } : { query: query! }, controller.signal) : [];
+          if (!response.destroyed) json(response, 200, { videos: tracks.map((t) => publicTrack(t)) });
+        } finally {
+          request.off("aborted", cancel);
+          response.off("close", cancel);
+        }
         return;
       }
       if (url.pathname === "/v1/application") {
@@ -854,5 +864,5 @@ export async function createServers(
     await close(true);
     throw error;
   }
-  return { publicServer, wss, close: () => close() };
+  return { publicServer, wss, close: () => { catalog.close(); return close(); } };
 }

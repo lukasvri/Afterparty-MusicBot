@@ -91,7 +91,9 @@ export class Providers {
   recommendationStatus = "artist";
   private searches = new Map<string, Promise<Track[]>>();
   private videoLookups = new Map<string, Promise<Track | undefined>>();
-  constructor(store: Store, env: NodeJS.ProcessEnv = process.env) {
+  private scope: { signal?: AbortSignal; metadataConcurrency?: number };
+  constructor(store: Store, env: NodeJS.ProcessEnv = process.env, scope: { signal?: AbortSignal; metadataConcurrency?: number } = {}) {
+    this.scope = scope;
     this.store = store;
     this.key = env.YOUTUBE_API_KEY ?? "";
     this.spotifyId = env.SPOTIFY_CLIENT_ID ?? "";
@@ -106,7 +108,7 @@ export class Providers {
     const url = new URL("https://www.googleapis.com/youtube/v3/" + path);
     for (const [k, v] of Object.entries({ ...params, key: this.key }))
       url.searchParams.set(k, v);
-    const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    const response = await fetch(url, { signal: AbortSignal.any([AbortSignal.timeout(12000), ...(this.scope.signal ? [this.scope.signal] : [])]) });
     if (!response.ok)
       throw new UserError(
         "YouTube search is temporarily unavailable.",
@@ -115,9 +117,10 @@ export class Providers {
     return response.json() as Promise<YouTubeResponses[K]>;
   }
   async extract(args: string[], signal?: AbortSignal, priority = false) {
-    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority);
+    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal && this.scope.signal && signal !== this.scope.signal ? AbortSignal.any([signal, this.scope.signal]) : signal ?? this.scope.signal, priority);
   }
   async video(ids: string[], skipUnavailable = false): Promise<Track[]> {
+    this.scope.signal?.throwIfAborted();
     if (!ids.length) return [];
     if (ids.some((id) => !/^[\w-]{11}$/.test(id)))
       throw new UserError("Invalid video ID.");
@@ -133,6 +136,7 @@ export class Providers {
       else if (!missing.includes(id)) missing.push(id);
     }
     for (let index = 0; index < missing.length; index += 50) {
+      this.scope.signal?.throwIfAborted();
       const batch = missing.slice(index, index + 50);
       const owned = new Map<string, { resolve: (value: Track | undefined) => void; reject: (error: unknown) => void }>();
       const pending: [string, Promise<Track | undefined>][] = [];
@@ -162,13 +166,22 @@ export class Providers {
         }
         pending.push([id, lookup]);
       }
-      if (owned.size) void this.hydrateVideoBatch([...owned.keys()], complete).catch(error => {
+      const hydration = owned.size ? this.hydrateVideoBatch([...owned.keys()], complete).catch(error => {
         for (const id of owned.keys()) complete(id, error instanceof Error ? error : new Error(String(error)));
-      });
-      await Promise.all(pending.map(async ([id, lookup]) => {
+      }) : undefined;
+      const results = pending.map(async ([id, lookup]) => {
         try { const track = await lookup; if (track) found.set(id, track); }
         catch (error) { if (!skipUnavailable) throw error; }
-      }));
+      });
+      if (this.scope.signal) {
+        // A strict early failure must not release request admission while later
+        // owned metadata work is still running. Shared playback keeps its fast path.
+        const outcomes = await Promise.allSettled(results);
+        await hydration;
+        this.scope.signal.throwIfAborted();
+        const failed = outcomes.find(result => result.status === 'rejected');
+        if (failed?.status === 'rejected') throw failed.reason;
+      } else await Promise.all(results);
     }
     return ids
       .map((id) => found.get(id))
@@ -202,12 +215,14 @@ export class Providers {
       }
       for (const id of batch) complete(id, found.get(id));
     } catch {
-      await mapLimited(batch, 3, async (id) => {
+      this.scope.signal?.throwIfAborted();
+      await mapLimited(batch, this.scope.metadataConcurrency ?? 3, async (id) => {
+        this.scope.signal?.throwIfAborted();
         try {
           const v = await this.extract([
             "--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node",
             "https://www.youtube.com/watch?v=" + id,
-          ]);
+          ], this.scope.signal);
           remember({
             id, genres: metadataGenres(v.description, v.tags), music: metadataMusic(undefined, v.categories),
             title: v.title ?? "YouTube", artist: v.artist ?? v.uploader ?? "YouTube",
@@ -258,6 +273,7 @@ export class Providers {
     count: number,
     musicOnly: boolean,
   ): Promise<Track[]> {
+    this.scope.signal?.throwIfAborted();
     let ids: string[];
     try {
       const data = await this.youtube("search", {
@@ -271,12 +287,13 @@ export class Providers {
       });
       ids = data.items.map((i) => i.id.videoId);
     } catch {
+      this.scope.signal?.throwIfAborted();
       const data = await this.extract([
         "--flat-playlist",
         "--dump-single-json",
         "--skip-download",
         `ytsearch${count}:${query}`,
-      ]);
+      ], this.scope.signal);
       ids = (data.entries ?? [])
         .map((t) => t?.id)
         .filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id));

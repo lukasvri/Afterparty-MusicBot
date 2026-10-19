@@ -73,3 +73,21 @@ test("running extractor cancellation and spawn failure do not exhaust the pool",
   );
   assert.deepEqual(results, [{}, {}, {}, {}]);
 });
+
+test('cancelling an extractor also stops its owned POSIX helper process', {skip:process.platform==='win32'}, async () => {
+ const {mkdtempSync,existsSync,readFileSync,rmSync}=await import('node:fs');
+ const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const directory=mkdtempSync(join(tmpdir(),'extractor-group-')),file=join(directory,'pids.json');
+ const controller=new AbortController();let helper=0;
+ const job=runJson(process.execPath,['-e',`const {spawn}=require('node:child_process');const fs=require('node:fs');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});fs.writeFileSync(${JSON.stringify(file)},JSON.stringify({helper:child.pid}));setInterval(()=>{},1000);`],controller.signal);
+ const cancelled=assert.rejects(job,/cancelled/);
+ try {
+  for(let i=0;i<100&&!existsSync(file);i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert(existsSync(file),'Synthetic extractor must report its owned helper');helper=JSON.parse(readFileSync(file,'utf8')).helper;
+  controller.abort();await cancelled;
+  // A terminated child may briefly be a zombie awaiting PID1's reaper.
+  const alive=()=>{try{const stat=readFileSync('/proc/'+helper+'/stat','utf8');return !/\) Z /.test(stat);}catch{return false;}};
+  for(let i=0;i<100&&alive();i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(alive(),false,'The JavaScript helper must not outlive its cancelled extractor');
+ }finally{controller.abort();if(helper)try{process.kill(helper,'SIGKILL');}catch{}await cancelled;rmSync(directory,{recursive:true,force:true});}
+});

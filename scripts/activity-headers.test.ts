@@ -91,6 +91,9 @@ if (process.env.ACTIVITY_HEADER_PREVIEW_URL) test('local built worker sends the 
   const base = new URL(process.env.ACTIVITY_HEADER_PREVIEW_URL!);
   assert(['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname), 'Only local preview verification is allowed');
   const launchRoot = process.env.ACTIVITY_HEADER_PREVIEW_LAUNCH_ROOT === 'true';
+  const { readFile } = await import('node:fs/promises');
+  const worker = JSON.parse(await readFile(new URL('../dist/server/wrangler.json', import.meta.url), 'utf8')) as { compatibility_flags?: string[] };
+  assert(worker.compatibility_flags?.includes('enable_request_signal'), 'Built Worker must expose incoming request cancellation');
   for (const path of ['/activity', '/', '/?frame_id=synthetic&instance_id=synthetic', '/admin', '/Activity', '/activity/', '/activity/admin', '/api/activity/auth']) {
     const response = await fetch(new URL(path, base), { redirect: 'manual', signal: AbortSignal.timeout(15000) });
     const root = path === '/' || path.startsWith('/?');
@@ -107,6 +110,6 @@ if (process.env.ACTIVITY_HEADER_PREVIEW_URL) test('local built worker sends the 
   const notes = await fetch(new URL('/patch-notes', base), { signal: AbortSignal.timeout(15000) });
   assert.equal(notes.status, 200);
   const html = await notes.text();
-  assert(html.includes('Give music searches time to finish'));
+  assert(html.includes('Bound music search work and cancellation'));
   assert(html.includes('3.0.0-beta.5'));
 });
