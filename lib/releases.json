@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.2.11",
+    "date": "2026-10-19",
+    "title": "Balanced DJ backdrop logo",
+    "items": [
+      "The AP emblem sits lower behind the DJ in welcome and empty-room scenes, sized to fit fully inside the rear LED screen with comfortable margins. The character, console and playback controls are unchanged."
+    ]
+  },
+  {
     "version": "2.2.10",
     "date": "2026-10-19",
     "title": "Retire the optional legacy Core dashboard",
