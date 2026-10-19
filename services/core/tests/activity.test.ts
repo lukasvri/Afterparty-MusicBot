@@ -1,3 +1,4 @@
+import { Catalog } from '../src/catalog.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DiscordOAuth } from '../src/oauth.ts';
@@ -103,4 +104,37 @@ test('Activity verification rechecks current membership and rejects standalone o
   await assert.rejects(oauth.verifyActivity(result.tokenCipher, B), /another server/);
   const standalone = oauth.seal({ access: 'synthetic-access', expiresAt: Date.now() + 60000, user: { id: USER, name: 'Member' } });
   await assert.rejects(oauth.verifyActivity(standalone, A), /login flow/);
+});
+
+test('Activity HTTP owns a private room while the bot stays disconnected; forged sessions and departed participants fail closed',async()=>{
+ const guilds=new Guilds(A),store=new Store(':memory:');
+ const sink:Sink={onIdle:null,onError:null,play(){throw Error('Voice playback must not start');},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
+ const engine=new Engine(store,new Providers(store,{}),sink),commands=new Commands(engine);clearInterval(engine.timer);
+ const state={guilds:[{id:A,permissions:'32'}]};const {oauth}=provider(state);
+ let present=true;let proofs=0;
+ const bot={async verifyActivityInstance(context:{guildId:string;channelId:string;instanceId:string},userId:string){proofs++;assert.equal(context.guildId,A);assert.equal(userId,USER);if(!present||context.channelId!==B||context.instanceId!=='i-synthetic')throw Object.assign(Error('Session left'),{status:403});}};
+ guilds.register({id:A,name:'Test',roomCode:'DISCORD1',engine,commands,bot:bot as never});
+ const catalog=new Catalog(store,{},()=>({search:async()=>[],video:async ids=>ids.map(id=>({id,title:'Verified',artist:'YouTube',image:'',duration:10,live:false,embeddable:true,source:'youtube',entryId:crypto.randomUUID()}))}));
+ const server=await createServers(engine,commands,{catalog,key:'test-key',origin:'https://site.example',guilds,oauth,activity:{enabled:true,clientId:APP,testGuildIds:[A]},host:'127.0.0.1',publicPort:0});
+ const base='http://127.0.0.1:'+(server.publicServer.address() as {port:number}).port;
+ const post=(input:unknown,path='/v1/activity')=>fetch(base+path,{method:'POST',headers:{Authorization:'Bearer test-key','Content-Type':'application/json'},body:JSON.stringify(input)});
+ try{
+  const initial=await oauth.exchangeActivity('private-playback',A);
+  const joined=await post({operation:'join',guildId:A,tokenCipher:initial.tokenCipher,channelId:B,instanceId:'i-synthetic'});assert.equal(joined.status,200);
+  const binding=await joined.json() as {tokenCipher:string;roomCode:string};assert.match(binding.roomCode,/^A1[A-F0-9]{6}$/);
+  const grant=oauth.open(binding.tokenCipher);assert.equal(grant.activityChannelId,B);assert.equal(grant.activityInstanceId,'i-synthetic');
+  const read=()=>post({operation:'read',guildId:A,tokenCipher:binding.tokenCipher});assert.equal((await read()).status,200);
+  assert.equal((await post({operation:'read',guildId:A,tokenCipher:initial.tokenCipher})).status,403);
+  assert.equal((await post({operation:'join',guildId:A,tokenCipher:binding.tokenCipher,channelId:B,instanceId:'other'})).status>=400,true);
+  assert.equal((await post({operation:'read',guildId:B,tokenCipher:binding.tokenCipher})).status,403);
+  const publicRead=await post({operation:'read',code:binding.roomCode},'/v1/rooms');assert.equal(publicRead.status,404);
+  const control=await post({operation:'control',guildId:A,tokenCipher:binding.tokenCipher,input:{action:'approval',enabled:true,version:1,host:true}});assert.equal(control.status,200);
+  state.guilds=[{id:A,permissions:'0'}];const denied=await post({operation:'control',guildId:A,tokenCipher:binding.tokenCipher,input:{action:'approval',enabled:false,version:2,host:true}});assert.equal(denied.status,403);
+  const added=await post({operation:'control',guildId:A,tokenCipher:binding.tokenCipher,input:{action:'add',videoId:'abcdefghijk',version:2,video:{title:'FORGED',duration:999},host:true}});assert.equal(added.status,200);
+  const addedRoom=await added.json() as {room:{requests:{title:string}[]}};assert.equal(addedRoom.room.requests[0].title,'Verified');
+  present=false;assert.ok((await read()).status>=400);
+  assert.equal(engine.connected,false);assert.equal(engine.current,null);assert.deepEqual(engine.queue,[]);
+  await assert.rejects(commands.execute({action:'enqueue',videoId:'abcdefghijk'},'public'),/voice channel/);
+  assert.ok(proofs>=4);
+ }finally{await server.close();commands.close();engine.close();store.close();}
 });

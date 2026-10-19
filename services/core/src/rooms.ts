@@ -40,14 +40,16 @@ export class Rooms extends EventEmitter {
   private stopped = false;
   readonly store: Store;
   readonly now: () => number;
-  constructor(store: Store, now: () => number = Date.now) {
+  readonly table: "video_rooms" | "activity_rooms";
+  constructor(store: Store, now: () => number = Date.now, table: "video_rooms" | "activity_rooms" = "video_rooms") {
     super();
     this.store = store;
+    this.table = table;
     this.now = now;
     store.db.exec(
-      `CREATE TABLE IF NOT EXISTS video_rooms(code TEXT PRIMARY KEY,data TEXT NOT NULL);
-       CREATE INDEX IF NOT EXISTS video_rooms_playing_expiry
-       ON video_rooms(json_extract(data,'$.expiresAt'))
+      `CREATE TABLE IF NOT EXISTS ${this.table}(code TEXT PRIMARY KEY,data TEXT NOT NULL);
+       CREATE INDEX IF NOT EXISTS ${this.table}_playing_expiry
+       ON ${this.table}(json_extract(data,'$.expiresAt'))
        WHERE json_extract(data,'$.state.playing')=1`,
     );
   }
@@ -55,7 +57,7 @@ export class Rooms extends EventEmitter {
     if (!/^[A-Z0-9]{8}$/.test(code) || code === "DISCORD1")
       throw new UserError("Room not found.", 404);
     const value = this.store
-      .prepare("SELECT data FROM video_rooms WHERE code=?")
+      .prepare(`SELECT data FROM ${this.table} WHERE code=?`)
       .get(code);
     if (!value) throw new UserError("Room not found.", 404);
     const room = JSON.parse(String(value.data)) as Saved;
@@ -66,7 +68,7 @@ export class Rooms extends EventEmitter {
   save(room: Saved) {
     this.store
       .prepare(
-        "INSERT INTO video_rooms VALUES(?,?) ON CONFLICT(code) DO UPDATE SET data=excluded.data",
+        `INSERT INTO ${this.table} VALUES(?,?) ON CONFLICT(code) DO UPDATE SET data=excluded.data`,
       )
       .run(room.code, JSON.stringify(room));
   }
@@ -254,7 +256,7 @@ export class Rooms extends EventEmitter {
     if (this.stopped) return;
     const rows = this.store
       .prepare(
-        "SELECT data FROM video_rooms WHERE json_extract(data,'$.expiresAt')>? AND json_extract(data,'$.state.playing')=1",
+        `SELECT data FROM ${this.table} WHERE json_extract(data,'$.expiresAt')>? AND json_extract(data,'$.state.playing')=1`,
       )
       .all(this.now());
     await Promise.all(
@@ -298,7 +300,7 @@ export class Rooms extends EventEmitter {
   }
   close(code: string) {
     this.load(code);
-    this.store.prepare("DELETE FROM video_rooms WHERE code=?").run(code);
+    this.store.prepare(`DELETE FROM ${this.table} WHERE code=?`).run(code);
     this.emit("change", code);
   }
 }

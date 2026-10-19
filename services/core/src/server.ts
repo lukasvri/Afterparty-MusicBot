@@ -1,3 +1,4 @@
+import { ActivityPlayback, activityContext } from "./activity-playback.ts";
 import { Catalog } from "./catalog.ts";
 import {
   createServer,
@@ -69,7 +70,9 @@ export async function createServers(
   const activity = options.activity;
   const activityReady = Boolean(activity?.enabled === true && /^\d{14,22}$/.test(activity.clientId) && activity.clientId === options.oauth?.clientId && options.oauth?.secret && options.guilds && activity.testGuildIds.length > 0 && activity.testGuildIds.length <= 20 && activity.testGuildIds.every(id => /^\d{14,22}$/.test(id)));
   const rooms = new Rooms(engine.store);
+  const activityPlayback = new ActivityPlayback(engine.store, options.key);
   const social = new Social(engine.store, options.key);
+  const activitySocial = new Social(engine.store, options.key, Date.now, "activity:");
   const socialClients = new Map<ServerResponse, { key: string; host: boolean }>();
   social.on("change", (key, state, reaction) => {
     const payload = JSON.stringify({ social: state });
@@ -164,7 +167,7 @@ export async function createServers(
       const url = new URL(request.url ?? "/", "http://core");
       if (url.pathname === "/v1/activity") {
         try { authenticate(request); } catch (error) { limit("activity-unauthorized", 120); throw error; }
-        limit("activity-global", 120);
+        limit("activity-global", 600);
       }
       if (url.pathname === "/v1/social") {
         // Invalid bridge callers cannot consume the allowance reserved for social
@@ -326,19 +329,76 @@ export async function createServers(
         authenticate(request);
         if (request.method !== "POST") throw new UserError("Method not allowed.", 405);
         const input = await body(request, 4096);
-        if (input.operation !== "verify") limit("activity-start", 30);
+        if (["exchange", "join"].includes(String(input.operation))) limit("activity-start", 30);
         if (input.operation === "config") {
           json(response, 200, { enabled: activityReady, clientId: activityReady ? activity!.clientId : "" });
           return;
         }
         if (!activityReady) throw new UserError("Activity test mode is disabled.", 503);
-        if (!["exchange", "verify"].includes(String(input.operation))) throw new UserError("Invalid Activity operation.");
+        if (!["exchange", "verify", "join", "read", "control", "social"].includes(String(input.operation))) throw new UserError("Invalid Activity operation.");
         if (typeof input.guildId !== "string" || !/^\d{14,22}$/.test(input.guildId) || !activity!.testGuildIds.includes(input.guildId)) throw new UserError("This server is not enabled for Activity tests.", 403);
         const target = options.guilds!.get(input.guildId);
         if (input.operation === "exchange") limit("activity-exchange", 12);
-        const result = input.operation === "verify"
-          ? await options.oauth!.verifyActivity(input.tokenCipher, target.id)
-          : await options.oauth!.exchangeActivity(input.code, target.id);
+        const result = input.operation === "exchange"
+          ? await options.oauth!.exchangeActivity(input.code, target.id)
+          : await options.oauth!.verifyActivity(input.tokenCipher, target.id);
+        if (["join", "read", "control", "social"].includes(String(input.operation))) {
+          const grant = options.oauth!.open(input.tokenCipher);
+          const context = input.operation === "join" ? activityContext(input) : activityContext({
+            guildId: grant.activityGuildId, channelId: grant.activityChannelId, instanceId: grant.activityInstanceId });
+          const verify = async () => {
+            if (options.guilds!.get(target.id) !== target) throw new UserError("The test server changed. Try again.", 409);
+            await target.bot.verifyActivityInstance(context, grant.user.id);
+          };
+          await verify();
+          if (request.aborted || response.destroyed) return;
+          if (input.operation === "join") {
+            // A bound grant cannot be rebound to another instance using the same session cookie.
+            if (grant.activityInstanceId && (grant.activityInstanceId !== context.instanceId || grant.activityChannelId !== context.channelId))
+              throw new UserError("Reopen the Activity to join another session.", 403);
+            const code = activityPlayback.join(context, target.name + " Activity");
+            json(response, 200, { guildId: target.id, roomCode: code, expiresAt: grant.expiresAt,
+              tokenCipher: options.oauth!.seal({ ...grant, activityChannelId: context.channelId,
+                activityInstanceId: context.instanceId, activityRoomCode: code }) });
+            return;
+          }
+          const code = grant.activityRoomCode ?? "";
+          const state = activityPlayback.snapshot(code, context, result.canManage);
+          if (input.operation === "social") {
+            const fields = input.input as Record<string, unknown>;
+            if (!fields || fields.scope !== "room" || fields.scopeId !== code) throw new UserError("Invalid Activity social scope.", 403);
+            if (fields.action === "stream") throw new UserError("Use Activity social polling.", 400);
+            const socialInput = { ...fields, scope: "room", scopeId: code };
+            json(response, 200, { ...activitySocial.apply(socialInput, { playbackKey: state.playbackKey ?? null,
+              videoId: state.current?.id ?? null, position: state.position }, result.canManage), canManage: result.canManage });
+            return;
+          }
+          if (input.operation !== "control") { json(response, 200, { room: state }); return; }
+          const controller = new AbortController();
+          const cancel = () => { if (!response.writableEnded) controller.abort(); };
+          request.once("aborted", cancel); response.once("close", cancel);
+          try {
+            if (request.aborted || response.destroyed) controller.abort();
+            if (!input.input || typeof input.input !== "object" || Array.isArray(input.input)) throw new UserError("Invalid Activity command.");
+            limit("activity-control:" + grant.user.id, 30);
+            const room = await activityPlayback.control(code, context, input.input as Record<string, unknown>, result,
+              async id => {
+                const tracks = await catalog.lookup({ ids: [id] }, controller.signal);
+                const track = tracks[0];
+                if (tracks.length !== 1 || track.id !== id || track.source !== "youtube" || !track.embeddable)
+                  throw new UserError("This video cannot be played here. Choose another one.", 422);
+                return publicTrack(track)!;
+              }, async () => {
+                controller.signal.throwIfAborted();
+                const latest = await options.oauth!.verifyActivity(input.tokenCipher, target.id);
+                if (latest.canManage !== result.canManage) throw new UserError("Activity permissions changed. Refresh.", 403);
+                await verify();
+                controller.signal.throwIfAborted();
+              });
+            if (!response.destroyed) json(response, 200, { room });
+          } finally { request.off("aborted", cancel); response.off("close", cancel); }
+          return;
+        }
         // Recheck installation after asynchronous identity verification.
         if (options.guilds!.get(target.id) !== target) throw new UserError("The test server changed. Try again.", 409);
         json(response, 200, { ...result, guild: { id: target.id, name: target.name, roomCode: target.roomCode } });
@@ -742,6 +802,7 @@ export async function createServers(
   const roomClock = setInterval(roomBroadcast, LIVE_SNAPSHOT_INTERVAL_MS);
   const roomAdvance = setInterval(() => {
     void rooms.tick().catch(() => {});
+    void activityPlayback.tick().catch(() => {});
   }, 500);
   const subscriptions = new Map<
     Engine,
@@ -817,6 +878,7 @@ export async function createServers(
       clearInterval(roomClock);
       clearInterval(roomAdvance);
       rooms.dispose();
+      activityPlayback.dispose();
       for (const client of socialClients.keys()) client.end();
       socialClients.clear();
       social.removeAllListeners();

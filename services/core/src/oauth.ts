@@ -1,7 +1,7 @@
 import {createCipheriv,createDecipheriv,createHash,randomBytes} from 'node:crypto';
 import {UserError} from './types.ts';
 export function canManageGuild(g:{owner?:boolean;permissions?:string}){try{return g.owner===true||(BigInt(g.permissions??'0')&40n)!==0n;}catch{return false;}}
-type Grant={access:string;expiresAt:number;user:{id:string;name:string};activityGuildId?:string};
+type Grant={access:string;expiresAt:number;user:{id:string;name:string};activityGuildId?:string;activityChannelId?:string;activityInstanceId?:string;activityRoomCode?:string};
 export class DiscordOAuth{
  private activityCodes=new Map<string,number>();
  private key:Buffer;readonly clientId:string;readonly secret:string;readonly origin:string;readonly request:typeof fetch;

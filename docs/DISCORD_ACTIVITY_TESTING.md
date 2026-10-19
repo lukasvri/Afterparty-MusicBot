@@ -109,17 +109,21 @@ the authorization code exchange. Core verifies Discord identity, guild membershi
 the test allowlist and installed guild. The browser receives an access token only
 in memory for SDK authentication; encrypted grants remain server-side. Sessions
 expire within 30 minutes and are separate from ordinary admin login. SDK guild,
-user, channel and instance data alone never grants permission. This iteration
-selects the verified guild's existing concert, not a separate channel/instance
-concert. It does not claim to verify voice-channel attendance.
+user, channel and instance data alone never grants permission. After SDK authentication,
+a separate join checks Discord's application-instance API and current channel access.
+The encrypted grant binds that verified guild/channel/instance and private playback
+room. It does not require the bot to join voice or claim voice-channel attendance.
 
 Only `/activity` and an explicitly enabled root launch document permit Discord framing. Activity traffic uses a fixed API bridge
 allowlist, with server-owned scope and participant identity. The standalone app's
 OAuth cookies/origin policies remain unchanged. Room creation, directory and admin
 navigation are excluded. Playback commands require a verified server manager;
-queue votes and social participation retain their scoped rules. Playback uses a bounded polling fallback with a ten-second Activity floor; social uses the authenticated POST stream.
+queue votes and social participation retain their scoped rules. Activity playback polls every two seconds while visible, within its five-second
+clock lease; hidden tabs use ten seconds and stop projecting an expired lease.
+Social uses scoped authenticated polling; direct streams are unavailable in this mode.
 Direct Core ticket/WebSocket fallback is intentionally unavailable through this
-adapter. Public state reads remain public data; writes recheck authorization.
+adapter. Activity state reads and writes both recheck instance participation and membership.
+Public concert reads outside Activity retain their existing filtering.
 
 YouTube's existing player is reused without a CSP/proxy bypass. If the provider or
 Discord blocks it, record that result and leave video compatibility unaccepted.
@@ -131,10 +135,11 @@ checks. The SDK does not become playback-clock or Discord-audio authority.
 Start with two clients, not a full-server capacity claim. The unchanged shared
 600/minute Core peer budget and Activity budgets still apply behind proxies.
 After the owner configures and authorizes the isolated environment, verify the
-pinned build and Core health. Start a concert with the separate test bot in the
-approved guild, then launch its Activity from Discord. Connect as a manager and
-as an ordinary member on desktop/mobile. Verify the correct guild concert, denied
-cross-guild actions, role demotion, reactions/bingo/highlights, reconnect and expiry.
+pinned build and Core health. Keep the separate test bot out of voice and launch
+its Activity from an approved guild channel. The bot must still be installed and
+connected to the guild gateway for identity and permission verification. Connect as a manager and
+as an ordinary member on desktop/mobile. Verify the private instance queue, denied cross-guild/channel/instance actions,
+participant departure, role demotion, reactions/bingo/highlights, reconnect and expiry.
 Confirm only managers can issue playback controls and social actions never alter
 the playback revision. Open Search with empty history and submit a search; the
 Activity must stay connected on its original launch URL without SDK CLOSE or a
@@ -146,8 +151,8 @@ overlap fails busy instead of building a queue. Disconnect and deadline cleanup
 must stop owned extractor helpers before another job is admitted. Busy/deadline
 errors must not fan out into direct-provider fallback. Ordinary state reads keep
 their short deadlines. A stopped or memory-starved Core still needs an authorized
-operational recovery; bounded work does not guarantee provider availability. Listen
-to real voice audio during these steps.
+operational recovery; bounded work does not guarantee provider availability.
+Listen to actual local Activity audio and verify ordinary bot voice independently.
 
 Record the build SHA, client/device, pass/fail evidence and any provider/proxy
 failure without private identifiers or tokens. Do not label the Activity ready
@@ -246,7 +251,7 @@ Without a permitted browser/client these gates remain pending. The code and
 mocked DOM tests are review material, not a successful Discord integration test.
 
 
-### Activity audio output and queue controls
+### Legacy beta.6 voice-backed Activity output and queue controls
 
 The embedded player must play synchronized video **with audio** inside Activity.
 The external link is only a failure fallback. A listener explicitly chooses local
@@ -270,3 +275,54 @@ from mutation. A generic Console thumbnail CSP error does not establish an order
 missing-item, moderation or stale-update queue bug. Capture the actual queue pane
 and relevant read status after the owner's operation before claiming that defect
 resolved. No live queue/playback mutation is part of source validation.
+
+
+## Independent Activity playback (beta.7 source preview)
+
+The earlier voice-backed path used Commands.execute/add and Engine's PCM clock.
+Both adding and transport required Engine.connected; removing that guard alone
+would leave clock progression, end-of-track and output coupled to Discord voice.
+Beta.7 uses the existing authoritative Rooms reducer/clock in a separate
+`activity_rooms` table, never the bot engine or public `video_rooms` table.
+
+After SDK authenticate, `/api/activity/join` asks Core to verify Discord's
+[application instance](https://docs.discord.com/developers/resources/application#get-application-activity-instance).
+Core uses the existing bot client's authenticated REST API, validates app/instance,
+`location.kind=gc`, guild/channel, current user list and channel View permission.
+The browser never supplies a trusted role, owner hash, clock or video metadata.
+The grant binds the verified context; it cannot be rebound to another instance.
+DMs are excluded. No new OAuth scopes or privileged gateway intents are requested.
+
+Same-instance participants share one private timeline. New instance IDs, channels
+and guilds receive different state. Display codes are not capabilities; ordinary
+room, public concert, directory and event endpoints cannot read the private table.
+Rooms expire after 24 hours; expired rows are removed on the next join, creation
+is capped at128, and a short-code collision is refused. State survives Core restart
+for the same still-authorized instance. Browser sign-out revokes its cookie only;
+it does not stop another participant's shared clock. Leaving the Discord instance
+removes read/control access at the next verification. Core's tick continues finite
+queued tracks without browsers, without decoding audio or joining voice.
+
+Members may add, vote and skip-vote, subject to approval and queue limits.
+Managers retain transport, seek and moderation. The first accepted track is cued
+paused until a manager plays; shared start deadlines, pause/seek, natural completion
+and next retain server version checks. Selected IDs use the bounded catalog job;
+metadata commits recheck membership, instance, role, cancellation and version.
+Automatic radio is intentionally unavailable in this mode. Ordinary Discord
+Commands/Engine and their voice connection guards remain unchanged.
+
+Activity output starts locally muted and requires an explicit Play audio in
+Activity gesture. It does not require a fictitious bot-mute confirmation: this
+queue has no bot voice output. If unrelated voice audio is audible, mute it only
+for yourself. No SDK or automatic operation changes that audio. Native/fallback
+fullscreen and provider restrictions remain unchanged. The beta.6 voice-backed
+instructions above are historical and do not describe this independent mode.
+
+Before approval to deploy, review both website/Core together and back up the
+isolated test data. The new Core table is additive; no D1 migration is needed,
+and old test cookies must reconnect through the new join flow. No merge, restart,
+Portal, live queue/playback mutation or deployment is part of this source task.
+After a separately approved deployment, use two real Discord clients to verify
+manager/member add, shared play/pause/seek/next, natural completion, leaving and
+rejoining, channel/instance isolation, local audio/autoplay and provider handshake.
+Mocks and HTTP fixtures cannot establish those real-client results.

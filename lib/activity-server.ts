@@ -14,3 +14,16 @@ export async function activityAuthenticate(request:Request){const input=await ac
 export async function activitySession(request:Request){activityOrigin(request,request.method==='GET');const token=cookie(request,'gk-activity');if(!/^[a-f0-9]{64}$/.test(token))fail(401,'Reopen this Activity to sign in.');const session=await db().prepare('SELECT * FROM activity_test_sessions WHERE token_hash=? AND expires_at>?').bind(await hash(token),Date.now()).first<ActivitySession>();if(!session)fail(401,'Activity session expired. Reopen it to sign in.');return session;}
 export async function activityResponse(run:()=>Promise<Response>){try{return await run();}catch(error){const status=(error as {status?:number})?.status;return Response.json({error:status===401?'Activity sign-in expired. Reopen the Activity.':status===403?'This Activity request is not authorized.':status===409?'Activity authorization expired or was already used.':status===429?'Activity testing is busy. Try again shortly.':'Activity testing is unavailable. Check the test configuration.'},{status:status&&status>=400&&status<600?status:503,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});}}
 export async function activityLogout(request:Request){activityOrigin(request);const token=cookie(request,'gk-activity');if(/^[a-f0-9]{64}$/.test(token))await db().prepare('DELETE FROM activity_test_sessions WHERE token_hash=?').bind(await hash(token)).run();return new Response(null,{status:204,headers:{'Cache-Control':'no-store','Set-Cookie':partitioned('gk-activity','',0)}});}
+
+/** Called after SDK authenticate, when Discord can attest current instance participation. */
+export async function activityJoin(request:Request){
+ const session=await activitySession(request),input=await activityBody(request);
+ await limit(request,'activity-join',12,60000,true);
+ if(typeof input.channelId!=='string'||!/^\d{14,22}$/.test(input.channelId)||typeof input.instanceId!=='string'||!/^[A-Za-z0-9_-]{1,256}$/.test(input.instanceId))fail(400,'Invalid Activity channel or session.');
+ const result=await coreRequest<{guildId:string;roomCode:string;tokenCipher:string;expiresAt:number}>('/v1/activity','POST',{
+  operation:'join',guildId:session.guild_id,tokenCipher:session.token_cipher,channelId:input.channelId,instanceId:input.instanceId});
+ if(result.guildId!==session.guild_id||!/^A1[A-F0-9]{6}$/.test(result.roomCode)||typeof result.tokenCipher!=='string'||!result.tokenCipher||result.tokenCipher.length>8192)fail(502,'Invalid Activity room.');
+ const changed=await db().prepare('UPDATE activity_test_sessions SET token_cipher=?,room_code=? WHERE token_hash=? AND token_cipher=? AND expires_at>?').bind(result.tokenCipher,result.roomCode,await hash(cookie(request,'gk-activity')),session.token_cipher,Date.now()).run();
+ if(changed.meta.changes!==1)fail(409,'Activity session changed. Reopen it.');
+ return Response.json({roomCode:result.roomCode,guildId:result.guildId,expiresAt:session.expires_at},{headers:{'Cache-Control':'no-store'}});
+}

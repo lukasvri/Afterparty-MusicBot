@@ -52,7 +52,7 @@ export type Room = {
   viewers: number;
   isHost: boolean;
   expiresAt: number;
-  mode?: "discord";
+  mode?: "discord" | "activity";
   buffering?: boolean;
   discordOnline?: boolean;
   playbackKey?: string;

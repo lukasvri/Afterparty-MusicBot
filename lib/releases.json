@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.0.0-beta.7",
+    "title": "Play inside Activity without a voice bot",
+    "date": "2026-10-19",
+    "items": [
+      "Activity has its own private queue and server-owned playback clock per Discord guild, channel and Activity instance. Verified participants can add YouTube videos without the bot joining voice. Managers control play, pause, seek, next and moderation; members retain add and voting. Track completion advances the queue on Core even without a connected browser. Ordinary Discord music and public/browser-room queues remain separate.",
+      "After SDK authentication, Core verifies the application instance, channel, guild and participant against Discord and checks channel access. Encrypted grants bind the verified instance. Every Activity read/control rechecks participation and current membership; asynchronous metadata commits recheck permissions, caller cancellation and the queue version. Display room codes grant no public access. Private Activity state expires after 24 hours and creation is capped.",
+      "Activity uses the existing synchronized official video player with listener-only audio. Enabling local audio no longer requires a bot-voice confirmation for this independent queue. Volume, user gesture, autoplay recovery and fullscreen remain local; no voice join, bot volume or ordinary bot controls are issued. Automatic radio is excluded from this focused mode.",
+      "This beta preview adds isolated clock, queue, authorization and transport tests. It does not establish live Discord instance verification, mapped YouTube ready/state events, audible audio, autoplay or fullscreen. Existing provider/Portal approval and actual desktop/mobile acceptance gates remain open; no deployment accompanies this source change."
+    ]
+  },
+  {
     "version": "3.0.0-beta.6",
     "title": "Preserve Activity video, audio and queue controls",
     "date": "2026-10-19",

@@ -38,6 +38,7 @@ async function startupProbe(failed: Failure, withGuilds: boolean) {
   const originalClear = globalThis.clearInterval;
   const originalDispose = Rooms.prototype.dispose;
   const originalWsClose = WebSocketServer.prototype.close;
+  const disposedTables: string[] = [];
   let disposed = 0, websocketClosed = 0;
   http.createServer = ((...args: Parameters<typeof http.createServer>) => {
     const server = originalCreateServer(...args);
@@ -54,7 +55,7 @@ async function startupProbe(failed: Failure, withGuilds: boolean) {
     intervals.delete(timer as ReturnType<typeof setInterval>);
     originalClear(timer);
   }) as typeof clearInterval;
-  Rooms.prototype.dispose = function () { disposed++; return originalDispose.call(this); };
+  Rooms.prototype.dispose = function () { disposed++; disposedTables.push(this.table); return originalDispose.call(this); };
   WebSocketServer.prototype.close = function (...args: Parameters<typeof originalWsClose>) { websocketClosed++; return originalWsClose.apply(this, args); };
   let recovered: Awaited<ReturnType<typeof createServers>> | undefined;
   try {
@@ -66,7 +67,7 @@ async function startupProbe(failed: Failure, withGuilds: boolean) {
     // Rollback must complete before the rejected call returns.
     await new Promise<void>(resolve => setImmediate(resolve));
     const afterFailure = {
-      errorCode, created: servers.length, intervals: intervals.size, disposed, websocketClosed,
+      errorCode, created: servers.length, intervals: intervals.size, disposed, disposedTables: [...disposedTables].sort(), websocketClosed,
       listening: servers.filter(server => server.listening).length,
       errorListeners: servers.reduce((sum, server) => sum + server.listenerCount('error'), 0),
       state: engine.listenerCount('state') - baseline.state,
@@ -125,7 +126,7 @@ if (process.argv[2] === '--startup-probe') {
         const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--startup-probe', failed, withGuilds ? 'guilds' : 'single'], {encoding: 'utf8', timeout: 15000, windowsHide: true});
         assert.equal(child.status, 0, child.stderr || String(child.error ?? 'child failed'));
         const report = JSON.parse(child.stdout);
-        assert.deepEqual(report.afterFailure, {errorCode: failed === 'invalid' ? 'ERR_SOCKET_BAD_PORT' : 'EADDRINUSE', created: 1, intervals: 0, disposed: 1, websocketClosed: 1, listening: 0, errorListeners: 0, state: 0, clock: 0, added: 0, removed: 0});
+        assert.deepEqual(report.afterFailure, {errorCode: failed === 'invalid' ? 'ERR_SOCKET_BAD_PORT' : 'EADDRINUSE', created: 1, intervals: 0, disposed: 2, disposedTables: ['activity_rooms','video_rooms'], websocketClosed: 1, listening: 0, errorListeners: 0, state: 0, clock: 0, added: 0, removed: 0});
         assert.deepEqual(report.recovery, {created: 2, status: 200, privateLeaked: false, denied: 403});
         assert.deepEqual(report.afterClose, {sharedClose: true, intervals: 0, listening: 0, state: 0, clock: 0});
       });
