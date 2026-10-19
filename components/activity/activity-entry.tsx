@@ -84,11 +84,18 @@ export function ActivityEntry() {
         // The server verified membership; this comparison prevents mounting a different SDK identity.
         if (!authenticated || authenticated.user.id !== result.userId) throw new Error("Discord account verification did not match. Connect again to retry.");
         if (!alive || controller.signal.aborted) return;
-        clearTimeout(timeout);
         restoreMedia = installActivityYoutubeScripts(url => attemptRemap({url,mappings:youtubeMappings}));
         restore = installActivityTransport();
-        const verified = { roomCode: result.roomCode, guildId: result.guildId, expiresAt: result.expiresAt };
+        const joinedResponse = await fetch("/api/activity/join", { method: "POST", credentials: "same-origin", cache: "no-store",
+          headers: { "Content-Type": "application/json" }, signal: controller.signal,
+          body: JSON.stringify({ channelId: sdk.channelId, instanceId: sdk.instanceId }) });
+        if (!joinedResponse.ok) throw new Error("This Activity session could not be verified. Reopen it in its server channel.");
+        const verified = await joinedResponse.json() as Session;
+        if (verified.guildId !== guildId || !/^A1[A-F0-9]{6}$/.test(verified.roomCode) || !Number.isFinite(verified.expiresAt) || verified.expiresAt > result.expiresAt)
+          throw new Error("The server returned an invalid Activity room.");
+        if (!alive || controller.signal.aborted) return;
         sdkRef.current = sdk;
+        clearTimeout(timeout);
         setSession(verified); setPhase("connected");
         expiry = setTimeout(() => { close(); if (alive) { setSession(null); setError("Your Activity session expired. Connect again to continue."); setPhase("error"); } }, verified.expiresAt - Date.now());
       } catch (cause) {
@@ -116,7 +123,7 @@ export function ActivityEntry() {
       <p className="activity-description">Join the music, react together and save the moments you want to remember.</p>
       <div className="activity-status" role="status" aria-live="polite">{working && <LoaderCircle size={18} aria-hidden="true" className="activity-spinner" />}{error || progress[phase]}</div>
       <div className="activity-gate-actions">{working ? <button disabled={phase === "disconnecting"} onClick={() => cancel.current?.()}>Cancel connection</button> : <button className="activity-connect" onClick={start}>{phase === "error" ? "Try connecting again" : "Connect with Discord"}</button>}</div>
-      <p className="activity-footnote">Available only in an enabled Discord server. Audio plays in Discord. Embedded video requires the test app’s approved URL mappings.</p>
+      <p className="activity-footnote">Available only in an enabled Discord server. Audio and video play inside this Activity. The bot does not need to join voice. Embedded video requires the test app’s approved URL mappings.</p>
     </main>}
   </div>;
 }

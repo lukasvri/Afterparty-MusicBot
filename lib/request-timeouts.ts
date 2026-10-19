@@ -7,5 +7,5 @@ export function browserRequestTimeoutMs(path: string): number {
   return pathname === '/api/search' || pathname === '/api/videos' ? 75000 : 12000;
 }
 export function coreRequestTimeoutMs(path: string): number {
-  return path.split('?')[0] === '/v1/catalog' ? 60000 : 25000;
+  return path.split('?')[0] === '/v1/catalog' || path === '/v1/activity?control=1' ? 60000 : 25000;
 }

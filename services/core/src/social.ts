@@ -19,9 +19,10 @@ export class Social extends EventEmitter {
   private store: Store;
   private key: string;
   private now: () => number;
-  constructor(store: Store, key: string, now = Date.now) {
+  private prefix: "" | "activity:";
+  constructor(store: Store, key: string, now = Date.now, prefix: "" | "activity:" = "") {
     super();
-    this.store = store; this.key = key; this.now = now;
+    this.store = store; this.key = key; this.now = now; this.prefix = prefix;
     store.db.exec(`CREATE TABLE IF NOT EXISTS concert_social(scope TEXT PRIMARY KEY,data TEXT NOT NULL,expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS concert_social_receipts(scope TEXT NOT NULL,event_id TEXT NOT NULL,expires INTEGER NOT NULL,kind TEXT NOT NULL DEFAULT 'guest',PRIMARY KEY(scope,event_id));
       CREATE INDEX IF NOT EXISTS concert_social_receipts_expiry ON concert_social_receipts(expires)`);
@@ -53,7 +54,7 @@ export class Social extends EventEmitter {
   }
   apply(input: Record<string, unknown>, playback: SocialPlayback, host: boolean) {
     if (!['room', 'guild'].includes(String(input.scope)) || typeof input.scopeId !== 'string' || !(input.scope === 'room' ? /^[A-Z0-9]{8}$/ : /^\d{14,22}$/).test(input.scopeId)) throw new UserError('Invalid social scope.');
-    const scope = input.scope as 'room' | 'guild', scopeId = input.scopeId, key = scope + ':' + scopeId, now = this.now(), reactionKey = key + ':' + playback.playbackKey;
+    const scope = input.scope as 'room' | 'guild', scopeId = input.scopeId, key = this.prefix + scope + ':' + scopeId, now = this.now(), reactionKey = key + ':' + playback.playbackKey;
     this.budget('global', 240); this.budget(key, 90);
     let token: string | undefined;
     if (input.action === 'join') {

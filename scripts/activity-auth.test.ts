@@ -43,9 +43,12 @@ const hooks = registerHooks({
         export const coreRequest=async(...args)=>{
           c.coreCalls.push(args);const [path,method,input]=args;
           if(c.coreFailure==='offline')throw Object.assign(new Error('sensitive upstream failure'),{status:503});
-          if(path==='/v1/activity'){
+          if(path.startsWith('/v1/activity')){
             if(input.operation==='config')return {enabled:c.coreFailure!=='unconfigured',clientId:'111111111111111111'};
             if(input.operation==='verify')return {canManage:!c.rejectAdmin,user:{id:'444444444444444444'}};
+            if(input.operation==='join')return {guildId:input.guildId,roomCode:'A1ABCDEF',tokenCipher:'private-cipher',expiresAt:Date.now()+1800000,...(c.grantOverride??{})};
+            if(input.operation==='read'||input.operation==='control')return {room:{code:'A1ABCDEF',mode:'activity',guildId:input.guildId,current:null,queue:[],version:1}};
+            if(input.operation==='social')return {social:{revision:1},canManage:false};
             return {accessToken:'synthetic-access',tokenCipher:'private-cipher',expiresAt:Date.now()+1800000,user:{id:'444444444444444444'},guild:{id:c.coreFailure==='oauth-rejected'?'333333333333333333':input.guildId,roomCode:'DISCORD1'},...(c.grantOverride??{})};
           }
           if(path.startsWith('/v1/state'))return {state:{online:true,ready:true,connected:true,playing:true,current:{id:'abcdefghijk'},queue:[],playbackKey:'playback',queueRevision:'revision'}};
@@ -77,6 +80,7 @@ const {activityGrant,bindActivityGrant}=await import('../lib/request-grant.ts');
 const {activityResponse,activitySession}=await import('../lib/activity-server.ts');
 const activity=await import('../app/api/activity/route.ts');
 const auth=await import('../app/api/activity/auth/route.ts');
+const join=await import('../app/api/activity/join/route.ts');
 const bridge=await import('../app/api/activity/bridge/route.ts');
 const logout=await import('../app/api/activity/logout/route.ts');
 hooks.deregister();
@@ -126,7 +130,7 @@ const ORIGIN=`https://${APP}.discordsays.com`;
 function enabled(){const f=setup();env.DISCORD_ACTIVITY_ENABLED='true';env.DISCORD_ACTIVITY_CLIENT_ID=APP;return f;}
 function req(path='/api/activity',method='GET',input?:unknown,cookie='',origin:string|undefined=ORIGIN){return new Request('https://afterparty.example'+path,{method,headers:{'Content-Type':'application/json',cookie,...(origin?{Origin:origin}:{})},...(input===undefined?{}:{body:JSON.stringify(input)})});}
 async function start(){const response=await activity.GET(req());assert.equal(response.status,200);const data=await response.json() as {state:string};return {state:data.state,cookie:response.headers.getSetCookie()[0].split(';')[0]};}
-async function signIn(){const state=await start();const response=await auth.POST(req('/api/activity/auth','POST',{...state,code:'synthetic-code',guildId:GUILD},state.cookie));assert.equal(response.status,200);return {response,cookie:response.headers.getSetCookie().find(c=>c.startsWith('gk-activity='))!.split(';')[0],state};}
+async function signIn(){const state=await start();const response=await auth.POST(req('/api/activity/auth','POST',{state:state.state,code:'code',guildId:GUILD},state.cookie));assert.equal(response.status,200);const cookie=response.headers.getSetCookie().find(c=>c.startsWith('gk-activity='))!.split(';')[0];assert.equal((await join.POST(req('/api/activity/join','POST',{channelId:'555555555555555555',instanceId:'i-test-instance'},cookie))).status,200);return {response,cookie,state};}
 function routed(path:string,cookie:string,method='GET',input?:unknown){return bridge.GET(req('/api/activity/bridge?path='+encodeURIComponent(path),method,input,cookie));}
 test('Activity auth requires configured exact origin and one-use cookie-bound state; private grant stays server-side',async()=>{
  const f=enabled();try{
@@ -163,37 +167,30 @@ test('Activity sessions cannot grant ordinary admin and only Request identity bi
   f.sqlite.prepare('UPDATE activity_test_sessions SET expires_at=0').run();assert.equal((await activityResponse(async()=>Response.json(await activitySession(req('/api/activity/bridge','GET',undefined,s.cookie))))).status,401);
  }finally{f.sqlite.close();}
 });
-test('Activity bridge rejects cross-guild routes, social scope changes, admin/auth paths and forged caller roles',async()=>{
+test('Activity bridge scopes private room controls and social to the bound session, with no ordinary bot command route',async()=>{
  const f=enabled();try{
   const s=await signIn();
-  for(const path of ['/api/admin/session','/api/auth/discord','/api/activity/auth','/api/rooms/OTHERONE','/api/discord?guildId='+OTHER,'/api/../api/admin/session','//evil.example/api/me'])assert.ok((await routed(path,s.cookie)).status>=400,path);
-  assert.equal((await routed('/api/social',s.cookie,'POST',{scope:'room',scopeId:'TESTROOM',action:'join'})).status,403);
-  assert.equal((await routed('/api/social',s.cookie,'POST',{scope:'guild',scopeId:OTHER,action:'join'})).status,403);
-  const response=await routed('/api/social',s.cookie,'POST',{scope:'guild',scopeId:GUILD,action:'join',host:true,tokenCipher:'forged'});assert.equal(response.status,200);
-  const payload=context.coreCalls.find(c=>c[0]==='/v1/social')![2] as Record<string,unknown>;assert.equal(payload.tokenCipher,'private-cipher');assert.equal(payload.host,undefined);
-  assert.equal((await routed('/api/me',s.cookie)).status,200);
+  for(const path of ['/api/admin/session','/api/auth/discord','/api/activity/auth','/api/rooms/OTHERONE','/api/discord','/api/discord/queue','/api/rooms/A1ABCDEF?guildId='+OTHER,'/api/../api/admin/session','//evil.example/api/me'])assert.ok((await routed(path,s.cookie)).status>=400,path);
+  assert.equal((await routed('/api/social',s.cookie,'POST',{scope:'guild',scopeId:GUILD,action:'join'})).status,403);
+  assert.equal((await routed('/api/social',s.cookie,'POST',{scope:'room',scopeId:'OTHERONE',action:'join'})).status,403);
+  assert.equal((await routed('/api/social',s.cookie,'POST',{scope:'room',scopeId:'A1ABCDEF',action:'join',host:true,tokenCipher:'forged'})).status,200);
+  const payload=context.coreCalls.find(c=>c[0]==='/v1/activity'&&(c[2] as {operation:string}).operation==='social')![2] as Record<string,unknown>;assert.equal(payload.tokenCipher,'private-cipher');
+  const response=await routed('/api/rooms/A1ABCDEF',s.cookie,'POST',{action:'add',videoId:'abcdefghijk',version:1,host:true});assert.equal(response.status,200);
+  const control=context.coreCalls.find(c=>c[0]==='/v1/activity?control=1')!;
+  assert.equal((control[2] as {guildId:string}).guildId,GUILD);assert.equal((control[2] as {tokenCipher:string}).tokenCipher,'private-cipher');
+  assert.equal(context.coreCalls.some(c=>c[0]==='/v1/command'||c[0]==='/v1/concert-queue'),false);
+  assert.equal((await routed('/api/rooms/A1ABCDEF',s.cookie)).status,200);
  }finally{f.sqlite.close();}
 });
-test('Activity playback requires fresh manager verification and strips direct-Core ticket fallback',async()=>{
+test('Activity join validates channel/instance input, preserves private grants and rejects invalid upstream bindings',async()=>{
  const f=enabled();try{
-  const s=await signIn();const input={action:'pause',commandId:crypto.randomUUID(),playbackKey:'playback',guildId:GUILD};
-  context.rejectAdmin=true;assert.equal((await routed('/api/discord',s.cookie,'POST',input)).status,403);assert.equal(context.coreCalls.some(c=>c[0]==='/v1/command'),false);
-  context.rejectAdmin=false;const response=await routed('/api/discord',s.cookie,'POST',input);assert.equal(response.status,200);const data=await response.json() as Record<string,unknown>;assert.equal(data.ticket,undefined);assert.equal(data.url,undefined);
-  const verifications=context.coreCalls.filter(c=>c[0]==='/v1/activity'&&(c[2] as {operation:string}).operation==='verify');assert.equal(verifications.length,2);
-  assert.equal((verifications[0][2] as {tokenCipher:string}).tokenCipher,'private-cipher');
- }finally{f.sqlite.close();}
-});
-test('ordinary Activity members vote through the public queue with deterministic verified identity',async()=>{
- const f=enabled();try{
-  const s=await signIn();context.rejectAdmin=true;
-  for(const action of ['vote','skip-vote']){
-   const response=await routed('/api/discord/queue',s.cookie,'POST',{action,guildId:GUILD,videoId:'abcdefghijk',playbackKey:'playback',revision:'revision',host:true,participantHash:'forged'});
-   assert.equal(response.status,200);
-  }
-  const calls=context.coreCalls.filter(c=>c[0]==='/v1/concert-queue').map(c=>c[2] as Record<string,unknown>);
-  assert.equal(calls.length,2);
-  for(const payload of calls){assert.equal(payload.admin,false);assert.equal(payload.tokenCipher,undefined);assert.equal(payload.guildId,GUILD);assert.notEqual(payload.participantHash,'forged');assert.match(String(payload.participantHash),/^[a-f0-9]{64}$/);}
-  assert.equal(calls[0].participantHash,calls[1].participantHash);
+  const s=await signIn();
+  for(const input of [{channelId:'bad',instanceId:'valid'},{channelId:'555555555555555555',instanceId:'../bad'}])assert.equal((await join.POST(req('/api/activity/join','POST',input,s.cookie))).status,400);
+  const valid={channelId:'555555555555555555',instanceId:'i-test-instance'};
+  assert.equal((await join.POST(req('/api/activity/join','POST',valid,s.cookie,'https://evil.example'))).status,403);
+  context.grantOverride={roomCode:'DISCORD1'};assert.equal((await join.POST(req('/api/activity/join','POST',valid,s.cookie))).status,502);
+  context.grantOverride={guildId:OTHER};assert.equal((await join.POST(req('/api/activity/join','POST',valid,s.cookie))).status,502);
+  context.grantOverride=null;const response=await join.POST(req('/api/activity/join','POST',valid,s.cookie));assert.equal(response.status,200);assert.ok(!(await response.text()).includes('private-cipher'));
  }finally{f.sqlite.close();}
 });
 test('Activity discovery history keeps the videos contract without exposing standalone history',async()=>{

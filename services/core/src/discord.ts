@@ -1,3 +1,4 @@
+import type { ActivityContext } from './activity-playback.ts';
 import {playerAction} from './player-compatibility.ts';
 import { Client, GatewayIntentBits, Events, MessageFlags, PermissionFlagsBits, ActivityType, ChannelType, type Interaction, type AutocompleteInteraction, type VoiceState, type ChatInputCommandInteraction, type ButtonInteraction, type VoiceBasedChannel, type Guild } from 'discord.js';
 import { joinVoiceChannel, entersState, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
@@ -119,6 +120,24 @@ export class DiscordBot {
             if(!this.engine.current&&this.engine.connected){if(this.engine.settings.secondsToWaitAfterQueueEmpties>0&&Date.now()-this.idleSince>this.engine.settings.secondsToWaitAfterQueueEmpties*1000)this.disconnect();}else this.idleSince=Date.now();
         },3000);
         await this.restore(guild);if(this.engine.current)await this.playerMessage.update(true,true).catch(()=>console.warn('The player message could not be moved.'));
+    }
+    /** Discord's own instance API proves the user, app and channel; joining voice is unnecessary. */
+    async verifyActivityInstance(context: ActivityContext, userId: string) {
+        if (context.guildId !== this.guildId || !this.client.isReady() || !this.client.user)
+            throw new UserError('Activity server is unavailable.', 503);
+        let value: { application_id?: string; instance_id?: string; location?: {kind?: string; guild_id?: string; channel_id?: string}; users?: string[] };
+        try {
+            value = await this.client.rest.get(`/applications/${this.client.user.id}/activity-instances/${encodeURIComponent(context.instanceId)}`) as typeof value;
+        } catch { throw new UserError('This Activity session is no longer available.', 403); }
+        if (value.application_id !== this.client.user.id || value.instance_id !== context.instanceId ||
+            value.location?.kind !== 'gc' || value.location.guild_id !== context.guildId ||
+            value.location.channel_id !== context.channelId || !Array.isArray(value.users) || !value.users.includes(userId))
+            throw new UserError('Join this Activity in its server channel first.', 403);
+        const guild = await this.client.guilds.fetch(this.guildId);
+        const channel = await guild.channels.fetch(context.channelId);
+        const member = await guild.members.fetch({user:userId,force:true});
+        if (!channel || !channel.permissionsFor(member)?.has(PermissionFlagsBits.ViewChannel))
+            throw new UserError('You cannot access this Activity channel.', 403);
     }
     async restore(guild: Guild) { const id = this.engine.store.get<string | null>('voice-channel', null), recovery = this.engine.store.get<{
         paused: boolean;

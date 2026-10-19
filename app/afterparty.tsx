@@ -89,7 +89,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
   const outputRef=useRef<AudioOutput>(activityRoomCode?'choose':'site');
   const [botMutedLocally,setBotMutedLocally]=useState(false);
   const chooseAudioOutput=(requested:'activity'|'voice')=>{
-    const next=selectActivityOutput(requested,botMutedLocally);
+    const next=selectActivityOutput(requested,Boolean(activityScope)||botMutedLocally);
     outputRef.current=next;setAudioOutput(next);
     if(requested==='voice')setBotMutedLocally(false);
     if(next==='activity'&&(audio.current.current.muted||audio.current.current.level===0))audio.toggleMute();
@@ -220,7 +220,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
   }, []);
   const accept = useCallback(
     (next: Room, updateTimeline = true) => {
-      if (activityRoomCode && (next.code !== activityRoomCode || next.guildId !== activityGuildId || next.mode !== "discord")) return;
+      if (activityRoomCode && (next.code !== activityRoomCode || next.guildId !== activityGuildId || next.mode !== "activity")) return;
       const previous = roomRef.current;
       if (!updateTimeline) {
         if (previous?.code === next.code) {
@@ -444,9 +444,9 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
           request<{ room: Room }>(`/api/rooms/${current.code}`, {
             method: "POST",
             headers: headers(current.code),
-            ...(["next", "radio"].includes(name)
-              ? { signal: AbortSignal.timeout(35000) }
-              : {}),
+            ...(activityRoomCode && ["add", "play-video"].includes(name)
+              ? { signal: AbortSignal.timeout(75000) }
+              : ["next", "radio"].includes(name) ? { signal: AbortSignal.timeout(35000) } : {}),
             body: JSON.stringify({
               action: name,
               guildId: roomRef.current?.guildId,
@@ -507,7 +507,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
         setPending(false);
       }
     },
-    [accept, refresh, announce, t, setPending, setError],
+    [accept, refresh, announce, t, setPending, setError, activityRoomCode],
   );
   useLayoutEffect(() => { actionRef.current = action; }, [action]);
   const add = async (video: Video) => {
@@ -887,6 +887,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
     const guildId = activityGuildId ?? room?.guildId;
+    if (activityRoomCode) return;
     const update = async () => {
       try {
         if (
@@ -988,9 +989,9 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       } finally {
         inFlight = false;
       }
-      if (!stopped) timer = setTimeout(poll, activityRoomCode ? Math.max(10000, roomPollMs(document.hidden)) : roomPollMs(document.hidden));
+      if (!stopped) timer = setTimeout(poll, activityRoomCode ? (document.hidden ? 10000 : 2000) : roomPollMs(document.hidden));
     };
-    timer = setTimeout(poll, activityRoomCode ? Math.max(10000, roomPollMs(document.hidden)) : roomPollMs(document.hidden));
+    timer = setTimeout(poll, activityRoomCode ? (document.hidden ? 10000 : 2000) : roomPollMs(document.hidden));
     const focus = () => {
       if (!document.hidden) {
         clearTimeout(timer);
@@ -1473,7 +1474,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       onSync={() => syncRef.current(true)}
       roomSettings={<>
               <div className="party-tools">
-                {room?.isHost && !discordMode && (
+                {room?.isHost && !discordMode && !activityScope && (
                   <button
                     className="button subtle room-radio-control"
                     aria-pressed={room.radio !== false}
@@ -1658,11 +1659,11 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                 <span>
                   {discordMode ? t("Konsertrommet") : t("Videorommet")}
                 </span>
-                <span className={`status-dot ${botOnline ? "live" : ""}`} />
+                <span className={`status-dot ${(activityScope ? online : botOnline) ? "live" : ""}`} />
               </span>
               <button
                 className="button subtle share-button"
-                disabled={!room}
+                disabled={!room || Boolean(activityScope)}
                 aria-label={t("Del rommet")}
                 title={t("Del rommet")}
                 onClick={share}
@@ -1672,7 +1673,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
               </button>
             </div>
           </section>
-          {(sharing || tv) && room && (
+          {!activityScope && (sharing || tv) && room && (
             <RoomSharing
               room={room}
               tv={tv}
@@ -1809,7 +1810,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   <span>{t(fullscreenFallback ? "Gjenopprett scena" : "Gå ut av fullskjerm")}</span>
                 </button>
               </div>
-              {activityScope && room?.current?.source !== "soundcloud" && <ActivityAudioOutput output={audioOutput} confirmed={botMutedLocally} onConfirm={confirmLocalMute} onSelect={chooseAudioOutput} />}
+              {activityScope && room?.current?.source !== "soundcloud" && <ActivityAudioOutput voiceAvailable={false} output={audioOutput} confirmed={botMutedLocally} onConfirm={confirmLocalMute} onSelect={chooseAudioOutput} />}
               <div
                 className="stage"
                 data-current={Boolean(current)}
@@ -2310,7 +2311,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   }) + " · "
                 : ""}
               {room?.code}
-              {!discordMode && room ? t(" · 48 timer") : ""}
+              {!discordMode && !activityScope && room ? t(" · 48 timer") : ""}
             </span>
             {!activityRoomCode && <nav className="footer-links" aria-label={t("Snarveier")}>
               <a href="/install">
