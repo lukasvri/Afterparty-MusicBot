@@ -194,7 +194,7 @@ test("actual parallel radio discovery hydrates its shared candidate once and pre
     assert(!("radioRelatedTo" in publicTrack(selected)!));
     const cached = await providers.radio(seed, [seed.id]);
     assert.equal(cached?.id, selected.id); assert.notEqual(cached.entryId, selected.entryId);
-    assert.equal(metadataCalls, 1); assert.equal(searches.length, 2);
+    assert.equal(metadataCalls, 1); assert.equal(searches.length, 3, "two discovery searches plus one cached format lookup");
     assert.deepEqual(seed, originalSeed); assert.deepEqual(store.get("radio-history", []), originalHistory);
   } finally { metadataGate.resolve(); await pending; store.close(); }
 });

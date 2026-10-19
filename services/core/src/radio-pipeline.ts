@@ -8,7 +8,7 @@ import {
 } from "./radio.ts";
 
 export const RADIO_LIMITS = Object.freeze({ metadata: 12, descriptors: 15, similarMatches: 3,
-  catalogMatches: 4, searchResults: 20, discoverySearches: 2, candidates: 60 });
+  catalogMatches: 4, searchResults: 20, discoverySearches: 2, candidates: 60, videoResults: 12 });
 export type RadioSource = "catalog" | "artist-catalog" | "genre" | "artist";
 type Stage = "metadata" | "catalog" | "artist-catalog" | "genre" | "artist";
 type StageResult = "unavailable" | "skipped" | "selected" | "empty" | "filtered" | "failed";
@@ -21,6 +21,9 @@ export type RadioDiagnostic = {
   metadata: "unchanged" | "refined" | "unavailable";
   searches: number;
   failedSearches: number;
+  musicVideo: StageResult;
+  videoSearches: number;
+  videoCandidates: number;
   candidates: number;
   catalogMatches: number;
   failedCatalogMatches: number;
@@ -50,6 +53,7 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
   const artist = radioArtist(original);
   const diagnostic: RadioDiagnostic = {
     version: 2, outcome: "empty", seedGenre: radioGenre(seed), artistKnown: Boolean(artist),
+    musicVideo: "skipped", videoSearches: 0, videoCandidates: 0,
     metadata: "unchanged", searches: 0, failedSearches: 0, candidates: 0, catalogMatches: 0, failedCatalogMatches: 0, source: null,
     stages: { metadata: "skipped", catalog: input.similar && input.match ? "skipped" : "unavailable",
       "artist-catalog": input.topTracks && input.match ? "skipped" : "unavailable", genre: "skipped", artist: "skipped" },
@@ -209,7 +213,45 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
   pool.sort((a, b) => quality(b) - quality(a) || diversity(a.track) - diversity(b.track) ||
     Number(favorite(b.track)) - Number(favorite(a.track)) || Number(official(b.track)) - Number(official(a.track)) || a.index - b.index);
   const chosen = pool[0];
-  if (chosen) return finish({ ...chosen.track, radioRelatedTo: original.id }, chosen.source);
+  if (chosen) {
+    // Format preference is scoped to the already selected recording. A video
+    // must never buy a different song a better genre/diversity/favorite rank.
+    const selected = chosen.track;
+    const artist = radioArtist(selected);
+    const title = radioTitle(selected).replace(/\s+official(?: music)? (?:audio|video)\s*$/i, "").trim();
+    const musicVideo = (track: Track) => (track.source ?? "youtube") === "youtube" &&
+      /\bofficial(?: music)? video\b/i.test(track.title) &&
+      !/\b(?:official audio|lyric(?:s)? video|visualizer)\b/i.test(track.title);
+    const eligibleVideo = (value: Track) => {
+      if (!artist || (selected.source ?? "youtube") !== "youtube") return null;
+      const raw = { ...value };
+      // A title is a format hint, not proof of authenticity. Catalog labels
+      // supplied with a search result cannot establish its recording identity.
+      delete raw.catalog;
+      delete raw.radioRelatedTo;
+      if (!musicVideo(raw) || !isRadioMusic(raw) || raw.concert ||
+        (input.requireEmbeddable && !raw.embeddable) || ids.has(raw.id) ||
+        !sameRadioRecording(selected, raw) ||
+        !radioStyleCompatible(selected, raw) || !radioStyleCompatible(seed, raw) ||
+        !ranker.rank([raw], chosen.related).length) return null;
+      return raw;
+    };
+    let video = pool.map(item => eligibleVideo(item.track)).find(track => track !== null);
+    if (!video && (selected.source ?? "youtube") === "youtube" && artist) {
+      diagnostic.videoSearches++;
+      try {
+        const found = (await input.search(`${artist} "${title.replace(/"/g, "")}" official music video`))
+          .slice(0, RADIO_LIMITS.videoResults);
+        diagnostic.videoCandidates = found.length;
+        video = found.map(eligibleVideo).find(track => track !== null);
+        diagnostic.musicVideo = video ? "selected" : found.length ? "filtered" : "empty";
+      } catch {
+        // An optional format lookup cannot invalidate an eligible audio match.
+        diagnostic.musicVideo = "failed";
+      }
+    } else if (video) diagnostic.musicVideo = "selected";
+    return finish({ ...(video ?? selected), radioRelatedTo: original.id }, chosen.source);
+  }
   diagnostic.outcome = !successfulDiscovery && lastError ? "provider-error" : diagnostic.candidates ||
     diagnostic.rejected["catalog-match"] > diagnostic.failedCatalogMatches ? "filtered" : "empty";
   return finish(null, null, diagnostic.outcome === "provider-error" ? lastError : undefined);
