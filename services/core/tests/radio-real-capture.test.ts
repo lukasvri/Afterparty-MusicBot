@@ -24,7 +24,7 @@ test("captured colon seed reaches bounded selection instead of insufficient meta
   const result = await selectRadio({ seed: track(metallicaSeed), recent: [], excluded: [], requireEmbeddable: true,
     search: async () => { calls++; return [candidate]; } });
   assert.equal(result.track?.id, candidate.id);
-  assert(calls > 0 && calls <= 3);
+  assert(calls > 0 && calls <= 4);
 });
 
 test("a colon inside a song and a generic publisher cannot invent an artist", () => {

@@ -283,7 +283,7 @@ for (const action of ["remove", "clear"] as const) {
       assert(persisted.radioHistory().some((track) => track.id === suggested.id));
       await assert.rejects(a.q.apply({ action, videoId: suggested.entryId, revision }, true), /changed/);
       await a.e.ensureRadio();
-      assert.equal(searches, 4, "each shared selection compares its two bounded discovery pools");
+      assert.equal(searches, 6, "each selection compares two discovery pools and one bounded video lookup");
       assert.deepEqual(a.e.queue.map((track) => track.id), [replacement.id]);
       assert.deepEqual(a.e.store.get<Track[]>("queue", []).map((track) => track.id), [replacement.id]);
     } finally { a.close(); }

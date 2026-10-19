@@ -34,7 +34,7 @@ test("radio v2: Core and room adapters share the safe original-artist fallback",
     queries.length = 0;
     const core = await providers.radio(seed, []);
     assert.equal(core?.id, own.id, "Core must recover the same eligible artist after an empty genre search");
-    assert.equal(queries.length, 2, "Genre and artist fallback remain bounded");
+    assert.equal(queries.length, 3, "Genre, artist and selected-recording video lookups remain bounded");
     assert.equal(core.radioRelatedTo, seed.id);
   } finally { store.close(); }
 });

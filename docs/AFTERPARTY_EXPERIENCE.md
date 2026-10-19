@@ -83,6 +83,33 @@ by Core and that protection has not been removed.
 The current source tests are synthetic. Live Discord continuity, multi-server
 capacity, licensing and the remaining cases in issue #37 are separate launch gates.
 
+#### Preview installation and rollback boundary
+
+Activities require the Core room service even for private, link-only browser rooms.
+A private room using only the website/D1 playback fallback has no social fallback.
+Device-local saved evenings remain local and do not acquire shared activity state.
+Rooms imported without a playback key cannot send activity events until a new
+playback instance starts. The shared bingo card is called by the host; it is not
+an individual randomized card or an automatic concert recognizer.
+
+Core creates two additive tables in its initial store: `concert_social` and
+`concert_social_receipts`, plus an expiry index. An existing preview receipt table
+without `kind` receives that column with a guest default. No D1 migration, existing
+playback-table rewrite, credential rotation or production migration is performed by
+this PR. Durable social writes and their receipts commit in one SQLite transaction.
+The 24-hour retention window is enforced on subsequent social requests. It is
+logical expiry, not an unattended physical purge; dormant rows can remain on disk
+until another activity request performs cleanup.
+
+Before any separately authorized installation, back up Core SQLite and the normal
+room/website data using the host's established procedure. Rolling website and Core
+back together to the preceding reviewed build leaves the additive tables unused;
+older code does not expose activities. An already-open preview panel will report
+unavailability and must not replay pending actions. Do not delete tables during
+rollback. Restoring an older full backup also discards newer social records and
+playback data, so that recovery requires the normal host backup/restore review.
+These are source compatibility implications, not a tested production rollback.
+
 Run `npm run check:all` with Node.js 24.17+, Python and FFmpeg. Tests include isolated SQLite room clocks, radio races, moderation, vote privacy, single-use and cross-room invitations, ownership transfer, revoked cohosts and blocked browser storage.
 
 The browser workflow uses synthetic API responses and a local preview only:

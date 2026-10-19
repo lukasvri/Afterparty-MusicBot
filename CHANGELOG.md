@@ -13,6 +13,19 @@ See [release policy](docs/RELEASING.md).
 - Social state, limits and revisions are separate from playback and queue commands. This prerelease needs matching website and Core builds; activities are unavailable without Core.
 - This is the first v3 review build, not a stable release or deployment. Live playback validation and music licensing remain separate launch requirements.
 
+## v2.2.12: Prefer matching music videos in radio
+
+2026-10-19
+
+- Automatic radio prefers an eligible official-music-video-labelled upload of the selected song and artist, including after catalog audio matching. Song relevance, recording identity, genre, history and exclusions remain authoritative; title wording alone cannot authorize a match.
+- When no suitable video is found or the bounded video lookup fails, radio retains its playable audio match. Manual queue priority and separate server and room state are preserved. Provider metadata does not verify upload authenticity, and videos with incompatible versions or long introductions remain excluded.
+
+## v2.2.11: Balanced DJ backdrop logo
+
+2026-10-19
+
+- The AP emblem sits lower behind the DJ in welcome and empty-room scenes, sized to fit fully inside the rear LED screen with comfortable margins. The character, console and playback controls are unchanged.
+
 ## v2.2.10: Retire the optional legacy Core dashboard
 
 2026-10-19

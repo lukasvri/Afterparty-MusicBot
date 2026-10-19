@@ -50,10 +50,11 @@ export const ConcertScenery = memo(function ConcertScenery({
   const lamps=[100,300,500,700,900,1100];
   // Rooms leave space for their empty-state controls; the welcome scene has its own centre.
   const stageOffset = composition === "welcome" ? -225 : 0;
-  // The complete emblem clears the performer's highest point in both compositions.
-  const emblemY = composition === "welcome" ? 184 : 212;
-  const emblemRadius = composition === "welcome" ? 56 : 78;
-  const markSize = composition === "welcome" ? 140 : 180;
+  // Lower the rear-screen emblem behind the DJ; SVG paint order keeps him in front.
+  const emblemY = 280;
+  const emblemRadius = 145;
+  // Center the complete canonical mark, including its red dot, with space around the lettering.
+  const markSize = 400;
   return <div className="concert-scenery" data-composition={composition} aria-hidden="true">
     <svg className="concert-venue" viewBox="0 0 1200 675" preserveAspectRatio={composition === "welcome" ? "xMidYMid slice" : "xMidYMid meet"} focusable="false">
       <defs>
@@ -77,7 +78,7 @@ export const ConcertScenery = memo(function ConcertScenery({
         <circle r={emblemRadius} stroke="#8d2835" strokeWidth="1.2" opacity=".7"/>
         <circle className="led-orbit" r={emblemRadius} stroke="#ff4357" strokeWidth="2.2" strokeLinecap="round" strokeDasharray={`36 ${2 * Math.PI * emblemRadius - 36}`} opacity=".75"/>
       </g>
-      <image href="/afterparty-mark.svg" x={825 - markSize / 2} y={emblemY - markSize / 2 - 4} width={markSize} height={markSize} opacity=".9"/>
+      <image href="/afterparty-mark.svg" x={825 - markSize * 127 / 240} y={emblemY - markSize / 2 - 4} width={markSize} height={markSize} opacity=".9"/>
       </g>
       </g>
       <g className="stage-light-bank">{lamps.map((x,i)=><g key={x} transform={`translate(${x} 85)`}><g className={`rig-beam ${i%2?'rig-beam-even':'rig-beam-odd'}`}><path d="M-4 0H4L98 490H-98Z" fill={i%2?`url(#${prefix}-cool-beam)`:`url(#${prefix}-warm-beam)`}/></g></g>)}</g>
