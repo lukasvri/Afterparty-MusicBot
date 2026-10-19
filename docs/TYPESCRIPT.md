@@ -23,13 +23,8 @@ These compatibility and system boundaries remain:
   conventional `.mjs` loader adapters, but configuration lives in typechecked
   `eslint.config.ts` and `postcss.config.ts`. This uses native Node type stripping
   without adding a separate TypeScript configuration loader dependency.
-- The inactive legacy Core dashboard asset in `services/core/public/app.js`
-  remains unchanged alongside `app.css`: the admin server still has dynamic
-  routes for these files, although the legacy `index.html` is absent and the
-  normal `main.ts` entry point disables that admin listener. Docker
-  copies them into the validation stage, not the final production image. They
-  are preserved pending an explicit decision about retiring the legacy routes;
-  they must not be deleted based only on missing static imports.
+- The obsolete optional Core dashboard assets and their separate HTTP listener
+  have been removed. Administration remains on the website at `/admin`.
 - CSS describes presentation. Shell and Dockerfiles provide system and container
   entry points. They remain appropriate for those jobs.
 

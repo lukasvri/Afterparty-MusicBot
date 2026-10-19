@@ -11,7 +11,6 @@ FROM dependencies AS validation
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY tsconfig.json ./
 COPY src src
-COPY public public
 COPY tests tests
 COPY benchmarks benchmarks
 RUN npm run check && npm test && touch /app/validation.ok

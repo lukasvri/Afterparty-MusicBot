@@ -50,6 +50,8 @@ The full stack has two services. **Core** runs on your computer or server and se
 | Website | Node.js 24.17+, Workers/D1 or Sites hosting, your database and HTTPS origin | [Website setup](docs/INSTALLATION.md#5-build-and-preview-the-website) |
 | Connection | A shared bridge secret and Discord OAuth configuration | [Configuration reference](docs/CONFIGURATION.md) |
 
+Administration uses the website at `/admin`. Core no longer includes the obsolete optional local dashboard or its separate port 3847 listener. Custom callers of `createServers` must remove the old dashboard options; supported Core APIs remain on the configured Core port.
+
 There is no one-command production installer for both services. The installation guide covers configuration, database migrations, hosting and your first track.
 
 ### Fresh installation
@@ -121,7 +123,7 @@ TypeScript. Node.js 24.17+ runs the Node scripts directly using native type
 stripping. ESLint and PostCSS load typechecked TypeScript configuration through
 small `.mjs` adapters. Existing installer adapters remain compatible with older
 configured entry points. See [TypeScript boundaries](docs/TYPESCRIPT.md) for the
-retained legacy dashboard and Python, shell and container tooling.
+retired legacy dashboard and retained Python, shell and container tooling.
 
 The README describes implemented source, not the currently deployed revision.
 Check [open PRs](https://github.com/lukasvri/Afterparty-MusicBot/pulls) for proposed

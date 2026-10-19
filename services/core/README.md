@@ -34,7 +34,7 @@ Keep an existing `.env` when updating. `ready: true` confirms Discord readiness;
 | Start the existing image | `docker compose up -d --no-build` |
 | Stop Core | `docker compose stop core` |
 
-`core-control.sh` supports `start`, `stop`, `status`, `logs` and `admin` using Docker context `default`. It selects an ignored `compose.local.yml` when present, or `CORE_COMPOSE_FILE` when explicitly configured. `start` uses the existing image. Administration lives at `/admin` on the website; the production entry point disables the older separate admin listener.
+`core-control.sh` supports `start`, `stop`, `status`, `logs` and `admin` using Docker context `default`. It selects an ignored `compose.local.yml` when present, or `CORE_COMPOSE_FILE` when explicitly configured. `start` uses the existing image. Administration lives at `/admin` on the website; the obsolete separate admin listener has been removed. Core exposes only its configured Core port. Custom `createServers` integrations must drop `adminPort`, `passwordHash`, `hosts`, `privateState`, `siteFetch` and use of the returned `adminServer`. The old listener's `/api/session`, `/api/health`, `/api/state`, `/api/player`, `/api/settings`, `/api/public-rooms` and static dashboard routes are no longer available. The supported `/health`, `/v1/*`, `/events` and `/live` routes remain.
 
 ## Audio and data
 

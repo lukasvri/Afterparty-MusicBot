@@ -3,9 +3,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { Engine } from "./engine.ts";
 import { Commands } from "./commands.ts";
@@ -20,35 +18,6 @@ export function equalSecret(a: string, b: string) {
     createHash("sha256").update(a).digest(),
     createHash("sha256").update(b).digest(),
   );
-}
-export async function verifyPassword(password: string, stored: string) {
-  const [kind, count, salt, expected] = stored.split("$");
-  if (
-    kind !== "pbkdf2" ||
-    count !== "100000" ||
-    !/^([a-f0-9]{2}){16}$/.test(salt ?? "") ||
-    !/^([a-f0-9]{2}){32}$/.test(expected ?? "") ||
-    password.length > 200
-  )
-    return false;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: Uint8Array.from(Buffer.from(salt, "hex")),
-      iterations: 100000,
-      hash: "SHA-256",
-    },
-    key,
-    256,
-  );
-  return equalSecret(Buffer.from(bits).toString("hex"), expected);
 }
 export function json(response: ServerResponse, status: number, data: unknown) {
   response.writeHead(status, {
@@ -78,12 +47,7 @@ export async function body(request: IncomingMessage, maximum = 16384) {
 type Options = {
   key: string;
   origin: string;
-  passwordHash: string;
-  hosts: string[];
-  privateState: () => unknown;
-  siteFetch?: (method: string, code?: string) => Promise<unknown>;
   publicPort?: number;
-  adminPort?: number | false;
   guilds?: Guilds;
   oauth?: DiscordOAuth;
   applicationId?: () => string;
@@ -106,8 +70,7 @@ export async function createServers(
       [...roomClients.values()].filter((value) => value === code).length +
       (joining ? 1 : 0),
   });
-  const rate = new Map<string, { until: number; count: number }>(),
-    sessions = new Map<string, number>();
+  const rate = new Map<string, { until: number; count: number }>();
   let rejectedUpgrades = 0;
   const upgradeOrigins = new Set<string>();
   const eventClients = new Set<ServerResponse>();
@@ -732,150 +695,9 @@ export async function createServers(
       (ws as WebSocket & { alive?: boolean }).alive = true;
     });
   });
-  const adminServer = createServer(async (request, response) => {
-    const started = performance.now();
-    response.once("finish", () =>
-      options.onRequest?.(performance.now() - started),
-    );
-    try {
-      const host = String(request.headers.host ?? "").split(":")[0];
-      if (!options.hosts.includes(host))
-        throw new UserError("Invalid host.", 403);
-      const url = new URL(request.url ?? "/", "http://" + request.headers.host);
-      if (!["GET", "HEAD"].includes(request.method ?? "GET")) {
-        const origin = request.headers.origin;
-        if (origin && new URL(origin).host !== request.headers.host)
-          throw new UserError("Invalid origin.", 403);
-        if (
-          request.headers["content-type"] &&
-          !String(request.headers["content-type"]).startsWith(
-            "application/json",
-          )
-        )
-          throw new UserError("Use JSON.");
-      }
-      const cookie =
-        request.headers.cookie
-          ?.split(";")
-          .map((s) => s.trim())
-          .find((s) => s.startsWith("gk-local-admin="))
-          ?.slice(15) ?? "";
-      const authenticated =
-        (sessions.get(createHash("sha256").update(cookie).digest("hex")) ?? 0) >
-        Date.now();
-      if (url.pathname === "/api/session") {
-        if (request.method === "GET") {
-          json(response, 200, { authenticated });
-          return;
-        }
-        if (request.method === "POST") {
-          limit("login:" + request.socket.remoteAddress, 5, 900000);
-          const input = await body(request);
-          if (
-            typeof input.password !== "string" ||
-            !(await verifyPassword(input.password, options.passwordHash))
-          )
-            throw new UserError("Incorrect password.", 401);
-          const token = randomBytes(32).toString("hex");
-          sessions.set(
-            createHash("sha256").update(token).digest("hex"),
-            Date.now() + 28800000,
-          );
-          response.setHeader(
-            "Set-Cookie",
-            `gk-local-admin=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${request.headers["x-forwarded-proto"] === "https" ? "; Secure" : ""}`,
-          );
-          json(response, 200, { authenticated: true });
-          return;
-        }
-        if (request.method === "DELETE") {
-          sessions.delete(createHash("sha256").update(cookie).digest("hex"));
-          response.setHeader(
-            "Set-Cookie",
-            "gk-local-admin=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
-          );
-          json(response, 200, { authenticated: false });
-          return;
-        }
-      }
-      if (url.pathname === "/api/health") {
-        json(response, engine.ready ? 200 : 503, {
-          ready: engine.ready,
-          status: engine.ready ? "ok" : "discord-unavailable",
-        });
-        return;
-      }
-      if (url.pathname.startsWith("/api/") && !authenticated)
-        throw new UserError("Sign in with the administrator password.", 401);
-      if (url.pathname === "/api/state" && request.method === "GET") {
-        json(response, 200, options.privateState());
-        return;
-      }
-      if (url.pathname === "/api/player" && request.method === "POST") {
-        await commands.execute(await body(request), "admin");
-        json(response, 200, options.privateState());
-        return;
-      }
-      if (url.pathname === "/api/settings" && request.method === "PUT") {
-        json(response, 200, {
-          settings: commands.updateSettings(await body(request)),
-        });
-        return;
-      }
-      if (url.pathname === "/api/public-rooms" && options.siteFetch) {
-        if (request.method === "GET") {
-          json(response, 200, await options.siteFetch("GET"));
-          return;
-        }
-        if (request.method === "DELETE") {
-          const input = await body(request);
-          if (
-            typeof input.code !== "string" ||
-            !/^[A-Z0-9]{8}$/.test(input.code)
-          )
-            throw new UserError("Invalid room code.");
-          json(response, 200, await options.siteFetch("DELETE", input.code));
-          return;
-        }
-      }
-      if (
-        request.method === "GET" &&
-        ["/", "/index.html", "/app.js", "/app.css"].includes(url.pathname)
-      ) {
-        const name =
-          url.pathname === "/" ? "index.html" : url.pathname.slice(1);
-        const file = await readFile(
-          join(import.meta.dirname, "../public", name),
-        );
-        response.writeHead(200, {
-          "Content-Type": name.endsWith(".js")
-            ? "text/javascript"
-            : name.endsWith(".css")
-              ? "text/css"
-              : "text/html",
-          "Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-          "Content-Security-Policy":
-            "default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'",
-        });
-        response.end(file);
-        return;
-      }
-      json(response, 404, { error: "Endpoint not found." });
-    } catch (error) {
-      json(response, error instanceof UserError ? error.status : 500, {
-        error:
-          error instanceof UserError
-            ? error.message
-            : "Could not complete the request.",
-      });
-    }
-  });
-  for (const server of [publicServer, adminServer]) {
-    server.requestTimeout = 15000;
-    server.headersTimeout = 10000;
-    server.on("clientError", (_e, socket) => socket.destroy());
-  }
+  publicServer.requestTimeout = 15000;
+  publicServer.headersTimeout = 10000;
+  publicServer.on("clientError", (_e, socket) => socket.destroy());
   let closePromise: Promise<void> | undefined;
   const close = (failedStartup = false) =>
     (closePromise ??= (async () => {
@@ -899,49 +721,33 @@ export async function createServers(
       wss.close();
       for (const client of eventClients) client.end();
       eventClients.clear();
-      await Promise.all(
-        [publicServer, adminServer].map(
-          (server) => new Promise<void>((r) => {
-            server.close(() => r());
-            if (failedStartup) server.closeAllConnections();
-          }),
-        ),
-      );
-    })());
-  // Settle every attempted bind before rollback, otherwise a later successful
-  // listen could reopen a server after the first bind has already failed.
-  const listening = await Promise.allSettled(
-    [
-      [publicServer, options.publicPort ?? 3990],
-      ...(options.adminPort === false
-        ? []
-        : [[adminServer, options.adminPort ?? 3847]]),
-    ].map(([value, port]) => {
-      const server = value as typeof publicServer;
-      return new Promise<void>((resolve, reject) => {
-        const onError = (error: Error) => {
-          server.off("listening", onListening);
-          server.off("error", onError);
-          reject(error);
-        };
-        const onListening = () => {
-          server.off("error", onError);
-          resolve();
-        };
-        server.once("error", onError);
-        server.once("listening", onListening);
-        try {
-          server.listen(port as number, options.host ?? "0.0.0.0");
-        } catch (error) {
-          onError(error as Error);
-        }
+      await new Promise<void>((resolve) => {
+        publicServer.close(() => resolve());
+        if (failedStartup) publicServer.closeAllConnections();
       });
-    }),
-  );
-  const failure = listening.find(result => result.status === "rejected");
-  if (failure) {
+    })());
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const onError = (error: Error) => {
+        publicServer.off("listening", onListening);
+        publicServer.off("error", onError);
+        reject(error);
+      };
+      const onListening = () => {
+        publicServer.off("error", onError);
+        resolve();
+      };
+      publicServer.once("error", onError);
+      publicServer.once("listening", onListening);
+      try {
+        publicServer.listen(options.publicPort ?? 3990, options.host ?? "0.0.0.0");
+      } catch (error) {
+        onError(error as Error);
+      }
+    });
+  } catch (error) {
     await close(true);
-    throw failure.reason;
+    throw error;
   }
-  return { publicServer, adminServer, wss, close: () => close() };
+  return { publicServer, wss, close: () => close() };
 }

@@ -56,7 +56,7 @@ export async function concertCore() {
  guilds.register(session);
  const oauth = new DiscordOAuth('synthetic-key','synthetic-app','synthetic-secret','http://localhost',async()=>Response.json([{id:guildId,name:'Synthetic guild',permissions:'32'}]));
  const tokenCipher = oauth.seal({access:'synthetic-token',expiresAt:Date.now()+600000,user:{id:guildId,name:'Synthetic manager'}});
- const servers = await createServers(engine,commands,{key:'synthetic-key',origin:'http://localhost',hosts:['127.0.0.1'],passwordHash:'',privateState:()=>({}),guilds,oauth,publicPort:0,adminPort:false,host:'127.0.0.1'});
+ const servers = await createServers(engine,commands,{key:'synthetic-key',origin:'http://localhost',guilds,oauth,publicPort:0,host:'127.0.0.1'});
  const address = servers.publicServer.address();
  assert(address && typeof address === 'object');
  const base = 'http://127.0.0.1:'+address.port;

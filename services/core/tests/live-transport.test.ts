@@ -35,8 +35,7 @@ test("live transports send five periodic snapshots in five seconds and publish c
   engine.connected = true;
   engine.current = video;
   const servers = await createServers(engine, commands, {
-    key: "synthetic-key", origin: "https://site.example", passwordHash: "", hosts: [],
-    publicPort: 0, adminPort: false, host: "127.0.0.1", privateState: () => ({}),
+    key: "synthetic-key", origin: "https://site.example", publicPort: 0, host: "127.0.0.1"
   });
   const port = (servers.publicServer.address() as { port: number }).port;
   const request = (input: unknown) => fetch(`http://127.0.0.1:${port}/v1/rooms`, {
