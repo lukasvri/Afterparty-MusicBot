@@ -1,6 +1,6 @@
 {
   "name": "gutta-krutt-core",
-  "version": "2.2.11",
+  "version": "2.2.12",
   "private": true,
   "type": "module",
   "engines": {
