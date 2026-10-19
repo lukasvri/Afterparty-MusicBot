@@ -1,10 +1,11 @@
 // TV layout and source-player continuity, using synthetic local data only.
 import assert from "node:assert/strict";
-import { mkdir,writeFile } from "node:fs/promises";
+import { mkdir,readFile,writeFile } from "node:fs/promises";
 import type { Player } from "../lib/youtube-player.ts";
 const {chromium} = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright") as typeof import("playwright");
 const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:8787";
 assert(["localhost", "127.0.0.1"].includes(new URL(base).hostname));
+const markSource=await readFile(new URL("../public/afterparty-mark.svg",import.meta.url),"utf8");
 const phase=process.env.UI_PHASE??"after";
 assert(["before","after"].includes(phase));
 const output=`outputs/unified-ui/${phase}`;
@@ -132,9 +133,18 @@ try {
         }
         const scene=page.locator(`.concert-scenery[data-composition=${composition}]`);
         await scene.waitFor();
-        const geometry=await scene.evaluate(el=>{
+        const geometry=await scene.evaluate((el,markSource)=>{
           const box=(selector:string)=>{const r=el.querySelector(selector)!.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
           const screen=box('[data-led-screen]'),halo=box('[data-led-halo]'),mark=box('.stage-backdrop image'),head=box('.performer-head');
+          const probe=new DOMParser().parseFromString(markSource,'image/svg+xml').documentElement as unknown as SVGSVGElement;
+          Object.assign(probe.style,{position:'absolute',visibility:'hidden',pointerEvents:'none'});
+          document.body.appendChild(probe);
+          const artwork=probe.getBBox(),viewBox=probe.viewBox.baseVal;
+          const logo={left:mark.left+artwork.x/viewBox.width*(mark.right-mark.left),
+            right:mark.left+(artwork.x+artwork.width)/viewBox.width*(mark.right-mark.left),
+            top:mark.top+artwork.y/viewBox.height*(mark.bottom-mark.top),
+            bottom:mark.top+(artwork.y+artwork.height)/viewBox.height*(mark.bottom-mark.top)};
+          probe.remove();
           const clipReference=el.querySelector('.stage-backdrop image')!.parentElement?.getAttribute('clip-path');
           const clipId=clipReference?.match(/^url\(#(.+)\)$/)?.[1];
           const clip=Array.from(el.querySelectorAll('clipPath')).find(item=>item.id===clipId)?.querySelector('rect');
@@ -166,21 +176,28 @@ try {
           }));
           return {composition:el.getAttribute('data-composition'),screen,halo,mark,head,
             copyClear,copyContained,copyTextVisible,
-            emblemBehindHead: mark.top < head.top && mark.bottom > head.bottom,
-            markScale: (mark.right - mark.left) / (screen.right - screen.left),
+            emblemBehindHead: logo.top < head.top && logo.bottom > head.top
+              && logo.left < head.left && logo.right > head.right,
+            logoFits: logo.left >= screen.left+(screen.right-screen.left)*.1
+              && logo.right <= screen.right-(screen.right-screen.left)*.1
+              && logo.top >= screen.top+(screen.bottom-screen.top)*.1
+              && logo.bottom <= screen.bottom-(screen.bottom-screen.top)*.1,
+            haloFits: halo.left>=screen.left && halo.right<=screen.right && halo.top>=screen.top && halo.bottom<=screen.bottom,
+            logoScale: (logo.right-logo.left)/(screen.right-screen.left),
             emblemClipped,
             performerInFront: !!(el.querySelector(".stage-backdrop")!.compareDocumentPosition(el.querySelector(".stage-dj")!) & Node.DOCUMENT_POSITION_FOLLOWING),
             consoleInFront: !!(el.querySelector(".stage-backdrop")!.compareDocumentPosition(el.querySelector(".dj-booth")!) & Node.DOCUMENT_POSITION_FOLLOWING),
             pageFits: document.documentElement.scrollWidth <= innerWidth,
             cabinetCounts:cabinets.map(array=>array.length),
             cabinetSeams:cabinets.every(array=>array.slice(1).every((cabinet,index)=>cabinet.top>=array[index].bottom-.5))};
-        });
+        },markSource);
         observation.checks.push(geometry);
         check(geometry.copyClear,`${composition}: empty-room copy must not overlap the performer`);
         check(geometry.copyTextVisible,`${composition}: the complete empty-room heading must stay readable`);
         check(geometry.copyContained,`${composition}: empty-room text and its action must fit inside the stage`);
-        check(geometry.emblemClipped,`${composition}: the oversized emblem is cropped by the LED-screen clip`);
-        check(geometry.markScale > 1.4,`${composition}: the canonical padded mark fills the LED screen`);
+        check(geometry.emblemClipped,`${composition}: the LED-screen clip remains valid`);
+        check(geometry.logoFits && geometry.haloFits,`${composition}: the complete logo has comfortable screen margins and the halo is not cropped`);
+        check(geometry.logoScale > .45 && geometry.logoScale < .65,`${composition}: the visible logo has balanced scale within the screen`);
         check(geometry.consoleInFront && geometry.pageFits,`${composition}: controls remain in front and the page has no horizontal overflow`);
         check(geometry.emblemBehindHead,`${composition}: the lowered emblem sits behind the DJ head`);
         check(geometry.performerInFront,`${composition}: the DJ paints in front of the backdrop emblem`);

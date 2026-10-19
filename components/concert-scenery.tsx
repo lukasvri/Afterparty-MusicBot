@@ -52,9 +52,9 @@ export const ConcertScenery = memo(function ConcertScenery({
   const stageOffset = composition === "welcome" ? -225 : 0;
   // Lower the rear-screen emblem behind the DJ; SVG paint order keeps him in front.
   const emblemY = 280;
-  const emblemRadius = 270;
-  // Account for the canonical mark's transparent padding so the lettering fills the LED screen.
-  const markSize = 800;
+  const emblemRadius = 145;
+  // Center the complete canonical mark, including its red dot, with space around the lettering.
+  const markSize = 400;
   return <div className="concert-scenery" data-composition={composition} aria-hidden="true">
     <svg className="concert-venue" viewBox="0 0 1200 675" preserveAspectRatio={composition === "welcome" ? "xMidYMid slice" : "xMidYMid meet"} focusable="false">
       <defs>
