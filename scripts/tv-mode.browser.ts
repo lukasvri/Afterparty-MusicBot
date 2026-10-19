@@ -134,10 +134,19 @@ try {
         await scene.waitFor();
         const geometry=await scene.evaluate(el=>{
           const box=(selector:string)=>{const r=el.querySelector(selector)!.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
-          const screen=box('[data-led-screen]'),halo=box('[data-led-halo]'),mark=box('.stage-backdrop image'),head=box('.performer-head'),booth=box('.dj-booth');
+          const screen=box('[data-led-screen]'),halo=box('[data-led-halo]'),mark=box('.stage-backdrop image'),head=box('.performer-head');
+          const clipReference=el.querySelector('.stage-backdrop image')!.parentElement?.getAttribute('clip-path');
+          const clipId=clipReference?.match(/^url\(#(.+)\)$/)?.[1];
+          const clip=Array.from(el.querySelectorAll('clipPath')).find(item=>item.id===clipId)?.querySelector('rect');
+          const clipBounds=clip?.getBBox();
+          const screenBounds=(el.querySelector('[data-led-screen]') as SVGGraphicsElement).getBBox();
+          const emblemClipped=!!clipBounds && clipBounds.x>=screenBounds.x && clipBounds.y>=screenBounds.y
+            && clipBounds.x+clipBounds.width<=screenBounds.x+screenBounds.width
+            && clipBounds.y+clipBounds.height<=screenBounds.y+screenBounds.height
+            && clipBounds.width>screenBounds.width*.95 && clipBounds.height>screenBounds.height*.95;
           const intersects=(a:DOMRect,b:DOMRect)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
           const copy=Array.from(el.closest('.stage')?.querySelectorAll('.stage-intro h2,.stage-intro p,.stage-intro button')??[]);
-          const subjects=[el.querySelector('.stage-backdrop image')!,el.querySelector('.performer-head')!].map(subject=>subject.getBoundingClientRect());
+          const subjects=[el.querySelector('.performer-head')!].map(subject=>subject.getBoundingClientRect());
           const copyClear=copy.every(item=>subjects.every(subject=>!intersects(item.getBoundingClientRect(),subject)));
           const stage=el.closest('.stage')?.getBoundingClientRect();
           const copyContained=copy.every(item=>{
@@ -157,24 +166,22 @@ try {
           }));
           return {composition:el.getAttribute('data-composition'),screen,halo,mark,head,
             copyClear,copyContained,copyTextVisible,
-            emblemBehindHead: halo.top < head.top && halo.bottom > head.top && halo.bottom < booth.top
-              && mark.top < head.top && mark.bottom > head.top
-              && Math.abs((mark.left + mark.right - head.left - head.right) / 2) < 2,
-            markContained: mark.left >= screen.left && mark.right <= screen.right && mark.top >= screen.top && mark.bottom <= screen.bottom,
+            emblemBehindHead: mark.top < head.top && mark.bottom > head.bottom,
             markScale: (mark.right - mark.left) / (screen.right - screen.left),
-            controlsClear: mark.bottom < booth.top,
+            emblemClipped,
             performerInFront: !!(el.querySelector(".stage-backdrop")!.compareDocumentPosition(el.querySelector(".stage-dj")!) & Node.DOCUMENT_POSITION_FOLLOWING),
-            haloContained:halo.left>=screen.left&&halo.right<=screen.right&&halo.top>=screen.top&&halo.bottom<=screen.bottom,
+            consoleInFront: !!(el.querySelector(".stage-backdrop")!.compareDocumentPosition(el.querySelector(".dj-booth")!) & Node.DOCUMENT_POSITION_FOLLOWING),
+            pageFits: document.documentElement.scrollWidth <= innerWidth,
             cabinetCounts:cabinets.map(array=>array.length),
             cabinetSeams:cabinets.every(array=>array.slice(1).every((cabinet,index)=>cabinet.top>=array[index].bottom-.5))};
         });
         observation.checks.push(geometry);
-        check(geometry.copyClear,`${composition}: empty-room copy must not overlap the logo or performer`);
+        check(geometry.copyClear,`${composition}: empty-room copy must not overlap the performer`);
         check(geometry.copyTextVisible,`${composition}: the complete empty-room heading must stay readable`);
         check(geometry.copyContained,`${composition}: empty-room text and its action must fit inside the stage`);
-        check(geometry.haloContained,`${composition}: the rotating halo stays inside the LED screen`);
-        check(geometry.markContained && geometry.controlsClear,`${composition}: the larger mark stays inside the screen and above the controls`);
-        check(geometry.markScale > (composition === "welcome" ? .35 : .42),`${composition}: the AP mark has the enlarged visual scale`);
+        check(geometry.emblemClipped,`${composition}: the oversized emblem is cropped by the LED-screen clip`);
+        check(geometry.markScale > 1.4,`${composition}: the canonical padded mark fills the LED screen`);
+        check(geometry.consoleInFront && geometry.pageFits,`${composition}: controls remain in front and the page has no horizontal overflow`);
         check(geometry.emblemBehindHead,`${composition}: the lowered emblem sits behind the DJ head`);
         check(geometry.performerInFront,`${composition}: the DJ paints in front of the backdrop emblem`);
         check(geometry.cabinetCounts.every(count=>count===7)&&geometry.cabinetSeams,`${composition}: both PA stacks retain seven aligned cabinets without overlapping seams`);
