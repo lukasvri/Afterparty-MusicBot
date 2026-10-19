@@ -60,7 +60,7 @@ test("failed genre search falls back to the seed artist, not unrelated results",
     return q.startsWith("Lensko ") ? [ownSong] : [video("wrong000001", "Unrelated - Track [Tech House]")];
   });
   assert.equal(next?.id, ownSong.id);
-  assert.equal(queries.length, 2);
+  assert.equal(queries.length, 3, "two discovery searches plus one format lookup");
 });
 
 test("refinement cannot use a different recording, tutorial, cover or conflicting genre", async () => {

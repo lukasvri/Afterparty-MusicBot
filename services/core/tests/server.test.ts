@@ -98,7 +98,7 @@ test('the authenticated own-room bridge advances radio without a Discord connect
  const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
  const providers=new Providers(store,{}),engine=new Engine(store,providers,sink),commands=new Commands(engine);
  const seed={id:'seed1234567',title:'Syn Cole - Feel Good | Future House | NCS - Copyright Free',artist:'NCS',image:'',duration:200,live:false,embeddable:true};
- let lookups=0;providers.search=async(query,count,musicOnly)=>{lookups++;assert(['future house audio -"Feel Good"','Syn Cole music audio'].includes(query));assert.equal(count,20);assert.equal(musicOnly,true);return [{...seed,id:'next1234567',title:'Other Artist - Synthetic next | Future House',entryId:'synthetic'}];};
+ let lookups=0;providers.search=async(query,count,musicOnly)=>{lookups++;assert(['future house audio -"Feel Good"','Syn Cole music audio','Other Artist "Synthetic next" official music video'].includes(query));assert.equal(count,20);assert.equal(musicOnly,true);return [{...seed,id:'next1234567',title:'Other Artist - Synthetic next | Future House',entryId:'synthetic'}];};
  const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',publicPort:0,host:'127.0.0.1'});
  const base=`http://127.0.0.1:${(servers.publicServer.address() as {port:number}).port}`;
  const request=(input:unknown)=>fetch(base+'/v1/rooms',{method:'POST',headers:{Authorization:'Bearer synthetic-key','Content-Type':'application/json'},body:JSON.stringify(input)});
@@ -106,7 +106,7 @@ test('the authenticated own-room bridge advances radio without a Discord connect
   const imported=await request({operation:'import',code:'TESTROOM',name:'Synthetic room',owner_hash:'a'.repeat(64),state:{current:seed,queue:[],playing:true,position:199},version:1,updated_at:Date.now(),expires_at:Date.now()+60000});assert.equal(imported.status,200);
   const guest=await request({operation:'mutate',code:'TESTROOM',action:'next',version:1,actorHash:'b'.repeat(64)});assert.equal(guest.status,403);assert.equal(lookups,0);
   const response=await request({operation:'mutate',code:'TESTROOM',action:'next',version:1,actorHash:'a'.repeat(64)});assert.equal(response.status,200);
-  const {room}=await response.json() as {room:RoomTimeline};assert.equal(room.current?.id,'next1234567');assert.equal(room.playing,true);assert.equal(room.version,2);assert.equal(lookups,2);
+  const {room}=await response.json() as {room:RoomTimeline};assert.equal(room.current?.id,'next1234567');assert.equal(room.playing,true);assert.equal(room.version,2);assert.equal(lookups,3);
   assert.equal(engine.current,null);assert.equal(engine.connected,false);assert.equal(store.history(10).length,0);
  }finally{await servers.close();commands.close();engine.close();store.close();rmSync(dir,{recursive:true,force:true});}
 });

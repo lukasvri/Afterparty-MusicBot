@@ -301,7 +301,7 @@ test("D1 radio refreshes old search metadata and excludes explicit non-music cat
       })) });
     };
     const { room } = await mutate(f.request, "TESTROOM", { action: "radio-prefetch", version: 1 });
-    assert.deepEqual(stages, ["search", "metadata", "search"], "Both discovery pools reuse fresh music-category metadata");
+    assert.deepEqual(stages, ["search", "metadata", "search", "search"], "Both discovery pools and the video lookup reuse fresh music-category metadata");
     assert.deepEqual(room.queue.map((video) => video.id), [next.id]);
     assert.equal(room.queue[0].music, true);
     assert(!JSON.stringify(room).includes("radioRelatedTo"));

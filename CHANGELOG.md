@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.11: Prefer matching music videos in radio
+
+2026-10-19
+
+- Automatic radio prefers an eligible official-music-video-labelled upload of the selected song and artist, including after catalog audio matching. Song relevance, recording identity, genre, history and exclusions remain authoritative; title wording alone cannot authorize a match.
+- When no suitable video is found or the bounded video lookup fails, radio retains its playable audio match. Manual queue priority and separate server and room state are preserved. Provider metadata does not verify upload authenticity, and videos with incompatible versions or long introductions remain excluded.
+
 ## v2.2.10: Retire the optional legacy Core dashboard
 
 2026-10-19

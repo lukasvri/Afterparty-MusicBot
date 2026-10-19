@@ -23,7 +23,7 @@ test("specific genre fallback reaches an eligible result without inventing an ar
     assert.deepEqual(rankRadio(seed, [positive], [], []), [positive]);
     assert.equal(canPlayRadioTrack(seed, positive), true);
     assert.equal((await p.radio(seed, []))?.id, positive.id);
-    assert.deepEqual(queries, ['electro house audio -"Unidentified song"']);
+    assert.deepEqual(queries, ['electro house audio -"Unidentified song"', 'Related Artist "Next song" official music video']);
   } finally { store.close(); }
 });
 
