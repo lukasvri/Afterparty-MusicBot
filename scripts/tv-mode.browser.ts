@@ -156,7 +156,11 @@ try {
             const r=cabinet.getBoundingClientRect();return {top:r.top,bottom:r.bottom};
           }));
           return {composition:el.getAttribute('data-composition'),screen,halo,mark,head,
-            copyClear,copyContained,copyTextVisible,performerGap:head.top-Math.max(halo.bottom,mark.bottom),
+            copyClear,copyContained,copyTextVisible,
+            emblemBehindHead: halo.top < head.top && halo.bottom > head.top && halo.bottom < head.bottom
+              && mark.top < head.top && mark.bottom > head.top
+              && Math.abs((mark.left + mark.right - head.left - head.right) / 2) < 2,
+            performerInFront: !!(el.querySelector(".stage-backdrop")!.compareDocumentPosition(el.querySelector(".stage-dj")!) & Node.DOCUMENT_POSITION_FOLLOWING),
             haloContained:halo.left>=screen.left&&halo.right<=screen.right&&halo.top>=screen.top&&halo.bottom<=screen.bottom,
             cabinetCounts:cabinets.map(array=>array.length),
             cabinetSeams:cabinets.every(array=>array.slice(1).every((cabinet,index)=>cabinet.top>=array[index].bottom-.5))};
@@ -166,7 +170,8 @@ try {
         check(geometry.copyTextVisible,`${composition}: the complete empty-room heading must stay readable`);
         check(geometry.copyContained,`${composition}: empty-room text and its action must fit inside the stage`);
         check(geometry.haloContained,`${composition}: the rotating halo stays inside the LED screen`);
-        check(geometry.performerGap>=0,`${composition}: backdrop graphics remain above the performer`);
+        check(geometry.emblemBehindHead,`${composition}: the lowered emblem sits behind the upper part of the DJ head`);
+        check(geometry.performerInFront,`${composition}: the DJ paints in front of the backdrop emblem`);
         check(geometry.cabinetCounts.every(count=>count===7)&&geometry.cabinetSeams,`${composition}: both PA stacks retain seven aligned cabinets without overlapping seams`);
         const surface=composition==="room"?page.locator('.stage'):scene;
         await surface.screenshot({path:`${output}/scene-${composition}-${viewport.width}x${viewport.height}.png`,animations:"disabled"});

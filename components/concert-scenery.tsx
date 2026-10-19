@@ -50,8 +50,8 @@ export const ConcertScenery = memo(function ConcertScenery({
   const lamps=[100,300,500,700,900,1100];
   // Rooms leave space for their empty-state controls; the welcome scene has its own centre.
   const stageOffset = composition === "welcome" ? -225 : 0;
-  // The complete emblem clears the performer's highest point in both compositions.
-  const emblemY = composition === "welcome" ? 184 : 212;
+  // Lower the rear-screen emblem behind the DJ; SVG paint order keeps him in front.
+  const emblemY = 280;
   const emblemRadius = composition === "welcome" ? 56 : 78;
   const markSize = composition === "welcome" ? 140 : 180;
   return <div className="concert-scenery" data-composition={composition} aria-hidden="true">
