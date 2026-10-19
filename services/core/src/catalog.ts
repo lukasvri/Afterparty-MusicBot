@@ -3,7 +3,7 @@ import { UserError, type Track } from './types.ts';
 import type { Store } from './store.ts';
 
 type CatalogProvider = Pick<Providers, 'search' | 'video'>;
-type Input = { query?: string; ids?: string[] };
+type Input = { query?: string; ids?: string[]; preview?: boolean };
 /** One request owns one bounded provider instance. It never cancels shared
  * playback/radio lookups and does not queue cold HTTP jobs behind one another. */
 export class Catalog {
@@ -22,7 +22,7 @@ export class Catalog {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const provider = this.factory(signal);
-      const tracks = input.ids ? await provider.video(input.ids) : await provider.search(input.query ?? '', 4);
+      const tracks = input.ids ? await provider.video(input.ids) : await provider.search(input.query ?? '', 4, false, input.preview === true);
       signal.throwIfAborted();
       return tracks;
     } catch (error) {

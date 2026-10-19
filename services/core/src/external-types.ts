@@ -20,6 +20,8 @@ export type ExtractedMedia = {
   artist?: string;
   artists?: string[];
   uploader?: string;
+  channel?: string;
+  live_status?: string;
   duration?: number;
   full_duration?: number;
   is_live?: boolean;

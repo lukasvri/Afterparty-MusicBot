@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiscordSDK } from "@discord/embedded-app-sdk";
 import Afterparty from "@/app/afterparty";
+import {installActivityYoutubeScripts,youtubeMappings} from "@/lib/activity-youtube";
+import { openActivityVideo } from "@/lib/activity-media";
 import { installActivityTransport } from "@/lib/activity-transport";
 import { LoaderCircle, Radio, ShieldCheck, X } from "lucide-react";
 
@@ -20,11 +22,13 @@ export function ActivityEntry() {
   const [error, setError] = useState("");
   const [session, setSession] = useState<Session | null>(null);
   const cancel = useRef<(() => void) | null>(null);
+  const sdkRef = useRef<DiscordSDK | null>(null);
   useEffect(() => {
     if (!attempt) return;
     let alive = true, issuedSession = false, cancelled = false;
     let sdk: DiscordSDK | null = null;
     let restore: (() => void) | undefined;
+    let restoreMedia: (() => void) | undefined;
     let expiry: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60000);
@@ -33,7 +37,7 @@ export function ActivityEntry() {
       issuedSession = false;
       try { return (await fetch("/api/activity/logout", { method: "POST", credentials: "same-origin", signal: AbortSignal.timeout(4000) })).ok; } catch { return false; }
     };
-    const close = () => { controller.abort(); clearTimeout(timeout); clearTimeout(expiry); restore?.(); restore = undefined; sdk?.close(1000, "Activity session ended"); sdk = null; };
+    const close = () => { controller.abort(); clearTimeout(timeout); clearTimeout(expiry); restore?.(); restore = undefined; restoreMedia?.(); restoreMedia = undefined; sdkRef.current = null; sdk?.close(1000, "Activity session ended"); sdk = null; };
     // SDK commands do not accept AbortSignal, so race them without replaying an authorization.
     const bounded = <T,>(promise: Promise<T>): Promise<T> => new Promise((resolve, reject) => {
       const aborted = () => reject(new Error("Connection cancelled or timed out. Try connecting again."));
@@ -54,7 +58,7 @@ export function ActivityEntry() {
           throw new Error("This Activity is not available with the current configuration.");
         if (!alive || controller.signal.aborted) return;
         setPhase("discord");
-        const { DiscordSDK } = await bounded(import("@discord/embedded-app-sdk"));
+        const { DiscordSDK, attemptRemap } = await bounded(import("@discord/embedded-app-sdk"));
         if (!alive || controller.signal.aborted) return;
         const parameters = new URLSearchParams(location.search);
         if (!["frame_id", "instance_id"].every(key => { const value = parameters.get(key); return value && value.length <= 256; }) || !["desktop", "mobile"].includes(parameters.get("platform") ?? ""))
@@ -81,8 +85,10 @@ export function ActivityEntry() {
         if (!authenticated || authenticated.user.id !== result.userId) throw new Error("Discord account verification did not match. Connect again to retry.");
         if (!alive || controller.signal.aborted) return;
         clearTimeout(timeout);
+        restoreMedia = installActivityYoutubeScripts(url => attemptRemap({url,mappings:youtubeMappings}));
         restore = installActivityTransport();
         const verified = { roomCode: result.roomCode, guildId: result.guildId, expiresAt: result.expiresAt };
+        sdkRef.current = sdk;
         setSession(verified); setPhase("connected");
         expiry = setTimeout(() => { close(); if (alive) { setSession(null); setError("Your Activity session expired. Connect again to continue."); setPhase("error"); } }, verified.expiresAt - Date.now());
       } catch (cause) {
@@ -102,7 +108,7 @@ export function ActivityEntry() {
   return <div className="activity-root" data-activity-phase={phase}>
     {session ? <>
       <header className="activity-connected"><span><ShieldCheck size={16} aria-hidden="true" /> Discord Activity <small>Private test</small></span><button onClick={() => cancel.current?.()}><X size={16} aria-hidden="true" /> Disconnect</button></header>
-      <Afterparty activityScope={session} />
+      <Afterparty activityScope={{...session, openVideo: id => sdkRef.current ? openActivityVideo(sdkRef.current.commands,id) : Promise.resolve(false)}} />
     </> : <main className="activity-gate">
       <div className="activity-mark" aria-hidden="true"><Radio size={30} /></div>
       <p className="activity-eyebrow">AFTERPARTY · PRIVATE ACTIVITY TEST</p>
@@ -110,7 +116,7 @@ export function ActivityEntry() {
       <p className="activity-description">Join the music, react together and save the moments you want to remember.</p>
       <div className="activity-status" role="status" aria-live="polite">{working && <LoaderCircle size={18} aria-hidden="true" className="activity-spinner" />}{error || progress[phase]}</div>
       <div className="activity-gate-actions">{working ? <button disabled={phase === "disconnecting"} onClick={() => cancel.current?.()}>Cancel connection</button> : <button className="activity-connect" onClick={start}>{phase === "error" ? "Try connecting again" : "Connect with Discord"}</button>}</div>
-      <p className="activity-footnote">Available only in an enabled Discord server. Video playback inside Discord is still being tested.</p>
+      <p className="activity-footnote">Available only in an enabled Discord server. Audio plays in Discord. Embedded video requires the test app’s approved URL mappings.</p>
     </main>}
   </div>;
 }

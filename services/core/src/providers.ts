@@ -236,7 +236,39 @@ export class Providers {
       });
     }
   }
-  async search(query: string, count = 8, musicOnly = false): Promise<Track[]> {
+  /** Interactive Activity previews never populate the verified metadata cache.
+   * Queue selection still resolves the selected ID through video()/resolve(). */
+  private async discover(query: string, count: number): Promise<Track[]> {
+    this.scope.signal?.throwIfAborted();
+    const key = 'discovery:v1:' + JSON.stringify([query.trim().normalize('NFKC').toLowerCase(), count]);
+    const cached = this.store.get<{at: number; tracks: Track[]} | null>(key, null);
+    if (cached?.tracks.length && Date.now() - cached.at < 3600000)
+      return cached.tracks.map(track => ({...track, entryId: randomUUID()}));
+    const data = await this.extract(['--flat-playlist', '--dump-single-json', '--skip-download', `ytsearch${count}:${query}`], this.scope.signal);
+    this.scope.signal?.throwIfAborted();
+    const seen = new Set<string>();
+    const tracks: Track[] = [];
+    for (const entry of data.entries ?? []) {
+      if (!entry || typeof entry.id !== 'string' || !/^[\w-]{11}$/.test(entry.id) || seen.has(entry.id) ||
+          typeof entry.title !== 'string' || !entry.title.trim() ||
+          (entry.availability && !['public', 'unlisted'].includes(entry.availability))) continue;
+      seen.add(entry.id);
+      const verified = this.store.get<{at:number; track:Track} | null>('metadata:v4:' + entry.id, null);
+      if (verified && Date.now() - verified.at < 86400000) tracks.push({...verified.track, entryId:randomUUID()});
+      else tracks.push({id:entry.id, title:entry.title, artist:entry.uploader ?? entry.channel ?? 'YouTube',
+        image:`https://i.ytimg.com/vi/${entry.id}/hqdefault.jpg`,
+        duration:typeof entry.duration === 'number' && Number.isFinite(entry.duration) ? Math.max(0, entry.duration) : 0,
+        live:entry.is_live === true || entry.live_status === 'is_live',
+        // Unknown embedding is not proof of browser playability. Activity queues
+        // play in Discord and validate the selected ID before adding it.
+        embeddable:entry.playable_in_embed === true, source:'youtube', entryId:randomUUID()});
+      if (tracks.length >= count) break;
+    }
+    if (tracks.length) this.store.set(key, {at:Date.now(), tracks});
+    return tracks;
+  }
+  async search(query: string, count = 8, musicOnly = false, preview = false): Promise<Track[]> {
+    if (preview) return this.discover(query, count);
     const key =
         "search:v5:" +
         JSON.stringify([

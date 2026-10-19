@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import { registerHooks, stripTypeScriptTypes } from "node:module";
 import { readFileSync, readdirSync } from "node:fs";
+import {bindActivityGrant} from "../lib/request-grant.ts";
 import type { RoomState } from "../lib/types.ts";
 
 // Exercise the actual Worker handlers and SQL using only an in-memory D1 adapter.
@@ -810,4 +811,18 @@ test('independent catalog readers preserve cancellation ownership',async()=>{
   for(let i=0;i<10&&requests.length<2;i++)await new Promise(resolve=>setImmediate(resolve));
   assert.equal(requests.length,2);first.abort();await rejected;assert.equal(requests[1].signal.aborted,false);requests[1].finish();assert.equal((await b).videos.length,1);
  }finally{first.abort();second.abort();delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
+});
+
+
+test('only a verified Activity request opts into preview discovery and its cache cannot replace full metadata',async()=>{
+ const f=fixture();syntheticEnv.GUTTA_CORE_PUBLIC_URL='https://core.example';syntheticEnv.ADMIN_BRIDGE_KEY='synthetic';
+ const calls:string[]=[];
+ try{
+  globalThis.fetch=async target=>{const url=new URL(String(target));calls.push(url.searchParams.get('preview')??'full');return Response.json({videos:[{...next,title:url.searchParams.has('preview')?'Preview':'Verified'}]});};
+  const activity=new Request('https://site.example/api/search');bindActivityGrant(activity,'synthetic-grant');
+  assert.equal((await searchHandler(activity,'scoped discovery')).videos[0].title,'Preview');
+  const ordinary=new Request('https://site.example/api/search',{headers:{'X-Activity':'true'}});
+  assert.equal((await searchHandler(ordinary,'scoped discovery')).videos[0].title,'Verified');
+  assert.deepEqual(calls,['1','full']);
+ }finally{delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
 });

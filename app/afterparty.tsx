@@ -1,6 +1,7 @@
 "use client";
-import Image from "next/image";
-import { loadYoutube, type Player } from "@/lib/youtube-player";
+import { type ActivityMedia } from "@/lib/activity-media";
+import { TrackArtwork } from "@/components/track-artwork";
+import { loadYoutube, youtubePlayerTarget, type Player } from "@/lib/youtube-player";
 import { headers, request } from "@/lib/browser-api";
 import { useConcertQueue } from "@/hooks/use-concert-queue";
 import { notePlayerEvent, playerDiagnostics } from "@/lib/player-diagnostics";
@@ -42,7 +43,8 @@ import { useBrowserValue, useClientReady } from "@/hooks/use-browser-value";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useAudioPreferences } from "@/hooks/use-audio-preferences";
 import { useImmersiveControls } from "@/hooks/use-immersive-controls";
-import { applyAudioPreferences } from "@/lib/audio-preferences";
+import {applyOutputAudio,acceptsPlayerAudio,selectActivityOutput,type AudioOutput} from "@/lib/activity-audio";
+import {ActivityAudioOutput} from "@/components/activity/activity-audio-output";
 import {
   canCorrectPlayback,
   isDuplicateSnapshot,
@@ -67,9 +69,10 @@ import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
 import releases from "@/lib/releases.json";
 
-export default function Afterparty({ activityScope }: { activityScope?: { roomCode: string; guildId: string } } = {}) {
+export default function Afterparty({ activityScope }: { activityScope?: { roomCode: string; guildId: string } & ActivityMedia } = {}) {
   const activityRoomCode = activityScope?.roomCode, activityGuildId = activityScope?.guildId;
   const { t, language } = useLanguage();
+  const mappedYoutube = Boolean(activityScope);
   const [directoryOpen, setDirectoryOpen] = useState(false),
     [publicListing, setPublicListing] = useState(false);
   const navigate = (view: "music" | "rooms") => {
@@ -82,6 +85,21 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
   };
   const {element: fullscreenElement, active: fullscreenActive, fallback: fullscreenFallback, toggle: toggleFullscreen} = useFullscreen();
   const audio = useAudioPreferences();
+  const [audioOutput,setAudioOutput]=useState<AudioOutput>(activityRoomCode?'choose':'site');
+  const outputRef=useRef<AudioOutput>(activityRoomCode?'choose':'site');
+  const [botMutedLocally,setBotMutedLocally]=useState(false);
+  const chooseAudioOutput=(requested:'activity'|'voice')=>{
+    const next=selectActivityOutput(requested,botMutedLocally);
+    outputRef.current=next;setAudioOutput(next);
+    if(requested==='voice')setBotMutedLocally(false);
+    if(next==='activity'&&(audio.current.current.muted||audio.current.current.level===0))audio.toggleMute();
+    if(player.current){applyOutputAudio(player.current,audio.current.current,next);if(next==='activity'&&roomRef.current?.playing)player.current.playVideo();}
+    if(next==='activity')setConsent(true);
+  };
+  const confirmLocalMute=(value:boolean)=>{
+    setBotMutedLocally(value);
+    if(!value&&outputRef.current==='activity'){outputRef.current='choose';setAudioOutput('choose');player.current?.mute();}
+  };
   const motion = useBrowserValue("afterparty-motion") !== "off";
   const setMotion = (value: boolean) => storage.set("afterparty-motion", value ? "on" : "off");
   const storedOffset = Number(useBrowserValue("afterparty-sync-offset", "0"));
@@ -363,7 +381,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
         if (generation === joinGeneration.current) setLoadingRoom(false);
       }
     },
-    [accept, setError, setLoadingRoom, setModal, setPlayerError, activityRoomCode],
+    [accept, setError, setLoadingRoom, setModal, setPlayerError, setPanel, activityRoomCode],
   );
   const create = async () => {
     if (activityRoomCode) return;
@@ -757,6 +775,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
           isHost: concertQueue.data.canManage,
         }
       : room;
+  const queueLoaded = room?.mode !== "discord" || Boolean(concertQueue.data);
   const queueAction = (name: string, extra?: Record<string, unknown>) =>
     room?.mode === "discord"
       ? void concertQueue.action(name, {
@@ -916,17 +935,18 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       else void action("play");
     }
     if (playerReady.current && player.current && r.playing) {
-      applyAudioPreferences(player.current, audio.current.current);
+      applyOutputAudio(player.current, audio.current.current,outputRef.current);
       syncRef.current(true);
       player.current.playVideo();
     }
   }
   function enableVideoAudio() {
     if (!player.current) return;
+    if (!acceptsPlayerAudio(outputRef.current)) return;
     temporaryMute.current = false;
     setAutoplayMuted(false);
     audioWriteUntil.current = performance.now() + 1000;
-    applyAudioPreferences(player.current, audio.current.current);
+    applyOutputAudio(player.current, audio.current.current,outputRef.current);
     player.current.playVideo();
   }
   useEffect(() => {
@@ -998,10 +1018,11 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
     }, 100);
     return () => clearInterval(timer);
   }, []);
-  const playerAudioReady = useEffectEvent((p: Player) => applyAudioPreferences(p, audio.current.current));
+  const activityPlayerAvailable = !activityScope || Boolean(room?.current && room.current.source !== "soundcloud");
+  const playerAudioReady = useEffectEvent((p: Player) => applyOutputAudio(p, audio.current.current,outputRef.current));
   const playerRefresh = useEffectEvent((code: string) => refresh(code));
   useEffect(() => {
-    if (!consent || !playerRoot.current) return;
+    if (!activityPlayerAvailable || !consent || !playerRoot.current) return;
     let disposed = false;
     setPlayerLoading(true);
     const readyTimer = setTimeout(() => {
@@ -1011,10 +1032,10 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       }
     }, 15000);
     Object.assign(window, { afterpartyPlaybackDiagnostics: playerDiagnostics });
-    loadYoutube()
+    loadYoutube(mappedYoutube)
       .then(() => {
         if (disposed || !playerRoot.current) return;
-        const target = document.createElement("div");
+        const target = youtubePlayerTarget(mappedYoutube,roomRef.current?.current?.id);
         playerRoot.current.replaceChildren(target);
         player.current = new window.YT!.Player(target, {
           videoId: roomRef.current?.current?.id,
@@ -1137,6 +1158,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
         });
       })
       .catch((e) => {
+        if (disposed) return;
         setPlayerLoading(false);
         setPlayerError(e.message);
       });
@@ -1149,7 +1171,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       loadedId.current = "";
       bufferStarted.current = null;
     };
-  }, [consent, playerEpoch]);
+  }, [consent, playerEpoch, activityPlayerAvailable, mappedYoutube]);
   function recordPlayback() {
     const r = roomRef.current;
     if (r?.isHost && r.playing && r.current) {
@@ -1183,6 +1205,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       nativeSeek.current.reset();
     }
     if (!p || !playerReady.current) return;
+    if (!acceptsPlayerAudio(outputRef.current) && !p.isMuted()) p.mute();
     if (!r?.current || r.current.source === "soundcloud") {
       p.pauseVideo();
       setSyncStatus(r?.current ? "Lyd i Discord" : "Ingen video");
@@ -1222,7 +1245,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       setAutoplayMuted(false);
       mutedFallbackTried.current = false;
       audioWriteUntil.current = now + 1000;
-      applyAudioPreferences(p, audio.current.current);
+      applyOutputAudio(p, audio.current.current,outputRef.current);
       if(target.playing) p.loadVideoById({
             videoId: r.current.id,
             startSeconds: target.position,
@@ -1238,7 +1261,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       temporaryMute.current = false;
       setAutoplayMuted(false);
     }
-    if (now >= audioWriteUntil.current && !temporaryMute.current)
+    if (acceptsPlayerAudio(outputRef.current) && now >= audioWriteUntil.current && !temporaryMute.current)
       audio.fromPlayer(p.getVolume(), p.isMuted());
     const state = p.getPlayerState();
     if (state !== 3) transportChangedRef.current = false;
@@ -1372,7 +1395,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       temporaryMute.current = false;
       setAutoplayMuted(false);
       audioWriteUntil.current = performance.now() + 1000;
-      applyAudioPreferences(player.current, audio.value);
+      applyOutputAudio(player.current, audio.value,outputRef.current);
     }
   }, [audio.value]);
   const current = room?.current,
@@ -1401,7 +1424,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
   };
   const controls = useImmersiveControls(
     fullscreenActive,
-    Boolean(playerError || autoplayBlocked || !current || settingsOpen),
+    Boolean(audioOutput==='choose' || playerError || autoplayBlocked || !current || settingsOpen),
     fullscreenElement,
   );
   const hideChrome = fullscreenActive && !controls.visible;
@@ -1625,7 +1648,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                       "Rom som vertene har åpnet for alle. Ingen konto nødvendig.",
                     )
                   : discordMode || !room
-                    ? t("Musikken i Discord. Videoen her. Same augeblikk.")
+                    ? t(activityScope ? "Musikken og fellesskapet i Discord." : "Musikken i Discord. Videoen her. Same augeblikk.")
                     : null}
               </p>
             </div>
@@ -1697,6 +1720,8 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
               ref={fullscreenElement}
               className={`stage-panel${fullscreenFallback ? " fullscreen-fallback" : ""}`}
               data-immersive={fullscreenActive}
+              role={fullscreenFallback ? "dialog" : undefined}
+              aria-modal={fullscreenFallback ? true : undefined}
               data-controls-visible={controls.visible}
               tabIndex={fullscreenActive ? -1 : undefined}
               onPointerMove={controls.onPointerMove}
@@ -1704,7 +1729,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
               onPointerUp={controls.onPointerUp}
               onPointerCancel={controls.onPointerCancel}
               onBlurCapture={controls.onBlurCapture}
-              aria-label={t("Videospiller")}
+              aria-label={t(activityScope ? "Konsertscene" : "Videospiller")}
             >
               <div
                 className="concert-stage-bar"
@@ -1776,14 +1801,15 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                 <button
                   className="cinema-button"
                   data-fullscreen-close
-                  aria-label={t("Gå ut av fullskjerm")}
-                  title={t("Gå ut av fullskjerm")}
+                  aria-label={t(fullscreenFallback ? "Gjenopprett scena" : "Gå ut av fullskjerm")}
+                  title={t(fullscreenFallback ? "Gjenopprett scena" : "Gå ut av fullskjerm")}
                   onClick={fullscreenToggle}
                 >
                   <Minimize2 size={20} />
-                  <span>{t("Lukk fullskjerm")}</span>
+                  <span>{t(fullscreenFallback ? "Gjenopprett scena" : "Gå ut av fullskjerm")}</span>
                 </button>
               </div>
+              {activityScope && room?.current?.source !== "soundcloud" && <ActivityAudioOutput output={audioOutput} confirmed={botMutedLocally} onConfirm={confirmLocalMute} onSelect={chooseAudioOutput} />}
               <div
                 className="stage"
                 data-current={Boolean(current)}
@@ -1809,7 +1835,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   playerLoading) && (
                   <>
                     {current ? (
-                      <Image unoptimized width={480} height={270} className="stage-cover" src={current.image} alt="" />
+                      <TrackArtwork width={480} height={270} className="stage-cover" video={current} alt="" />
                     ) : (
                       <ConcertScenery />
                     )}
@@ -1831,7 +1857,13 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                                   ? t("Laster videospilleren …")
                                   : t("Last videoen fra YouTube.")}
                           </p>
-                          {audioOnly ? (
+                          {activityScope && playerError && !audioOnly ? (
+                            <>
+                            <button className="button primary" onClick={reloadPlayer}><RefreshCw size={17} /> {t("Prøv videoen igjen")}</button>
+                            <button className="button subtle" onClick={() => { void activityScope.openVideo(current.id).then(opened => { if (!opened) announce("Discord kunne ikkje opne YouTube. Prøv igjen frå Discord."); }); }}>
+                              {t("Åpne på YouTube")} <ArrowUpRight size={17} />
+                            </button></>
+                          ) : audioOnly ? (
                             <a
                               className="button subtle"
                               href={current.url}
@@ -1926,6 +1958,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   </div>
                 )}
                 {autoplayMuted &&
+                  acceptsPlayerAudio(audioOutput) &&
                   !audio.value.muted &&
                   audio.value.level > 0 && (
                     <div className="audio-unlock">
@@ -2031,12 +2064,12 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                     disabled={!current}
                     aria-label={
                       fullscreenActive
-                        ? t("Gå ut av fullskjerm")
+                        ? t(fullscreenFallback ? "Gjenopprett scena" : "Gå ut av fullskjerm")
                         : t("Fullskjerm")
                     }
                     title={
                       fullscreenActive
-                        ? t("Gå ut av fullskjerm")
+                        ? t(fullscreenFallback ? "Gjenopprett scena" : "Gå ut av fullskjerm")
                         : t("Fullskjerm")
                     }
                     onClick={fullscreenToggle}
@@ -2098,7 +2131,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   <ListMusic size={20} aria-hidden="true" />
                   <span className="tab-label">{t("Kø")}</span>
                   <span className="tab-count">
-                    {queueRoom?.queue.length ?? 0}
+                    {queueLoaded ? queueRoom?.queue.length ?? 0 : "…"}
                   </span>
                 </button>
                 <button
@@ -2145,11 +2178,8 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   <div className="queue-content">
                     {room?.current && (
                       <article className="queue-current">
-                        <Image unoptimized width={480} height={270}
-                          src={
-                            room.current.image ||
-                            `https://i.ytimg.com/vi/${room.current.id}/mqdefault.jpg`
-                          }
+                        <TrackArtwork width={480} height={270}
+                          video={room.current}
                           alt=""
                         />
                         <div>
@@ -2159,7 +2189,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                         </div>
                       </article>
                     )}
-                    {queueRoom && (
+                    {queueRoom && queueLoaded && (
                       <SocialQueue
                         room={queueRoom}
                         busy={
@@ -2171,9 +2201,10 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                       />
                     )}
                     {discordMode && concertQueue.error && (
-                      <p role="alert">{t(concertQueue.error)}</p>
+                      <div role="alert"><p>{t(concertQueue.error)}</p><button type="button" onClick={()=>void concertQueue.reload()}>{t("Retry queue read")}</button></div>
                     )}
-                    {!queueRoom?.queue.length && (
+                    {!queueLoaded && !concertQueue.error && <p role="status">{t("Loading concert queue…")}</p>}
+                    {queueLoaded && !concertQueue.error && !queueRoom?.queue.length && (
                       <div className="empty-queue">
                         <h3>{t("Køa er tom")}</h3>
                         <button
@@ -2349,7 +2380,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
               );
             }}
           >
-            Kø {queueRoom?.queue.length ?? 0}
+            Kø {queueLoaded ? queueRoom?.queue.length ?? 0 : "…"}
           </button>
           <button
             onClick={() => {

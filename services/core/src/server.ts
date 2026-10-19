@@ -304,7 +304,7 @@ export async function createServers(
         response.once("close", cancel);
         try {
           if (request.aborted || response.destroyed) controller.abort();
-          const tracks = query || ids ? await catalog.lookup(ids ? { ids: ids.split(",").slice(0, 50) } : { query: query! }, controller.signal) : [];
+          const tracks = query || ids ? await catalog.lookup(ids ? { ids: ids.split(",").slice(0, 50) } : { query: query!, preview: url.searchParams.get('preview') === '1' }, controller.signal) : [];
           if (!response.destroyed) json(response, 200, { videos: tracks.map((t) => publicTrack(t)) });
         } finally {
           request.off("aborted", cancel);

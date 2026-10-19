@@ -1,6 +1,23 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Audio output for you":["Lydutgang for deg", "Audio output for you"],
+ "I muted the bot locally in Discord":["Jeg har dempet boten lokalt i Discord", "I muted the bot locally in Discord"],
+ "Play audio in Activity":["Spill lyd i Activity", "Play audio in Activity"],
+ "Use Discord voice audio":["Bruk lyden i Discord-talekanalen", "Use Discord voice audio"],
+ "Choose an output before enabling sound here.":["Velg lydutgang før du slår på lyd her.", "Choose an output before enabling sound here."],
+ "Activity audio follows this concert. Volume affects only you.":["Lyden i Activity følger konserten. Volumet gjelder bare deg.", "Activity audio follows this concert. Volume affects only you."],
+ "This video is muted. Unmute the bot locally to listen in Discord voice.":["Denne videoen er dempet. Opphev lokal demping av boten for å lytte i Discord-talekanalen.", "This video is muted. Unmute the bot locally to listen in Discord voice."],
+ "Mute the bot only for yourself before enabling Activity audio to avoid hearing both. This view cannot verify that local mute.":["Demp boten bare for deg selv før du slår på Activity-lyd, slik at du ikke hører begge. Denne visningen kan ikke kontrollere lokal demping.", "Mute the bot only for yourself before enabling Activity audio to avoid hearing both. This view cannot verify that local mute."],
+ "Loading concert queue…":["Laster konsertkøen …", "Loading concert queue…"],
+ "Retry queue read":["Hent køen på nytt", "Retry queue read"],
+ "Videospilleren i Discord kunne ikke lastes. Be servereieren kontrollere Activity-oppsettet.":["Videospilleren i Discord kunne ikke lastes. Be servereieren kontrollere Activity-oppsettet.","The embedded player could not load in Discord. Ask the server owner to check the Activity setup."],
+ "Konsertscene":["Konsertscene","Concert stage"],
+ "Utvid scena":["Utvid scenen","Expand stage"],
+ "Gjenopprett scena":["Gjenopprett scenen","Restore stage"],
+ "Lyden spelar i Discord. Video opnar på YouTube.":["Lyden spilles i Discord. Video åpnes på YouTube.","Audio plays in Discord. Video opens on YouTube."],
+ "Musikken og fellesskapet i Discord.":["Musikken og fellesskapet i Discord.","Music and company in Discord."],
+ "Discord kunne ikkje opne YouTube. Prøv igjen frå Discord.":["Discord kunne ikke åpne YouTube. Prøv igjen fra Discord.","Discord could not open YouTube. Try again from Discord."],
  "Your access changed. Reconnect to check your concert permissions.":["Tilgangen din er endret. Koble til igjen for å kontrollere konserttillatelsene.","Your access changed. Reconnect to check your concert permissions."],
  "Concert together":["Konsert sammen", "Concert together"],
  "Preview":["Forhåndsvisning", "Preview"],

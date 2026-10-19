@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import { TrackArtwork } from "@/components/track-artwork";
 import { useLanguage } from "@/components/language";
 import type { Room } from "@/lib/types";
 import { time } from "@/lib/types";
@@ -38,7 +38,7 @@ export function SocialQueue({
         return (
           <article className="social-track" key={v.entryId ?? v.id}>
             <span className="queue-number">{i + 1}</span>
-            <Image unoptimized width={48} height={48} className="queue-art" src={v.image || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" />
+            <TrackArtwork width={48} height={48} className="queue-art" video={v} alt="" loading="lazy" />
             <div>
               <strong>{v.title}</strong>
               <small>{v.artist}</small>

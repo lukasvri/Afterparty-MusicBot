@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {enterFullscreen,fullscreenElement,leaveFullscreen} from '@/lib/fullscreen';
 
-export function useFullscreen(){
+export function useFullscreen({viewportOnly = false}: {viewportOnly?: boolean} = {}){
   const element = useRef<HTMLElement>(null);
   const busy = useRef(false);
   const [native,setNative] = useState(false);
@@ -15,10 +15,10 @@ export function useFullscreen(){
     try{
       if(fallback){setFallback(false);focusControl();}
       else if(fullscreenElement(root.ownerDocument)===root){await leaveFullscreen(root);setNative(false);focusControl();}
-      else if(await enterFullscreen(root)){setNative(true);}
+      else if(await enterFullscreen(root,viewportOnly)){setNative(true);}
       else setFallback(true);
     }finally{busy.current=false;}
-  },[fallback,focusControl]);
+  },[fallback,focusControl,viewportOnly]);
   useEffect(()=>{
     const change=()=>{const active=fullscreenElement(document)===element.current;setNative(active);if(!active)focusControl();};
     const escape=(event:KeyboardEvent)=>{const root=element.current;if(event.key==='Escape'&&root&&fullscreenElement(document)===root){event.preventDefault();void leaveFullscreen(root).catch(()=>{});}};
@@ -43,7 +43,7 @@ export function useFullscreen(){
     };
     document.addEventListener('keydown',key);
     return()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',key);};
-  },[fallback,focusControl]);
+  },[fallback,focusControl,viewportOnly]);
   useEffect(()=>()=>{const root=element.current;if(root&&fullscreenElement(document)===root)void leaveFullscreen(root).catch(()=>{});},[]);
-  return {element,active:native||fallback,fallback,toggle};
+  return {element,active:native||fallback,native,fallback,toggle};
 }

@@ -5,7 +5,8 @@ export function fullscreenElement(doc: Document): Element | null {
   return doc.fullscreenElement ?? (doc as SafariDocument).webkitFullscreenElement ?? null;
 }
 
-export async function enterFullscreen(element: HTMLElement): Promise<boolean> {
+export async function enterFullscreen(element: HTMLElement, viewportOnly = false): Promise<boolean> {
+  if (viewportOnly) return false;
   const doc = element.ownerDocument;
   if (fullscreenElement(doc) === element) return true;
   try {

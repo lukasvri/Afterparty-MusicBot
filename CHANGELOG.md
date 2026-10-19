@@ -4,6 +4,17 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-beta.6: Preserve Activity video, audio and queue controls
+
+2026-10-19
+
+- YouTube artwork in Search, the queue and stage loads through a fixed-host, bounded, cacheable same-origin JPEG endpoint. Discord no longer needs to load thumbnails directly from a blocked external image host; failed artwork falls back to the Afterparty mark.
+- Authenticated Activity discovery returns up to four flat search previews without four full extraction jobs. Preview and verified caches stay separate; selecting a track still resolves full metadata before queueing. One-job admission, total deadline, cancellation and extraction resource limits remain in place. Ordinary website and radio discovery keep their verified metadata path.
+- Activity retains the official YouTube IFrame API and synchronization controls. Its initial API script and pre-created iframe use a narrow test-app URL mapping; a scoped, removable widget-script adapter uses the SDK URL remapper without patching fetch, XHR or WebSocket. External opening remains an explicit error fallback. Required Portal mappings and nested-player behavior need owner approval and real Discord verification; no video media is relayed or rehosted.
+- Activity listeners explicitly choose local player audio or Discord voice audio. The player stays muted until local Activity audio is selected with a confirmation that the bot has been muted for that listener in Discord. Local volume/unmute gestures and synchronized room playback are retained without changing bot voice, shared volume or other listeners. The SDK cannot verify or perform that per-user bot mute; real-client double-audio and autoplay checks remain required.
+- The concert queue no longer presents a missing or failed authoritative queue read as an empty queue. Loading, read errors and a read-only retry are distinct. Add/play and queue mutations continue through existing server authority, permissions and revision guards; the reported queue display defect still needs a matching screenshot or authenticated read evidence.
+- Activity and ordinary browsers both try native fullscreen when their client grants permission, with Escape and focus restoration. A denied or unsupported request uses a clearly labelled stage-viewport fallback. This preview does not claim successful in-Activity playback or fullscreen from mocks, and remains gated on real desktop/mobile checks.
+
 ## v3.0.0-beta.5: Bound music search work and cancellation
 
 2026-10-19
