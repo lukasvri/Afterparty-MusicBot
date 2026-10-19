@@ -1,8 +1,9 @@
 # Discord Activity feasibility
 
-Afterparty can be adapted to open inside a Discord Activity. It is not currently
-Activity-compatible, and this planning document is not an implementation or launch
-approval. The v3 social panel and the Discord Activities platform are different
+Afterparty now has an opt-in Activity integration test route in the beta.2 source.
+Real Discord compatibility has not been established. See the
+[isolated testing setup](DISCORD_ACTIVITY_TESTING.md) for implemented boundaries
+and pending configuration. This planning document is not launch approval. The v3 social panel and the Discord Activities platform are different
 things. The concert beta does not depend on shipping an Activity.
 
 Discord runs Activities in an iframe. Its documented launch flow uses the
@@ -63,8 +64,9 @@ members, small servers (fewer than 25 members) and DMs in its
 Check current eligibility and configuration before an authorized test. Production
 verification/distribution is a separate decision.
 
-No SDK dependency, Developer Portal setting, OAuth credential, URL mapping,
-installation, publication or production configuration is changed by this plan.
+The integration test adds the pinned Embedded App SDK and isolated source adapters.
+No Developer Portal setting, OAuth credential, URL mapping, installation, publication
+or production configuration has been changed.
 Implementation and real-client testing require a defined Activity scope and
 separate authorization. Music licensing and public-live issue #37 remain open
 regardless of embedding feasibility.

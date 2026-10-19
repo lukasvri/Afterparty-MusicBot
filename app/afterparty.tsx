@@ -67,11 +67,13 @@ import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
 import releases from "@/lib/releases.json";
 
-export default function Afterparty() {
+export default function Afterparty({ activityScope }: { activityScope?: { roomCode: string; guildId: string } } = {}) {
+  const activityRoomCode = activityScope?.roomCode, activityGuildId = activityScope?.guildId;
   const { t, language } = useLanguage();
   const [directoryOpen, setDirectoryOpen] = useState(false),
     [publicListing, setPublicListing] = useState(false);
   const navigate = (view: "music" | "rooms") => {
+    if (activityRoomCode) return;
     setDirectoryOpen(view === "rooms");
     const url = new URL(location.href);
     if(view === "rooms") url.searchParams.set("view", "rooms");
@@ -200,6 +202,7 @@ export default function Afterparty() {
   }, []);
   const accept = useCallback(
     (next: Room, updateTimeline = true) => {
+      if (activityRoomCode && (next.code !== activityRoomCode || next.guildId !== activityGuildId || next.mode !== "discord")) return;
       const previous = roomRef.current;
       if (!updateTimeline) {
         if (previous?.code === next.code) {
@@ -255,7 +258,7 @@ export default function Afterparty() {
         setPlayerError("");
       setOnline(true);
     },
-    [setRoom, setPlayerError, setOnline],
+    [setRoom, setPlayerError, setOnline, activityRoomCode, activityGuildId],
   );
   const liveKey = useRef("");
   const realtime = useLiveDiscord(
@@ -274,11 +277,11 @@ export default function Afterparty() {
         previous ? { ...previous, online: false } : null,
       );
     },
-    room?.guildId,
-    !room || room.mode === "discord",
+    activityGuildId ?? room?.guildId,
+    !activityRoomCode && (!room || room.mode === "discord"),
   );
   const roomLive = useLiveRoom(
-    room?.mode === "discord" ? undefined : room?.code,
+    activityRoomCode || room?.mode === "discord" ? undefined : room?.code,
     (next) => {
       const previous = roomRef.current;
       if (activeCode.current === next.code)
@@ -325,6 +328,8 @@ export default function Afterparty() {
   const join = useCallback(
     async (code: string, recordHistory = true) => {
       code = code.toUpperCase().trim();
+      if (activityRoomCode && code !== activityRoomCode) return;
+      if (activityRoomCode) recordHistory = false;
       if (!/^[A-Z0-9]{8}$/.test(code)) {
         setError("Romkoden har åtte bokstaver eller tall.");
         return;
@@ -358,9 +363,10 @@ export default function Afterparty() {
         if (generation === joinGeneration.current) setLoadingRoom(false);
       }
     },
-    [accept, setError, setLoadingRoom, setModal, setPlayerError],
+    [accept, setError, setLoadingRoom, setModal, setPlayerError, activityRoomCode],
   );
   const create = async () => {
+    if (activityRoomCode) return;
     const generation = ++joinGeneration.current;
     setPending(true);
     setError("");
@@ -595,23 +601,23 @@ export default function Afterparty() {
   if (clientReady && !urlInitialized) {
     setUrlInitialized(true);
     const params = new URLSearchParams(location.search);
-    setLoadingRoom(params.has("room"));
-    setTV(params.get("tv") === "1");
-    setDirectoryOpen(params.get("view") === "rooms");
+    setLoadingRoom(Boolean(activityRoomCode) || params.has("room"));
+    setTV(!activityRoomCode && params.get("tv") === "1");
+    setDirectoryOpen(!activityRoomCode && params.get("view") === "rooms");
   }
   useEffect(() => {
     if (!storage.get("afterparty-visitor"))
       storage.set("afterparty-visitor", crypto.randomUUID());
     const params = new URLSearchParams(location.search),
-      code = params.get("room");
+      code = activityRoomCode ?? params.get("room");
     const fragment = new URLSearchParams(location.hash.slice(1));
     const invitation = fragment.get("host"),
       access = fragment.get("access");
-    if (access && code && /^[a-f0-9]{64}$/.test(access)) {
+    if (!activityRoomCode && access && code && /^[a-f0-9]{64}$/.test(access)) {
       storage.set(`afterparty-host:${code}`, access);
       history.replaceState(null, "", location.pathname + location.search);
     }
-    if (invitation && code) {
+    if (!activityRoomCode && invitation && code) {
       history.replaceState(null, "", location.pathname + location.search);
       void request<{ token: string }>(`/api/rooms/${code}`, {
         method: "POST",
@@ -631,11 +637,12 @@ export default function Afterparty() {
         pollGeneration.current++;
         activeCode.current = code;
         accept(compensateDelivery(next, performance.now() - started));
-        setDirectoryOpen(params.get("view") === "rooms");
+        setDirectoryOpen(!activityRoomCode && params.get("view") === "rooms");
         setLoadingRoom(false);
       }, e => { if(mounted.current && generation === joinGeneration.current){setError(e.message);setLoadingRoom(false);} });
     }
     const pop = () => {
+      if (activityRoomCode) return;
       const generation = ++joinGeneration.current;
       const p = new URLSearchParams(location.search);
       setDirectoryOpen(p.get("view") === "rooms");
@@ -665,7 +672,7 @@ export default function Afterparty() {
       window.removeEventListener("popstate", pop);
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
-  }, [join, accept]);
+  }, [join, accept, activityRoomCode]);
   useEffect(() => {
     if (panel === "music" && !directoryOpen && !tv) {
       requestAnimationFrame(() => {
@@ -692,6 +699,7 @@ export default function Afterparty() {
 
   const concertQueue = useConcertQueue(
     room?.mode === "discord" ? room.guildId : undefined,
+    activityRoomCode ? 10000 : 3000,
   );
   async function seekDiscord(seconds: number) {
     const target = roomRef.current,
@@ -859,7 +867,7 @@ export default function Afterparty() {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
-    const guildId = room?.guildId;
+    const guildId = activityGuildId ?? room?.guildId;
     const update = async () => {
       try {
         if (
@@ -888,7 +896,7 @@ export default function Afterparty() {
             previous ? { ...previous, online: false } : null,
           );
       }
-      if (!disposed) timer = setTimeout(update, document.hidden ? 15000 : 3000);
+      if (!disposed) timer = setTimeout(update, document.hidden ? 15000 : activityRoomCode ? 10000 : 3000);
     };
     void update();
     return () => {
@@ -896,7 +904,7 @@ export default function Afterparty() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [liveFresh, room?.guildId, room?.mode, realtime.live]);
+  }, [liveFresh, room?.guildId, room?.mode, realtime.live, activityGuildId, activityRoomCode]);
   function startVideo() {
     const r = roomRef.current;
     if (!r?.current) return;
@@ -960,9 +968,9 @@ export default function Afterparty() {
       } finally {
         inFlight = false;
       }
-      if (!stopped) timer = setTimeout(poll, roomPollMs(document.hidden));
+      if (!stopped) timer = setTimeout(poll, activityRoomCode ? Math.max(10000, roomPollMs(document.hidden)) : roomPollMs(document.hidden));
     };
-    timer = setTimeout(poll, roomPollMs(document.hidden));
+    timer = setTimeout(poll, activityRoomCode ? Math.max(10000, roomPollMs(document.hidden)) : roomPollMs(document.hidden));
     const focus = () => {
       if (!document.hidden) {
         clearTimeout(timer);
@@ -977,7 +985,7 @@ export default function Afterparty() {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", focus);
     };
-  }, [room?.code, room?.mode, refresh, liveFresh, roomLive.fresh]);
+  }, [room?.code, room?.mode, refresh, liveFresh, roomLive.fresh, activityRoomCode]);
   useEffect(() => {
     const timer = setInterval(() => {
       const current = roomRef.current;
@@ -1495,7 +1503,7 @@ export default function Afterparty() {
               {discordMode && !concertQueue.data?.canManage && (
                 <p>
                   {t("Logg inn med Discord for å administrere denne serveren.")}{" "}
-                  <a href="/api/auth/discord">Discord</a>
+                  {!activityRoomCode && <a href="/api/auth/discord">Discord</a>}
                 </p>
               )}
       </>}
@@ -1555,7 +1563,7 @@ export default function Afterparty() {
       data-tv={tv && Boolean(room)}
       data-empty={!current}
     >
-      <Sidebar view={directoryOpen ? "rooms" : "music"} onNavigate={navigate} />
+      {!activityRoomCode && <Sidebar view={directoryOpen ? "rooms" : "music"} onNavigate={navigate} />}
       <a className="skip-link" href="#party-content">
         {t("Hopp til musikken")}
       </a>
@@ -1575,19 +1583,19 @@ export default function Afterparty() {
             >
               <Sparkles size={17} />
             </button>
-            <button className="button subtle" onClick={() => setModal("join")}>
+            {!activityRoomCode && <button className="button subtle" onClick={() => setModal("join")}>
               <Link2 size={16} /> {t("Bli med")}
-            </button>
-            <button
+            </button>}
+            {!activityRoomCode && <button
               className="button subtle"
               onClick={() => setModal("create")}
             >
               <Plus size={17} /> {t("Eige rom")}
-            </button>
+            </button>}
           </div>
         </header>
         <div className="content">
-          {!directoryOpen && (!room || (discordMode && !botOnline)) && (
+          {!activityRoomCode && !directoryOpen && (!room || (discordMode && !botOnline)) && (
             <StartEvening
               offline={Boolean(room)}
               onBrowser={() => setModal("create")}
@@ -2273,7 +2281,7 @@ export default function Afterparty() {
               {room?.code}
               {!discordMode && room ? t(" · 48 timer") : ""}
             </span>
-            <nav className="footer-links" aria-label={t("Snarveier")}>
+            {!activityRoomCode && <nav className="footer-links" aria-label={t("Snarveier")}>
               <a href="/install">
                 {language === "en" ? "Install bot" : "Legg til bot"}
               </a>
@@ -2288,12 +2296,12 @@ export default function Afterparty() {
               <a href="/admin" target="_top">
                 Admin <ArrowUpRight size={13} />
               </a>
-            </nav>
+            </nav>}
           </div>
         </div>
       </main>
       <RoomDialog
-        mode={modal}
+        mode={activityRoomCode ? null : modal}
         name={roomName}
         onName={setRoomName}
         code={joinCode}

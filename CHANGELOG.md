@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-beta.2: Isolated Discord Activity test mode
+
+2026-10-19
+
+- Adds a default-off /activity entry that initializes the Discord Embedded App SDK and reuses the concert interface after server-verified test-server authorization. Activity sessions and routes are separate from ordinary website sign-in.
+- Test mode uses an exact configured application and server allowlist, one-use authorization state, scoped sessions and bounded requests. Standalone pages retain framing protection; only the Activity document permits Discord framing. A separate additive website database migration is required.
+- This is source for an isolated integration test, not a deployed or verified Discord Activity. Portal configuration, authorized test hosting and real Discord desktop/mobile checks are still required. YouTube embedding, proxy cookies and provider behavior remain unverified; existing beta live-audio and licensing gates remain open.
+
 ## v3.0.0-beta.1: Concert activities beta test candidate
 
 2026-10-19

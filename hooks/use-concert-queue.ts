@@ -8,7 +8,7 @@ type QueueState = Pick<
 > & {
   revision: string;
 };
-export function useConcertQueue(guildId: string | undefined) {
+export function useConcertQueue(guildId: string | undefined, pollIntervalMs = 3000) {
   const [data, setData] = useState<{
       state: QueueState;
       canManage: boolean;
@@ -56,7 +56,7 @@ export function useConcertQueue(guildId: string | undefined) {
       } catch {
         if (!stopped) setError("Konsertkøen er ikkje tilgjengeleg.");
       }
-      if (!stopped) timer = setTimeout(update, 3000);
+      if (!stopped) timer = setTimeout(update, Math.max(3000, pollIntervalMs));
     };
     let timer: ReturnType<typeof setTimeout>;
     void update();
@@ -65,7 +65,7 @@ export function useConcertQueue(guildId: string | undefined) {
       invalidate();
       clearTimeout(timer);
     };
-  }, [guildId, refresh, invalidate]);
+  }, [guildId, refresh, invalidate, pollIntervalMs]);
   const action = async (name: string, extra: Record<string, unknown> = {}) => {
     if (!guildId || !data || pending.current) return;
     const g = generation.current,

@@ -86,3 +86,11 @@ The bot token, OAuth client secret and bridge secret are different credentials. 
 - Do not prefix server secrets with `NEXT_PUBLIC_`, paste them into issues or include them in screenshots.
 - Keep backups outside Git with restricted filesystem permissions.
 - If a credential is exposed, revoke it at the provider and update your services. Deleting a file from the latest commit does not remove it from Git history.
+
+## Optional Discord Activity test mode
+
+The default-off Activity adapter uses separate scoped sessions and test guilds.
+See [isolated Activity testing](DISCORD_ACTIVITY_TESTING.md) for the exact Core
+and website variables, additive test database migration, root-document routing,
+Portal steps and real-client gates. Do not enable it on a production installation
+merely because the source contains an Activity route.

@@ -29,6 +29,13 @@
       "when": 1792012218520,
       "tag": "0003_chemical_psylocke",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792425108784,
+      "tag": "0004_activity_test_sessions",
+      "breakpoints": true
     }
   ]
 }

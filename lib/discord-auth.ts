@@ -1,3 +1,4 @@
+import {activityGrant} from "./request-grant";
 import {db,hash,fail,isAdmin,limit} from './server';
 import {coreRequest} from './core-server';
 import {ownerUpdateUrl} from './owner-update';
@@ -8,7 +9,7 @@ const cookie=(request:Request,name:string)=>request.headers.get('cookie')?.split
 const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
 const header=(name:string,value:string,seconds:number)=>`${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${seconds}`;
 export async function application(){return coreRequest<Application>('/v1/application');}
-export async function discordSession(request:Request){const value=cookie(request,'gk-discord');if(!/^[a-f0-9]{64}$/.test(value))return null;return db().prepare('SELECT token_cipher FROM discord_admin_sessions WHERE token_hash=? AND expires_at>?').bind(await hash(value),Date.now()).first<{token_cipher:string}>();}
+export async function discordSession(request:Request){const internal=activityGrant(request);if(internal)return {token_cipher:internal};const value=cookie(request,'gk-discord');if(!/^[a-f0-9]{64}$/.test(value))return null;return db().prepare('SELECT token_cipher FROM discord_admin_sessions WHERE token_hash=? AND expires_at>?').bind(await hash(value),Date.now()).first<{token_cipher:string}>();}
 export async function adminGuilds(request:Request){
  // Recovery access is independent of Core, but never implies a guild grant.
  // Recheck the password session after the failed request, including when a

@@ -1,4 +1,4 @@
-import {sqliteTable, text, integer} from 'drizzle-orm/sqlite-core';
+import {sqliteTable, text, integer, index} from 'drizzle-orm/sqlite-core';
 export const rooms = sqliteTable('rooms', {
   code: text('code').primaryKey(), name: text('name').notNull(), ownerHash: text('owner_hash').notNull(),
   state: text('state').notNull(), version: integer('version').notNull().default(1),
@@ -13,3 +13,13 @@ export const botState=sqliteTable('bot_state',{key:text('key').primaryKey(),stat
 export const botCommands=sqliteTable('bot_commands',{id:text('id').primaryKey(),guildId:text('guild_id'),payload:text('payload').notNull(),status:text('status').notNull(),result:text('result'),createdAt:integer('created_at').notNull(),expiresAt:integer('expires_at').notNull()});
 export const discordOauthStates=sqliteTable('discord_oauth_states',{tokenHash:text('token_hash').primaryKey(),expiresAt:integer('expires_at').notNull()});
 export const discordAdminSessions=sqliteTable('discord_admin_sessions',{tokenHash:text('token_hash').primaryKey(),tokenCipher:text('token_cipher').notNull(),expiresAt:integer('expires_at').notNull()});
+
+// Isolated embedded test sessions, never ordinary website administration sessions.
+export const activityTestSessions = sqliteTable("activity_test_sessions", {
+ tokenHash: text("token_hash").primaryKey(),
+ tokenCipher: text("token_cipher").notNull(),
+ guildId: text("guild_id").notNull(),
+ roomCode: text("room_code").notNull(),
+ userId: text("user_id").notNull(),
+ expiresAt: integer("expires_at").notNull(),
+}, table => [index("activity_test_sessions_expiry").on(table.expiresAt)]);

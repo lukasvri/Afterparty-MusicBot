@@ -51,6 +51,7 @@ type Options = {
   publicPort?: number;
   guilds?: Guilds;
   oauth?: DiscordOAuth;
+  activity?: { enabled: boolean; clientId: string; testGuildIds: string[] };
   applicationId?: () => string;
   isReady?: () => boolean;
   host?: string;
@@ -62,6 +63,8 @@ export async function createServers(
   options: Options,
 ) {
   if (!options.key) throw new Error("The bridge connection is missing a secret.");
+  const activity = options.activity;
+  const activityReady = Boolean(activity?.enabled === true && /^\d{14,22}$/.test(activity.clientId) && activity.clientId === options.oauth?.clientId && options.oauth?.secret && options.guilds && activity.testGuildIds.length > 0 && activity.testGuildIds.length <= 20 && activity.testGuildIds.every(id => /^\d{14,22}$/.test(id)));
   const rooms = new Rooms(engine.store);
   const social = new Social(engine.store, options.key);
   const socialClients = new Map<ServerResponse, { key: string; host: boolean }>();
@@ -156,6 +159,10 @@ export async function createServers(
     );
     try {
       const url = new URL(request.url ?? "/", "http://core");
+      if (url.pathname === "/v1/activity") {
+        try { authenticate(request); } catch (error) { limit("activity-unauthorized", 120); throw error; }
+        limit("activity-global", 120);
+      }
       if (url.pathname === "/v1/social") {
         // Invalid bridge callers cannot consume the allowance reserved for social
         // participants or playback. Keep their own bounded socket/global guard.
@@ -305,6 +312,28 @@ export async function createServers(
         });
         return;
       }
+      if (url.pathname === "/v1/activity") {
+        authenticate(request);
+        if (request.method !== "POST") throw new UserError("Method not allowed.", 405);
+        const input = await body(request, 4096);
+        if (input.operation !== "verify") limit("activity-start", 30);
+        if (input.operation === "config") {
+          json(response, 200, { enabled: activityReady, clientId: activityReady ? activity!.clientId : "" });
+          return;
+        }
+        if (!activityReady) throw new UserError("Activity test mode is disabled.", 503);
+        if (!["exchange", "verify"].includes(String(input.operation))) throw new UserError("Invalid Activity operation.");
+        if (typeof input.guildId !== "string" || !/^\d{14,22}$/.test(input.guildId) || !activity!.testGuildIds.includes(input.guildId)) throw new UserError("This server is not enabled for Activity tests.", 403);
+        const target = options.guilds!.get(input.guildId);
+        if (input.operation === "exchange") limit("activity-exchange", 12);
+        const result = input.operation === "verify"
+          ? await options.oauth!.verifyActivity(input.tokenCipher, target.id)
+          : await options.oauth!.exchangeActivity(input.code, target.id);
+        // Recheck installation after asynchronous identity verification.
+        if (options.guilds!.get(target.id) !== target) throw new UserError("The test server changed. Try again.", 409);
+        json(response, 200, { ...result, guild: { id: target.id, name: target.name, roomCode: target.roomCode } });
+        return;
+      }
       if (url.pathname === "/v1/oauth") {
         authenticate(request);
         if (request.method !== "POST" || !options.oauth)
@@ -446,6 +475,8 @@ export async function createServers(
           if (typeof input.scopeId !== "string" || !/^\d{14,22}$/.test(input.scopeId) || !options.oauth) throw new UserError("Discord sign-in required.", 403);
           const target = select(input.scopeId);
           if (target.id !== input.scopeId) throw new UserError("Invalid server.", 403);
+          const grant = options.oauth.open(input.tokenCipher);
+          if (grant.activityGuildId && (!activityReady || !activity!.testGuildIds.includes(target.id))) throw new UserError("Activity test mode is disabled for this server.", 403);
           const access = await options.oauth.member(input.tokenCipher, target.id);
           host = access.canManage;
           const state = snapshot(target);

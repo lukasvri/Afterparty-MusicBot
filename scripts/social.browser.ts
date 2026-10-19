@@ -12,7 +12,7 @@ await mkdir(shots, { recursive: true });
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, reducedMotion: "reduce" });
   await context.addInitScript(() => localStorage.setItem("gutta-language", "en"));
-  let manage = true, unavailable = false, joins = 0, streams = 0, staleOnce = true, expireNext = false, foreignFrame = false, denied = 0, socialRequests = 0;
+  let manage = true, unavailable = false, joins = 0, streams = 0, staleOnce = true, expireNext = false, foreignFrame = false, denied = 0, armedDenial = 0, socialRequests = 0;
   const playbackCommands: unknown[] = [], actions: string[] = [];
   const room: Room = { code: "TESTROOM", name: "The late show", current: { id: "seed1234567", title: "An evening together • Live concert", artist: "Afterparty sessions", image: "/afterparty-mark.svg", duration: 5400, live: false, embeddable: true, concert: true }, queue: [], playing: true, position: 245, version: 17, serverTime: Date.now(), viewers: 4, isHost: true, expiresAt: Date.now() + 86400000, playbackKey: "concert-one" };
   const social: SocialState = { scope: "room", scopeId: room.code, playbackKey: room.playbackKey!, revision: 0, enabled: true, reactions: [], highlights: [], bingo: null };
@@ -22,6 +22,7 @@ try {
     if (!url.pathname.startsWith("/api/")) return route.continue();
     const input = route.request().method() === "POST" ? route.request().postDataJSON() : null;
     let data: unknown = {};
+    if (url.pathname === "/api/social" && input && !["join", "read"].includes(input.action) && armedDenial) { denied = armedDenial; armedDenial = 0; }
     if (url.pathname.startsWith("/api/social")) { socialRequests++; if (denied) return route.fulfill({ status: denied, json: { error: "Synthetic persistent denial" } }); }
     if (url.pathname === "/api/social/stream") {
       streams++;
@@ -155,7 +156,7 @@ try {
   await page.waitForFunction(() => !(document.querySelector('[aria-label="Love"]') as HTMLButtonElement)?.disabled);
   // Allow the already-authorized initial stream frame to arrive before denying writes.
   await page.waitForTimeout(150);
-  denied = 429;
+  armedDenial = 429;
   await panel.getByRole("button", { name: "Love", exact: true }).click();
   await panel.getByText("The room is busy. Try again in a moment.").waitFor();
   denied = 0;
@@ -167,7 +168,7 @@ try {
   await panel.getByRole("button", { name: /Concert together/ }).click();
   await page.waitForFunction(() => !(document.querySelector('[aria-label="Love"]') as HTMLButtonElement)?.disabled);
   for (const status of [403, 409]) {
-    denied = status;
+    armedDenial = status;
     const beforeDenial = socialRequests;
     await panel.getByRole("button", { name: "Love", exact: true }).click();
     await page.waitForTimeout(1200);
