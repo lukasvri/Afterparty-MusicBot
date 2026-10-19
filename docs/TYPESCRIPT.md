@@ -18,11 +18,18 @@ These compatibility and system boundaries remain:
   failure and active-playback tests. Replacing it needs a dedicated migration
   that preserves the installed command and recovery journal compatibility.
 - Two small JavaScript installer entry points forward to their TypeScript
-  implementations for callers using the previous paths. ESLint and PostCSS
-  retain their conventional JavaScript configuration adapters.
+  implementations for callers using the previous paths. The maintained shell
+  installer invokes `npm-install.ts` directly. ESLint and PostCSS retain their
+  conventional `.mjs` loader adapters, but configuration lives in typechecked
+  `eslint.config.ts` and `postcss.config.ts`. This uses native Node type stripping
+  without adding a separate TypeScript configuration loader dependency.
 - The inactive legacy Core dashboard asset in `services/core/public/app.js`
-  remains unchanged. It is not an active application source or included in the
-  current Core image; rebuilding that retired dashboard is outside this change.
+  remains unchanged alongside `app.css`: the admin server still has dynamic
+  routes for these files, although the legacy `index.html` is absent and the
+  normal `main.ts` entry point disables that admin listener. Docker
+  copies them into the validation stage, not the final production image. They
+  are preserved pending an explicit decision about retiring the legacy routes;
+  they must not be deleted based only on missing static imports.
 - CSS describes presentation. Shell and Dockerfiles provide system and container
   entry points. They remain appropriate for those jobs.
 

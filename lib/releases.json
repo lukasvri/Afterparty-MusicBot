@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.2.9",
+    "date": "2026-10-19",
+    "title": "TypeScript tooling and current setup guidance",
+    "items": [
+      "ESLint and PostCSS configuration now lives in typechecked TypeScript, with small conventional loader adapters preserved. The maintained shell installer calls the TypeScript implementation directly; older installer entry points remain compatible.",
+      "The README clarifies setup and validation commands, implemented versus deployed status, and the paused Rust evaluation. Existing Rust research and legacy dashboard assets are preserved."
+    ]
+  },
+  {
     "version": "2.2.8",
     "date": "2026-10-19",
     "title": "Safer connections and server channel lists",
