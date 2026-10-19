@@ -11,6 +11,17 @@ import type { Sink } from '../src/audio.ts';
 import type { YouTubeResponses } from '../src/external-types.ts';
 import { deferred } from './deferred.ts';
 
+test('catalog passes the Activity preview capability only to search and keeps ID hydration strict', async () => {
+ const store=new Store(':memory:');const calls:unknown[][]=[];
+ const catalog=new Catalog(store,{},()=>({search:async(...args)=>{calls.push(args);return [];},video:async ids=>{calls.push(['ids',ids]);return [];}}));
+ try{
+  await catalog.lookup({query:'preview',preview:true},new AbortController().signal);
+  await catalog.lookup({query:'ordinary'},new AbortController().signal);
+  await catalog.lookup({ids:['synthetic01'],preview:true},new AbortController().signal);
+  assert.deepEqual(calls,[['preview',4,false,true],['ordinary',4,false,false],['ids',['synthetic01']]]);
+ }finally{catalog.close();store.close();}
+});
+
 test('catalog rejects overlapping jobs and holds ownership until cancelled work actually settles', async () => {
  const store = new Store(':memory:'), cleanup = deferred<void>(), started = deferred<void>();
  const caller = new AbortController(); let observed: AbortSignal | undefined;

@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-beta.6: Adapt the concert view to Discord Activities
+
+2026-10-19
+
+- YouTube artwork in Search, the queue and stage loads through a fixed-host, bounded, cacheable same-origin JPEG endpoint. Discord no longer needs to load thumbnails directly from a blocked external image host; failed artwork falls back to the Afterparty mark.
+- Authenticated Activity discovery returns up to four flat search previews without four full extraction jobs. Preview and verified caches stay separate; selecting a track still resolves full metadata before queueing. One-job admission, total deadline, cancellation and extraction resource limits remain in place. Ordinary website and radio discovery keep their verified metadata path.
+- The Activity concert view keeps audio in Discord and opens videos through the supported Discord external-link command. It does not retry a YouTube player script or frame blocked by Discord. Expand stage fills only the Activity viewport, with Escape, focus restoration and a visible restore control; it is not device fullscreen. Ordinary browser video and native fullscreen remain available.
+- This preview needs a real Discord desktop/mobile check of images, discovery, external opening and stage expansion before publication. It does not claim in-Activity YouTube playback, device fullscreen, or a Portal mapping change.
+
 ## v3.0.0-beta.5: Bound music search work and cancellation
 
 2026-10-19

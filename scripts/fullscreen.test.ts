@@ -53,3 +53,9 @@ test('native exit is awaited and errors remain observable',async()=>{
  await leaveFullscreen(element);assert.equal(done,true);
  doc.exitFullscreen=async()=>{throw new Error('Exit failed');};await assert.rejects(leaveFullscreen(element),/Exit failed/);
 });
+
+
+test('Activity stage expansion never requests or reports native fullscreen',async()=>{
+ let requests=0;const element=elementFixture({fullscreenEnabled:true},{async requestFullscreen(){requests++;}});
+ assert.equal(await enterFullscreen(element,true),false);assert.equal(requests,0);
+});

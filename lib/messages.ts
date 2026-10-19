@@ -1,6 +1,12 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Konsertscene":["Konsertscene","Concert stage"],
+ "Utvid scena":["Utvid scenen","Expand stage"],
+ "Gjenopprett scena":["Gjenopprett scenen","Restore stage"],
+ "Lyden spelar i Discord. Video opnar på YouTube.":["Lyden spilles i Discord. Video åpnes på YouTube.","Audio plays in Discord. Video opens on YouTube."],
+ "Musikken og fellesskapet i Discord.":["Musikken og fellesskapet i Discord.","Music and company in Discord."],
+ "Discord kunne ikkje opne YouTube. Prøv igjen frå Discord.":["Discord kunne ikke åpne YouTube. Prøv igjen fra Discord.","Discord could not open YouTube. Try again from Discord."],
  "Your access changed. Reconnect to check your concert permissions.":["Tilgangen din er endret. Koble til igjen for å kontrollere konserttillatelsene.","Your access changed. Reconnect to check your concert permissions."],
  "Concert together":["Konsert sammen", "Concert together"],
  "Preview":["Forhåndsvisning", "Preview"],

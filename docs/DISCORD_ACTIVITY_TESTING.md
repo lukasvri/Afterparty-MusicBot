@@ -153,3 +153,65 @@ Record the build SHA, client/device, pass/fail evidence and any provider/proxy
 failure without private identifiers or tokens. Do not label the Activity ready
 for server use until the real-client gates pass. Disconnect test clients and stop
 only the separate test services when finished; preserve test data for review.
+
+
+## Media capabilities and release gate (beta.6)
+
+The Activity and standalone website have different media capabilities. Discord
+serves an Activity through its own proxy and applies a sandbox CSP. Direct
+`i.ytimg.com` thumbnails, `youtube.com/iframe_api` scripts and YouTube frames
+are outside the observed policy. Changing the website frame-ancestors policy
+cannot override Discord's restrictions. See [Discord networking](https://docs.discord.com/developers/activities/development-guides/networking)
+and [the Embedded App SDK reference](https://docs.discord.com/developers/developer-tools/embedded-app-sdk).
+
+- Artwork uses `/api/artwork/youtube/<11-character-id>` on the existing app
+  origin. The endpoint fetches only a fixed YouTube JPEG path, refuses redirects
+  and non-JPEG/oversized output, uses a five-second deadline, forwards no caller
+  credentials, and sets public cache headers. It does not relay video or scripts.
+  No extra Portal URL mapping is required for this same-origin route.
+- Only an internally verified Activity request selects flat discovery. Search
+  previews have their own cache and cannot certify playability or populate the
+  verified metadata cache. Choosing an ID still uses the existing full resolver.
+  Ordinary website, metadata-ID reads and radio retain their prior full path.
+- Activity audio remains in the server's Discord concert. The stage shows artwork
+  and title, and an explicit YouTube action uses `sdk.commands.openExternalLink`.
+  A cancelled/failed external opening does not navigate the Activity or change
+  playback. The Activity does not attempt a blocked YouTube iframe. This is an
+  honest fallback, not restored in-Activity video playback.
+- The installed SDK has no fullscreen request command. Activity **Expand stage**
+  fills the Activity viewport only, with a visible restore control, Escape and
+  focus restoration. It cannot enlarge Discord's outer iframe or the device
+  screen. Standalone website native fullscreen and its viewport fallback remain.
+  Missing native fullscreen cannot be attributed to a particular client permission
+  without checking that client; an HTTP proxy header alone does not prove it.
+
+Do not map a full YouTube player behind an ad hoc proxy or weaken CSP. A
+`/youtube -> www.youtube.com` mapping alone is not a verified player solution:
+subsequent script URLs, frame origins, media requests and provider identification
+still need supported behavior. No such mapping is part of beta.6. Restoring a
+fully synchronized YouTube player inside the Activity is an open compatibility
+requirement, not a claim of this PR. YouTube also has per-video embedding and
+referrer restrictions, separate from a script being blocked before player setup.
+See [YouTube IFrame API](https://developers.google.com/youtube/iframe_api_reference).
+
+### Required real-client acceptance before publication
+
+Node/HTTP fixtures and a local Worker preview do not establish Discord behavior.
+On an explicitly authorized beta candidate, record client/platform and verify:
+
+1. Search result, queue and stage artwork load through the app origin; source
+   failure shows the Afterparty mark. No blocked external thumbnail requests.
+2. A cold search gives four previews with title, channel and duration/live badge;
+   a repeat uses cache. Select a test ID only in an owner-approved playback test
+   and confirm full metadata/availability validation remains in place.
+3. The stage explains Discord audio and external video. Explicitly open/cancel
+   the SDK link and confirm shared playback, Activity navigation and session stay
+   unchanged. In-Activity video remains an open requirement.
+4. Expand/restore the stage with pointer and keyboard, Escape, focus restoration
+   and visible controls on desktop and mobile. Confirm it is labelled as stage
+   expansion, not device fullscreen. Discord's own window expansion stays under
+   client control. Retest standalone video/fullscreen separately.
+5. Preserve one-job/50-second cancellation and the isolated Core resource cap.
+
+If no permitted browser/Discord client is available, leave these gates pending.
+Do not publish merely to call unit tests an end-to-end result.

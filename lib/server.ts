@@ -1,5 +1,6 @@
 import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
+import { activityGrant } from "./request-grant.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { env as cloudEnv } from "cloudflare:workers";
 import type { Video, RoomState, Room } from "./types";
@@ -309,12 +310,13 @@ export async function search(request: Request, query: string) {
   await limit(request, "search-visitor", 20, 600000);
   if (/^https?:\/\//.test(query))
     return { videos: await videos(request, [videoId(query)]) };
-  const result = await cached(`search:v3:${query.toLowerCase()}`, async () => {
+  const preview = Boolean(activityGrant(request));
+  const result = await cached(`${preview ? "discovery:v1" : "search:v3"}:${query.toLowerCase()}`, async () => {
     if (coreUrl()) {
       try {
         return (
           await coreRequest<{ videos: Video[] }>(
-            "/v1/catalog?q=" + encodeURIComponent(query), "GET", undefined, {}, request.signal,
+            "/v1/catalog?q=" + encodeURIComponent(query) + (preview ? "&preview=1" : ""), "GET", undefined, {}, request.signal,
           )
         ).videos;
       } catch (error) {

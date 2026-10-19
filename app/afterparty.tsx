@@ -1,5 +1,6 @@
 "use client";
-import Image from "next/image";
+import { stageDisplayMode, type ActivityMedia } from "@/lib/activity-media";
+import { TrackArtwork } from "@/components/track-artwork";
 import { loadYoutube, type Player } from "@/lib/youtube-player";
 import { headers, request } from "@/lib/browser-api";
 import { useConcertQueue } from "@/hooks/use-concert-queue";
@@ -67,9 +68,10 @@ import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
 import releases from "@/lib/releases.json";
 
-export default function Afterparty({ activityScope }: { activityScope?: { roomCode: string; guildId: string } } = {}) {
+export default function Afterparty({ activityScope }: { activityScope?: { roomCode: string; guildId: string } & ActivityMedia } = {}) {
   const activityRoomCode = activityScope?.roomCode, activityGuildId = activityScope?.guildId;
   const { t, language } = useLanguage();
+  const displayMode = stageDisplayMode(Boolean(activityScope));
   const [directoryOpen, setDirectoryOpen] = useState(false),
     [publicListing, setPublicListing] = useState(false);
   const navigate = (view: "music" | "rooms") => {
@@ -80,7 +82,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
     else url.searchParams.delete("view");
     history.pushState(null, "", url.pathname + url.search);
   };
-  const {element: fullscreenElement, active: fullscreenActive, fallback: fullscreenFallback, toggle: toggleFullscreen} = useFullscreen();
+  const {element: fullscreenElement, active: fullscreenActive, fallback: fullscreenFallback, toggle: toggleFullscreen} = useFullscreen({viewportOnly:displayMode.viewportOnly});
   const audio = useAudioPreferences();
   const motion = useBrowserValue("afterparty-motion") !== "off";
   const setMotion = (value: boolean) => storage.set("afterparty-motion", value ? "on" : "off");
@@ -1001,7 +1003,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
   const playerAudioReady = useEffectEvent((p: Player) => applyAudioPreferences(p, audio.current.current));
   const playerRefresh = useEffectEvent((code: string) => refresh(code));
   useEffect(() => {
-    if (!consent || !playerRoot.current) return;
+    if (!displayMode.embeddedVideo || !consent || !playerRoot.current) return;
     let disposed = false;
     setPlayerLoading(true);
     const readyTimer = setTimeout(() => {
@@ -1149,7 +1151,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
       loadedId.current = "";
       bufferStarted.current = null;
     };
-  }, [consent, playerEpoch]);
+  }, [consent, playerEpoch, displayMode.embeddedVideo]);
   function recordPlayback() {
     const r = roomRef.current;
     if (r?.isHost && r.playing && r.current) {
@@ -1386,6 +1388,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
     adding = pending || botPending;
   const needsVideoStart = Boolean(
     current &&
+    displayMode.embeddedVideo &&
     !audioOnly &&
     (!consent || autoplayBlocked),
   );
@@ -1401,7 +1404,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
   };
   const controls = useImmersiveControls(
     fullscreenActive,
-    Boolean(playerError || autoplayBlocked || !current || settingsOpen),
+    Boolean(!displayMode.embeddedVideo || playerError || autoplayBlocked || !current || settingsOpen),
     fullscreenElement,
   );
   const hideChrome = fullscreenActive && !controls.visible;
@@ -1625,7 +1628,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                       "Rom som vertene har åpnet for alle. Ingen konto nødvendig.",
                     )
                   : discordMode || !room
-                    ? t("Musikken i Discord. Videoen her. Same augeblikk.")
+                    ? t(activityScope ? "Musikken og fellesskapet i Discord." : "Musikken i Discord. Videoen her. Same augeblikk.")
                     : null}
               </p>
             </div>
@@ -1697,6 +1700,8 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
               ref={fullscreenElement}
               className={`stage-panel${fullscreenFallback ? " fullscreen-fallback" : ""}`}
               data-immersive={fullscreenActive}
+              role={fullscreenFallback ? "dialog" : undefined}
+              aria-modal={fullscreenFallback ? true : undefined}
               data-controls-visible={controls.visible}
               tabIndex={fullscreenActive ? -1 : undefined}
               onPointerMove={controls.onPointerMove}
@@ -1704,7 +1709,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
               onPointerUp={controls.onPointerUp}
               onPointerCancel={controls.onPointerCancel}
               onBlurCapture={controls.onBlurCapture}
-              aria-label={t("Videospiller")}
+              aria-label={t(activityScope ? "Konsertscene" : "Videospiller")}
             >
               <div
                 className="concert-stage-bar"
@@ -1776,21 +1781,21 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                 <button
                   className="cinema-button"
                   data-fullscreen-close
-                  aria-label={t("Gå ut av fullskjerm")}
-                  title={t("Gå ut av fullskjerm")}
+                  aria-label={t(fullscreenFallback ? "Gjenopprett scena" : displayMode.restore)}
+                  title={t(fullscreenFallback ? "Gjenopprett scena" : displayMode.restore)}
                   onClick={fullscreenToggle}
                 >
                   <Minimize2 size={20} />
-                  <span>{t("Lukk fullskjerm")}</span>
+                  <span>{t(fullscreenFallback ? "Gjenopprett scena" : displayMode.restore)}</span>
                 </button>
               </div>
               <div
                 className="stage"
                 data-current={Boolean(current)}
-                data-player-status={syncStatus}
+                data-player-status={activityScope ? "discord-audio" : syncStatus}
                 data-room-position={room?.position.toFixed(3)}
               >
-                {consent && (
+                {displayMode.embeddedVideo && consent && (
                   <div
                     className="youtube-player"
                     ref={playerRoot}
@@ -1802,14 +1807,14 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                     }}
                   />
                 )}
-                {(!current ||
+                {(!displayMode.embeddedVideo || !current ||
                   audioOnly ||
                   !consent ||
                   playerError ||
                   playerLoading) && (
                   <>
                     {current ? (
-                      <Image unoptimized width={480} height={270} className="stage-cover" src={current.image} alt="" />
+                      <TrackArtwork width={480} height={270} className="stage-cover" video={current} alt="" />
                     ) : (
                       <ConcertScenery />
                     )}
@@ -1818,12 +1823,16 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                       {current ? (
                         <>
                           <h2>
-                            {playerError
+                            {!displayMode.embeddedVideo
+                              ? current.title
+                              : playerError
                               ? t("Videoen kan ikke vises")
                               : current.title}
                           </h2>
                           <p>
-                            {audioOnly
+                            {activityScope
+                              ? t("Lyden spelar i Discord. Video opnar på YouTube.")
+                              : audioOnly
                               ? t("Denne sangen spiller som lyd i Discord.")
                               : playerError
                                 ? t(playerError)
@@ -1831,7 +1840,11 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                                   ? t("Laster videospilleren …")
                                   : t("Last videoen fra YouTube.")}
                           </p>
-                          {audioOnly ? (
+                          {activityScope && !audioOnly ? (
+                            <button className="button subtle" onClick={() => { void activityScope.openVideo(current.id).then(opened => { if (!opened) announce("Discord kunne ikkje opne YouTube. Prøv igjen frå Discord."); }); }}>
+                              {t("Åpne på YouTube")} <ArrowUpRight size={17} />
+                            </button>
+                          ) : audioOnly ? (
                             <a
                               className="button subtle"
                               href={current.url}
@@ -1985,7 +1998,7 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   {
                     <span className="sync-badge" role="status">
                       <span className="tiny-dot" />
-                      {botPending ? t("Ventar på boten") : t(syncStatus)}
+                      {botPending ? t("Ventar på boten") : activityScope ? t("Lyd i Discord") : t(syncStatus)}
                     </span>
                   }
                   {current && (discordMode || room?.isHost) && (
@@ -2031,13 +2044,13 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                     disabled={!current}
                     aria-label={
                       fullscreenActive
-                        ? t("Gå ut av fullskjerm")
-                        : t("Fullskjerm")
+                        ? t(fullscreenFallback ? "Gjenopprett scena" : displayMode.restore)
+                        : t(displayMode.expand)
                     }
                     title={
                       fullscreenActive
-                        ? t("Gå ut av fullskjerm")
-                        : t("Fullskjerm")
+                        ? t(fullscreenFallback ? "Gjenopprett scena" : displayMode.restore)
+                        : t(displayMode.expand)
                     }
                     onClick={fullscreenToggle}
                   >
@@ -2145,11 +2158,8 @@ export default function Afterparty({ activityScope }: { activityScope?: { roomCo
                   <div className="queue-content">
                     {room?.current && (
                       <article className="queue-current">
-                        <Image unoptimized width={480} height={270}
-                          src={
-                            room.current.image ||
-                            `https://i.ytimg.com/vi/${room.current.id}/mqdefault.jpg`
-                          }
+                        <TrackArtwork width={480} height={270}
+                          video={room.current}
                           alt=""
                         />
                         <div>

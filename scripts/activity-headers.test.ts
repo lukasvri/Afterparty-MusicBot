@@ -110,6 +110,6 @@ if (process.env.ACTIVITY_HEADER_PREVIEW_URL) test('local built worker sends the 
   const notes = await fetch(new URL('/patch-notes', base), { signal: AbortSignal.timeout(15000) });
   assert.equal(notes.status, 200);
   const html = await notes.text();
-  assert(html.includes('Bound music search work and cancellation'));
-  assert(html.includes('3.0.0-beta.5'));
+  assert(html.includes('Adapt the concert view to Discord Activities'));
+  assert(html.includes('3.0.0-beta.6'));
 });

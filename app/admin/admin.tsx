@@ -1,5 +1,5 @@
 "use client";
-import Image from "next/image";
+import { TrackArtwork } from "@/components/track-artwork";
 import Link from "next/link";
 import { useClientReady } from "@/hooks/use-browser-value";
 import { AdminSeek } from "@/components/party/admin-seek";
@@ -555,7 +555,7 @@ export default function Admin() {
                         </div>
                         <div className="bot-deck">
                           {current ? (
-                            <Image unoptimized width={320} height={320} src={current.image} alt="" />
+                            <TrackArtwork width={320} height={320} video={current} alt="" />
                           ) : (
                             <div className="bot-empty-art">GK</div>
                           )}
