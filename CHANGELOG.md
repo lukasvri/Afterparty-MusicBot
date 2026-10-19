@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-alpha.1: Concert activities preview
+
+2026-10-19
+
+- Opt in to concert reactions, shared timestamp highlights and a host-managed bingo board while the video keeps focus. Highlights are text and YouTube timestamp links, not recordings.
+- Room guests use short-lived scoped activity sessions. Discord activities require sign-in and server membership; hosts and server managers can moderate highlights and disable activities.
+- Social state, limits and revisions are separate from playback and queue commands. This prerelease needs matching website and Core builds; activities are unavailable without Core.
+- This is the first v3 review build, not a stable release or deployment. Live playback validation and music licensing remain separate launch requirements.
+
 ## v2.2.10: Retire the optional legacy Core dashboard
 
 2026-10-19

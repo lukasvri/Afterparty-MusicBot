@@ -9,6 +9,7 @@ import { MusicDiscovery } from "@/components/party/music-discovery";
 import { StartEvening } from "@/components/party/start-evening";
 import { RoomDialog } from "@/components/party/room-dialog";
 import { RoomSharing } from "@/components/party/room-sharing";
+import { ConcertSocial } from "@/components/party/concert-social";
 import { SocialQueue, QueueSettings } from "@/components/party/social-queue";
 import { EveningLibrary } from "@/components/party/evening-library";
 import { browserStorage as storage } from "@/lib/browser-storage";
@@ -2041,6 +2042,7 @@ export default function Afterparty() {
                 </div>
               </div>
               {!fullscreenActive && playerSettings}
+              {room && !fullscreenActive && !tv && <ConcertSocial room={room} />}
               {room && !room.isHost && !discordMode && (
                 <p className="guest-hint">
                   {t("Verten styrer avspillingen. Du kan legge til sanger.")}

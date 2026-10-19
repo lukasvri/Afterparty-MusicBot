@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.0.0-alpha.1",
+    "title": "Concert activities preview",
+    "date": "2026-10-19",
+    "items": [
+      "Opt in to concert reactions, shared timestamp highlights and a host-managed bingo board while the video keeps focus. Highlights are text and YouTube timestamp links, not recordings.",
+      "Room guests use short-lived scoped activity sessions. Discord activities require sign-in and server membership; hosts and server managers can moderate highlights and disable activities.",
+      "Social state, limits and revisions are separate from playback and queue commands. This prerelease needs matching website and Core builds; activities are unavailable without Core.",
+      "This is the first v3 review build, not a stable release or deployment. Live playback validation and music licensing remain separate launch requirements."
+    ]
+  },
+  {
     "version": "2.2.10",
     "date": "2026-10-19",
     "title": "Retire the optional legacy Core dashboard",

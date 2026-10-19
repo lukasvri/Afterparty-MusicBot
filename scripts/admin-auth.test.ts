@@ -36,6 +36,10 @@ const hooks = registerHooks({
       url: moduleUrl(`
         export const coreUrl=()=>null;
         export const commandTicket=async()=>({});
+        export const coreSocialStream=async(input)=>{
+          globalThis.__afterpartyAuthTest.coreCalls.push(['social-stream',input]);
+          return new Response('data: {}\\n\\n',{headers:{'Content-Type':'text/event-stream'}});
+        };
         export const coreRequest=async(...args)=>{
           globalThis.__afterpartyAuthTest.coreCalls.push(args);
           const failure=globalThis.__afterpartyAuthTest.coreFailure;
@@ -58,6 +62,11 @@ const hooks = registerHooks({
           if(args[0]==='/v1/admin' && args[1]==='POST'){
             if(globalThis.__afterpartyAuthTest.rejectAdmin)throw Object.assign(new Error('Synthetic Core permission rejection'),{status:403});
             return {settings:{...args[2].settings,updatedAt:'2026-10-18T00:00:00.000Z'}};
+          }
+          if(args[0]==='/v1/rooms')return {room:{}};
+          if(args[0]==='/v1/social'){
+            if(globalThis.__afterpartyAuthTest.rejectAdmin)throw Object.assign(new Error('Synthetic membership rejection'),{status:403});
+            return {social:{revision:1},canManage:args[2].host===true};
           }
           if(args[0]==='/v1/concert-queue')return {state:{queue:[],revision:'synthetic'},canManage:args[2].admin===true};
           throw new Error('Unexpected upstream call');
@@ -86,6 +95,8 @@ const guilds = await import("../app/api/admin/guilds/route.ts");
 const me = await import("../app/api/me/route.ts");
 const queue = await import("../app/api/discord/queue/route.ts");
 const control = await import("../app/api/admin/control/route.ts");
+const social = await import("../app/api/social/route.ts");
+const socialStream = await import("../app/api/social/stream/route.ts");
 hooks.deregister();
 
 function fixture() {
@@ -416,4 +427,68 @@ test("admin settings writes enforce origin, authenticated selected-guild scope a
     assert.equal((await control.POST(f.request('gk-discord=' + token, 'POST', input(foreign)))).status, 403,
       'Core rechecks the Discord grant on every settings write');
   } finally {f.sqlite.close();}
+});
+
+
+test("social room roles are freshly derived and payload authority is never trusted", async () => {
+ const f=setup();
+ try {
+  const token='c8'.repeat(32), ownerHash=await hash(token), now=Date.now();
+  f.sqlite.prepare('INSERT INTO rooms(code,name,owner_hash,state,version,updated_at,expires_at,is_public) VALUES(?,?,?,?,1,?,?,0)')
+   .run('SOCIAL01','Synthetic room',ownerHash,JSON.stringify({current:null,queue:[],playing:false,position:0}),now,now+60000);
+  const input={scope:'room',scopeId:'SOCIAL01',action:'join',host:true,actorId:'forged',tokenCipher:'forged',position:999};
+  assert.equal((await social.POST(f.request('', 'POST',input))).status,200);
+  const sent=context.coreCalls.at(-1)?.[2] as Record<string,unknown>;
+  assert.equal(sent.host,false);assert.equal(sent.tokenCipher,undefined);assert.equal(sent.actorId,undefined);assert.equal(sent.position,undefined);
+  assert.deepEqual(context.coreCalls.map(c=>c[0]),['/v1/rooms','/v1/social']);
+  context.coreCalls.length=0;
+  const req=new Request(f.request('', 'POST',{...input,action:'configure',enabled:false}),{headers:{'Content-Type':'application/json',Authorization:'Bearer '+token}});
+  assert.equal((await social.POST(req)).status,200);
+  assert.equal((context.coreCalls.at(-1)?.[2] as Record<string,unknown>).host,true);
+  assert.equal(context.coreCalls.length,1,'social actions must not import or mutate playback');
+  f.sqlite.prepare('UPDATE rooms SET owner_hash=? WHERE code=?').run(await hash('new-owner'),'SOCIAL01');
+  assert.equal((await social.POST(new Request(f.request('', 'POST',{...input,action:'read'}),{headers:{'Content-Type':'application/json',Authorization:'Bearer '+token}}))).status,200);
+  assert.equal((context.coreCalls.at(-1)?.[2] as Record<string,unknown>).host,false,'revoked host cannot retain privileges');
+ } finally {f.sqlite.close();}
+});
+
+test("social guild sessions, cross-origin and oversized requests fail closed",async()=>{
+ const f=setup();
+ try{
+  const input={scope:'guild',scopeId:'333333333333333333',action:'join',host:true,tokenCipher:'forged'};
+  assert.equal((await social.POST(f.request('', 'POST',input))).status,401);
+  assert.equal(context.coreCalls.length,0);
+  const cookie=await f.signIn();
+  assert.equal((await social.POST(f.request(cookie,'POST',input))).status,401,'owner recovery is not a guild membership grant');
+  const token='d9'.repeat(32);
+  f.sqlite.prepare('INSERT INTO discord_admin_sessions VALUES(?,?,?)').run(await hash(token),'synthetic-member-grant',Date.now()+60000);
+  const discord='gk-discord='+token;
+  assert.equal((await social.POST(f.request(discord,'POST',input))).status,200);
+  const sent=context.coreCalls.at(-1)?.[2] as Record<string,unknown>;
+  assert.equal(sent.tokenCipher,'synthetic-member-grant');assert.equal(sent.host,undefined);
+  context.rejectAdmin=true;
+  assert.equal((await social.POST(f.request(discord,'POST',input))).status,403,'Core rejection cannot fall back to guest privileges');
+  const count=context.coreCalls.length;
+  assert.equal((await social.POST(new Request(f.request(discord,'POST',input),{headers:{'Content-Type':'application/json',Origin:'https://foreign.invalid'}}))).status,403);
+  assert.equal((await social.POST(f.request(discord,'POST',{...input,text:'x'.repeat(5000)}))).status,413);
+  assert.equal((await social.POST(f.request(discord,'POST',{...input,scopeId:'../other'}))).status,400);
+  assert.equal(context.coreCalls.length,count);
+ } finally{f.sqlite.close();}
+});
+
+
+test("social streams use the same fresh authority boundary and keep tokens out of URLs",async()=>{
+ const f=setup();
+ try{
+  const input={scope:'guild',scopeId:'333333333333333333',token:'scoped-social-session',host:true};
+  assert.equal((await socialStream.POST(f.request('','POST',input))).status,401);
+  assert.equal(context.coreCalls.length,0);
+  const token='da'.repeat(32);
+  f.sqlite.prepare('INSERT INTO discord_admin_sessions VALUES(?,?,?)').run(await hash(token),'verified-grant',Date.now()+60000);
+  const response=await socialStream.POST(f.request('gk-discord='+token,'POST',input));
+  assert.equal(response.headers.get('Content-Type'),'text/event-stream');
+  const sent=context.coreCalls.at(-1)?.[1] as Record<string,unknown>;
+  assert.equal(sent.action,'stream');assert.equal(sent.token,input.token);assert.equal(sent.host,undefined);assert.equal(sent.tokenCipher,'verified-grant');
+  assert.equal((await social.POST(f.request('','POST',{...input,action:'stream'}))).status,400,'streaming cannot occupy the JSON handler');
+ }finally{f.sqlite.close();}
 });

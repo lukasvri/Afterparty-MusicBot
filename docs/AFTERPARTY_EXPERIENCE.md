@@ -34,6 +34,55 @@ Mobile controls keep player, search, queue and saved evenings reachable. Search 
 
 ## Validation
 
+### Concert activities preview (3.0.0-alpha.1)
+
+The optional **Concert together** panel offers reactions, a shared nine-square
+bingo card and timestamp highlights. Hosts create and manually mark bingo prompts;
+there is no automatic song-boundary detection. Highlights contain short text and
+external YouTube timestamp links, never recordings. Opening a highlight in a new
+tab does not seek the shared player. The panel is collapsed initially, stays out
+of TV/fullscreen layouts, and respects reduced motion.
+
+This first v3 slice requires matching Core and website builds. Browser guests
+join with the existing room link and receive a signed, room-scoped activity
+session, valid for 30 minutes. It is casual link-based participation, not verified
+personhood. Website room-owner and cohost credentials are checked on every request.
+Discord participation requires OAuth sign-in and verified membership of the exact
+selected guild. Only its owner, administrators or managers can moderate. A website
+owner recovery login does not grant Discord social membership or cross-guild access.
+
+`services/core/src/social.ts` owns a separate SQLite table and revision. It reads
+the canonical playback key and position without calling playback commands,
+advancing the queue, resetting clocks or invalidating playback revisions. Stale
+keys and repeated event IDs are rejected. Highlights and bingo reset when the
+playback instance changes; host enable/disable remains scoped to the room or guild.
+Hosts can remove highlights even while activities are disabled.
+
+Authenticated POST streams carry snapshots separately from playback events. A
+stream starts with the current snapshot and closes after 60 seconds so reconnection
+rechecks access. Hiding or closing the panel stops the stream. Failed social writes
+are never queued or replayed after reconnect. Reactions expire after six seconds
+and are memory-only; slow consumers lose reaction updates before durable updates.
+The fallback uses bounded reads and backoff. Core unavailability disables activities
+without introducing a second persistence authority.
+
+Limits deliberately favor playback: 64 social streams within the existing 128
+HTTP-stream ceiling; 120 social HTTP requests per minute globally before the
+existing 600-per-peer request protection; 30 reaction events per scope and six per
+activity session per minute; three highlights per session per minute. Storage holds
+at most 128 active scopes, 30 highlights per scope, nine bingo prompts and 20 recent
+reactions. Durable social records expire after 24 hours without a durable write;
+rate-limit and deduplication maps are bounded. Durable event receipts survive
+Core restart for 24 hours, with 128 guest actions and a separate reserve of 128
+host-control actions per scope. Guest activity cannot consume that moderation
+reserve. Reaction receipts are intentionally ephemeral across a process restart. These are preview ceilings, not a
+claim of production capacity. A shared proxy peer can still couple playback clients
+under the existing global protection. No arbitrary forwarded headers are trusted
+by Core and that protection has not been removed.
+
+The current source tests are synthetic. Live Discord continuity, multi-server
+capacity, licensing and the remaining cases in issue #37 are separate launch gates.
+
 Run `npm run check:all` with Node.js 24.17+, Python and FFmpeg. Tests include isolated SQLite room clocks, radio races, moderation, vote privacy, single-use and cross-room invitations, ownership transfer, revoked cohosts and blocked browser storage.
 
 The browser workflow uses synthetic API responses and a local preview only:
