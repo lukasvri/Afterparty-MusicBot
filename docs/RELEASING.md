@@ -32,7 +32,9 @@ The tested `nextVersion` helper in `scripts/releases.ts` encodes these rules.
 
 An unfinished feature preview may use a numbered prerelease, for example
 `3.0.0-alpha.1`, in both manifests, locks and canonical notes. The first preview
-must target the next patch, minor or major version of the preceding stable entry.
+must target the next patch, minor or major version of the preceding stable entry,
+or follow the higher-line alpha supersession rule above when that source line
+is still a prerelease.
 Increment the same stage one number at a time; a following beta or rc stage starts
 at 1. Promotion to that stable version is a separate release decision. Prerelease
 notes must identify preview limitations and must not claim stable availability or
