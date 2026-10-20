@@ -77,7 +77,18 @@ async function client(host: boolean, nickname: string) {
   });
   const page = await context.newPage(); const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto(`${base}/games?room=TESTROOM`);
-  const join = async () => { await page.getByLabel('Nickname', { exact: true }).fill(nickname); await page.getByRole('button', { name: 'Join lobby', exact: true }).click(); await page.getByRole('complementary', { name: 'Scoreboard' }).waitFor(); };
+  const join = async () => {
+    // The SSR form exists before hydration applies the URL room and input handlers.
+    await page.waitForFunction(() => (document.querySelector('.guess-join input[pattern]') as HTMLInputElement)?.value === 'TESTROOM');
+    await page.getByLabel('Nickname', { exact: true }).fill(nickname);
+    const joined = page.waitForResponse(response => response.url().endsWith('/api/guess') && response.request().postDataJSON()?.action === 'join');
+    await page.getByRole('button', { name: 'Join lobby', exact: true }).click();
+    const response = await joined;
+    assert.equal(response.request().postDataJSON().nickname, nickname, 'join sends the entered nickname');
+    const value = await response.json();
+    assert.equal(value.game.scoreboard.find((player: { id: string }) => player.id === value.self.participantId)?.nickname, nickname);
+    await page.getByRole('complementary', { name: 'Scoreboard' }).waitFor();
+  };
   return { page, context, errors, join, access: { scope: 'room', scopeId: 'TESTROOM', host, actor } as GuessAccess };
 }
 try {
