@@ -60,7 +60,7 @@ Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 a
 
 ## Concert extras preview
 
-The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The combined `2.4.0-alpha.1` preparation candidate remains review source with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
+The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The combined `2.4.0-alpha.2` preparation candidate remains review source with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
 
 ## Run your own Afterparty
 

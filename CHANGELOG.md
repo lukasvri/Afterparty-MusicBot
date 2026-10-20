@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.2: Fair concurrent answers and authorized game inventory
+
+2026-10-21
+
+- Simultaneous Guess the Song answers may use the same valid round snapshot without losing a later answer because another participant answered or joined. Session and round identity, deadlines, duplicate and rate limits remain authoritative; host controls retain strict revision checks and scores use server receipt time.
+- A provider-neutral operator inventory factory accepts at most eight explicitly approved canonical 15-30-second WAV samples through the existing private game transport. Input and returned audio are copied, metadata and permission references stay private, and the entire snapshot becomes unavailable after the earliest permission expiry or five minutes. Cancellation and disposal cannot return stale audio.
+- The default music catalog remains unavailable. No Spotify, YouTube or Deezer provider, startup option, real recording or production configuration is enabled. Permission references are syntactically checked operator attestations, not verified music rights. The source comparison documents provider restrictions and the remaining rights and live-client acceptance gates.
+
 ## v2.4.0-alpha.1: Concert extras alongside the multiplayer game
 
 2026-10-21
