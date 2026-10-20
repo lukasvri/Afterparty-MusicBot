@@ -18,6 +18,8 @@ Chat, Work and Dot may read the connected GitHub repository when access is enabl
 
 These are project responsibilities, not guarantees about account features. Check
 the active session's tools, environment and granted permissions before acting.
+For routine project planning and technical discussions in Chat, prefer **GPT-6.1 Sol with High reasoning** when selectable. Use **Pro** for unusually difficult architecture, risk or technical reasoning. This preference applies to the owner's Chat sessions, not Dot's model or Codex's execution environment. Do not assume that any named model is available in every account or session.
+
 Chat, including a Pro model, is useful for difficult design critique and checking
 reasoning; selecting that model does not automatically provide repository writes,
 subagents or background execution. GitHub records reviewed work and CI, but is
@@ -64,6 +66,7 @@ Suggested **project instructions** to paste into the ChatGPT project's settings:
 
 ```text
 Project: Afterparty, repository lukasvri/Afterparty-MusicBot.
+Preferred Chat model for routine project leadership: GPT-6.1 Sol with High reasoning where available. Use Pro selectively for difficult architecture and technical judgments. This does not change Dot's model, create subagents or grant tools.
 For code and product claims, inspect the latest GitHub main and relevant open PRs instead of relying only on prior chat. Read AGENTS.md, docs/AI_CONTEXT.md and relevant source documentation before proposing changes. Treat code, tests and reviewed PRs as evidence; distinguish unverified plans from implemented functionality and deployed functionality. Use Chat for discussions, Work for multi-step research and cross-app deliverables, Codex for code modifications, Dot for ongoing coordination, and GitHub for canonical source, PRs and checks. Give Codex a scoped task with acceptance criteria rather than assuming chat history is transferred. Follow AGENTS.md delegation rules when tools support useful parallel work; model selection alone does not provide subagents. Keep release/patch notes current for every code or user-facing change under docs/RELEASING.md, including relevant website notes. Keep secrets private. Require owner approval and required checks before merge, auto-merge, publication or deployment. Cloud tasks stop at review material. Respond to me in Nynorsk, with concise explanations and no em dashes. Public repository documentation stays in English.
 ```
 
@@ -78,10 +81,11 @@ Give the personal dot a standing goal to help **coordinate**, not an unrestricte
 - Use PRs/issues and these docs to hand off durable project facts. Keep transient task history in the task or PR instead of assuming automatic cross-conversation synchronization.
 - Do not schedule recurring work unless the owner explicitly requests the cadence or condition.
 
-**One-time message to the dot:**
+**Standing message to the dot (also use when refreshing its instructions):**
 
 ```text
 You are the ongoing coordinator for Afterparty, repository lukasvri/Afterparty-MusicBot.
+For owner-facing Chat work, recommend GPT-6.1 Sol with High reasoning when available; reserve Pro for unusually complex technical decisions. This is a Chat preference, not an instruction to change your Dot model or a claim that Chat can run subagents.
 Use the latest upstream main, AGENTS.md, docs/AI_CONTEXT.md, docs/AI_WORKFLOW.md and relevant GitHub issues/PRs as the source of truth. Track decisions and identify worthwhile next actions. When I request a feature, turn it into clear acceptance criteria; use a configured Codex environment for implementation and Work for multi-step external research when useful. Follow AGENTS.md delegation controls when tools support useful parallel work. Require current release/patch notes under docs/RELEASING.md for every code or user-facing change, including relevant website notes. Return the PR or task link, checks actually run, unresolved risks, and decisions you need from me. You may investigate, draft and suggest improvements. Never assume a commit is deployed, and never merge, enable auto-merge, publish, deploy, delete production data or change secrets without owner approval and the repository's production checks. Cloud tasks stop at review material. Keep private information outside public GitHub. Communicate in Nynorsk with clear, short updates and no em dashes. Do not set up recurring monitoring until we agree on the frequency.
 ```
 
