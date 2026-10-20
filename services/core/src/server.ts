@@ -9,6 +9,7 @@ import { Engine } from "./engine.ts";
 import { Commands } from "./commands.ts";
 import { UserError, publicTrack } from "./types.ts";
 import { Rooms } from "./rooms.ts";
+import { Social } from "./social.ts";
 import type { Guilds, GuildSession } from "./guilds.ts";
 import type { DiscordOAuth } from "./oauth.ts";
 import { verifyTicket } from "./tickets.ts";
@@ -62,6 +63,19 @@ export async function createServers(
 ) {
   if (!options.key) throw new Error("The bridge connection is missing a secret.");
   const rooms = new Rooms(engine.store);
+  const social = new Social(engine.store, options.key);
+  const socialClients = new Map<ServerResponse, { key: string; host: boolean }>();
+  social.on("change", (key, state, reaction) => {
+    const payload = JSON.stringify({ social: state });
+    for (const [client, access] of socialClients) {
+      if (access.key !== key) continue;
+      if (client.destroyed || client.writableLength > 16384) {
+        if (!reaction) client.destroy();
+        continue;
+      }
+      try { client.write("data: " + payload.slice(0, -1) + ",\"canManage\":" + access.host + "}\n\n"); } catch { client.destroy(); }
+    }
+  });
   rooms.search = (query) => engine.providers.search(query, 20, true);
   const roomClients = new Map<ServerResponse, string>();
   const roomState = (code: string, joining = false) => ({
@@ -71,6 +85,7 @@ export async function createServers(
       (joining ? 1 : 0),
   });
   const rate = new Map<string, { until: number; count: number }>();
+  const socialUnauthorized = new Map<string, { until: number; count: number }>();
   let rejectedUpgrades = 0;
   const upgradeOrigins = new Set<string>();
   const eventClients = new Set<ServerResponse>();
@@ -141,7 +156,23 @@ export async function createServers(
     );
     try {
       const url = new URL(request.url ?? "/", "http://core");
-      limit("public:" + request.socket.remoteAddress, 600);
+      if (url.pathname === "/v1/social") {
+        // Invalid bridge callers cannot consume the allowance reserved for social
+        // participants or playback. Keep their own bounded socket/global guard.
+        try { authenticate(request); } catch (error) {
+          limit("social-unauthorized-global", 600);
+          const now = Date.now(), peer = request.socket.remoteAddress ?? "unknown";
+          for (const [id, entry] of socialUnauthorized) if (entry.until <= now) socialUnauthorized.delete(id);
+          let entry = socialUnauthorized.get(peer);
+          if (!entry) {
+            if (socialUnauthorized.size >= 1024) throw new UserError("Too many requests. Try again later.", 429);
+            entry = { count: 0, until: now + 60000 }; socialUnauthorized.set(peer, entry);
+          }
+          if (++entry.count > 120) throw new UserError("Too many requests. Try again later.", 429);
+          throw error;
+        }
+      }
+      if (url.pathname !== "/v1/social") limit("public:" + request.socket.remoteAddress, 600);
       if (
         request.method === "GET" &&
         ["/events", "/v1/clock"].includes(url.pathname)
@@ -154,7 +185,7 @@ export async function createServers(
           json(response, 200, { serverTime: Date.now() });
           return;
         }
-        if (eventClients.size + roomClients.size >= 128)
+        if (eventClients.size + roomClients.size + socialClients.size >= 128)
           throw new UserError("Too many connections.", 503);
         const code = url.searchParams.get("room");
         const target = code ? null : select(url.searchParams.get("guildId"));
@@ -397,6 +428,57 @@ export async function createServers(
             ? queue.snapshot()
             : await target.engine.serialize(() => queue.apply(input, admin));
         json(response, 200, { state, canManage: admin });
+        return;
+      }
+      if (url.pathname === "/v1/social") {
+        authenticate(request);
+        if (request.method !== "POST") throw new UserError("Method not allowed.", 405);
+        const input = await body(request, 8192);
+        let host = false;
+        let playback: { playbackKey: string | null; videoId: string | null; position: number };
+        try {
+          if (input.scope === "room") {
+            if (typeof input.scopeId !== "string" || !/^[A-Z0-9]{8}$/.test(input.scopeId) || input.scopeId === "DISCORD1" || options.guilds?.byRoom(input.scopeId)) throw new UserError("Invalid browser room.", 404);
+            const state = rooms.snapshot(input.scopeId);
+            playback = { playbackKey: state.playbackKey ?? null, videoId: state.current?.id ?? null, position: state.position };
+            host = input.host === true;
+          } else if (input.scope === "guild") {
+            if (typeof input.scopeId !== "string" || !/^\d{14,22}$/.test(input.scopeId) || !options.oauth) throw new UserError("Discord sign-in required.", 403);
+            const target = select(input.scopeId);
+            if (target.id !== input.scopeId) throw new UserError("Invalid server.", 403);
+            const access = await options.oauth.member(input.tokenCipher, target.id);
+            host = access.canManage;
+            const state = snapshot(target);
+            playback = { playbackKey: state.playbackKey, videoId: state.current?.id ?? null, position: state.position };
+          } else throw new UserError("Invalid social scope.");
+          // OAuth membership can outlive a disconnected HTTP client. Do not create
+          // state, retain a dead stream, or attach cleanup after close already fired.
+          if (request.aborted || response.destroyed) return;
+          social.authorize(input, host);
+        } catch (error) {
+          // Signed bridge requests can still carry invalid/expired participant
+          // grants or forbidden host actions. Their rejection cannot drain the
+          // participant allowance or the shared playback socket budget.
+          limit("social-rejected-global", 600);
+          limit("social-rejected:" + request.socket.remoteAddress, 120);
+          throw error;
+        }
+        limit("social-global", 120);
+        limit("public:" + request.socket.remoteAddress, 600);
+        const result = { ...social.apply(input, playback, host), canManage: host };
+        if (input.action === "stream") {
+          if (socialClients.size >= 64 || socialClients.size + eventClients.size + roomClients.size >= 128) throw new UserError("Social connections are busy.", 503);
+          response.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Content-Type-Options": "nosniff" });
+          response.flushHeaders();
+          socialClients.set(response, { key: input.scope + ":" + input.scopeId, host });
+          response.write("data: " + JSON.stringify(result) + "\n\n");
+          const heartbeat = setInterval(() => {
+            if (response.writableLength > 16384) response.destroy();
+            else response.write(": heartbeat\n\n");
+          }, 15000);
+          const expiry = setTimeout(() => response.end(), 60000);
+          response.once("close", () => { clearInterval(heartbeat); clearTimeout(expiry); socialClients.delete(response); });
+        } else json(response, 200, result);
         return;
       }
       if (url.pathname === "/v1/rooms") {
@@ -705,6 +787,9 @@ export async function createServers(
       clearInterval(roomClock);
       clearInterval(roomAdvance);
       rooms.dispose();
+      for (const client of socialClients.keys()) client.end();
+      socialClients.clear();
+      social.removeAllListeners();
       for (const client of roomClients.keys()) client.end();
       roomClients.clear();
       for (const [source, listeners] of subscriptions) {

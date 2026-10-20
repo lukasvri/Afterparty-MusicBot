@@ -32,7 +32,7 @@ test('all historical entries retain their labels, dates and content in the chang
  }
 });
 test('validation rejects version drift and duplicate releases',()=>{
- try{releases.unshift({...releases[0],version:nextVersion(releases[0].version,'patch')});assert.throws(validate,/Version mismatch/);}finally{releases.shift();}
+ try{releases.unshift({...releases[0],version:releases[0].version.includes('-')?releases[0].version.replace(/\d+$/,n=>String(Number(n)+1)):nextVersion(releases[0].version,'patch')});assert.throws(validate,/Version mismatch/);}finally{releases.shift();}
  try{releases.push(releases[0]);assert.throws(validate,/Duplicate/);}finally{releases.pop();}
  validate();
 });
@@ -66,8 +66,21 @@ test('release history rejects ascending, mixed, skipped and non-reset transition
 });
 test('full validation rejects an appended newer release before checking generated notes',()=>{
  try{
-  releases.push({...releases[0],version:nextVersion(releases[0].version,'patch')});
+  releases.push({...releases[0],version:'99.0.0'});
   assert.throws(validate,/Invalid release transition/);
  }finally{releases.pop();}
  validate();
+});
+
+
+test('numbered prereleases advance without claiming an unfinished stable release',()=>{
+ for(const versions of [
+  ['3.0.0-alpha.1','2.2.10'],['3.0.0-alpha.2','3.0.0-alpha.1','2.2.10'],
+  ['3.0.0-beta.1','3.0.0-alpha.2'],['3.0.0-rc.1','3.0.0-beta.1'],['3.0.0','3.0.0-rc.1'],
+ ])assert.doesNotThrow(()=>validateReleaseHistory(history(versions)));
+ for(const versions of [
+  ['3.0.0-alpha.3','3.0.0-alpha.1'],['3.0.0-alpha.1','3.0.0'],
+  ['3.0.0-rc.1','3.0.0-alpha.1'],['4.0.0-alpha.1','3.0.0-alpha.1'],
+  ['3.0.0-alpha.2','2.2.10'],['3.0.0-alpha.01'],
+ ])assert.throws(()=>validateReleaseHistory(history(versions)));
 });

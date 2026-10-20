@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-rc.1: Concert extras without Discord Activity
+
+2026-10-20
+
+- Games & extras starts closed and offers separate optional views for live reactions, shared timestamp bookmarks and a nine-cell bingo card called by the host. Back and close restore keyboard focus; closing releases the optional connection. Bookmarks contain text and external timestamp links, not recordings. Fullscreen and TV keep the video in focus.
+- Social state, event receipts, rate limits and revisions remain separate from playback and queue commands. Browser-room hosts and cohosts manage extras; ordinary Discord sign-in and fresh server membership determine concert access and manager controls. Matching website and Core builds are required; extras are unavailable in the website-only room fallback.
+- Rejected bridge callers, invalid scoped tokens and forbidden host actions have separate rejection handling and cannot consume the authenticated Core social allowance or shared playback request budget. Guest and normal host receipt ceilings retain a separate bounded moderation reserve. Per-visitor limits and all authenticated-participant shared ceilings still apply.
+- The candidate preserves the FIFO queue and specific player-error fixes from 2.2.13 and 2.2.14. Discord Activity routes, SDK, OAuth grants, session migrations, media mappings and launch configuration are excluded. The rc label identifies review source, not stable availability, live listening approval or deployment. Real Discord audio, audience/load and host rollback acceptance remain open.
+
 ## v2.2.14: Keep specific player failures visible
 
 2026-10-20
