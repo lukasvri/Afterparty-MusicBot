@@ -43,7 +43,7 @@ establish these results:
 - Remaining public-live acceptance in [issue #37](https://github.com/lukasvri/Afterparty-MusicBot/issues/37), music rights/licensing and operator launch approval.
 
 These gates require separate authorization and suitable test participants. They
-remain open even when a `3.0.0-rc.1` source candidate passes automated checks.
+remain open even when a prerelease source candidate passes automated checks.
 Do not merge, publish or deploy solely because the source carries a prerelease label.
 
 ## Separately authorized manual session
