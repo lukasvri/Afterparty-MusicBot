@@ -40,8 +40,11 @@ documentation in English. Do not use em dashes.
   including Pro, does not by itself provide subagent tools. If delegation is
   unavailable or would add unnecessary coordination, work sequentially and
   report the limitation or reason. Never claim that an agent or check ran unless it did.
-- The lead agent owns integration, validation and the final report. Delegation
-  does not grant merge, publishing, deployment or production access.
+- The lead agent owns integration, validation and the final report. When Dot is
+  coordinating an owner request, it should follow the task through GitHub review
+  and Codex handoffs without making the owner manually relay routine updates.
+  Request decisions only for genuinely ambiguous goals or protected actions.
+  Delegation does not grant merge, publishing, deployment or production access.
 
 ## Release notes and pull requests
 
@@ -76,5 +79,8 @@ See [Cloud workflow](docs/CLOUD_DEVELOPMENT.md) and [operations](services/core/P
 
 ## Shared AI context
 
-- For Dot, ChatGPT Chat, Work and Codex handoffs, consult [shared project context](docs/AI_CONTEXT.md) and [AI collaboration workflow](docs/AI_WORKFLOW.md). The live repository and reviewed PRs, not assistant chat history, are the source of truth.
+- For Dot and Codex coordination, with Chat available for optional discussion,
+  consult [shared project context](docs/AI_CONTEXT.md) and
+  [AI collaboration workflow](docs/AI_WORKFLOW.md). The live repository and
+  reviewed PRs, not assistant chat history, are the source of truth.
 - Keep the context document to lasting, verified decisions. Use GitHub issues and PRs for current task progress. Never confuse merged code with production deployment.
