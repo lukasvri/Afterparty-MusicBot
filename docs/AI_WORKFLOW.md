@@ -1,133 +1,133 @@
-# AI collaboration: Dot, Chat, Work and Codex
+# AI collaboration: Dot, Codex and GitHub
 
 [Documentation](README.md) · [Project context](AI_CONTEXT.md) · [Core instructions](../AGENTS.md) · [Cloud development](CLOUD_DEVELOPMENT.md)
 
-This guide keeps a personal dot, ChatGPT Chat, ChatGPT Work and Codex aligned without assuming that their chat histories are shared. The **current GitHub repository**, its source files and reviewed pull requests are the source of truth, not conversation memory or a stale local checkout.
+The owner talks to **Sjefen (Dot)** about new Afterparty ideas, problems and decisions. Dot coordinates the remaining supported work, primarily through Codex and GitHub. The owner should not need to repeat a request in Codex, manually pass task status between assistants, or supervise routine implementation steps.
 
-## Who does what?
+**Current GitHub source, issues and reviewed pull requests are the source of truth.** Memories, task conversations and local checkouts may be stale. A source commit is not proof of deployment.
 
-| Tool | Best use | Deliverable |
+## Responsibilities
+
+| Tool | Responsibility | Expected output |
 | --- | --- | --- |
-| Dot | Ongoing coordination, contextual follow-up, proactive review and delegated work | A current summary, proposed next action or scoped task handoff |
-| Chat | Questions, explanation, prioritization, design critique, acceptance criteria | A decision or a small task brief |
-| Work | Multi-step research, comparison, cross-app investigation, planning and documents | Evidence, an actionable report, or a task brief |
-| Codex | Repository inspection, implementation, debugging, tests and code review | A focused branch and draft pull request |
-| GitHub | Canonical source, issue tracking, PR review, CI and release records | A named commit, reviewable diff, check results and release history |
+| Dot (Sjefen) | Owner's main interface; inspect GitHub, refine goals, prioritize, research, delegate, review, track and follow up | A completed coordination loop, relevant links, verified status and only essential owner decisions |
+| Codex | Inspect, implement, debug, test, review and use supported subagents | A focused branch, updated release notes where required, checks and draft PR |
+| GitHub | Canonical source, issues, PRs, CI, decisions and release records | Named commits, reviewable diffs and persistent task state |
+| Chat (optional) | Separate explanations and design discussions when the owner chooses | Advice or an explicit decision passed back to Dot/GitHub |
 
-Chat, Work and Dot may read the connected GitHub repository when access is enabled. Codex works against the actual selected checkout or cloud environment. Dot can create Codex cloud tasks in an environment configured in Codex, and can create local Work or Codex tasks only after the owner explicitly grants local computer access. **Neither Chat nor Work should claim to know the latest code or live deployment status without checking.** Codex history and Chat/Work histories are separate.
+**ChatGPT Work is not part of this project workflow.** Dot should use its own supported research and orchestration capabilities, and delegate repository implementation to Codex. Do not require the owner to open a different assistant for routine steps.
 
-These are project responsibilities, not guarantees about account features. Check
-the active session's tools, environment and granted permissions before acting.
-Chat, including a Pro model, is useful for difficult design critique and checking
-reasoning; selecting that model does not automatically provide repository writes,
-subagents or background execution. GitHub records reviewed work and CI, but is
-not evidence that a production host has been updated.
+## Model preference and tool availability
+
+- Dot uses **GPT-6 Astra** when that is the model supplied by the Dot product. Do not claim a manual Dot model switch has happened.
+- Whenever Dot delegates a task to **Codex**, request **GPT-6.1 Sol with High reasoning effort** if the actual Codex environment supports model and effort selection. Apply the same preference to supported Codex subagents.
+- Confirm what the session or task actually used. When the preferred model or effort cannot be selected or verified, say so and identify the available fallback. Never silently claim a requested model was enforced.
+- A model name or subscription does not guarantee agent creation, subagents, repository write access, local computer access or a particular reasoning budget. Inspect available tools and permissions before committing to an action.
+- If Codex is unavailable, Dot should still investigate, record actionable findings in GitHub when authorized, and report the blocked delegation. Do not claim the task was coded or tested.
+
+## Dot's end-to-end task ownership
+
+When the owner describes a feature, bug, design idea or improvement, Dot should take responsibility for all authorized follow-through, not stop at writing a prompt.
+
+1. **Understand the goal.** Use the conversation to identify expected behavior, scope and observable acceptance criteria. Make reversible implementation choices independently. Ask the owner only if a missing decision materially changes the result, cost, safety or protected action.
+2. **Read current project state.** Refresh GitHub `main` and relevant open issues/PRs; read [AGENTS.md](../AGENTS.md), [project context](AI_CONTEXT.md), this guide and affected source or architecture documents. Check whether the request has already been implemented, is in progress or conflicts with another change. Do not mistake old chat content for repository facts.
+3. **Plan and track.** For multi-step or durable work, create or update a focused GitHub issue describing the goal, acceptance criteria, constraints, dependencies and current state. Link related PRs. For a small task, a well-scoped draft PR can be the tracking record.
+4. **Delegate implementation.** Create a Codex task in a configured environment with repository/ref, relevant links, concrete acceptance criteria, the preferred model request, applicable branch strategy, test expectations and safety boundaries. Use supported subagents for independent work when useful, with bounded scopes and non-overlapping writes.
+5. **Review the outcome.** Inspect the actual branch, changed files, tests and PR. Require the acceptance criteria, relevant regression coverage, current upstream changes and [release notes](RELEASING.md#notes-for-every-change) to be addressed. If necessary, ask Codex for a focused revision and review again. A Codex completion message is not test evidence.
+6. **Complete the review handoff.** Ensure a draft PR targets the correct branch, contains verification and limitations, links the issue, and is ready for the owner's review. Keep GitHub issue/PR status accurate. Stop at the approval boundary: do not merge, enable auto-merge, publish or deploy without explicit owner approval.
+7. **Report concisely.** Tell the owner what was changed or investigated, what was actually verified, the issue/PR links, remaining problems and only decisions needing owner input. Follow up on authorized outstanding work where supported, without implying continuous activity or notifications that have not been configured.
+
+Do not repeatedly ask the owner to copy prompts, post Codex results, or move task information between apps when a supported direct delegation or GitHub update is available. If a necessary action is unavailable, explain the exact limitation and provide a usable handoff.
+
+Research and recommendations may be handled by Dot itself. For coding changes, use Codex rather than presenting untested implementation as completed work. For complex work, partition tasks into bounded, reviewable pieces, but keep one accountable coordinator.
 
 ## Delegation controls
 
-Use subagents or delegation when the active tool supports it and independent work
-benefits from parallel execution. Suitable splits include source inspection,
-release-note review and validation review. Keep tightly coupled or small tasks
-sequential when coordination would outweigh the benefit.
+1. Verify current tool availability, environment, access and permissions. Dot can create Codex cloud tasks only when a Codex environment is configured. Local computer access requires explicit permission on that computer.
+2. Give each delegated task a named repo and source commit/branch, defined scope, acceptance criteria, expected checks and clear limits. Use separate worktrees or non-overlapping file ownership for parallel writes.
+3. The coordinating agent reviews the combined diff, integrates results, resolves conflicts and validates affected behavior. Report the checks actually run and their failures or limits. A delegated agent's assurance is not a passing test.
+4. Delegation never broadens authority. Follow the [production boundary](../AGENTS.md#local-production-boundary), even when a tool offers an action. No autonomous merge, auto-merge, publication, deployment or production mutation.
 
-1. Verify delegation tools and permissions in this session. If unavailable, work
-   sequentially or prepare an explicit handoff and report the limitation. Never
-   claim that a Chat model has agents solely because it is called Pro, or report
-   parallel checks that were not run.
-2. Give each agent the repository, source commit/branch, bounded scope, acceptance
-   criteria and applicable safety rules. Use non-overlapping file ownership or
-   separate worktrees for writes. Separate visible chats are not a substitute for
-   subagents unless that handoff is supported and authorized.
-3. The lead reviews agent findings, resolves conflicts, checks the integrated diff
-   and runs relevant validation. Report delegation actually used, checks, failures
-   and limits in the PR. An agent's assurance is not a passing test.
-4. Delegation does not broaden permissions. Owner approval is still required for
-   merge, auto-merge, publication and deployment. Cloud tasks retain the production
-   boundary in `AGENTS.md` regardless of the coordinating tool.
+These are requested responsibilities, not a promise that every account, Dot session or Codex environment supports every action.
 
-The role guidance follows [Use ChatGPT](https://learn.chatgpt.com/docs/use-chatgpt),
-[Meet dots](https://learn.chatgpt.com/docs/dots) and
-[Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), checked
-17 October 2026. Availability can change; verify the actual session instead of
-assuming that documentation enables a tool or grants permission.
+## Setup
 
-## Set up one ChatGPT project
+1. Connect Dot to the accessible `lukasvri/Afterparty-MusicBot` repository and, where supported, a configured Codex environment. Set up any local access separately, only with explicit permission.
+2. Keep `AGENTS.md`, `docs/AI_CONTEXT.md` and this workflow available to Dot and Codex. The current repository replaces any stale project file copies.
+3. In Codex, work from a current checkout. `AGENTS.md` supplies repository-wide constraints; this guide explains owner coordination and handoffs.
+4. Share the one-time brief below with Dot. The repository files do not automatically alter an existing Dot's private instructions or model settings.
+5. Keep private credentials, host settings, backups, personal identifiers and production data out of public prompts, branches, issues and PRs.
 
-1. Create a ChatGPT project named **Afterparty**. Check which memory and Work options are available for the account and workspace before choosing settings; product access can change.
-2. Move related Chat/Work conversations into the project where useful. Add stable decisions as project sources, but keep the canonical public engineering documentation in GitHub.
-3. Use the connected GitHub app for fresh source inspection in Chat/Work. Project files or uploaded copies can become stale and must not override GitHub.
-4. In Codex desktop, open the current `Afterparty-MusicBot` checkout. Codex reads the root `AGENTS.md`; consult `docs/AI_CONTEXT.md` for shared project decisions.
-5. Introduce the dot separately to the repository and give it the coordination brief below. Dot tasks do not automatically inherit all ChatGPT project instructions or every conversation.
-6. Keep production credentials and personal data outside the project, prompts, issues, PRs and repository.
-
-Suggested **project instructions** to paste into the ChatGPT project's settings:
+### One-time message for Sjefen (Dot)
 
 ```text
-Project: Afterparty, repository lukasvri/Afterparty-MusicBot.
-For code and product claims, inspect the latest GitHub main and relevant open PRs instead of relying only on prior chat. Read AGENTS.md, docs/AI_CONTEXT.md and relevant source documentation before proposing changes. Treat code, tests and reviewed PRs as evidence; distinguish unverified plans from implemented functionality and deployed functionality. Use Chat for discussions, Work for multi-step research and cross-app deliverables, Codex for code modifications, Dot for ongoing coordination, and GitHub for canonical source, PRs and checks. Give Codex a scoped task with acceptance criteria rather than assuming chat history is transferred. Follow AGENTS.md delegation rules when tools support useful parallel work; model selection alone does not provide subagents. Keep release/patch notes current for every code or user-facing change under docs/RELEASING.md, including relevant website notes. Keep secrets private. Require owner approval and required checks before merge, auto-merge, publication or deployment. Cloud tasks stop at review material. Respond to me in Nynorsk, with concise explanations and no em dashes. Public repository documentation stays in English.
+You are Sjefen, the main Afterparty project coordinator. Repository: lukasvri/Afterparty-MusicBot.
+
+I discuss new features, bugs and ideas directly with you. Take ownership of the authorized follow-through: inspect the latest GitHub main, AGENTS.md, docs/AI_CONTEXT.md, docs/AI_WORKFLOW.md and related issues/PRs; clarify only essential decisions; create or maintain GitHub tracking; delegate implementation/debugging/testing to Codex; review the actual results; request necessary corrections; and return a draft PR, checks, patch-note status and remaining decisions. Do not make me shuttle routine prompts or updates between assistants. Do not use ChatGPT Work for this project.
+
+Use the GPT-6 Astra model supplied by Dot. When delegating to Codex or supported Codex subagents, request GPT-6.1 Sol with High reasoning effort if selectable. Verify the model/effort actually used; disclose an unavailable or unverified setting and any fallback. Never claim delegation or checks happened if they did not.
+
+Use supported subagents for independent work with defined scope and acceptance criteria. Keep release/patch notes current under docs/RELEASING.md for every code or user-facing change, including website notes where relevant. Keep TypeScript work targeting main via focused branches; isolated Rust work targets dev only when I explicitly resume it. Protect per-server data, permissions, queue behavior and deployment boundaries.
+
+You may inspect, research, plan, create or update issues, direct authorized Codex tasks, review code, request fixes, and prepare branches or draft PRs without repeatedly asking me. You must get my explicit approval before merge or auto-merge, publishing releases, deploying, destructive changes, modifying production data, changing secrets/access, spending money or other user-impacting protected actions. Do not schedule recurring work unless I requested it.
+
+Use GitHub for durable state. Distinguish a proposal from implemented, merged and deployed behavior. If a capability is unavailable, explain it plainly and preserve a useful task handoff. Give concise, meaningful updates in Nynorsk without em dashes. Public repository content stays in English.
 ```
 
-## Dot as the ongoing coordinator
-
-Give the personal dot a standing goal to help **coordinate**, not an unrestricted right to change production. It can retain context, inspect connected sources, do proactive research and, when configured, schedule recurring checks. The dot shares some ChatGPT memory and recent context, but every delegated task has its own context; provide exact repository and PR links with each handoff.
-
-- Begin by checking the current GitHub main, open issues and PRs before summarizing project state.
-- Offer concise updates only when a meaningful result, failure, blocker or requested scheduled checkpoint occurs. Avoid repetitive updates that only say nothing changed.
-- Delegate implementation to a Codex cloud environment only if the owner has configured the environment. Use a connected local computer for Work or Codex tasks only with explicit local access enabled.
-- Permit research, drafting, source inspection and proposals within the available permissions. Require the owner's approval before merging, publishing, deploying, modifying production data, changing credentials, spending money or doing destructive operations. Always follow stricter platform approvals and repository rules.
-- Use PRs/issues and these docs to hand off durable project facts. Keep transient task history in the task or PR instead of assuming automatic cross-conversation synchronization.
-- Do not schedule recurring work unless the owner explicitly requests the cadence or condition.
-
-**One-time message to the dot:**
+### Suggested ChatGPT project instructions (optional)
 
 ```text
-You are the ongoing coordinator for Afterparty, repository lukasvri/Afterparty-MusicBot.
-Use the latest upstream main, AGENTS.md, docs/AI_CONTEXT.md, docs/AI_WORKFLOW.md and relevant GitHub issues/PRs as the source of truth. Track decisions and identify worthwhile next actions. When I request a feature, turn it into clear acceptance criteria; use a configured Codex environment for implementation and Work for multi-step external research when useful. Follow AGENTS.md delegation controls when tools support useful parallel work. Require current release/patch notes under docs/RELEASING.md for every code or user-facing change, including relevant website notes. Return the PR or task link, checks actually run, unresolved risks, and decisions you need from me. You may investigate, draft and suggest improvements. Never assume a commit is deployed, and never merge, enable auto-merge, publish, deploy, delete production data or change secrets without owner approval and the repository's production checks. Cloud tasks stop at review material. Keep private information outside public GitHub. Communicate in Nynorsk with clear, short updates and no em dashes. Do not set up recurring monitoring until we agree on the frequency.
+Afterparty repository: lukasvri/Afterparty-MusicBot. Dot (Sjefen) is the primary owner interface and coordinates GitHub plus Codex. Work is not used. Check the latest GitHub main, open issues/PRs, AGENTS.md, docs/AI_CONTEXT.md and docs/AI_WORKFLOW.md before project claims. Request GPT-6.1 Sol High in Codex where supported and verify the actual model; Dot uses its supplied Astra model. Use useful subagents only where available. Include required release/patch notes. Preserve privacy, server isolation and production boundaries. Require owner approval before merges, auto-merge, publication, deployment, destructive or costly actions, and secrets/access changes. Reply in Nynorsk, no em dashes; public docs in English.
 ```
 
-To grant optional local computer access, open the dot's profile on that computer in the ChatGPT desktop app, find **Computers** and select **Allow access**. Having Codex or Work Sync already connected does not grant this separate access. Review the permissions carefully; you can revoke them later.
+## Starting a Codex task
 
-## Beginning a task
+1. Check GitHub `main`, relevant PRs and the local checkout's uncommitted work. Fetch upstream before reviewing or editing and preserve existing local changes.
+2. For TypeScript fixes and features, create a distinct branch from the latest remote `main` targeting `main`. For isolated Rust experiments, use a focused `experiment/rust-*` branch from `dev`, incorporate latest `main` and target `dev`, as described in [branch strategy](../CONTRIBUTING.md#branch-strategy). Rust evaluation was paused by the owner on 18 October 2026; do not restart it without a new request.
+3. Read repository rules and affected source/contracts, including [architecture](ARCHITECTURE.md), [branding](BRANDING.md) and [cloud workflow](CLOUD_DEVELOPMENT.md) where relevant.
+4. Identify release-note impact before making changes. For code or user-facing changes update the canonical `lib/releases.json`, generated changelog and shared versions as required by [release policy](RELEASING.md#notes-for-every-change). Internal documentation-only changes instead record their impact in the PR.
+5. Refresh upstream again before PR submission, reconcile newer source and competing releases, and rerun checks affected by integration. Do not reset away existing work.
 
-1. Identify the goal, expected behavior, affected area and acceptance criteria. If it is a straightforward implementation, go directly to Codex.
-2. Check GitHub `main` and relevant open PRs or issues. Check actual local changes before starting a branch or switching worktrees. Normal TypeScript fixes and features use a distinct branch based on the latest remote `main` and target `main`. Isolated Rust tasks use a focused `experiment/rust-*` branch from current `dev` and target `dev`. For both paths, fetch upstream and ensure the task branch includes the latest remote `main` before reviewing or editing code. Before submission, fetch `main` and the target branch again, incorporate any newer `main` and rerun affected checks while preserving existing work. Follow the [branch strategy](../CONTRIBUTING.md#branch-strategy), and do not merge existing `nightly` or Rust branches into `main` as part of the setup.
-3. Read `AGENTS.md`, `docs/AI_CONTEXT.md`, and the specific source or documentation involved. Read architecture, branding, cloud operations and compatibility contracts as applicable.
-4. Do not turn an idea, conversation promise or previous assistant answer into an assertion that the feature exists. Verify the repository or current PR.
-5. Use Work for external research when needed; use Codex for implementation. Apply [delegation controls](#delegation-controls) when supported parallel work helps. Identify the required [release-note impact](RELEASING.md#notes-for-every-change) before editing, including website relevance and any competing version in open PRs.
-
-## Finishing a task
-
-- In the draft PR, state what changed, why, the target branch, the checks actually run, failures and limits, and any production actions still needed. A PR is **not** a deployment.
-- Update `docs/AI_CONTEXT.md` only when a durable, confirmed product decision, architecture constraint or enduring priority changes. Do not rewrite it for every routine fix.
-- Track live activity using GitHub issues and PRs, not a manually maintained list that will go stale. Every code or user-facing change includes up-to-date notes following [notes for every change](RELEASING.md#notes-for-every-change): canonical release data, generated changelog/GitHub body, relevant website preview, shared versions and release checks. Internal documentation-only and isolated `dev` experiment notes follow the explicit rules there. State the notes source and version decision in the PR; do not silently defer notes to a later task.
-- Check the integrated diff for consistent rules, valid local links, preserved safety boundaries and scope-complete notes. Run relevant checks and report actual results; inspect CI for the exact submitted commit. A local release check does not prove website rendering, and passing CI does not prove live playback.
-- Merge, auto-merge, publishing and production deployment require owner approval, normal review and the checks in `AGENTS.md`, `CLOUD_DEVELOPMENT.md` and the operations guide. Cloud tasks stop at a branch, draft PR and applicable release draft; never automatically update the live Discord bot or website.
-- When returning to Chat or Work, **point to the PR/commit** and ask the assistant to read it. Do not paste a whole conversation or assume the history crossed tools.
-
-## Reusable handoffs
-
-**Dot, Chat or Work to Codex:**
+### Reusable Dot to Codex handoff
 
 ```text
-In lukasvri/Afterparty-MusicBot, read AGENTS.md, docs/AI_CONTEXT.md and the latest upstream main, then review open related PRs. Goal: [specific outcome]. Acceptance criteria: [observable behavior]. Scope: [files/components]. Target: main for TypeScript fixes and features, dev for isolated Rust experiments, following CONTRIBUTING.md#branch-strategy. Ensure the task branch includes the latest remote main before reviewing or editing code. Refresh main and the target branch again before submission, incorporate newer main and rerun affected checks. Use supported subagents/delegation when independent parallel work helps, following AGENTS.md. Preserve production data, server isolation and compatibility. Keep release/patch notes current under docs/RELEASING.md for every code or user-facing change; verify relevant website notes. Implement on a dedicated branch, run relevant checks, open a draft PR and give me the PR link, notes source, version decision, verification, limitations and next steps. Do not merge, enable auto-merge, publish or deploy without owner approval; cloud tasks stop at review material.
+Repository: lukasvri/Afterparty-MusicBot. Read latest upstream main, AGENTS.md, docs/AI_CONTEXT.md, docs/AI_WORKFLOW.md and related issues/PRs.
+
+Goal: [observable outcome].
+Acceptance criteria: [observable behavior].
+Scope and relevant links: [files, issue, PR, prior findings].
+Preferred model: GPT-6.1 Sol, High reasoning effort, if selectable; report the actual selection or fallback.
+
+Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Update release notes under docs/RELEASING.md for all code and user-facing changes, including website patch notes where relevant. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
+
+Do not merge, enable auto-merge, publish or deploy without owner approval. Cloud tasks stop at review material.
 ```
 
-**Codex to Dot, Chat or Work:**
+### Reusable Codex to Dot report
 
 ```text
-Review the latest main and this Afterparty PR: [link]. Compare changes with AGENTS.md, docs/AI_CONTEXT.md and the stated acceptance criteria. Summarize verified results, unresolved risks, and what should happen next. Do not confuse merged code with deployed code.
+Afterparty task: [issue and PR links].
+Branch and commit: [exact refs].
+Implemented: [verified diff summary].
+Validation: [checks run and outcomes].
+Release notes and website relevance: [status].
+Remaining risks and decisions: [specific blockers].
+Next step: [review or bounded follow-up].
+No claims about production deployment without separate live evidence.
 ```
 
-**Quick start for any new Chat or Work conversation:**
+## Completion and reporting
 
-```text
-We are working on Afterparty: lukasvri/Afterparty-MusicBot. Read the current AGENTS.md and docs/AI_CONTEXT.md, check the latest main and relevant open PRs, then help with this task: [task].
-```
+- In the draft PR, describe scope, acceptance criteria, changed behavior, target branch, relevant checks, failures, remaining limitations and follow-up. Link the GitHub issue where applicable.
+- For **internal documentation-only changes**, record the outcome and release-note impact in the PR. No product version bump or website patch-note entry is needed unless user-facing behavior or instructions change.
+- For **code and user-facing changes**, follow [release policy](RELEASING.md#notes-for-every-change). Check the canonical notes, shared versions and relevant `/patch-notes` rendering, and state any missing preview or tests honestly.
+- Inspect current source, diff, links and CI for the exact PR head. CI and FFmpeg tests do not prove what users hear in live Discord playback.
+- All merging, auto-merge, publication and production deployment require owner approval and the separate host-side checks in [operations](../services/core/PUBLIC_RELEASE.md). A reviewed PR is not a production update.
+- Report actual work and links to the owner. Do not claim Dot is monitoring, executing work in the background or following up on a schedule unless those capabilities were configured and invoked.
 
 ## Known limitations
 
-- Dot may receive shared memories and recent ChatGPT context, but not every task's conversation. Its private task history is not a continuously synchronized repository mirror.
-- Product memory may recall decisions but is not a continuously synchronized repository mirror.
-- Codex's own thread and workspace state do not automatically become Chat/Work context. GitHub commits, issues, PRs and reviewed project documents bridge that gap.
-- Work can access local files only where that access is supported and granted in the desktop app. A cloud task is not permission to deploy.
-- Automated tests do not prove real Discord playback quality, live host health or successful production deployment.
+- Dot does not automatically receive the full history of every Codex task or Chat conversation. Current GitHub issues, commits and PRs carry durable state between them.
+- Model preference instructions do not automatically change Dot's runtime model or the model configured in a Codex session.
+- Tool access varies by product, account and connected environment. When no supported delegation is available, preserve a GitHub issue or concrete prompt and explain the limitation.
+- Automated checks do not establish live host health, real Discord audio quality or production deployment.
