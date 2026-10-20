@@ -293,10 +293,11 @@ export class Engine extends EventEmitter {
   enqueue(tracks: Track[], next = false, immediate = false) {
     if (!tracks.length) throw new UserError("No songs found.");
     const key = (t: Track) => JSON.stringify([t.concert === true, t.id]);
-    const manual = this.queue.filter((t) => !t.radio);
+    const requested = new Set(tracks.map(key));
+    const queued = this.queue.filter((t) => !t.radio || !requested.has(key(t)));
     const seen = new Set([
       ...(this.current ? [key(this.current)] : []),
-      ...manual.map(key),
+      ...queued.map(key),
     ]);
     const fresh = tracks.filter((t) => {
       const id = key(t);
@@ -305,9 +306,9 @@ export class Engine extends EventEmitter {
       return true;
     });
     if (!fresh.length) throw new UserError("This song is already in the queue.");
-    if (manual.length + fresh.length > this.settings.playlistLimit)
+    if (queued.length + fresh.length > this.settings.playlistLimit)
       throw new UserError("The queue is full.");
-    this.queue = next ? [...fresh, ...manual] : [...manual, ...fresh];
+    this.queue = next ? [...fresh, ...queued] : [...queued, ...fresh];
     this.mixer?.invalidateNext();
     this.persist();
     this.changed();

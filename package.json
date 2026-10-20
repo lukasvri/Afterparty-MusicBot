@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "2.2.12",
+  "version": "2.2.13",
   "private": true,
   "engines": {
     "node": ">=24.17.0"
@@ -21,7 +21,7 @@
     "release:changelog": "node scripts/releases.ts --write",
     "test:party": "node scripts/party.browser.ts",
     "test:sync": "node --test --test-concurrency=1 --test-timeout=45000 scripts/sync.browser.ts",
-    "test:unit": "node --test scripts/fullscreen.test.ts scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/live-command.test.ts scripts/native-seek.test.ts scripts/rooms.test.ts scripts/bridge.test.ts scripts/admin-auth.test.ts scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts scripts/radio-catalog-probe.test.ts",
+    "test:unit": "node --test scripts/fullscreen.test.ts scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/live-command.test.ts scripts/native-seek.test.ts scripts/rooms.test.ts scripts/bridge.test.ts scripts/admin-auth.test.ts scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts scripts/radio-catalog-probe.test.ts scripts/queue-order.test.ts",
     "test:admin-channels": "node scripts/admin-channels.browser.ts"
   },
   "dependencies": {

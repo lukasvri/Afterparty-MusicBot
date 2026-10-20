@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.13: Append ordinary queue additions
+
+2026-10-20
+
+- Ordinary additions and approved room requests append after the existing queue, including eligible queued radio suggestions. Adding a song no longer silently removes those suggestions and makes the new request appear first. Discord voice and browser-room playback keep their current track and server/session boundaries.
+- Explicit play-next still inserts at the front; play-now remains an explicit track change. Full queues reject additions without removing existing entries, and duplicate/current-track guards remain in place. Queue rendering follows the authoritative order. This stable fix contains no Discord Activity routes or experimental playback changes.
+
 ## v2.2.12: Prefer matching music videos in radio
 
 2026-10-19

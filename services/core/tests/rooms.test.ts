@@ -513,7 +513,7 @@ test("radio queues the next song before the end, preserves the clock, and yields
   } finally { rooms.dispose();store.close(); }
 });
 
-test("turning radio off removes its prepared track and a manual request takes priority", async()=>{
+test("turning radio off removes its prepared track while an ordinary addition preserves queue order", async()=>{
  for(const action of ['radio','add']) {
   const {rooms,store}=setup();
   try {
@@ -521,7 +521,7 @@ test("turning radio off removes its prepared track and a manual request takes pr
    assert.equal(prepared.queue.length,1);
    const manual={...video,id:'manual12345'};
    const result=rooms.mutate('TESTROOM',{action,enabled:false,video:manual,version:prepared.version,actorHash:'a'.repeat(64)});
-   assert.deepEqual(result.queue.map(v=>v.id),action==='add'?[manual.id]:[]);
+   assert.deepEqual(result.queue.map(v=>v.id),action==='add'?[next.id,manual.id]:[]);
   }finally{store.close();}
  }
 });
