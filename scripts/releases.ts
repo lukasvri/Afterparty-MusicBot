@@ -21,11 +21,17 @@ export function releaseNotes(release: Release){
 export function changelog(){
  return '# Changelog\n\nGenerated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by hand.\nRelease entries describe source versions, not production deployment status.\nSee [release policy](docs/RELEASING.md).\n\n'+releases.map(releaseNotes).join('\n')+'\n## Historical integer versions\n\nOriginal dates, numbering and Norwegian wording are preserved.\n\n'+legacyUpdates.map(entry=>`### V${entry.version}: ${entry.title}\n\n${entry.date}\n\n${entry.items.map(item=>`- ${item}`).join('\n')}\n`).join('\n');
 }
+// Prerelease notes describe review builds, never a stable release or deployment.
+export function releaseVersion(value: string){
+ const match=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|rc)\.(0|[1-9]\d*))?$/.exec(value);
+ if(!match)throw new Error('Expected semantic release or numbered prerelease');
+ return {base:match.slice(1,4).join('.'),stage:match[4]??'',number:Number(match[5]??0)};
+}
 export function validateReleaseHistory(releases: Release[]){
  if(!releases.length)throw new Error('At least one release is required');
  const versions=new Set();
  for(const release of releases){
-  nextVersion(release.version,'patch');
+  releaseVersion(release.version);
   if(versions.has(release.version))throw new Error('Duplicate release version');
   versions.add(release.version);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(release.date)||new Date(release.date).toISOString().slice(0,10)!==release.date)throw new Error('Invalid release date');
@@ -34,7 +40,12 @@ export function validateReleaseHistory(releases: Release[]){
  for(let index=1;index<releases.length;index++){
   const older=releases[index].version;
   const newer=releases[index-1].version;
-  if(!['patch','minor','major'].some(kind=>nextVersion(older,kind)===newer)){
+  const a=releaseVersion(older),b=releaseVersion(newer);
+  const normal=!a.stage&&['patch','minor','major'].some(kind=>nextVersion(a.base,kind)===b.base)&&(!b.stage||b.number===1);
+  const advance=a.stage&&a.base===b.base&&(!b.stage||
+   (a.stage===b.stage&&b.number===a.number+1)||
+   (['alpha','beta','rc'].indexOf(b.stage)===['alpha','beta','rc'].indexOf(a.stage)+1&&b.number===1));
+  if(!normal&&!advance){
    throw new Error(`Invalid release transition: ${older} -> ${newer}; releases must be newest first with one patch, minor or major increment`);
   }
  }

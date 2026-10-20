@@ -1563,7 +1563,7 @@ export default function Afterparty() {
       data-tv={tv && Boolean(room)}
       data-empty={!current}
     >
-      <Sidebar view={directoryOpen ? "rooms" : "music"} onNavigate={navigate} />
+      <Sidebar view={directoryOpen ? "rooms" : "music"} onNavigate={navigate} gameHref={room ? `/games?${room.mode === "discord" ? "guild" : "room"}=${encodeURIComponent(room.guildId ?? room.code)}` : "/games"} />
       <a className="skip-link" href="#party-content">
         {t("Hopp til musikken")}
       </a>

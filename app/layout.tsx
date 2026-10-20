@@ -4,6 +4,7 @@ import "./globals.css";
 import "./concert.css";
 import "./interface.css";
 import "./party.css";
+import "./guess.css";
 export const metadata: Metadata = {
   title: "Afterparty",
   description: "Find music, share video rooms and follow the music from Discord.",

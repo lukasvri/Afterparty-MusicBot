@@ -15,6 +15,10 @@ renumber those entries or move existing tags.
 - Massive update: increment MAJOR by one and reset MINOR and PATCH to zero,
   for example `1.4.9` to `2.0.0`. Breaking compatibility requires a major release.
 
+Numbered `alpha.N`, `beta.N` and `rc.N` prereleases identify unfinished previews.
+Start at `alpha.1` on the next semantic version and advance the number or stage
+without advertising a stable release. A preview build is not deployment evidence.
+
 For a release containing several changes, use the largest applicable increment.
 Continue from the current shared version; do not reinterpret historical V36 as `36.0.0`.
 The tested `nextVersion` helper in `scripts/releases.ts` encodes these rules.

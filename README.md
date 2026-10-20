@@ -42,6 +42,18 @@ YouTube video uses the official embedded player. SoundCloud provides audio; Spot
 
 Screenshots show a local preview with synthetic API responses, in English. They illustrate the interface, not a connected production bot.
 
+## Synthetic game preview
+
+The `2.3.0-alpha.1` source adds **Games / Guess the Song** for existing private
+rooms and authorized Discord servers. It is a focused preview, independent of
+concert extras and Discord Activities. Deployment remains a separate operator
+action. The default catalog is unavailable.
+
+An operator may explicitly enable `GUESS_SYNTHETIC_TEST=1` on Core to test the
+shared game using five locally generated tones with fictional **Test Tone One**
+through **Test Tone Five** titles. These are synthetic test sounds, not real songs
+or a licensed catalog. See [synthetic game testing](docs/GUESS_SYNTHETIC_TEST.md).
+
 ## Stable and experimental channels
 
 Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
