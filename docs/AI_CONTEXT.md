@@ -50,6 +50,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 
 - The personal dot is the proposed ongoing coordinator for planning and follow-up, not an authority for unreviewed code merges or live deployment.
 - Chat provides interactive decisions, Work handles broader multi-step research and app work, and Codex implements and validates repository changes.
+- For ordinary owner-facing project planning in Chat, prefer **GPT-6.1 Sol with High reasoning** when that option is available. Reserve Pro for unusually demanding architecture and technical evaluations. This is a model preference for Chat, not a Dot model setting or a guarantee of tools, subagents or access.
 - Use supported subagents/delegation for independent work when parallel execution helps. Tool availability and permissions, not a Chat model name or Pro selection, determine whether delegation is possible. The lead reviews the combined result; see [delegation controls](AI_WORKFLOW.md#delegation-controls).
 - GitHub holds canonical source, issues, PRs, checks and release records. Keep code, user-facing notes and validation together in the PR, following the [release policy](RELEASING.md#notes-for-every-change). Merging, auto-merge, publication and deployment require owner approval; cloud work stops at review material.
 - All tools should verify current source and PRs before claiming a feature exists or that a production change has gone live. See [AI collaboration](AI_WORKFLOW.md) for Dot setup, permissions and delegated tasks.
