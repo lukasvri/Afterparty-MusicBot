@@ -147,7 +147,7 @@ test('competitive HTTP refreshes roles, scopes grants, hides metadata, preserves
   } finally { abort.abort(); release?.(); await f.close(); }
 });
 
-test('default catalog has no media endpoint and rejected traffic spends neither game participants nor public socket capacity', async () => {
+test('default catalog leaves media unavailable and rejected traffic spends neither game participants nor public socket capacity', async () => {
   const f = await fixture();
   const room = { scope: 'room', scopeId: 'TESTROOM', host: true, roomExpiresAt: Date.now() + 3_600_000 };
   const before = f.state();
@@ -159,7 +159,7 @@ test('default catalog has no media endpoint and rejected traffic spends neither 
     joined = await (await f.call({ ...context, ...mutation(joined, 'configure', { categoryId: '2010s', settings: DEFAULT_GUESS_SETTINGS }) })).json() as Result;
     assert.equal((await f.call({ ...context, ...mutation(joined, 'start') })).status, 503);
     assert.equal((await fetch(f.base + '/v1/guess/media')).status, 404);
-    assert.equal((await f.call({ ...context, action: 'media' })).status, 400);
+    assert.equal((await f.call({ ...context, action: 'media' })).status, 409);
     for (let n = 0; n < 130; n++) {
       const unsigned = await f.call({ ...room, action: 'join', eventId: randomUUID() }, false);
       assert([403, 429].includes(unsigned.status)); await unsigned.arrayBuffer();

@@ -10,7 +10,7 @@ export async function guessInput(request: Request) {
   await limit(request, 'guess-visitor', 90, 60000);
   if (action === 'catalog') return { action };
   if (!['room', 'guild'].includes(String(scope)) || typeof scopeId !== 'string' || !(scope === 'room' ? /^[A-Z0-9]{8}$/ : /^\d{14,22}$/).test(scopeId)) fail(400, 'Invalid game scope.');
-  if (!['join', 'read', 'configure', 'start', 'guess', 'reveal', 'next', 'end', 'reset'].includes(String(action))) fail(400, 'Unknown game action.');
+  if (!['join', 'read', 'media', 'configure', 'start', 'guess', 'reveal', 'next', 'end', 'reset'].includes(String(action))) fail(400, 'Unknown game action.');
   if (action === 'join') await limit(request, 'guess-join', 6, 60000);
   let authority: Record<string, unknown>;
   if (scope === 'guild') { const session = await discordSession(request); if (!session) fail(401, 'Sign in with Discord to join this game.'); authority = { tokenCipher: session.token_cipher }; }

@@ -11,6 +11,7 @@ import { UserError, publicTrack } from "./types.ts";
 import { Rooms } from "./rooms.ts";
 import { Social } from "./social.ts";
 import { GuessHttp } from "./guess-http.ts";
+import type { GuessMediaSource } from './guess-media.ts';
 import type { GuessCatalog } from "./guess-catalog.ts";
 import type { Guilds, GuildSession } from "./guilds.ts";
 import type { DiscordOAuth } from "./oauth.ts";
@@ -50,6 +51,7 @@ export async function body(request: IncomingMessage, maximum = 16384) {
 type Options = {
   key: string;
   guessCatalog?: GuessCatalog;
+  guessMedia?: GuessMediaSource;
   origin: string;
   publicPort?: number;
   guilds?: Guilds;
@@ -152,7 +154,7 @@ export async function createServers(
     }
     return { id, status: previous?.status ?? "processing" };
   };
-  const guessing = new GuessHttp({ key: options.key, authenticate, body, json, catalog: options.guessCatalog,
+  const guessing = new GuessHttp({ key: options.key, authenticate, body, json, catalog: options.guessCatalog, media: options.guessMedia,
     browserRoom: id => id !== "DISCORD1" && !options.guilds?.byRoom(id),
     guild: async (grant, id) => {
       if (!options.oauth || select(id).id !== id) throw new UserError("Discord sign-in required.", 403);

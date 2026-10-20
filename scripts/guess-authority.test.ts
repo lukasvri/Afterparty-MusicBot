@@ -99,3 +99,61 @@ test('configure whitelists setting keys without coercing illegal values, and cat
   assert.deepEqual(JSON.parse(JSON.stringify(catalog)), { action: 'catalog' });
   assert.equal(f.reads, reads); assert.deepEqual(f.calls, []);
 });
+
+async function audioProxy(fetcher: typeof fetch) {
+  const format = await import('../services/core/src/guess-audio-format.ts');
+  const source = ts.transpileModule(readFileSync(new URL('../lib/core-server.ts', import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const exports: Record<string, unknown> = {};
+  runInNewContext(source, { exports, URL, Response, AbortSignal, fetch: fetcher, require: (name: string) => {
+    if (name === 'cloudflare:workers') return { env: { GUTTA_CORE_PUBLIC_URL: 'https://core.example', ADMIN_BRIDGE_KEY: 'synthetic-bridge-key' } };
+    if (name.endsWith('guess-audio-format.ts')) return format;
+    throw Error('Unexpected audio proxy dependency: ' + name);
+  } });
+  return exports.coreGuessAudio as (input: unknown, signal: AbortSignal) => Promise<Response>;
+}
+
+test('binary game proxy forwards only the fixed authenticated Core action and returns canonical private WAV', async () => {
+  const { guessWave } = await import('../services/core/src/guess-audio-format.ts');
+  const wave = guessWave(new Uint8Array(16000 * 2 * 15));
+  const input = { action: 'media', scope: 'room', scopeId: 'TESTROOM', token: 'synthetic-game-token' };
+  const proxy = await audioProxy((async (url, init) => {
+    assert.equal(url, 'https://core.example/v1/guess'); assert.equal(init?.method, 'POST');
+    assert.equal(init?.redirect, 'error'); assert.equal(init?.headers && (init.headers as Record<string, string>).Authorization, 'Bearer synthetic-bridge-key');
+    assert.deepEqual(JSON.parse(String(init?.body)), input);
+    return new Response(wave.buffer as ArrayBuffer, { headers: { 'Content-Type': 'audio/wav', 'Content-Disposition': 'inline; filename=secret-song.wav', 'X-Provider-Title': 'Secret title', 'Access-Control-Allow-Origin': '*' } });
+  }) as typeof fetch);
+  const response = await proxy(input, new AbortController().signal);
+  assert.equal(response.headers.get('content-type'), 'audio/wav');
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  for (const key of ['content-disposition', 'x-provider-title', 'access-control-allow-origin']) assert.equal(response.headers.get(key), null);
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), wave);
+});
+
+test('binary game proxy rejects metadata, invalid bodies and upstream failures without exposing provider details', async () => {
+  for (const response of [new Response('Secret title at https://provider.example/secret.mp3', { status: 403 }),
+    new Response('Secret title', { headers: { 'Content-Type': 'application/json' } }),
+    new Response('bad', { headers: { 'Content-Type': 'audio/wav' } }),
+    new Response('oversized', { headers: { 'Content-Type': 'audio/wav', 'Content-Length': '960045' } })]) {
+    const proxy = await audioProxy((async () => response) as typeof fetch);
+    await assert.rejects(proxy({ action: 'media' }, new AbortController().signal), error => {
+      const failure = error as Error; assert.equal(typeof failure.message, 'string'); assert.equal(failure.message.includes('Secret'), false); assert.equal(failure.message.includes('provider.example'), false); return true;
+    });
+  }
+});
+
+test('media proxy derives fresh authority and propagates cancellation into the bounded Core request', async () => {
+  const f = await fixture();
+  const input = await f.call({ action: 'media', host: true, mediaKey: 'forged', providerUrl: 'https://provider.example/secret.mp3' });
+  assert.equal(input.action, 'media'); assert.equal(input.host, false);
+  assert.equal('mediaKey' in input, false); assert.equal('providerUrl' in input, false);
+  const controller = new AbortController();
+  const proxy = await audioProxy(((_url, init) => new Promise<Response>((_resolve, reject) => {
+    const signal = init!.signal!;
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    if (signal.aborted) reject(signal.reason);
+  })) as typeof fetch);
+  const pending = proxy(input, controller.signal); controller.abort(); await assert.rejects(pending);
+});

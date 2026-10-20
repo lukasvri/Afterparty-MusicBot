@@ -1,6 +1,8 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Cancel preview":["Avbryt lydklipp","Cancel preview"],
+ "Preview audio is private to this game round.":["Lydklippet er knyttet til denne spillrunden.","Preview audio is private to this game round."],
  "The lobby changed while you edited. Review the latest settings.":["Lobbyen ble endret mens du redigerte. Se gjennom de nyeste innstillingene.","The lobby changed while you edited. Review the latest settings."],
  "Use latest settings":["Bruk nyeste innstillinger","Use latest settings"],
  "Games":["Spill","Games"],

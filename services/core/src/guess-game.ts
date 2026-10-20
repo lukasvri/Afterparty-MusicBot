@@ -244,7 +244,7 @@ export class GuessGame {
     const state = this.states.get(key);
     if (!state || !state.participants.has(access.actor)) throw new UserError('Join this game first.', 403);
     this.reconcile(state, now);
-    if (!input || input.sessionId !== state.sessionId || input.roundId !== state.round?.id || !['round', 'reveal'].includes(state.phase))
+    if (!input || input.sessionId !== state.sessionId || input.roundId !== state.round?.id || state.phase !== 'round' || now < state.round.startsAt)
       throw new UserError('The game round changed.', 409);
     this.budget('media', key, 512, 128, now);
     const descriptor = copyGuessMedia(this.catalog.media(state.round!.song.mediaKey));
