@@ -62,5 +62,5 @@ The [asset notes](assets/README.md) identify the generated brand banner and synt
 
 ## AI collaboration
 
-- [AI collaboration workflow](AI_WORKFLOW.md): roles for Dot, Chat, Work and Codex, shared context, and practical handoff prompts.
+- [AI collaboration workflow](AI_WORKFLOW.md): ChatGPT Chat coordination, Codex implementation, shared context and practical handoff prompts; Dot is temporarily paused and Work is excluded.
 - [Shared AI project context](AI_CONTEXT.md): durable product decisions, source-of-truth rules and important architecture boundaries.
