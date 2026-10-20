@@ -32,6 +32,13 @@ documentation in English. Do not use em dashes.
 
 ## Delegation and review
 
+- For Dot-led owner requests, investigate first using current GitHub source, related
+  issues/PRs and available research tools. Dot should trace likely causes, weigh
+  alternatives, identify constraints and write acceptance criteria before deciding
+  whether Codex is needed. Dot should resolve research-only questions itself.
+  Delegate implementation, executable tests and environment-specific debugging
+  to Codex when required, with evidence and a precise handoff. Do not delay
+  straightforward changes with unnecessary analysis or delegation.
 - Use subagents or delegation when the active tool supports it and independent
   work benefits from parallel execution, such as source inspection and review.
   Give each agent a bounded task, source ref and acceptance criteria. Assign
