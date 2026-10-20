@@ -1,6 +1,13 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Game catalog connected":["Spillkatalog tilkoblet","Game catalog connected"],
+ "Choose a category and settings that fit its available recordings.":["Velg en kategori og innstillinger som passer til de tilgjengelige opptakene.","Choose a category and settings that fit its available recordings."],
+ "Available recordings are supplied by the connected Core. No music is bundled with this website.":["Tilgjengelige opptak leveres av tilkoblet Core. Ingen musikk følger med dette nettstedet.","Available recordings are supplied by the connected Core. No music is bundled with this website."],
+ "No eligible recordings are available for this category.":["Ingen kvalifiserte opptak er tilgjengelige i denne kategorien.","No eligible recordings are available for this category."],
+ "Choose rounds of {seconds} seconds or less for this category.":["Velg runder på maksimalt {seconds} sekunder i denne kategorien.","Choose rounds of {seconds} seconds or less for this category."],
+ "Only {count} distinct recordings fit {seconds}-second rounds. Reduce the rounds or duration.":["Bare {count} ulike opptak passer til runder på {seconds} sekunder. Velg færre eller kortere runder.","Only {count} distinct recordings fit {seconds}-second rounds. Reduce the rounds or duration."],
+ "Up to {count} rounds are available at {seconds} seconds.":["Opptil {count} runder er tilgjengelige ved {seconds} sekunder.","Up to {count} rounds are available at {seconds} seconds."],
  "Synthetic audio test":["Syntetisk lydtest","Synthetic audio test"],
  "Synthetic test only: generated tones and fictional titles. No real songs or provider music.":["Kun syntetisk test: genererte toner og oppdiktede titler. Ingen ekte sanger eller leverandørmusikk.","Synthetic test only: generated tones and fictional titles. No real songs or provider music."],
  "Test answers: Test Tone One, Test Tone Two, Test Tone Three, Test Tone Four, Test Tone Five.":["Testsvar: Test Tone One, Test Tone Two, Test Tone Three, Test Tone Four, Test Tone Five.","Test answers: Test Tone One, Test Tone Two, Test Tone Three, Test Tone Four, Test Tone Five."],
