@@ -20,3 +20,15 @@ export async function coreGuessAudio(input: unknown, callerSignal: AbortSignal) 
   return new Response(bytes.buffer as ArrayBuffer,{headers:{'Content-Type':'audio/wav','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
  }catch{throw Object.assign(new Error('Game preview is unavailable.'),{status:502});}
 }
+
+/** An authenticated social stream has its own short lease and no playback commands. */
+export async function coreSocialStream(input: unknown, signal: AbortSignal) {
+ const origin=coreUrl(), key=(env as unknown as {ADMIN_BRIDGE_KEY?:string}).ADMIN_BRIDGE_KEY;
+ if(!origin||!key)throw Object.assign(new Error('Concert extras need the Core service.'),{status:503});
+ const response=await fetch(origin+'/v1/social',{method:'POST',
+  headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(input),
+  redirect:'manual',signal:AbortSignal.any([signal,AbortSignal.timeout(70000)])});
+ if(!response.ok){const data=await response.json().catch(()=>({})) as {error?:string};throw Object.assign(new Error(data.error??'Concert extras are unavailable.'),{status:response.status});}
+ if(!response.body)throw Object.assign(new Error('Concert extras are unavailable.'),{status:502});
+ return new Response(response.body,{headers:{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store','X-Accel-Buffering':'no','X-Content-Type-Options':'nosniff'}});
+}

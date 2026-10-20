@@ -19,9 +19,30 @@ Numbered `alpha.N`, `beta.N` and `rc.N` prereleases identify unfinished previews
 Start at `alpha.1` on the next semantic version and advance the number or stage
 without advertising a stable release. A preview build is not deployment evidence.
 
+When an unfinished preview line is superseded by the next minor or major line,
+start that higher line at `alpha.1` and preserve the earlier preview notes.
+This does not create a stable release for the abandoned line or skip directly to
+beta or rc. Unmerged competing proposals are review material, not historical
+releases: reconcile their scope and versions in the combined PR. Keep the
+independent Activity beta source separate from ordinary bot/web candidates.
+
 For a release containing several changes, use the largest applicable increment.
 Continue from the current shared version; do not reinterpret historical V36 as `36.0.0`.
 The tested `nextVersion` helper in `scripts/releases.ts` encodes these rules.
+
+An unfinished feature preview may use a numbered prerelease, for example
+`3.0.0-alpha.1`, in both manifests, locks and canonical notes. The first preview
+must target the next patch, minor or major version of the preceding stable entry.
+Increment the same stage one number at a time; a following beta or rc stage starts
+at 1. Promotion to that stable version is a separate release decision. Prerelease
+notes must identify preview limitations and must not claim stable availability or
+deployment. Preserve intervening stable patch histories when reconciling parallel
+PRs; do not merge unrelated feature branches merely to reserve a version.
+
+A focused non-Activity v3 extraction may use a new numbered stage such as
+`3.0.0-rc.1` without importing the combined beta history. Do not reuse an existing
+prerelease label for different source. The candidate stage does not close live
+acceptance gates or authorize promotion, publication or deployment.
 
 ## Notes for every change
 
