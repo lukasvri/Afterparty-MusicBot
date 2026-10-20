@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import type { SocialState } from "../services/core/src/social.ts";
 import type { Room } from "../lib/types.ts";
+import type { Locator } from "playwright";
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright") as typeof import("playwright");
 const base = process.env.PREVIEW_URL ?? "http://127.0.0.1:8787";
 assert(["localhost", "127.0.0.1"].includes(new URL(base).hostname));
@@ -75,6 +76,12 @@ try {
     };
   });
   const page = await context.newPage();
+  const waitForFocus = async (target: Locator) => {
+    const element = await target.elementHandle();
+    assert(element);
+    // Focus restoration follows React effects or the next animation frame.
+    await page.waitForFunction(el => el === document.activeElement, element, { timeout: 5000 });
+  };
   const setOffline = async (offline: boolean) => {
     await context.setOffline(offline);
     await page.evaluate(value => { (window as unknown as { socialTestOffline: boolean }).socialTestOffline = value; window.dispatchEvent(new Event(value ? "offline" : "online")); }, offline);
@@ -94,7 +101,7 @@ try {
   await choose("Concert bingo");
   const create = panel.getByRole("button", { name: "Create card" });
   await create.focus(); await page.keyboard.press("Enter");
-  assert.equal(await page.getByRole("textbox", { name: "Moment 1", exact: true }).evaluate(el => el === document.activeElement), true);
+  await waitForFocus(page.getByRole("textbox", { name: "Moment 1", exact: true }));
   await page.getByRole("textbox", { name: "Moment 2", exact: true }).fill("Opening song");
   assert(await panel.getByRole("button", { name: "Start card" }).isDisabled());
   await panel.getByText("Enter nine different, non-empty moments without control characters.").waitFor();
@@ -229,10 +236,10 @@ try {
   await page.getByRole("button", { name: "English", exact: true }).click();
   await panel.getByRole("button", { name: "All extras", exact: true }).focus();
   await page.keyboard.press("Escape");
-  assert.equal(await panel.getByRole("button", { name: "Concert bingo", exact: true }).evaluate(el => el === document.activeElement), true);
+  await waitForFocus(panel.getByRole("button", { name: "Concert bingo", exact: true }));
   await page.keyboard.press("Escape");
   assert.equal(await panel.getByRole("button", { name: /Games & extras/ }).getAttribute("aria-expanded"), "false");
-  assert.equal(await panel.getByRole("button", { name: /Games & extras/ }).evaluate(el => el === document.activeElement), true);
+  await waitForFocus(panel.getByRole("button", { name: /Games & extras/ }));
   social.bingo = { cells: ["A","B","C","D","E","F","G","H","I"], marked: [], active: false };
   manage = false;
   await page.reload();
