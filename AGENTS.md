@@ -1,7 +1,8 @@
 # Working on Afterparty
 
 This repository is the source of truth for the website and Core. Write public
-documentation in English. Do not use em dashes.
+documentation in English and owner-facing updates in Norwegian Bokmål. Do not
+use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Source freshness
 
@@ -16,10 +17,13 @@ documentation in English. Do not use em dashes.
 
 ## Development and validation
 
-- Use Node.js 24.17+, Python 3.11+ and FFmpeg. Run `npm run setup:cloud` to install both locked
-  dependency trees, then `npm run check:all` for lint with zero warnings, website typechecks, browser
-  behavior tests, deployer recovery tests, Core typechecks and tests including real audio, and a website
-  production build. Docker is not required for these checks.
+- Use Node.js 24.17+, Python 3.11+ and FFmpeg. `npm run setup:cloud` installs both
+  locked dependency trees. `npm run check:all` runs lint with zero warnings,
+  recovery and application tests, both typechecks, Core audio tests with real
+  FFmpeg, and the website production build. Separate Playwright browser suites
+  are not included; run relevant browser suites for UI/playback changes. Docker
+  is not required for these checks. For internal documentation-only edits,
+  verify links and the diff without running the full application suite.
 - Core lives in `services/core/src/`; the website is in `app/`, `components/`,
   `hooks/` and `lib/`. Preserve third-party license notices.
 - Keep changes focused and report the checks actually run and any limitations.
@@ -32,13 +36,12 @@ documentation in English. Do not use em dashes.
 
 ## Delegation and review
 
-- For Dot-led owner requests, investigate first using current GitHub source, related
-  issues/PRs and available research tools. Dot should trace likely causes, weigh
-  alternatives, identify constraints and write acceptance criteria before deciding
-  whether Codex is needed. Dot should resolve research-only questions itself.
-  Delegate implementation, executable tests and environment-specific debugging
-  to Codex when required, with evidence and a precise handoff. Do not delay
-  straightforward changes with unnecessary analysis or delegation.
+- For Dot-led requests, inspect current GitHub evidence and only the files,
+  issues and documentation relevant to the task. Investigate bugs, constraints
+  and tradeoffs enough to define observable acceptance criteria. Skip lengthy
+  discovery for small, obvious changes. Dot resolves research-only requests
+  directly; delegate code edits, executable tests or environment-specific
+  debugging to Codex when needed, with a focused technical handoff.
 - Use subagents or delegation when the active tool supports it and independent
   work benefits from parallel execution, such as source inspection and review.
   Give each agent a bounded task, source ref and acceptance criteria. Assign
