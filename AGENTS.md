@@ -36,7 +36,8 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Delegation and review
 
-- ChatGPT Chat is the project coordinator and primary owner dialogue. Dot
+- The owner can work directly with Codex and GitHub. ChatGPT Chat is an
+  optional coordinator when the owner chooses it; it is not a dependency. Dot
   (Sjefen) is temporarily excluded from the active workflow because it is
   unstable. Do not route tasks, handoffs or reviews through Dot. Resume its role
   only after an explicit owner decision. ChatGPT Work remains excluded.
@@ -96,7 +97,7 @@ See [Cloud workflow](docs/CLOUD_DEVELOPMENT.md) and [operations](services/core/P
 
 ## Shared AI context
 
-- For ChatGPT Chat coordination and Codex implementation, consult
+- For direct Codex work or optional ChatGPT Chat coordination, consult
   [shared project context](docs/AI_CONTEXT.md) and
   [AI collaboration workflow](docs/AI_WORKFLOW.md). The live repository and
   reviewed PRs, not assistant chat history, are the source of truth.

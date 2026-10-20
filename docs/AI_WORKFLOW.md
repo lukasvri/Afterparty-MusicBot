@@ -1,8 +1,8 @@
-# AI collaboration: ChatGPT Chat, Codex and GitHub
+# Afterparty workflow: Codex and GitHub
 
 [Documentation](README.md) · [Project context](AI_CONTEXT.md) · [Core instructions](../AGENTS.md) · [Cloud development](CLOUD_DEVELOPMENT.md)
 
-The owner talks to **ChatGPT Chat** about new Afterparty ideas, problems and decisions. Chat coordinates the remaining supported work, primarily through Codex and GitHub. The owner should not need to repeat a request in Codex, manually pass task status between assistants, or supervise routine implementation steps.
+The owner can work **directly in Codex and GitHub**. Codex reads current source, investigates, implements, tests and prepares reviewable changes; the owner makes protected decisions. ChatGPT Chat can coordinate when the owner chooses it, but opening Chat or relaying messages through another assistant is not required. Start with [the dated Codex handoff](CODEX_HANDOFF.md) when continuing the October 2026 recovery work.
 
 **Dot (Sjefen) is temporarily excluded from the entire active workflow because it is unstable.** Do not use Dot for owner dialogue, research, task routing, handoffs, reviews or follow-up. Resume Dot only after an explicit owner decision. This replaces the previous Dot-led workflow and its setup instructions.
 
@@ -12,7 +12,7 @@ The owner talks to **ChatGPT Chat** about new Afterparty ideas, problems and dec
 
 | Tool | Responsibility | Expected output |
 | --- | --- | --- |
-| ChatGPT Chat | Owner's main interface; inspect GitHub, refine goals, prioritize, research, delegate, review, track and follow up | A completed coordination loop, relevant links, verified status and only essential owner decisions |
+| ChatGPT Chat (optional) | When explicitly chosen by the owner; inspect GitHub, refine goals, prioritize, research, delegate, review, track and follow up | A completed coordination loop, relevant links, verified status and only essential owner decisions |
 | Codex | Inspect, implement, debug, test, review and use supported subagents | A focused branch, updated release notes where required, checks and draft PR |
 | GitHub | Canonical source, issues, PRs, CI, decisions and release records | Named commits, reviewable diffs and persistent task state |
 
@@ -27,7 +27,7 @@ The owner talks to **ChatGPT Chat** about new Afterparty ideas, problems and dec
 
 ## Chat-first investigation before Codex
 
-Chat should use its own supported tools to do the analytical work before delegating. This is the default, not a compulsory lengthy research phase for minor changes.
+This section applies only when the owner chooses Chat as coordinator. In a direct Codex task, Codex performs the same source inspection, diagnosis and acceptance planning itself. No preliminary Chat session is required. Keep the work proportionate to the change.
 
 1. **Inspect the evidence.** Read current GitHub source and related issues/PRs. For bugs, trace the relevant functions, state transitions and event boundaries; compare reported symptoms with actual code and existing tests. Use current external documentation or community reports when needed. Never invent reproductions, runtime logs or findings from inaccessible systems.
 2. **Form a technical diagnosis.** Separate verified facts, plausible hypotheses and unknowns. Check for duplicate or in-progress fixes and relevant architectural or security constraints, including queue order, per-server isolation, playback revisions, compatibility and data safety.
@@ -40,7 +40,7 @@ Chat's available connected tools can support investigation where permitted. Clou
 
 ## Chat's end-to-end task ownership
 
-When the owner describes a feature, bug, design idea or improvement, Chat should take responsibility for all authorized follow-through, not stop at writing a prompt.
+When the owner explicitly chooses Chat as coordinator for a feature, bug, design idea or improvement, Chat should take responsibility for all authorized follow-through, not stop at writing a prompt.
 
 1. **Understand the goal.** Use the conversation to identify expected behavior, scope and observable acceptance criteria. Make reversible implementation choices independently. Ask the owner only if a missing decision materially changes the result, cost, safety or protected action.
 2. **Read relevant project state.** Refresh GitHub `main` and inspect applicable issues, PRs and source files. Follow [AGENTS.md](../AGENTS.md); consult [project context](AI_CONTEXT.md), this guide and architectural documents when relevant. For minor documentation edits, do not read unrelated source or documents. Verify whether a proposed change already exists; do not mistake old chat content for current repository facts.
@@ -65,10 +65,10 @@ These are requested responsibilities, not a promise that every account, Chat ses
 
 ## Setup
 
-1. Connect ChatGPT Chat to the accessible `lukasvri/Afterparty-MusicBot` repository and, where supported, a configured Codex environment. Set up any local access separately, only with explicit permission.
+1. Open the `lukasvri/Afterparty-MusicBot` project directly in Codex and connect GitHub as available. Chat coordination is optional. Set up local host access separately, only with explicit permission.
 2. Keep `AGENTS.md`, `docs/AI_CONTEXT.md` and this workflow available to Chat and Codex. The current repository replaces any stale project file copies.
 3. In Codex, work from a current checkout. `AGENTS.md` supplies repository-wide constraints; this guide explains owner coordination and handoffs.
-4. Use the one-time brief below in the existing ChatGPT Chat project or conversation. The repository files do not automatically alter an existing Chat's project instructions or model settings.
+4. Only if using optional Chat coordination, use the one-time brief below in that Chat project or conversation. The repository files do not automatically alter an existing Chat's project instructions or model settings.
 5. Keep private credentials, host settings, backups, personal identifiers and production data out of public prompts, branches, issues and PRs.
 
 ### One-time message for ChatGPT Chat

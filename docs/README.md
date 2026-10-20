@@ -62,5 +62,6 @@ The [asset notes](assets/README.md) identify the generated brand banner and synt
 
 ## AI collaboration
 
-- [AI collaboration workflow](AI_WORKFLOW.md): ChatGPT Chat coordination, Codex implementation, shared context and practical handoff prompts; Dot is temporarily paused and Work is excluded.
+- [Codex handoff](CODEX_HANDOFF.md): dated source/deployment state, failed synthetic-game rollout, verified rollback, preserved work and the next safe task.
+- [AI collaboration workflow](AI_WORKFLOW.md): direct Codex and GitHub work, optional Chat coordination and practical prompts; Dot is paused and Work is excluded.
 - [Shared AI project context](AI_CONTEXT.md): durable product decisions, source-of-truth rules and important architecture boundaries.
