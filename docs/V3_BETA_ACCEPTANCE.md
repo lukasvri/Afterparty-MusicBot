@@ -1,7 +1,8 @@
 # Non-Activity concert extras acceptance
 
-This checklist covers the focused non-Activity v3 source candidate, stacked on
-player/error and channel-boundary PR #84 and FIFO queue PR #83. It does not
+This checklist covers the focused non-Activity v3 source candidate targeting `main`,
+preserving the merged player/error and channel-boundary fixes from PR #84 and
+FIFO queue fixes from PR #83. It does not
 approve production installation, public launch, a Discord Activity, or a stable
 release. The source deliberately excludes Discord Activity code. Website and Core must
 be reviewed and installed together in a separately
