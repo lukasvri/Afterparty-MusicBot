@@ -9,6 +9,9 @@ import { Engine } from "./engine.ts";
 import { Commands } from "./commands.ts";
 import { UserError, publicTrack } from "./types.ts";
 import { Rooms } from "./rooms.ts";
+import { GuessHttp } from "./guess-http.ts";
+import type { GuessCatalog } from "./guess-catalog.ts";
+import type { GuessMediaSource } from "./guess-media.ts";
 import type { Guilds, GuildSession } from "./guilds.ts";
 import type { DiscordOAuth } from "./oauth.ts";
 import { verifyTicket } from "./tickets.ts";
@@ -46,6 +49,8 @@ export async function body(request: IncomingMessage, maximum = 16384) {
 }
 type Options = {
   key: string;
+  guessCatalog?: GuessCatalog;
+  guessMedia?: GuessMediaSource;
   origin: string;
   publicPort?: number;
   guilds?: Guilds;
@@ -134,6 +139,14 @@ export async function createServers(
     }
     return { id, status: previous?.status ?? "processing" };
   };
+  const guessing = new GuessHttp({
+    key: options.key, authenticate, body, json, catalog: options.guessCatalog, media: options.guessMedia,
+    browserRoom: id => id !== "DISCORD1" && !options.guilds?.byRoom(id),
+    guild: async (grant, id, signal) => {
+      if (!options.oauth || select(id).id !== id) throw new UserError("Discord sign-in required.", 403);
+      return options.oauth.member(grant, id, signal);
+    },
+  });
   const publicServer = createServer(async (request, response) => {
     const started = performance.now();
     response.once("finish", () =>
@@ -141,6 +154,7 @@ export async function createServers(
     );
     try {
       const url = new URL(request.url ?? "/", "http://core");
+      if (url.pathname === "/v1/guess") { await guessing.handle(request, response); return; }
       limit("public:" + request.socket.remoteAddress, 600);
       if (
         request.method === "GET" &&

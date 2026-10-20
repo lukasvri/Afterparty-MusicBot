@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { Radio, ShieldCheck, Users } from "lucide-react";
+import { Radio, ShieldCheck, Users, Gamepad2 } from "lucide-react";
 import { useLanguage } from "./language";
 export function Logo() {
   const { t } = useLanguage();
@@ -23,9 +23,11 @@ export function Sidebar({
   admin = false,
   view = "music",
   onNavigate,
+  gameHref = "/games",
 }: {
   admin?: boolean;
-  view?: "music" | "rooms";
+  view?: "music" | "rooms" | "games";
+  gameHref?: string;
   onNavigate?: (view: "music" | "rooms") => void;
 }) {
   const { t } = useLanguage();
@@ -69,6 +71,7 @@ export function Sidebar({
         >
           <Users size={17} /> {t("Åpne rom")}
         </Link>
+        <Link prefetch={false} target="_top" href={gameHref} className={!admin && view === "games" ? "nav-link active" : "nav-link"} aria-current={!admin && view === "games" ? "page" : undefined}><Gamepad2 size={17} /> {t("Games")}</Link>
         <Link prefetch={false} target="_top"
           className={admin ? "nav-link active" : "nav-link"}
           aria-current={admin ? "page" : undefined}

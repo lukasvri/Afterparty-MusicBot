@@ -21,6 +21,7 @@ File: `services/core/.env`. Docker Compose loads this file. After editing it, ru
 | `SPOTIFY_CLIENT_ID` | Optional | Your Spotify application client ID |
 | `SPOTIFY_CLIENT_SECRET` | Optional | Matching Spotify client secret |
 | `LASTFM_API_KEY` | Optional | Enables Last.fm-backed radio recommendations |
+| `GUESS_SYNTHETIC_TEST` | Optional | Exact value `1` enables five fictional generated test tones for the game preview; default off. No real songs or external provider audio. See [test guide](GUESS_SYNTHETIC_TEST.md). |
 | `MAX_ACTIVE_VOICE_SESSIONS` | Optional | Simultaneous voice-session limit; default `8`, not a measured capacity guarantee |
 
 Compose sets `DATA_DIR=/data` and `CORE_PORT=3990`. Keep these consistent with its volume and port configuration. The Docker image supplies Node, FFmpeg and yt-dlp.

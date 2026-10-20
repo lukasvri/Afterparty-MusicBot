@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.3.0-alpha.1: Synthetic multiplayer game test
+
+2026-10-20
+
+- Games adds a separate Guess the Song lobby for existing private rooms and authorized Discord servers. Hosts choose rounds, time, scoring and hints; players submit titles and see shared results. Game state and audio never write music queues or control ordinary playback. This focused preview excludes concert reactions, highlights, bingo and Discord Activities.
+- Core operators can explicitly enable GUESS_SYNTHETIC_TEST=1 to test multiplayer rounds with five locally generated tones and fictional Test Tone One through Test Tone Five answers. The website labels this synthetic test catalog, limits it to five rounds of at most 30 seconds, and starts preview audio only after a local click. No real songs, external provider transport or music rights are included; the default catalog remains unavailable.
+- Game requests reuse room or fresh Discord membership authorization, bind answers and media to the current session and round, and reject stale or repeated actions. Local audio stops on cancellation, hidden tabs, disconnection, changed access and round changes. Sessions are ephemeral and disappear on Core restart. Automated synthetic checks do not establish real music availability or audible Discord playback.
+
 ## v2.2.14: Keep specific player failures visible
 
 2026-10-20
