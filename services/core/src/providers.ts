@@ -4,6 +4,7 @@ import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
+import { deezerRef, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
 import {
@@ -87,6 +88,7 @@ export class Providers {
   spotifyId: string;
   spotifySecret: string;
   spotifyCatalog: SpotifyCatalog;
+  private readonly deezerMetadata: boolean;
   recommendations: Recommendations;
   recommendationStatus = "artist";
   private searches = new Map<string, Promise<Track[]>>();
@@ -96,6 +98,7 @@ export class Providers {
     this.key = env.YOUTUBE_API_KEY ?? "";
     this.spotifyId = env.SPOTIFY_CLIENT_ID ?? "";
     this.spotifySecret = env.SPOTIFY_CLIENT_SECRET ?? "";
+    this.deezerMetadata = env.DEEZER_METADATA === "1";
     this.spotifyCatalog = new SpotifyCatalog(
       this.spotifyId,
       this.spotifySecret,
@@ -337,6 +340,12 @@ export class Providers {
       const items = await this.spotify(spotify.kind, spotify.id);
       return mapLimited(items, 3, (item) => this.matchSong(item));
     }
+    const deezer = deezerRef(query);
+    if (deezer) {
+      if (!this.deezerMetadata) throw new UserError("Deezer link matching is not enabled for this installation.");
+      const items = await loadDeezer(deezer, Math.min(500, this.store.settings().playlistLimit));
+      return mapLimited(items, 3, (item) => this.matchSong(item));
+    }
     if (soundcloudUrl(query) || /^sc(?:search)?:/i.test(query))
       return resolveSoundcloud(
         query,
@@ -344,7 +353,7 @@ export class Providers {
         (args) => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args),
       );
     if (/^https?:\/\//.test(query))
-      throw new UserError("Use a YouTube, Spotify or SoundCloud link.");
+      throw new UserError(this.deezerMetadata ? "Use a YouTube, Spotify, Deezer or SoundCloud link." : "Use a YouTube, Spotify or SoundCloud link.");
     const audio = /\b(live|video|konsert|concert)\b/i.test(query)
       ? query
       : query + " audio";

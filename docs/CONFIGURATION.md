@@ -20,6 +20,7 @@ File: `services/core/.env`. Docker Compose loads this file. After editing it, ru
 | `YOUTUBE_API_KEY` | Optional for Core | YouTube Data API key; Core has a search fallback |
 | `SPOTIFY_CLIENT_ID` | Optional | Your Spotify application client ID |
 | `SPOTIFY_CLIENT_SECRET` | Optional | Matching Spotify client secret |
+| `DEEZER_METADATA` | Optional | Exact value `1` enables canonical Deezer track/album/playlist metadata lookup for normal playback and matching through existing sources. Default off; at most 500 entries within the configured playlist limit. No Deezer preview/full-audio streaming or Guess the Song inventory is enabled. |
 | `LASTFM_API_KEY` | Optional | Enables Last.fm-backed radio recommendations |
 | `GUESS_SYNTHETIC_TEST` | Optional | Exact value `1` enables five fictional generated test tones for the game preview; default off. No real songs or external provider audio. See [test guide](GUESS_SYNTHETIC_TEST.md). |
 | `MAX_ACTIVE_VOICE_SESSIONS` | Optional | Simultaneous voice-session limit; default `8`, not a measured capacity guarantee |

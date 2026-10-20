@@ -48,6 +48,18 @@ test('Spotify references support URI and regional URLs without accepting spoofed
  assert.equal(spotifyRef('https://open.spotify.com.evil.test/track/'+source.id),null);
  await assert.rejects(expandSpotifyLink('https://spotify.link/test',async()=>new Response(null,{status:302,headers:{location:'http://127.0.0.1:3990'}})),/Invalid/);
 });
+
+test('version words in a title or artist credit cannot substitute for an explicit recording version',()=>{
+ for(const title of ['Live Forever','Live Forever With A Long Completely Distinct Song Title']){
+  const live={...source,title:title+' Live'};
+  assert.equal(scoreMatch(live,track('Artist - '+title)),0);
+  assert(scoreMatch(live,track('Artist - '+title+' (Live)'))>.9);
+ }
+ const liveArtist={...source,artist:'Live',title:'Live Forever Live'};
+ assert.equal(scoreMatch(liveArtist,{...track('Live - Live Forever'),artist:'Live - Topic'}),0);
+ assert(scoreMatch(liveArtist,{...track('Live - Live Forever (Live)'),artist:'Live - Topic'})>.9);
+ assert(scoreMatch({...liveArtist,title:'Live Forever'},{...track('Live Forever'),artist:'Live - Topic'})>.9);
+});
 test('Spotify paginates in order and ignores episodes and local files',async()=>{
  const song=(id:string)=>({id,name:'Song '+id,artists:[{name:'Artist'}],duration_ms:200000,type:'track',external_ids:{isrc:source.isrc}});const calls:string[]=[];
  const fake=async(url:Parameters<typeof fetch>[0])=>{calls.push(String(url));if(String(url).includes('/api/token'))return Response.json({access_token:'test',expires_in:3600});if(String(url).includes('offset=2'))return Response.json({items:[{item:song('two')}],next:null});return Response.json({items:[{track:song('one')},{track:{...song('local'),is_local:true}},{track:{...song('podcast'),type:'episode'}}],next:'https://api.spotify.com/v1/playlists/list/items?offset=2'});};
@@ -57,6 +69,26 @@ test('matching uses ISRC first, verifies candidate and caches a fresh entry iden
  const t=setup();try{const p=new Providers(t.store,{});const queries:string[]=[];p.search=async q=>{queries.push(q);return [track()]};p.video=async()=>[track()];const a=await p.matchSong(source),b=await p.matchSong(source);assert.deepEqual(queries,['"'+source.isrc+'"']);assert.equal(a.catalog?.id,source.id);assert.notEqual(a.entryId,b.entryId);
  p.search=async q=>q.includes(source.isrc)?[track('Artist - Example Song Live')]:[track()];await p.matchSong({...source,id:'different'});
  }finally{t.close();}
+});
+
+test('Deezer metadata is opt-in and uses strict existing source matching without Spotify enrichment or preview playback',async t=>{
+ const f=setup();try{
+  let fetches=0,enrichments=0;const queries:string[]=[];
+  t.mock.method(globalThis,'fetch',async()=>{fetches++;return Response.json({id:123,title:'Example Song',duration:200,readable:true,artist:{name:'Artist'},isrc:source.isrc,preview:'https://untrusted.example/secret.mp3'});});
+  for(const value of [undefined,'0','true','yes'])await assert.rejects(new Providers(f.store,{DEEZER_METADATA:value}).resolve('https://www.deezer.com/track/123'),/not enabled/);
+  assert.equal(fetches,0,'disabled imports never contact the provider');
+  const p=new Providers(f.store,{DEEZER_METADATA:'1'});
+  t.mock.method(p.spotifyCatalog,'enrich',async()=>{enrichments++;throw Error('must not enrich Deezer as Spotify');});
+  p.search=async query=>{queries.push(query);return [track('Artist - Example Song Live'),track()];};p.video=async()=>[track()];
+  const first=await p.resolve('https://www.deezer.com/track/123'),second=await p.resolve('https://www.deezer.com/track/123');
+  assert.equal(first[0].id,'abcdefghijk');assert.equal(first[0].source,'youtube');
+  assert.equal(first[0].catalog?.isrc,source.isrc);assert.equal(first[0].catalog?.id,undefined);assert.equal(enrichments,0);
+  assert.deepEqual(queries,['"'+source.isrc+'"']);assert.notEqual(first[0].entryId,second[0].entryId);
+  assert.equal(JSON.stringify(first).includes('secret.mp3'),false);assert.equal(fetches,2);
+  p.search=async()=>[track('Artist - Different Song')];p.video=async()=>[];
+  await assert.rejects(p.resolve('https://www.deezer.com/track/123'),/reliable audio match/);
+  const before=fetches;await assert.rejects(p.resolve('https://www.deezer.com.evil.test/track/123'),/Use a/);assert.equal(fetches,before);
+ }finally{f.close();}
 });
 test('bounded matching preserves playlist order despite out-of-order completion',async()=>{const out=await mapLimited([20,0,5],2,async n=>{await new Promise(r=>setTimeout(r,n));return n;});assert.deepEqual(out,[20,0,5]);});
 const sc=(id:string)=>({id,title:'Sound '+id,uploader:'Artist',duration:180,webpage_url:'https://soundcloud.com/artist/'+id,thumbnail:'https://example.test/image'});

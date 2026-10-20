@@ -6,7 +6,15 @@ export function scoreMatch(source:CatalogSong,track:Track){
  if(track.live||!Number.isFinite(track.duration)||track.duration<=0)return 0;
  if(source.duration>0&&Math.abs(track.duration-source.duration)>Math.max(12,Math.min(30,source.duration*.08)))return 0;
  const title=normalized(track.title),wanted=normalized(source.title),artist=normalized(track.artist);
- for(const version of versions)if(new RegExp(`\\b${version}\\b`).test(title)!==new RegExp(`\\b${version}\\b`).test(wanted))return 0;
+ // A version word in the song title or verified artist credit cannot stand in
+ // for a second, explicit version marker supplied by the catalog.
+ const separator=/\s+[-:\u2013\u2014]\s+/.exec(track.title);
+ const recordingTitle=separator&&normalized(track.title.slice(0,separator.index))===normalized(source.artist)
+  ?normalized(track.title.slice(separator.index+separator[0].length)):title;
+ for(const version of versions){
+  const pattern=new RegExp('\\b'+version+'\\b','g');
+  if((recordingTitle.match(pattern)?.length??0)!==(wanted.match(pattern)?.length??0))return 0;
+ }
  const words=wanted.split(' ').filter(w=>w.length>1&&!['feat','ft','official','audio','video'].includes(w));
  const artists=normalized(source.artist).split(' ').filter(w=>w.length>1);
  const actual=new Set((title+' '+artist).split(' ')),titleWords=new Set(title.split(' '));

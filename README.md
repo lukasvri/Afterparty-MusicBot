@@ -27,7 +27,7 @@ Play music in a Discord voice channel, share a concert with video, or open a pri
 
 Ordinary queue additions append after existing entries, including eligible radio suggestions. Explicit play-next and play-now controls retain their distinct behavior. A full queue rejects additions without silently dropping earlier entries.
 
-YouTube video uses the official embedded player. SoundCloud provides audio; Spotify links are matched to a playable source. Provider availability and browser autoplay rules still apply.
+YouTube video uses the official embedded player. SoundCloud provides audio; Spotify links are matched to a playable source. Core can optionally match canonical Deezer track, album and playlist metadata through existing sources with `DEEZER_METADATA=1`; this does not stream Deezer audio or fill the quiz catalog. See the [source investigation](docs/MUSIC_SOURCE_INVESTIGATION.md). Provider availability and browser autoplay rules still apply.
 
 ## Built for the big screen. Ready for your pocket.
 
@@ -57,6 +57,11 @@ or a licensed catalog. See [synthetic game testing](docs/GUESS_SYNTHETIC_TEST.md
 Reviewed server integrations can prepare explicitly approved WAV inventory using
 the [bounded operator catalog adapter](docs/GUESS_CATALOG_SOURCES.md). This does
 not activate a provider or supply approved real music in the default application.
+
+The lobby offers title or artist answers and capacity-aware quick/classic presets.
+Settings must be saved before starting. Joined players can vote to skip a round;
+a strict roster majority reveals the answer without changing scores. The host
+keeps the reveal and next-round controls. See the [two-client test guide](docs/GUESS_SYNTHETIC_TEST.md).
 
 ## Stable and experimental channels
 

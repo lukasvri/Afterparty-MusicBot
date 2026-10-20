@@ -45,6 +45,8 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 
 ## Engineering records
 
+- [Music source investigation](MUSIC_SOURCE_INVESTIGATION.md): verified Jockie features, independently documented source architecture and current quiz scope.
+
 These are dated reviews of specific changes, not a live checklist of production status. Their test counts and baselines refer to the snapshot they describe.
 
 | Record | Context |

@@ -12,6 +12,11 @@ independent or classical catalog can support development, but does not replace
 that product requirement. No provider agreement or playable commercial inventory
 has been established.
 
+The [music source investigation](MUSIC_SOURCE_INVESTIGATION.md) compares Jockie's
+documented quiz behavior with an independently documented metadata/playback
+architecture and Afterparty's actual resolver. Optional Deezer metadata matching
+for ordinary music is separate from a playable quiz inventory.
+
 Each private record supplies song metadata, explicit category membership,
 canonical WAV bytes and an operator approval with an HTTPS evidence reference
 and permission expiry. References receive syntax checks only. Neither approval
