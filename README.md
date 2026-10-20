@@ -50,6 +50,8 @@ Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 a
 
 The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The `3.0.0-rc.1` candidate remains review source with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
 
+The dedicated Games tab contains the competitive Guess the song source foundation. Its default catalog has no songs: automatic category discovery and real audio remain unavailable pending a rights-cleared source and reviewed delivery adapter. Hosts can configure lobby rules; synthetic tests cover scoring and UI, not a finished music catalog. See [the game contract](docs/GUESS_THE_SONG.md).
+
 ## Run your own Afterparty
 
 The full stack has two services. **Core** runs on your computer or server and sends audio to Discord. The **website** runs on Cloudflare Workers/D1 or Sites and provides rooms, video and administration. Core's host must stay online for Discord playback.

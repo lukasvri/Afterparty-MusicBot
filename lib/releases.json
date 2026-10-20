@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.0.0-rc.2",
+    "date": "2026-10-20",
+    "title": "Independent Guess the song source foundation",
+    "items": [
+      "A dedicated Games tab adds a competitive quiz lobby, category cards, server-clock countdown, late hints, private answer feedback and an anonymous game scoreboard. Hosts choose category, round length and count, starting/minimum points and hints in the lobby; active rounds freeze those settings. Earlier answers are never rescored. Each participant can earn points once per round, with faster answers worth more.",
+      "Built-in categories such as 2010s and EDM classics are represented by a bounded catalog adapter, not personal uploads or custom playlists. The production adapter has no songs and real music rounds remain unavailable. Eligible catalog discovery, rights, real audio delivery and a reviewed media transport remain unresolved. Synthetic test audio verifies explicit local listening and cleanup only; it is not a playable music catalog. YouTube is not hidden or used as quiz audio, and Spotify is not used for the game.",
+      "Games reuse verified room or Discord-server access but have their own sessions, participants, revisions, event receipts and moderation capacity. The game never imports rooms, reads private music queues or issues shared playback commands. Leaving the dedicated page releases local game audio; music preferences remain unchanged. Discord or other-tab audio must be muted by the listener if needed.",
+      "This rc.2 candidate retains the separately reviewed FIFO queue, player-error and optional concert-extras changes. It is source review material with open catalog and live acceptance gates, not a stable/public release, catalog license or deployment."
+    ]
+  },
+  {
     "version": "3.0.0-rc.1",
     "date": "2026-10-20",
     "title": "Concert extras without Discord Activity",
