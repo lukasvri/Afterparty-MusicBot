@@ -262,6 +262,50 @@ try {
   await layout(page, 'synthetic-results-en');
   await page.getByRole('button', { name: 'New game', exact: true }).click();
   await page.getByRole('heading', { name: 'Game settings', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Quick (15 seconds)', exact: true }).click();
+  await page.getByLabel('Rounds', { exact: true }).fill('1');
+  await page.getByLabel('Answer mode', { exact: true }).selectOption('artist');
+  assert(await page.getByRole('button', { name: 'Start game', exact: true }).isDisabled(), 'artist preset changes require an explicit save');
+  const artistSaved = page.waitForResponse(r => r.url().endsWith('/api/guess') && r.request().postDataJSON()?.action === 'configure');
+  await page.getByRole('button', { name: 'Save game settings', exact: true }).click(); assert.equal((await artistSaved).status(), 200);
+  await page.getByRole('button', { name: 'Start game', exact: true }).click();
+  for (const c of [host, guest]) {
+    await c.page.getByRole('heading', { name: 'Who’s the artist?', exact: true }).waitFor();
+    await c.page.getByRole('button', { name: 'Listen to preview', exact: true }).click(); await playing(c.page);
+    assert.equal(c.latest().game.settings.answerMode, 'artist');
+    assert.equal(c.latest().game.round!.skipVotes, 0); assert.equal(c.latest().game.round!.skipRequired, 2);
+  }
+  const wrongArtist = page.waitForResponse(r => r.url().endsWith('/api/guess') && r.request().postDataJSON()?.action === 'guess');
+  await page.getByLabel('Artist name', { exact: true }).fill('Test Tone One'); await page.getByRole('button', { name: 'Send guess', exact: true }).click();
+  assert.deepEqual((await (await wrongArtist).json() as Result).self.result, { correct: false, awarded: 0 });
+  await page.getByText('Not quite. Try another artist.', { exact: true }).waitFor();
+  const artistReply = page.waitForResponse(r => r.url().endsWith('/api/guess') && r.request().postDataJSON()?.action === 'guess');
+  await page.getByLabel('Artist name', { exact: true }).fill('Synthetic Test Generator'); await page.getByRole('button', { name: 'Send guess', exact: true }).click();
+  const artistResult = await (await artistReply).json() as Result;
+  assert(artistResult.self.result?.correct); const artistAward = artistResult.self.result.awarded;
+  assert(artistAward >= 100 && artistAward <= 1000);
+  const scoresBeforeSkip = artistResult.game.scoreboard.map(player => player.total);
+  const nextBeforeSkip = host.diagnostics().replies.filter(reply => reply.action === 'next').length;
+  const guestSkip = guest.page.waitForResponse(r => r.url().endsWith('/api/guess') && r.request().postDataJSON()?.action === 'skip');
+  await guest.page.getByRole('button', { name: 'Vote to skip', exact: true }).click();
+  const firstVote = await (await guestSkip).json() as Result;
+  assert.equal(firstVote.self.skipVoted, true); assert.equal(firstVote.game.phase, 'round'); assert.equal(firstVote.game.round!.skipVotes, 1);
+  await guest.page.getByText('1 of 2 votes to reveal this round', { exact: true }).waitFor();
+  assert(await guest.page.getByRole('button', { name: 'Skip vote recorded', exact: true }).isDisabled());
+  await page.getByRole('button', { name: 'Vote to skip', exact: true }).click();
+  for (const c of [host, guest]) {
+    await c.page.getByRole('heading', { name: 'Synthetic Test Generator', exact: true }).waitFor(); await released(c.page);
+    assert.equal(c.latest().game.phase, 'reveal'); assert.equal(c.latest().game.roundNumber, 1);
+    assert.deepEqual(c.latest().game.scoreboard.map(player => player.total), scoresBeforeSkip, 'skip quorum never changes scores');
+  }
+  assert.equal(host.diagnostics().replies.filter(reply => reply.action === 'next').length, nextBeforeSkip, 'skip reveal never auto-advances');
+  await layout(page, 'synthetic-artist-skip');
+  await page.getByRole('button', { name: 'Next round', exact: true }).click();
+  await page.getByRole('button', { name: 'New game', exact: true }).click();
+  await page.getByLabel('Answer mode', { exact: true }).selectOption('title');
+  await page.getByRole('button', { name: 'Classic (30 seconds)', exact: true }).click();
+  const titleSaved = page.waitForResponse(r => r.url().endsWith('/api/guess') && r.request().postDataJSON()?.action === 'configure');
+  await page.getByRole('button', { name: 'Save game settings', exact: true }).click(); assert.equal((await titleSaved).status(), 200);
   await page.getByRole('button', { name: 'Start game', exact: true }).click();
   await page.getByRole('button', { name: 'Listen to preview', exact: true }).click(); await playing(page);
   await page.getByRole('button', { name: 'Leave game', exact: true }).click(); await released(page);
