@@ -29,7 +29,10 @@ function song(value:unknown):{id:string;song:CatalogSong}|null{
  if(!title||!artist||typeof duration!=='number'||!Number.isFinite(duration)||duration<=0||duration>86400)return null;
  const version=text(track.title_version,200);
  if(track.title_version!==undefined&&track.title_version!==null&&track.title_version!==''&&!version)return null;
- const fullTitle=version&&!title.toLocaleLowerCase('en').includes(version.toLocaleLowerCase('en'))?title+' '+version:title;
+ const lowerTitle=title.toLocaleLowerCase('en'),lowerVersion=version?.toLocaleLowerCase('en');
+ // A title word such as Alive, or the opening Live in Live Forever, is not a version annotation.
+ const hasVersion=lowerVersion&&[` ${lowerVersion}`,`(${lowerVersion})`,`[${lowerVersion}]`].some(suffix=>lowerTitle.endsWith(suffix));
+ const fullTitle=version&&!hasVersion?title+' '+version:title;
  if(fullTitle.length>500)return null;
  const result:CatalogSong={title:fullTitle,artist,duration};
  if(typeof track.isrc==='string'&&/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/i.test(track.isrc))result.isrc=track.isrc.toUpperCase();

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {deezerRef,loadDeezer} from '../src/deezer.ts';
 import type {DeezerRef} from '../src/deezer.ts';
 import {UserError} from '../src/types.ts';
+import {scoreMatch} from '../src/matching.ts';
+import type {Track} from '../src/types.ts';
 
 const track=(id:number|string=1,extra:Record<string,unknown>={})=>({id,type:'track',title:'Synthetic Song',artist:{name:'Lead & Artist'},duration:180,readable:true,...extra});
 const ref:DeezerRef={kind:'track',id:'1'};
@@ -135,4 +137,17 @@ test('the overall deadline aborts requests independently of individual request t
 
 test('version metadata stays bounded and malformed or hidden controls cannot alter matching',async()=>{
  for(const extra of [{title:'x'.repeat(499),title_version:'(Live)'},{title_version:'x'.repeat(201)},{title_version:123},{title:'Synthetic\u202e Song'},{artist:{name:'Artist\u200b'}}])await assert.rejects(loadDeezer(ref,1,fake(track(1,extra))),/no available songs/);
+});
+
+test('explicit live versions cannot be hidden inside the title or mistaken for an opening title word',async()=>{
+ for(const title of ['Alive','Live Forever']){
+  const [song]=await loadDeezer(ref,1,fake(track(1,{title,title_version:'Live'})));
+  assert.equal(song.title,title+' Live');
+  const studio:Track={id:'abcdefghijk',entryId:'synthetic',title,artist:'Lead & Artist',duration:180,image:'',live:false,embeddable:true,source:'youtube'};
+  if(title==='Alive')assert.equal(scoreMatch(song,studio),0);
+ }
+ for(const [title,version] of [['Alive (Live)','(Live)'],['Alive (Live)','Live'],['Alive [Live]','Live'],['Alive Live','Live'],['Alive (Radio Edit)','(Radio Edit)']]){
+  assert.equal((await loadDeezer(ref,1,fake(track(1,{title,title_version:version}))))[0].title,title);
+ }
+ await assert.rejects(loadDeezer(ref,1,fake(track(1,{title:'x'.repeat(496)+'Live',title_version:'Live'}))),/no available songs/);
 });
