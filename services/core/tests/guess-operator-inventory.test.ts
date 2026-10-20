@@ -14,6 +14,7 @@ test('private authorized WAV inventory derives duration and keeps evidence and m
   const input = record(), shorter = record(2, 15);
   const inventory = prepareOperatorGuessInventory([input, shorter]); t.after(inventory.dispose);
   assert.equal(inventory.catalog.categories()[0].count, 2);
+  assert.deepEqual(inventory.catalog.categories()[0].durations, [{ seconds: 15, count: 1 }, { seconds: 30, count: 1 }]);
   const song = inventory.catalog.select('2010s', select);
   assert.equal(song.id, input.song.id);
   assert.equal(inventory.catalog.media(song.mediaKey).durationSeconds, 30);
@@ -71,6 +72,7 @@ test('earliest permission expiration disables the whole snapshot before and afte
   t.mock.timers.tick(1000);
   await assert.rejects(pending, { status: 503 });
   assert(inventory.catalog.categories().every(c => c.count === 0 && !c.available));
+  assert(inventory.catalog.categories().every(c => c.durations?.length === 0));
   assert.throws(() => inventory.catalog.select('2010s', select), { status: 503 });
   assert.throws(() => inventory.catalog.media(song.mediaKey), { status: 503 });
   await assert.rejects(inventory.media.read(song.mediaKey, new AbortController().signal), { status: 503 });
@@ -87,11 +89,13 @@ test('five-minute TTL, cancellation and explicit disposal cannot return stale au
   t.mock.timers.tick(300_000);
   await assert.rejects(inventory.media.read(key, new AbortController().signal), { status: 503 });
   assert(inventory.catalog.categories().every(c => !c.available));
+  assert(inventory.catalog.categories().every(c => c.durations?.length === 0));
   const fresh = prepareOperatorGuessInventory([record()]); t.after(fresh.dispose);
   const freshKey = fresh.catalog.select('2010s', select).mediaKey;
   const disposed = fresh.media.read(freshKey, new AbortController().signal); fresh.dispose(); fresh.dispose();
   await assert.rejects(disposed, { status: 503 });
   assert(fresh.catalog.categories().every(c => !c.available));
+  assert(fresh.catalog.categories().every(c => c.durations?.length === 0));
 });
 
 test('empty inventory remains unavailable and eight recordings are the bounded maximum', t => {

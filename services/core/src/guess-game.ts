@@ -95,7 +95,22 @@ export class GuessGame {
         typeof category.name !== 'string' || !category.name.trim() || category.name.length > 60 || CONTROL.test(category.name) ||
         typeof category.available !== 'boolean' || !Number.isInteger(category.count) || category.count < 0 || category.count > 1000 || category.available !== (category.count > 0))
         throw new UserError('The eligible song catalog is unavailable.', 503);
-      seen.add(category.id); return { id: category.id, name: category.name, available: category.available, count: category.count };
+      let durations: GuessCategorySummary['durations'];
+      if (category.durations !== undefined) {
+        if (!Array.isArray(category.durations) || category.durations.length > 76)
+          throw new UserError('The eligible song catalog is unavailable.', 503);
+        durations = [];
+        let previous = 14, total = 0;
+        for (const bin of category.durations) {
+          if (!bin || Array.isArray(bin) || !Number.isInteger(bin.seconds) || bin.seconds <= previous || bin.seconds > 90 ||
+            !Number.isInteger(bin.count) || bin.count < 1 || bin.count > 1000)
+            throw new UserError('The eligible song catalog is unavailable.', 503);
+          durations.push({ seconds: bin.seconds, count: bin.count }); previous = bin.seconds; total += bin.count;
+        }
+        if (total !== category.count) throw new UserError('The eligible song catalog is unavailable.', 503);
+      }
+      seen.add(category.id); return { id: category.id, name: category.name, available: category.available, count: category.count,
+        ...(durations === undefined ? {} : { durations }) };
     });
   }
   private settings(value: unknown): Readonly<GuessSettings> {

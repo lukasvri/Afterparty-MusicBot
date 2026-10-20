@@ -59,7 +59,7 @@ export function prepareOperatorGuessInventory(records: readonly OperatorGuessInv
   const timer = setTimeout(dispose, Math.max(0, expiresAt - Date.now())); timer.unref();
   const catalog: GuessCatalog = {
     categories() {
-      if (disposed || Date.now() >= expiresAt) { dispose(); return stored.categories().map(c => ({ ...c, available: false, count: 0 })); }
+      if (disposed || Date.now() >= expiresAt) { dispose(); return stored.categories().map(c => ({ ...c, available: false, count: 0, durations: [] })); }
       return stored.categories();
     },
     select(categoryId, options) { active(); const song = stored.select(categoryId, options); active(); return song; },

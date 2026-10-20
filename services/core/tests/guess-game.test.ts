@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GuessGame, DEFAULT_GUESS_SETTINGS, type GuessAccess, type GuessSettings } from '../src/guess-game.ts';
-import { OperatorGuessCatalog, type GuessCatalog, type OperatorGuessRecord } from '../src/guess-catalog.ts';
+import { OperatorGuessCatalog, type GuessCatalog, type GuessCategorySummary, type OperatorGuessRecord } from '../src/guess-catalog.ts';
 
 const host: GuessAccess = { scope: 'room', scopeId: 'ROOM0001', host: true, actor: 'private-anonymous-host-grant' };
 const guest: GuessAccess = { ...host, host: false, actor: 'private-anonymous-guest-grant' };
@@ -60,6 +60,37 @@ test('default production games expose unavailable categories and cannot start in
   assert.throws(() => model.apply(host, { action: 'start', sessionId: joined.game.sessionId, roundId: null,
     revision: joined.game.revision, eventId: id() }), { status: 503 });
   assert.equal(model.apply(host, { action: 'read' }).game.phase, 'lobby');
+});
+test('game validates optional duration histograms, copies only public fields and accepts older catalogs', () => {
+  const base = new OperatorGuessCatalog(records(2));
+  const input = { id: '2010s', name: '2010s', available: true, count: 2,
+    durations: [{ seconds: 15, count: 1, metadata: { mediaKey: 'private-key' } }, { seconds: 30, count: 1 }],
+    providerUrl: 'https://private.example/catalog' };
+  const adapter = (category: unknown): GuessCatalog => ({ categories: () => [category as GuessCategorySummary],
+    select: (categoryId, options) => base.select(categoryId, options), media: key => base.media(key) });
+  const f = fixture(adapter(input));
+  assert.deepEqual(f.current.categories, [{ id: '2010s', name: '2010s', available: true, count: 2,
+    durations: [{ seconds: 15, count: 1 }, { seconds: 30, count: 1 }] }]);
+  assert.equal(JSON.stringify(f.current).includes('private'), false);
+  f.current.categories[0].durations![0].count = 999;
+  assert.equal(f.read().game.categories[0].durations![0].count, 1);
+  input.durations[0].count = 2; assert.throws(() => f.read(), { status: 503 }); input.durations[0].count = 1;
+  const legacy = fixture(adapter({ id: '2010s', name: '2010s', available: true, count: 2 }));
+  assert.equal('durations' in legacy.current.categories[0], false);
+  const empty = fixture(adapter({ id: '2010s', name: '2010s', available: false, count: 0, durations: [] }));
+  assert.deepEqual(empty.current.categories[0].durations, []);
+  const invalid: unknown[] = [null, {}, '30', [null], Array(1),
+    [{ seconds: 14, count: 2 }], [{ seconds: 91, count: 2 }], [{ seconds: 30.5, count: 2 }],
+    [{ seconds: '30', count: 2 }], [{ seconds: NaN, count: 2 }], [{ seconds: 30, count: 0 }],
+    [{ seconds: 30, count: -1 }], [{ seconds: 30, count: 1.5 }], [{ seconds: 30, count: '2' }],
+    [{ seconds: 30, count: Infinity }], [{ seconds: 30, count: 1001 }], [],
+    [{ seconds: 30, count: 1 }], [{ seconds: 30, count: 1 }, { seconds: 30, count: 1 }],
+    [{ seconds: 30, count: 1 }, { seconds: 15, count: 1 }], Array.from({ length: 77 }, (_, n) => ({ seconds: n + 15, count: 1 })),
+  ];
+  for (const durations of invalid) assert.throws(() => fixture(adapter({ ...input, durations })), { status: 503 });
+  assert.throws(() => fixture(adapter({ ...input, available: false, count: 0, durations: [{ seconds: 30, count: 1 }] })), { status: 503 });
+  const fullRange = fixture(adapter({ ...input, count: 76, durations: Array.from({ length: 76 }, (_, n) => ({ seconds: n + 15, count: 1 })) }));
+  assert.equal(fullRange.current.categories[0].durations!.length, 76);
 });
 
 test('host authorization and strict action fields reject forged roles, catalogs, scores and media before quotas', () => {
