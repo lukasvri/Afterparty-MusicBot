@@ -36,12 +36,19 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Delegation and review
 
-- For Dot-led requests, inspect current GitHub evidence and only the files,
+- ChatGPT Chat is the project coordinator and primary owner dialogue. Dot
+  (Sjefen) is temporarily excluded from the active workflow because it is
+  unstable. Do not route tasks, handoffs or reviews through Dot. Resume its role
+  only after an explicit owner decision. ChatGPT Work remains excluded.
+- For Chat-led requests, inspect current GitHub evidence and only the files,
   issues and documentation relevant to the task. Investigate bugs, constraints
   and tradeoffs enough to define observable acceptance criteria. Skip lengthy
-  discovery for small, obvious changes. Dot resolves research-only requests
+  discovery for small, obvious changes. Chat resolves research-only requests
   directly; delegate code edits, executable tests or environment-specific
   debugging to Codex when needed, with a focused technical handoff.
+- Prefer GPT-6.1 Sol with High reasoning effort in Chat, Codex and supported
+  subagents when selectable. Verify the actual model and effort, and report any
+  fallback or setting that cannot be verified.
 - Use subagents or delegation when the active tool supports it and independent
   work benefits from parallel execution, such as source inspection and review.
   Give each agent a bounded task, source ref and acceptance criteria. Assign
@@ -50,7 +57,7 @@ use em dashes. Keep global personal preferences out of repository instructions.
   including Pro, does not by itself provide subagent tools. If delegation is
   unavailable or would add unnecessary coordination, work sequentially and
   report the limitation or reason. Never claim that an agent or check ran unless it did.
-- The lead agent owns integration, validation and the final report. When Dot is
+- The lead agent owns integration, validation and the final report. When Chat is
   coordinating an owner request, it should follow the task through GitHub review
   and Codex handoffs without making the owner manually relay routine updates.
   Request decisions only for genuinely ambiguous goals or protected actions.
@@ -89,8 +96,8 @@ See [Cloud workflow](docs/CLOUD_DEVELOPMENT.md) and [operations](services/core/P
 
 ## Shared AI context
 
-- For Dot and Codex coordination, with Chat available for optional discussion,
-  consult [shared project context](docs/AI_CONTEXT.md) and
+- For ChatGPT Chat coordination and Codex implementation, consult
+  [shared project context](docs/AI_CONTEXT.md) and
   [AI collaboration workflow](docs/AI_WORKFLOW.md). The live repository and
   reviewed PRs, not assistant chat history, are the source of truth.
 - Keep the context document to lasting, verified decisions. Use GitHub issues and PRs for current task progress. Never confuse merged code with production deployment.
