@@ -44,14 +44,15 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - [Contributing](../CONTRIBUTING.md): module map and review standards.
 - [Changelog](../CHANGELOG.md): generated release notes, **not** proof of deployment.
 - [Release policy](RELEASING.md#notes-for-every-change): notes required in each code or user-facing PR, the shared release source, website checks and documentation/experiment handling.
-- [AI collaboration](AI_WORKFLOW.md): using Dot, Chat, Work and Codex without losing the handoff.
+- [AI collaboration](AI_WORKFLOW.md): using Dot, Codex and GitHub without losing the handoff.
 
 ## AI coordination
 
-- The personal dot is the proposed ongoing coordinator for planning and follow-up, not an authority for unreviewed code merges or live deployment.
-- Chat provides interactive decisions, Work handles broader multi-step research and app work, and Codex implements and validates repository changes.
+- **Dot (Sjefen) is the owner's primary Afterparty interface and ongoing coordinator.** The owner discusses new ideas, requirements and decisions with Dot; Dot handles the supported follow-through: current GitHub inspection, planning, issue tracking, scoped Codex work, review, checks, draft PRs and concise progress updates. Avoid asking the owner to shuttle routine task context between tools.
+- Chat remains optional for separate discussion. Do not include ChatGPT Work in the standard project workflow. Codex implements, debugs and validates repository changes. Dot performs supported research and coordination directly when useful.
+- Prefer GPT-6 Astra for Dot where the product supplies it. For Codex tasks, **request GPT-6.1 Sol with High reasoning effort** when model selection is supported. Verify the actual available model and effort in the target environment; if unavailable, disclose the fallback and do not claim the preference was enforced. Model requests do not create delegation capabilities.
 - Use supported subagents/delegation for independent work when parallel execution helps. Tool availability and permissions, not a Chat model name or Pro selection, determine whether delegation is possible. The lead reviews the combined result; see [delegation controls](AI_WORKFLOW.md#delegation-controls).
-- GitHub holds canonical source, issues, PRs, checks and release records. Keep code, user-facing notes and validation together in the PR, following the [release policy](RELEASING.md#notes-for-every-change). Merging, auto-merge, publication and deployment require owner approval; cloud work stops at review material.
+- GitHub holds canonical source, issues, PRs, checks and release records. Dot follows each owner request through the available steps and records status in GitHub rather than relying on shared chat history. Keep code, user-facing notes and validation together in the PR, following the [release policy](RELEASING.md#notes-for-every-change). Merging, auto-merge, publication and deployment require owner approval; cloud work stops at review material.
 - All tools should verify current source and PRs before claiming a feature exists or that a production change has gone live. See [AI collaboration](AI_WORKFLOW.md) for Dot setup, permissions and delegated tasks.
 
 ## Active work and uncertainties
