@@ -36,6 +36,7 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 - [Cloud development](CLOUD_DEVELOPMENT.md): source-only cloud development and the local production boundary.
 - [TypeScript conventions](TYPESCRIPT.md): application code, Node tooling and incremental consolidation.
 - [Release policy](RELEASING.md): shared versioning and generated release notes.
+- [Release channels](RELEASE_CHANNELS.md): stable bot/web patches and experimental Discord Activities.
 - [Changelog](../CHANGELOG.md): product versions and preserved historical notes.
 
 ## Policies

@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.2.14: Keep specific player failures visible
+
+2026-10-20
+
+- YouTube player and API-loader failures remain visible after the startup deadline instead of being replaced by a generic timeout. Failed startup stops the loading indicator, stale callbacks from an unmounted player cannot change its replacement, and unanswered startup still reports the existing timeout. Browser-local diagnostics retain only the numeric provider error code, without media URLs or user data.
+- Stable bot and web patches are reviewed separately from the experimental beta and Discord Activity line. This patch ports only shared player error handling and documents that boundary; it does not add Activity routes, SDK/session changes or media proxy mappings, and does not establish working Discord embedded video or audio.
+
 ## v2.2.13: Append ordinary queue additions
 
 2026-10-20
