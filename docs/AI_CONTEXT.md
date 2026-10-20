@@ -16,6 +16,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 ## Architectural boundaries
 
 - GitHub repository: `lukasvri/Afterparty-MusicBot`; normal TypeScript development, fixes and new application features target the latest remote `main` through reviewed PRs.
+- `main` remains the stable bot/web line. `beta` retains the v3 and Discord Activity experiments; extract independently tested shared fixes without promoting the Activity SDK, routes, session model or test configuration. See [release channels](RELEASE_CHANNELS.md).
 - `dev` is reserved for isolated Rust testing, initially based on the latest `main`. It is not the staging branch for normal features. Existing `nightly` and Rust branches remain separate from `main`; future Rust adoption requires a separate owner decision and review. Follow the [branch strategy](../CONTRIBUTING.md#branch-strategy).
 - Rust evaluation is paused at the owner's request on 18 October 2026; [research task #51](https://github.com/lukasvri/Afterparty-MusicBot/issues/51) and [PR #66](https://github.com/lukasvri/Afterparty-MusicBot/pull/66) are closed. Prioritize TypeScript/Node.js and FFmpeg performance and stability. Preserve Rust source, measurements and branch history, and resume Rust work only on an explicit owner request.
 - Website: `app/`, `components/`, `hooks/`, `lib/`; hosted separately from Core.

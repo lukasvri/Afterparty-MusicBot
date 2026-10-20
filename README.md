@@ -42,6 +42,10 @@ YouTube video uses the official embedded player. SoundCloud provides audio; Spot
 
 Screenshots show a local preview with synthetic API responses, in English. They illustrate the interface, not a connected production bot.
 
+## Stable and experimental channels
+
+Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
+
 ## Run your own Afterparty
 
 The full stack has two services. **Core** runs on your computer or server and sends audio to Discord. The **website** runs on Cloudflare Workers/D1 or Sites and provides rooms, video and administration. Core's host must stay online for Discord playback.

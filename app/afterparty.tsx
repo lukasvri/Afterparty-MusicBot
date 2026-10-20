@@ -3,7 +3,7 @@ import Image from "next/image";
 import { loadYoutube, type Player } from "@/lib/youtube-player";
 import { headers, request } from "@/lib/browser-api";
 import { useConcertQueue } from "@/hooks/use-concert-queue";
-import { notePlayerEvent, playerDiagnostics } from "@/lib/player-diagnostics";
+import { notePlayerError, notePlayerEvent, playerDiagnostics, resetPlayerError } from "@/lib/player-diagnostics";
 import { NativeSeekTracker } from "@/lib/native-seek";
 import { MusicDiscovery } from "@/components/party/music-discovery";
 import { StartEvening } from "@/components/party/start-evening";
@@ -994,9 +994,11 @@ export default function Afterparty() {
   useEffect(() => {
     if (!consent || !playerRoot.current) return;
     let disposed = false;
+    let startupFailed = false;
+    resetPlayerError();
     setPlayerLoading(true);
     const readyTimer = setTimeout(() => {
-      if (!disposed && !playerReady.current) {
+      if (!disposed && !startupFailed && !playerReady.current) {
         setPlayerLoading(false);
         setPlayerError("YouTube-spilleren svarer ikke. Prøv videoen igjen.");
       }
@@ -1041,7 +1043,7 @@ export default function Afterparty() {
                 player.current?.setPlaybackRate(1);
             },
             onReady: () => {
-              if (disposed) return;
+              if (disposed || startupFailed) return;
               playerReady.current = true;
               clearTimeout(readyTimer);
               setPlayerLoading(false);
@@ -1061,6 +1063,10 @@ export default function Afterparty() {
             },
             onError: (event: { data: number }) => {
               if (disposed) return;
+              startupFailed = true;
+              clearTimeout(readyTimer);
+              setPlayerLoading(false);
+              notePlayerError(event.data);
               bufferStarted.current = null;
               setBufferSeconds(0);
               setSyncStatus("Video utilgjengelig");
@@ -1128,6 +1134,9 @@ export default function Afterparty() {
         });
       })
       .catch((e) => {
+        if (disposed) return;
+        startupFailed = true;
+        clearTimeout(readyTimer);
         setPlayerLoading(false);
         setPlayerError(e.message);
       });

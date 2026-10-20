@@ -7,6 +7,14 @@ const events: {
 let corrections = 0,
   interruptions = 0,
   maxBufferMs = 0;
+let providerErrorCode: number | null = null;
+export function resetPlayerError() {
+  providerErrorCode = null;
+}
+/** Retain only the numeric provider code, never event objects or media identity. */
+export function notePlayerError(code: number) {
+  providerErrorCode = Number.isSafeInteger(code) ? code : null;
+}
 export function notePlayerEvent(
   reason: "buffer-start" | "buffer-end" | "correction",
   durationMs = 0,
@@ -26,6 +34,7 @@ export function playerDiagnostics() {
     corrections,
     interruptions,
     maxBufferMs: Math.round(maxBufferMs),
+    providerErrorCode,
     events: [...events],
   };
 }
