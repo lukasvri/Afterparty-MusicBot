@@ -4,13 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
-## v3.0.0-alpha.1: Concert extras alongside the multiplayer game
+## v2.4.0-alpha.1: Concert extras alongside the multiplayer game
 
 2026-10-21
 
 - Concert extras and Guess the Song share a reviewed source candidate while retaining independent audio, playback clocks, queues, permissions and event limits. Optional reactions, host-called bingo and timestamp bookmarks remain outside fullscreen and TV views. Matching website and Core builds are required.
 - The existing private Guess the Song game, Worker-compatible audio previews and synthetic test catalog remain available alongside extras. Room and Discord authorization, OAuth cancellation and expiry checks, playback isolation and ordinary queues are preserved. No real music provider is enabled.
-- This combined alpha supersedes the separate unmerged concert rc.1 and private-audio rc.2 proposals for this source branch. Recorded 2.3.0 alpha notes are preserved; the experimental beta and Discord Activity source remain separate. A new higher-version alpha may supersede an unfinished lower-version preview without promoting it to stable.
+- This combined preparation alpha preserves recorded 2.3.0 notes and uses a distinct version from the separate unmerged v3 rc proposals and experimental Activity beta. It does not claim v3 acceptance. A new higher-version alpha may supersede an unfinished lower-version preview without promoting it to stable.
 
 ## v2.3.0-alpha.2: Fix game preview audio on Workers
 

@@ -39,10 +39,12 @@ notes must identify preview limitations and must not claim stable availability o
 deployment. Preserve intervening stable patch histories when reconciling parallel
 PRs; do not merge unrelated feature branches merely to reserve a version.
 
-A focused non-Activity v3 extraction may use a new numbered stage such as
-`3.0.0-rc.1` without importing the combined beta history. Do not reuse an existing
-prerelease label for different source. The candidate stage does not close live
-acceptance gates or authorize promotion, publication or deployment.
+Do not reuse a prerelease label already present in another maintained branch for
+new source. The integrated bot/web preparation uses the distinct `2.4.0-alpha`
+line while `beta` retains its experimental v3 history. The separate unmerged
+v3 rc proposals remain review material; neither their labels nor a preparation
+alpha establish v3 acceptance. A later v3 proposal must reconcile all candidates
+and the owner-approved release scope without promoting Activity experiments.
 
 ## Notes for every change
 
