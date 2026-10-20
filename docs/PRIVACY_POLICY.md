@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Effective: 16 October 2026
+Effective: 21 October 2026
 
 This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://afterparty.lukasvri.chatgpt.site/support). Independently hosted copies are operated separately.
 
@@ -13,6 +13,7 @@ This policy describes the hosted Afterparty Discord bot and Afterparty website. 
 - **Optional admin login:** Discord sign-in requests the `identify` and `guilds` scopes. We process your Discord ID, display name, server list and permissions to check which servers you may manage. The Discord access token and identity are stored in an encrypted grant for the session. The application does not request your Discord password or email through these scopes.
 - **Website security and preferences:** session cookies, random visitor identifiers, hashes derived from IP addresses, request counters and operational errors support authentication, viewer counts, rate limits and troubleshooting. Hosting providers process connection information such as IP addresses and request metadata.
 - **Device storage:** your browser can retain language, volume, display name, visitor ID, room host credentials and saved evening settings in local storage. These remain until you clear the site’s browser data or remove them through the interface.
+- **Copyright requests:** the [notice preparation form](https://afterparty.lukasvri.chatgpt.site/copyright) keeps entered details in the current page without submitting or saving them to Afterparty. If you copy a notice or open an email draft, your clipboard or email application receives that text. When you send a notice to the maintainer, the contact details and claim are used to investigate, respond and handle disputes; information necessary to address the claim may be shared with the affected content provider.
 
 The bot uses server and voice-state events. It does not request Discord’s Message Content, Server Members or Presence privileged intents. Its audio engine sends music to voice channels; it does not record participants’ conversations.
 
@@ -31,6 +32,8 @@ We do not sell personal data or use Discord API data for advertising or training
 Server settings, favorites, saved queues and bot playback history persist in per-server bot databases until removed or deleted by the operator. Removing the bot from a server does not currently delete those databases automatically. Temporary website rooms expire after 48 hours. Admin sessions expire within eight hours, and login state challenges within ten minutes. Expired website records are cleaned during subsequent relevant requests, so expiry does not mean immediate physical deletion.
 
 The website bridge removes concert history older than 90 days and command records older than one day during bridge updates. The bot’s local history and job records do not currently have a fixed automatic deletion period. Operational logs and recovery backups can retain copies after live records change; there is no single guaranteed retention period across these stores. Ask the maintainer about a specific record or deletion from recoverable copies.
+
+The copyright form does not create a server-side notice archive. Notices you send through email or another private channel remain in that channel and can be retained as needed to resolve the claim, related disputes and applicable legal obligations. No fixed retention period is promised for those correspondence records; contact the maintainer with a deletion or access request.
 
 
 ## Your choices and rights

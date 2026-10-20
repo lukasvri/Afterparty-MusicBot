@@ -195,7 +195,7 @@ test('normal server options enable only the labeled synthetic test catalog and b
     const catalogResponse = await f.call({ action: 'catalog' });
     assert.equal(catalogResponse.status, 200);
     assert.deepEqual(await catalogResponse.json(), {
-      categories: [{ id: 'synthetic-test', name: 'Synthetic test tones', available: true, count: 5 }],
+      categories: [{ id: 'synthetic-test', name: 'Synthetic test tones', available: true, count: 5, durations: [{ seconds: 30, count: 5 }] }],
       playable: true, syntheticTest: true,
     });
     let host = await (await f.call({ ...room, action: 'join', eventId: randomUUID() })).json() as Result;

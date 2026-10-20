@@ -1,6 +1,6 @@
 # Terms of Service
 
-Effective: 15 October 2026
+Effective: 21 October 2026
 
 These terms cover the hosted Afterparty Discord bot and Afterparty website, maintained by Discord user **lukasvri**. Independently hosted copies have their own operators. Using this service means agreeing to these terms.
 
@@ -17,6 +17,10 @@ Only install or administer the bot where you have permission. Server administrat
 Only request or share content you are entitled to use. The service grants no rights to music, videos, artwork or other third-party content. Respect the terms and restrictions of Discord, YouTube, Spotify, SoundCloud and any other source you use.
 
 Do not use the service for unlawful content, harassment, spam, unauthorized access, bypassing platform restrictions or disrupting other users. Do not attempt to extract private server information, interfere with playback across servers or evade rate limits.
+
+## Copyright complaints
+
+Copyright owners and authorized representatives can use the [copyright and removal request form](https://afterparty.lukasvri.chatgpt.site/copyright) to prepare a notice. Send it privately through the listed contact channel so the maintainer can review it and remove or disable access where appropriate. For disputed removals, request a private review through [Support](https://afterparty.lukasvri.chatgpt.site/support). A reporting process does not grant permission to use third-party material.
 
 
 ## Availability and changes

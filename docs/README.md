@@ -41,7 +41,7 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 
 ## Policies
 
-[Security reporting](../SECURITY.md) · [Privacy](PRIVACY_POLICY.md) · [Terms](TERMS_OF_SERVICE.md) · [MIT license](../LICENSE) · [Third-party notices](../THIRD_PARTY_NOTICES.md)
+[Security reporting](../SECURITY.md) · [Privacy](PRIVACY_POLICY.md) · [Terms](TERMS_OF_SERVICE.md) · [Copyright requests](COPYRIGHT_REQUESTS.md) · [MIT license](../LICENSE) · [Third-party notices](../THIRD_PARTY_NOTICES.md)
 
 ## Engineering records
 

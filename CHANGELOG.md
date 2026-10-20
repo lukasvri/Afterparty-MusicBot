@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.3: Catalog-aware game rounds and copyright requests
+
+2026-10-21
+
+- Guess the Song catalogs can advertise the number of clips available at each supported length. Hosts and guests see when a duration or round count exceeds the selected category, and invalid settings cannot start a round. The server still validates eligibility; older catalog integrations retain compatibility.
+- Operator catalogs compute bounded duration summaries once, without exposing answers, recording IDs, media keys or permission references. Synthetic tests advertise their actual five 30-second tones, and expired inventories clear their capacity as well as their audio.
+- The remote quiz still needs a commercial-hit catalog. No music provider is activated, no real recordings are included, and no paid account or agreement is created. The source comparison records territory limits and the answer-revealing titles in official YouTube embeds; a same-room presenter does not meet the remote-play requirement.
+- A copyright/removal request page prepares a private notice for the operator's public email address, with work and location details, contact information, declarations and signature. The reporter must send the email draft; the website neither stores nor submits notices and does not remove material automatically. Support, terms and privacy information explain the flow. A reporting form does not grant music rights.
+
 ## v2.4.0-alpha.2: Fair concurrent answers and authorized game inventory
 
 2026-10-21

@@ -7,6 +7,11 @@ It does not configure the application, activate a provider, download media, read
 files, expose an upload endpoint or supply a real-song inventory. The default
 application catalog stays unavailable.
 
+The release target requires recognizable commercial hits. A freely licensed
+independent or classical catalog can support development, but does not replace
+that product requirement. No provider agreement or playable commercial inventory
+has been established.
+
 Each private record supplies song metadata, explicit category membership,
 canonical WAV bytes and an operator approval with an HTTPS evidence reference
 and permission expiry. References receive syntax checks only. Neither approval
@@ -29,6 +34,15 @@ Host duration and round settings must fit the measured lengths and distinct
 eligible inventory. This adapter cannot supply 31–90-second rounds or more than
 eight distinct recordings. It does not alter existing game settings or routes.
 
+Catalog summaries can include an ascending `durations` histogram of whole-second
+clip lengths and recording counts. Lengths are floored and capped at 90 seconds;
+each recording contributes to one bin. The sum equals the category count. The
+lobby uses it to reject a duration or round count that exceeds the eligible
+inventory before starting. Expired inventories report no available bins. This
+public capacity information contains no recording IDs, titles, aliases, media
+keys or permission references. The server remains authoritative and older
+catalogs without histograms retain their existing compatibility.
+
 ## Source choices and unresolved rights
 
 - Prefer operator-owned or expressly licensed recordings when permission covers
@@ -50,9 +64,38 @@ eight distinct recordings. It does not alter existing game settings or routes.
 - [YouTube Developer Policies](https://developers.google.com/youtube/terms/developer-policies#i.-additional-prohibitions)
   prohibit separated audio and hidden/background players. A visible embed is a
   different integration; it does not authorize a PCM extraction/proxy adapter.
+  The [official player parameters](https://developers.google.com/youtube/player_parameters#revision_history)
+  no longer support hiding video titles with `showinfo`. A visible player on
+  each remote participant's device can reveal the answer. A presenter-only
+  player with shared speakers would instead require everyone to be in the same
+  room, which does not satisfy the current remote-play requirement. Neither
+  approach is implemented or claimed to clear music rights here.
 - [Deezer's developer terms](https://developers.deezer.com/termsofuse) restrict
   standard use to noncommercial/private family contexts and require approval
   for other purposes. A reachable preview does not authorize public quiz use.
+
+## Commercial-hit candidates and launch requirements
+
+[Feed Clips explicitly describes music trivia and multiplayer rounds](https://blog.feed.fm/dont-miss-a-beat-why-music-trivia-apps-need-licensed-music-clips).
+However, its [current geographic requirements](https://clips.feed.fm/docs/Licensing%20Requirements/Geographic%20Restrictions/)
+limit the standard catalog to the United States and its territories. That is
+not a ready launch solution for listeners in Norway. Its
+[pricing page](https://www.feed.fm/pricing-page) requires a customized proposal;
+no price, account, agreement or territory extension has been approved here.
+
+Songclip has historical partnerships covering music in gaming apps, documented
+by [Warner Music Group](https://www.wmg.com/news/warner-music-group-partners-songclip-power-music-feature-35511)
+and [Universal Music Group](https://www.universalmusic.com/songclip-announces-multi-year-agreement-with-universal-music-group-and-universal-music-publishing-group/).
+Those announcements do not establish current onboarding, pricing, Norway
+coverage or permission for this application. No Songclip adapter is enabled.
+
+Before selecting any provider, obtain an agreement covering the intended
+countries, multiplayer quiz use, hidden answers, sample lengths, delivery,
+permitted caching/processing, usage reporting and rights expiry/revocation.
+Confirm whether the provider requires its own player or direct streams before
+assuming the existing private PCM transport is permitted. A subscription or a
+successful preview API response is not a substitute for these terms. Do not
+proxy through another territory to evade a provider's geographic restrictions.
 
 These source comparisons are implementation guidance, not verification of any
 recording's rights. No public playable music inventory or provider permission
