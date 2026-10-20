@@ -54,9 +54,17 @@ shared game using five locally generated tones with fictional **Test Tone One**
 through **Test Tone Five** titles. These are synthetic test sounds, not real songs
 or a licensed catalog. See [synthetic game testing](docs/GUESS_SYNTHETIC_TEST.md).
 
+Reviewed server integrations can prepare explicitly approved WAV inventory using
+the [bounded operator catalog adapter](docs/GUESS_CATALOG_SOURCES.md). This does
+not activate a provider or supply approved real music in the default application.
+
 ## Stable and experimental channels
 
 Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
+
+## Concert extras preview
+
+The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The combined `2.4.0-alpha.2` preparation candidate remains review source with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
 
 ## Run your own Afterparty
 

@@ -180,17 +180,59 @@ test('stale CAS, duplicate/conflicting receipts, normalized duplicate guesses an
   assert.equal(f.read(guest).self.result, null);
 });
 
-test('concurrent participants refresh CAS independently and each receives exactly one award', () => {
+test('concurrent answers from one round snapshot survive other answers and joins until the server deadline', () => {
   const f = fixture(); f.join(); f.configure(); f.command('start'); f.setTime(f.current.round!.startsAt);
   const shared = { action: 'guess', text: 'Fictional Signal 1', sessionId: f.current.sessionId,
     revision: f.current.revision, roundId: f.current.round!.roundId };
   const first = f.model.apply(guest, { ...shared, eventId: f.id() });
   assert.equal(first.self.result!.awarded, 1000);
+  f.join({ ...guest, actor: 'late-participant' });
+  f.setTime(first.game.round!.deadline - 1);
+  const second = f.model.apply(host, { ...shared, eventId: f.id() });
+  assert.equal(second.self.result!.awarded, 100, 'points use receipt time, not the older snapshot');
+  assert.deepEqual(second.game.scoreboard.map(player => player.total), [1000, 100, 0]);
+  assert.equal(second.game.answeredCount, 2); assert.equal(second.game.round!.answer, undefined);
+  assert.equal(f.join(host).self.participantId, second.self.participantId);
+  assert.deepEqual(f.read().self.result, second.self.result, 'reconnect preserves the existing award');
   assert.throws(() => f.model.apply(host, { ...shared, eventId: f.id() }), { status: 409 });
-  f.read();
-  assert.equal(f.command('guess', { text: 'Fictional Signal 1' }).self.result!.awarded, 1000);
-  assert.deepEqual(f.current.scoreboard.map(player => player.total), [1000, 1000]);
-  assert.equal(f.current.answeredCount, 2); assert.equal(f.current.round!.answer, undefined);
+  f.setTime(first.game.round!.deadline);
+  assert.throws(() => f.model.apply({ ...guest, actor: 'late-participant' }, { ...shared, eventId: f.id() }), { status: 409 });
+  assert.equal(f.read().game.answeredCount, 2);
+});
+
+test('guess revisions stay bounded to the active round while host controls retain strict CAS', () => {
+  const f = fixture(); f.join(); f.configure({ roundCount: 2 });
+  const lobbyRevision = f.current.revision;
+  f.command('start'); f.setTime(f.current.round!.startsAt);
+  const shared = { sessionId: f.current.sessionId, roundId: f.current.round!.roundId, revision: f.current.revision };
+  const guess = (fields: Record<string, unknown> = {}) => f.model.apply(guest, {
+    action: 'guess', text: 'Wrong title', ...shared, eventId: f.id(), ...fields,
+  });
+  for (const revision of [undefined, null, -1, lobbyRevision, shared.revision + 1, 1.5, NaN, Infinity, String(shared.revision)]) {
+    assert.throws(() => guess({ revision }), { status: 409 });
+  }
+  assert.throws(() => guess({ sessionId: f.id() }), { status: 409 });
+  assert.throws(() => guess({ roundId: f.id() }), { status: 409 });
+  assert.equal(f.read().game.revision, shared.revision);
+  const eventId = f.id();
+  assert.deepEqual(guess({ eventId }).self.result, { correct: false, awarded: 0 });
+  assert.throws(() => guess({ eventId, text: 'Fictional Signal 1' }), /already received/);
+  assert.throws(() => guess({ text: 'WRONG---TITLE!!' }), /already received/);
+  assert.throws(() => f.model.apply(host, { action: 'reveal', ...shared, eventId: f.id() }), { status: 409 });
+  assert.deepEqual(guess({ text: 'Fictional Signal 1' }).self.result, { correct: true, awarded: 1000 });
+  f.read(); f.command('reveal'); f.command('next'); f.setTime(f.current.round!.startsAt);
+  assert.throws(() => guess({ text: 'Fictional Signal 2' }), { status: 409 });
+  assert.throws(() => guess({ roundId: f.current.round!.roundId, text: 'Fictional Signal 2' }), { status: 409 });
+  assert.equal(f.command('guess', { text: 'Fictional Signal 2' }, guest).self.result!.awarded, 1000);
+});
+
+test('stale round snapshots cannot bypass per-player guess limits', () => {
+  const f = fixture(); f.join(); f.configure(); f.command('start'); f.setTime(f.current.round!.startsAt);
+  const shared = { sessionId: f.current.sessionId, roundId: f.current.round!.roundId, revision: f.current.revision };
+  for (let n = 0; n < 20; n++) f.model.apply(guest, { action: 'guess', ...shared, eventId: f.id(), text: `Wrong ${n}` });
+  assert.throws(() => f.model.apply(guest, { action: 'guess', ...shared, eventId: f.id(), text: 'Fictional Signal 1' }), { status: 429 });
+  const result = f.read(guest);
+  assert.equal(result.game.scoreboard.find(player => player.id === result.self.participantId)!.total, 0);
 });
 
 test('catalog selection is atomic, complete and without repeats, and next/reset honor lobby lifecycle', () => {

@@ -11,11 +11,24 @@ export async function coreGuessAudio(input: unknown, callerSignal: AbortSignal) 
  const origin=coreUrl(),key=(env as unknown as {ADMIN_BRIDGE_KEY?:string}).ADMIN_BRIDGE_KEY;
  if(!origin||!key)throw Object.assign(new Error('Game preview is unavailable.'),{status:503});
  const signal=AbortSignal.any([callerSignal,AbortSignal.timeout(12000)]);
- const response=await fetch(origin+'/v1/guess',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(input),redirect:'error',signal});
- if(!response.ok){void response.body?.cancel().catch(() => {});throw Object.assign(new Error('Game preview is unavailable. Reconnect and try again.'),{status:response.status});}
+ // Workerd supports manual/follow only. Never follow a redirect with bridge credentials.
+ const response=await fetch(origin+'/v1/guess',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(input),redirect:'manual',signal});
+ if(!response.ok){void response.body?.cancel().catch(() => {});throw Object.assign(new Error('Game preview is unavailable. Reconnect and try again.'),{status:response.status>=300&&response.status<400?502:response.status});}
  try {
   if(response.headers.get('content-type')!=='audio/wav'){void response.body?.cancel().catch(()=>{});throw Error();}
   const bytes=await readGuessBytes(response,GUESS_AUDIO_MAX_BYTES,signal);guessWaveSeconds(bytes);
   return new Response(bytes.buffer as ArrayBuffer,{headers:{'Content-Type':'audio/wav','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
  }catch{throw Object.assign(new Error('Game preview is unavailable.'),{status:502});}
+}
+
+/** An authenticated social stream has its own short lease and no playback commands. */
+export async function coreSocialStream(input: unknown, signal: AbortSignal) {
+ const origin=coreUrl(), key=(env as unknown as {ADMIN_BRIDGE_KEY?:string}).ADMIN_BRIDGE_KEY;
+ if(!origin||!key)throw Object.assign(new Error('Concert extras need the Core service.'),{status:503});
+ const response=await fetch(origin+'/v1/social',{method:'POST',
+  headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(input),
+  redirect:'manual',signal:AbortSignal.any([signal,AbortSignal.timeout(70000)])});
+ if(!response.ok){const data=await response.json().catch(()=>({})) as {error?:string};throw Object.assign(new Error(data.error??'Concert extras are unavailable.'),{status:response.status});}
+ if(!response.body)throw Object.assign(new Error('Concert extras are unavailable.'),{status:502});
+ return new Response(response.body,{headers:{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store','X-Accel-Buffering':'no','X-Content-Type-Options':'nosniff'}});
 }

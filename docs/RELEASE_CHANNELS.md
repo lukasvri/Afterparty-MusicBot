@@ -30,7 +30,9 @@ contracts in each extraction. Do not merge all of `beta` to obtain one shared fi
 - Bounded catalog extraction and request cancellation are candidates for a focused
   stable port, with their own provider, process-cleanup and timeout regressions.
   Their existence on beta alone does not establish that main contains them.
-- Concert reactions, social moderation and v3 UX need separate acceptance and scope.
+- Concert reactions, social moderation and v3 UX use a focused non-Activity extraction
+  with separate acceptance in [the v3 checklist](V3_BETA_ACCEPTANCE.md). Its prerelease
+  source and automated tests do not establish live audio or production readiness.
 - Activity authentication, private Activity rooms, media URL mappings, listener-only
   output and launch-root configuration remain experimental as a unit. A successful
   synthetic widget handshake does not establish working embedded Discord video/audio.

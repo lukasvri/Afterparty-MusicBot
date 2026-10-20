@@ -19,9 +19,34 @@ Numbered `alpha.N`, `beta.N` and `rc.N` prereleases identify unfinished previews
 Start at `alpha.1` on the next semantic version and advance the number or stage
 without advertising a stable release. A preview build is not deployment evidence.
 
+When an unfinished preview line is superseded by the next minor or major line,
+start that higher line at `alpha.1` and preserve the earlier preview notes.
+This does not create a stable release for the abandoned line or skip directly to
+beta or rc. Unmerged competing proposals are review material, not historical
+releases: reconcile their scope and versions in the combined PR. Keep the
+independent Activity beta source separate from ordinary bot/web candidates.
+
 For a release containing several changes, use the largest applicable increment.
 Continue from the current shared version; do not reinterpret historical V36 as `36.0.0`.
 The tested `nextVersion` helper in `scripts/releases.ts` encodes these rules.
+
+An unfinished feature preview may use a numbered prerelease, for example
+`3.0.0-alpha.1`, in both manifests, locks and canonical notes. The first preview
+must target the next patch, minor or major version of the preceding stable entry,
+or follow the higher-line alpha supersession rule above when that source line
+is still a prerelease.
+Increment the same stage one number at a time; a following beta or rc stage starts
+at 1. Promotion to that stable version is a separate release decision. Prerelease
+notes must identify preview limitations and must not claim stable availability or
+deployment. Preserve intervening stable patch histories when reconciling parallel
+PRs; do not merge unrelated feature branches merely to reserve a version.
+
+Do not reuse a prerelease label already present in another maintained branch for
+new source. The integrated bot/web preparation uses the distinct `2.4.0-alpha`
+line while `beta` retains its experimental v3 history. The separate unmerged
+v3 rc proposals remain review material; neither their labels nor a preparation
+alpha establish v3 acceptance. A later v3 proposal must reconcile all candidates
+and the owner-approved release scope without promoting Activity experiments.
 
 ## Notes for every change
 

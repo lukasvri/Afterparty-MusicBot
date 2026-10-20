@@ -4,6 +4,29 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.2: Fair concurrent answers and authorized game inventory
+
+2026-10-21
+
+- Simultaneous Guess the Song answers may use the same valid round snapshot without losing a later answer because another participant answered or joined. Session and round identity, deadlines, duplicate and rate limits remain authoritative; host controls retain strict revision checks and scores use server receipt time.
+- A provider-neutral operator inventory factory accepts at most eight explicitly approved canonical 15-30-second WAV samples through the existing private game transport. Input and returned audio are copied, metadata and permission references stay private, and the entire snapshot becomes unavailable after the earliest permission expiry or five minutes. Cancellation and disposal cannot return stale audio.
+- The default music catalog remains unavailable. No Spotify, YouTube or Deezer provider, startup option, real recording or production configuration is enabled. Permission references are syntactically checked operator attestations, not verified music rights. The source comparison documents provider restrictions and the remaining rights and live-client acceptance gates.
+
+## v2.4.0-alpha.1: Concert extras alongside the multiplayer game
+
+2026-10-21
+
+- Concert extras and Guess the Song share a reviewed source candidate while retaining independent audio, playback clocks, queues, permissions and event limits. Optional reactions, host-called bingo and timestamp bookmarks remain outside fullscreen and TV views. Matching website and Core builds are required.
+- The existing private Guess the Song game, Worker-compatible audio previews and synthetic test catalog remain available alongside extras. Room and Discord authorization, OAuth cancellation and expiry checks, playback isolation and ordinary queues are preserved. No real music provider is enabled.
+- This combined preparation alpha preserves recorded 2.3.0 notes and uses a distinct version from the separate unmerged v3 rc proposals and experimental Activity beta. It does not claim v3 acceptance. A new higher-version alpha may supersede an unfinished lower-version preview without promoting it to stable.
+
+## v2.3.0-alpha.2: Fix game preview audio on Workers
+
+2026-10-20
+
+- Guess the Song previews use a redirect mode supported by the website Worker runtime, fixing a reproducible HTTP 500 before the audio request reached Core. Upstream redirects are rejected with a generic 502 response without following them or exposing their destination; existing room and Discord authorization, cancellation and bounded WAV validation remain in place.
+- An isolated Workerd integration test now exercises the real game routes, D1 room authority and a temporary Core with generated tones. This synthetic-only prerelease is review material and does not enable real music or establish successful production playback.
+
 ## v2.3.0-alpha.1: Synthetic multiplayer game test
 
 2026-10-20

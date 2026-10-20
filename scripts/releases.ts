@@ -45,7 +45,11 @@ export function validateReleaseHistory(releases: Release[]){
   const advance=a.stage&&a.base===b.base&&(!b.stage||
    (a.stage===b.stage&&b.number===a.number+1)||
    (['alpha','beta','rc'].indexOf(b.stage)===['alpha','beta','rc'].indexOf(a.stage)+1&&b.number===1));
-  if(!normal&&!advance){
+  // A new alpha may supersede an unfinished lower release line. Retain that
+  // line's notes without manufacturing a stable release or a skipped stage.
+  const supersede=a.stage&&b.stage==='alpha'&&b.number===1&&
+   ['minor','major'].some(kind=>nextVersion(a.base,kind)===b.base);
+  if(!normal&&!advance&&!supersede){
    throw new Error(`Invalid release transition: ${older} -> ${newer}; releases must be newest first with one patch, minor or major increment`);
   }
  }

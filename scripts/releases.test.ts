@@ -80,7 +80,19 @@ test('numbered prereleases advance without claiming an unfinished stable release
  ])assert.doesNotThrow(()=>validateReleaseHistory(history(versions)));
  for(const versions of [
   ['3.0.0-alpha.3','3.0.0-alpha.1'],['3.0.0-alpha.1','3.0.0'],
-  ['3.0.0-rc.1','3.0.0-alpha.1'],['4.0.0-alpha.1','3.0.0-alpha.1'],
+  ['3.0.0-rc.1','3.0.0-alpha.1'],['4.0.0-rc.1','3.0.0-alpha.1'],
   ['3.0.0-alpha.2','2.2.10'],['3.0.0-alpha.01'],
  ])assert.throws(()=>validateReleaseHistory(history(versions)));
+});
+
+test('a higher alpha can supersede an unfinished preview while preserving its history',()=>{
+ for(const versions of [
+  ['3.0.0-alpha.1','2.3.0-alpha.2','2.3.0-alpha.1','2.2.14'],
+  ['4.0.0-alpha.1','3.0.0-rc.2'],['3.1.0-alpha.1','3.0.0-beta.7'],
+ ])assert.doesNotThrow(()=>validateReleaseHistory(history(versions)));
+ for(const versions of [
+  ['3.0.0-rc.1','2.3.0-alpha.2'],['3.0.0-beta.1','2.3.0-alpha.2'],
+  ['3.0.0-alpha.2','2.3.0-alpha.2'],['4.0.0-alpha.1','2.3.0-alpha.2'],
+  ['2.3.0-alpha.1','3.0.0-rc.2'],['2.3.1-alpha.1','2.3.0-alpha.2'],
+ ])assert.throws(()=>validateReleaseHistory(history(versions)),/Invalid release transition/);
 });

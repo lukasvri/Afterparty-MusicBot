@@ -19,7 +19,7 @@ export type GuessPublicState = {
 export type GuessResult = { game: GuessPublicState; self: { participantId: string; result: GuessFeedback | null } };
 type Participant = { id: string; nickname: string; total: number; lastResult: GuessFeedback | null;
   rate: { until: number; count: number }; guesses: Set<string> };
-type Round = { id: string; song: GuessSong; startsAt: number; deadline: number;
+type Round = { id: string; startRevision: number; song: GuessSong; startsAt: number; deadline: number;
   settings: Readonly<GuessSettings>; awards: Map<string, number> };
 type State = {
   scope: GuessAccess['scope']; scopeId: string; sessionId: string; gameId: string; revision: number;
@@ -41,8 +41,11 @@ const extras: Record<string, string[]> = { join: ['nickname'], read: [], configu
  * private feedback for the requesting anonymous participant. join needs eventId
  * and optional nickname, bootstraps a lobby or recovers the same actor/public ID.
  * read requires an existing joined actor. Every other action requires current
- * sessionId/revision/roundId (null in lobby) and UUID eventId. configure takes a
- * complete settings object and categoryId from catalog summaries, in lobby only.
+ * sessionId/roundId (null in lobby) and UUID eventId. Host actions require the
+ * current revision; guesses accept only revisions from the same active round,
+ * so another participant's answer or join cannot invalidate an in-flight guess.
+ * configure takes a complete settings object and categoryId from catalog
+ * summaries, in lobby only.
  * The handler strips grant/role fields and rechecks authority after any awaits.
  *
  * start atomically selects the full game from the trusted catalog. next advances
@@ -129,7 +132,7 @@ export class GuessGame {
   }
   private newRound(state: State, now: number) {
     const settings = Object.freeze({ ...state.activeSettings! });
-    state.round = { id: this.id(), song: state.songs[state.roundNumber], startsAt: now + 1500,
+    state.round = { id: this.id(), startRevision: state.revision + 1, song: state.songs[state.roundNumber], startsAt: now + 1500,
       deadline: now + 1500 + settings.durationSeconds * 1000, settings, awards: new Map() };
     state.roundNumber++; state.phase = 'round'; state.guestReceipts.clear();
     for (const participant of state.participants.values()) { participant.lastResult = null; participant.guesses.clear(); }
@@ -171,7 +174,11 @@ export class GuessGame {
     this.reconcile(state, now);
     const categories = this.categories();
     if (action === 'read') { this.budget('read', key, 4096, 480, now); state.expires = now + TTL; return this.snapshot(state, access.actor, now, categories); }
-    if (input.sessionId !== state.sessionId || input.roundId !== (state.round?.id ?? null) || input.revision !== state.revision)
+    const revision = input.revision;
+    const validRevision = action === 'guess'
+      ? typeof revision === 'number' && Number.isInteger(revision) && state.round !== null && revision >= state.round.startRevision && revision <= state.revision
+      : revision === state.revision;
+    if (input.sessionId !== state.sessionId || input.roundId !== (state.round?.id ?? null) || !validRevision)
       throw new UserError('The game changed. Refresh and try again.', 409);
     if (typeof input.eventId !== 'string' || !UUID.test(input.eventId)) throw new UserError('Invalid game event.');
     if ([state.joinReceipts, state.guestReceipts, state.hostReceipts, state.moderationReceipts].some(receipts => receipts.has(input.eventId as string)))
