@@ -75,13 +75,13 @@ test('ordinary Discord music is absent from the website while concert intent sur
 
 test('ordinary music retains Discord history without becoming a website concert',()=>{const t=setup();try{t.engine.connected=true;t.engine.current=track();t.engine.segments=[{track:t.engine.current,startFrame:0,offset:0}];t.sink.ms=20;t.engine.tick();assert.equal(t.store.history().length,1);assert.equal(t.store.history()[0].video.concert,false);assert.equal(t.engine.websiteSnapshot().current,null);}finally{t.close();}});
 
-test('radio queues early, deduplicates concurrent lookups and yields to manual songs',async()=>{
+test('radio queues early, deduplicates concurrent lookups and keeps additions in order',async()=>{
  const t=setup();try{
   t.engine.connected=true;t.engine.current=track();let calls=0;
   t.providers.radio=async()=>{calls++;return track('radio123456');};
   t.engine.tick();await t.engine.ensureRadio();
   assert.equal(calls,1);assert.equal(t.engine.queue[0].radio,true);assert.equal(t.sink.duration(),0);
-  t.engine.enqueue([track('manual12345')]);assert.deepEqual(t.engine.queue.map(t=>t.id),['manual12345']);
+  t.engine.enqueue([track('manual12345')]);assert.deepEqual(t.engine.queue.map(t=>t.id),['radio123456','manual12345']);
   t.engine.setSettings({radio:false});assert.deepEqual(t.engine.queue.map(t=>t.id),['manual12345']);
  }finally{t.close();}
 });
@@ -265,21 +265,22 @@ test('exhausted crossfade recovery skips the consumed incoming entry, not back i
 });
 
 for (const sameRecording of [false, true]) {
- test(`manual enqueue replaces a full radio queue (${sameRecording ? 'same' : 'different'} recording)`,()=>{
+ test(`manual enqueue ${sameRecording ? 'promotes the selected radio recording' : 'preserves a full radio queue and rejects a different recording'}`,()=>{
   const t=setup();clearInterval(t.engine.timer);try{
    t.engine.settings.playlistLimit=1;
    const radio={...track('radio123456'),radio:true};t.engine.queue=[radio];
    const manual=track(sameRecording?radio.id:'manual12345');
-   assert.equal(t.engine.enqueue([manual]),1);
-   assert.deepEqual(t.engine.queue,[manual]);
-   assert.deepEqual(t.store.get<Track[]>('queue',[]),[manual]);
+   t.engine.persist();
+   if(sameRecording){assert.equal(t.engine.enqueue([manual]),1);assert.deepEqual(t.engine.queue,[manual]);}
+   else{assert.throws(()=>t.engine.enqueue([manual]),/full/);assert.deepEqual(t.engine.queue,[radio]);}
+   assert.deepEqual(t.store.get<Track[]>('queue',[]),t.engine.queue);
   }finally{t.close();}
  });
 }
 for (const next of [false,true]) {
  test(`manual enqueue uses retained capacity and preserves atomic rejection (next=${next})`,()=>{
   const t=setup();clearInterval(t.engine.timer);try{
-   t.engine.settings.playlistLimit=3;
+   t.engine.settings.playlistLimit=4;
    const existing=track('manual12345'),radio={...track('radio123456'),radio:true};
    const first=track('first123456'),second=track('second12345');
    t.engine.queue=[existing,radio];t.engine.persist();
@@ -287,7 +288,7 @@ for (const next of [false,true]) {
    assert.throws(()=>t.engine.enqueue([first,second,track('third123456')],next),/The queue is full/);
    assert.deepEqual({queue:t.engine.queue,saved:t.store.get<Track[]>('queue',[]),revision:t.engine.revision()},before);
    assert.equal(t.engine.enqueue([existing,first,first,second],next),2);
-   assert.deepEqual(t.engine.queue,next?[first,second,existing]:[existing,first,second]);
+   assert.deepEqual(t.engine.queue,next?[first,second,existing,radio]:[existing,radio,first,second]);
    assert.equal(t.engine.queue.length,t.engine.settings.playlistLimit);
   }finally{t.close();}
  });

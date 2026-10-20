@@ -342,10 +342,10 @@ test("concert move and undo preserve rejection history for entries that were nev
   } finally { a.close(); }
 });
 
-test('approval replaces radio at capacity and preserves other pending requests and servers',async()=>{
+test('approval appends after radio and rejects at capacity while preserving requests and servers',async()=>{
  const a=setup(),b=setup();clearInterval(a.e.timer);clearInterval(b.e.timer);
  try{
-  a.e.settings.playlistLimit=2;a.e.queue=[];
+  a.e.settings.playlistLimit=3;a.e.queue=[];
   const act=(action:string,extra={})=>a.q.apply({action,revision:a.q.revision(),...extra},true);
   await act('approval',{enabled:true});
   assert(a.q.request([track('requested'),track('waiting')]));
@@ -353,7 +353,7 @@ test('approval replaces radio at capacity and preserves other pending requests a
   a.e.queue=[privateTrack,{...track('radio'),radio:true}];a.e.persist();
   const other={queue:[...b.e.queue],saved:b.q.read(),revision:b.q.revision()};
   await act('approve',{videoId:'requested'});
-  assert.deepEqual(a.e.queue.map(t=>t.entryId),['private','requested']);
+  assert.deepEqual(a.e.queue.map(t=>t.entryId),['private','radio','requested']);
   assert.deepEqual(a.q.read().requests.map(t=>t.entryId),['waiting']);
   const before={queue:[...a.e.queue],saved:a.q.read(),revision:a.q.revision()};
   await assert.rejects(act('approve',{videoId:'waiting'}),/The queue is full/);

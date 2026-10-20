@@ -188,7 +188,6 @@ export function changeRoom(
         state.playing = false;
         state.playbackKey = crypto.randomUUID();
       } else {
-        state.queue = state.queue.filter(item => !item.radio);
         state.queue.push(track);
       }
     }
@@ -239,7 +238,6 @@ export function changeRoom(
         state.playing = false;
         state.playbackKey = crypto.randomUUID();
       } else {
-        state.queue = state.queue.filter(item => !item.radio);
         state.queue.push(track);
       }
     }

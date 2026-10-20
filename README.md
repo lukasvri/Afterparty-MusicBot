@@ -25,6 +25,8 @@ Play music in a Discord voice channel, share a concert with video, or open a pri
 | Pause, seek, skip and crossfade | Playback follows Core's audio clock | Save evenings locally, import/export and use TV mode |
 | Separate settings and storage for each server | Ordinary Discord music stays private | Browser rooms work without a Discord connection |
 
+Ordinary queue additions append after existing entries, including eligible radio suggestions. Explicit play-next and play-now controls retain their distinct behavior. A full queue rejects additions without silently dropping earlier entries.
+
 YouTube video uses the official embedded player. SoundCloud provides audio; Spotify links are matched to a playable source. Provider availability and browser autoplay rules still apply.
 
 ## Built for the big screen. Ready for your pocket.
