@@ -120,7 +120,7 @@ test('binary game proxy forwards only the fixed authenticated Core action and re
   const input = { action: 'media', scope: 'room', scopeId: 'TESTROOM', token: 'synthetic-game-token' };
   const proxy = await audioProxy((async (url, init) => {
     assert.equal(url, 'https://core.example/v1/guess'); assert.equal(init?.method, 'POST');
-    assert.equal(init?.redirect, 'error'); assert.equal(init?.headers && (init.headers as Record<string, string>).Authorization, 'Bearer synthetic-bridge-key');
+    assert.equal(init?.redirect, 'manual'); assert.equal(init?.headers && (init.headers as Record<string, string>).Authorization, 'Bearer synthetic-bridge-key');
     assert.deepEqual(JSON.parse(String(init?.body)), input);
     return new Response(wave.buffer as ArrayBuffer, { headers: { 'Content-Type': 'audio/wav', 'Content-Disposition': 'inline; filename=secret-song.wav', 'X-Provider-Title': 'Secret title', 'Access-Control-Allow-Origin': '*' } });
   }) as typeof fetch);

@@ -11,8 +11,9 @@ export async function coreGuessAudio(input: unknown, callerSignal: AbortSignal) 
  const origin=coreUrl(),key=(env as unknown as {ADMIN_BRIDGE_KEY?:string}).ADMIN_BRIDGE_KEY;
  if(!origin||!key)throw Object.assign(new Error('Game preview is unavailable.'),{status:503});
  const signal=AbortSignal.any([callerSignal,AbortSignal.timeout(12000)]);
- const response=await fetch(origin+'/v1/guess',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(input),redirect:'error',signal});
- if(!response.ok){void response.body?.cancel().catch(() => {});throw Object.assign(new Error('Game preview is unavailable. Reconnect and try again.'),{status:response.status});}
+ // Workerd supports manual/follow only. Never follow a redirect with bridge credentials.
+ const response=await fetch(origin+'/v1/guess',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(input),redirect:'manual',signal});
+ if(!response.ok){void response.body?.cancel().catch(() => {});throw Object.assign(new Error('Game preview is unavailable. Reconnect and try again.'),{status:response.status>=300&&response.status<400?502:response.status});}
  try {
   if(response.headers.get('content-type')!=='audio/wav'){void response.body?.cancel().catch(()=>{});throw Error();}
   const bytes=await readGuessBytes(response,GUESS_AUDIO_MAX_BYTES,signal);guessWaveSeconds(bytes);

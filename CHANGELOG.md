@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.3.0-alpha.2: Fix game preview audio on Workers
+
+2026-10-20
+
+- Guess the Song previews use a redirect mode supported by the website Worker runtime, fixing a reproducible HTTP 500 before the audio request reached Core. Upstream redirects are rejected with a generic 502 response without following them or exposing their destination; existing room and Discord authorization, cancellation and bounded WAV validation remain in place.
+- An isolated Workerd integration test now exercises the real game routes, D1 room authority and a temporary Core with generated tones. This synthetic-only prerelease is review material and does not enable real music or establish successful production playback.
+
 ## v2.3.0-alpha.1: Synthetic multiplayer game test
 
 2026-10-20
