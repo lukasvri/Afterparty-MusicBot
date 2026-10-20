@@ -59,7 +59,7 @@ export class GuessHttp {
         return;
       }
       if (!['room', 'guild'].includes(String(input.scope)) || typeof input.scopeId !== 'string' || !(input.scope === 'room' ? /^[A-Z0-9]{8}$/ : /^\d{14,22}$/).test(input.scopeId)) throw new UserError('Invalid game scope.');
-      if (!['join', 'read', 'guess', 'media', ...controls].includes(String(input.action))) throw new UserError('Unknown game action.');
+      if (!['join', 'read', 'guess', 'skip', 'media', ...controls].includes(String(input.action))) throw new UserError('Unknown game action.');
       const scope = input.scope as 'room' | 'guild', scopeId = input.scopeId, key = scope + ':' + scopeId;
       let host = false;
       if (scope === 'guild') host = (await guessAbort(this.deps.guild(input.tokenCipher, scopeId, connectionSignal), connectionSignal)).canManage;

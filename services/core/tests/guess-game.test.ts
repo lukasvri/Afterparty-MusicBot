@@ -129,6 +129,110 @@ test('settings validate all types/ranges and freeze a complete game and each rou
   assert.deepEqual(f.read().game.round!.hints, {});
 });
 
+test('artist mode accepts only the complete normalized artist and freezes mode, hints and reveal fields', () => {
+  const f = fixture(); f.join(); f.configure({ answerMode: 'artist', roundCount: 2 }); f.command('start');
+  f.setTime(f.current.round!.startsAt);
+  for (const text of ['Fictional Signal 1', 'Invented Alias 1', 'Sample', 'Sample Artist', 'Sample Artist 1 extra']) {
+    assert.deepEqual(f.command('guess', { text }, guest).self.result, { correct: false, awarded: 0 });
+  }
+  assert.deepEqual(f.command('guess', { text: 'SÁMPLE---ARTIST 1!!' }, guest).self.result, { correct: true, awarded: 1000 });
+  assert.equal(f.current.settings.answerMode, 'artist'); f.current.settings.answerMode = 'title';
+  assert.equal(f.read().game.settings.answerMode, 'artist');
+  assert.throws(() => f.configure({ answerMode: 'title' }), { status: 409 });
+  f.setTime(f.current.round!.startsAt + 25_000);
+  assert.deepEqual(f.read().game.round!.hints, { artistInitial: 'S', artistWordCount: 3 });
+  for (const secret of ['Sample Artist 1', 'Fictional Signal', 'Invented Alias', 'mediaKey', guest.actor]) assert(!JSON.stringify(f.current).includes(secret));
+  const revealed = f.command('reveal');
+  assert.deepEqual(revealed.game.round!.answer, { title: 'Fictional Signal 1', artist: 'Sample Artist 1' });
+  f.command('next'); assert.equal(f.current.settings.answerMode, 'artist');
+  f.setTime(f.current.round!.startsAt); assert.equal(f.command('guess', { text: 'Sample Artist 2' }).self.result!.awarded, 1000);
+});
+
+test('omitted answer mode normalizes to title and unsupported modes fail without changing settings', () => {
+  const f = fixture(), legacy = { ...DEFAULT_GUESS_SETTINGS }; delete legacy.answerMode;
+  f.command('configure', { categoryId: '2010s', settings: legacy });
+  assert.equal(f.current.settings.answerMode, 'title');
+  for (const answerMode of [null, false, 0, {}, [], 'album', 'ARTIST', '']) {
+    assert.throws(() => f.command('configure', { categoryId: '2010s', settings: { ...legacy, answerMode } }), { status: 400 });
+    assert.equal(f.read().game.settings.answerMode, 'title');
+  }
+  f.command('start'); f.setTime(f.current.round!.startsAt);
+  assert.equal(f.command('guess', { text: 'Sample Artist 1' }).self.result!.correct, false);
+  assert.equal(f.command('guess', { text: 'Invented Alias 1' }).self.result!.correct, true);
+});
+
+test('same-revision skip votes reveal on strict current-roster majority and preserve existing scores and private feedback', () => {
+  const f = fixture(), third = { ...guest, actor: 'third-private-actor' };
+  f.join(); f.join(third); f.configure({ roundCount: 2 }); f.command('start'); f.setTime(f.current.round!.startsAt);
+  const shared = { sessionId: f.current.sessionId, roundId: f.current.round!.roundId, revision: f.current.revision };
+  f.command('guess', { text: 'Fictional Signal 1' }, guest);
+  const eventId = f.id(), vote = (access: GuessAccess, fields = {}) => f.model.apply(access, { action: 'skip', ...shared, eventId: f.id(), ...fields });
+  const first = vote(host, { eventId });
+  assert.equal(first.game.phase, 'round'); assert.equal(first.game.round!.skipVotes, 1); assert.equal(first.game.round!.skipRequired, 2);
+  assert.equal(first.self.skipVoted, true); assert.equal(f.read(guest).self.skipVoted, false);
+  assert.equal('skipVoted' in first.game, false);
+  assert.throws(() => vote(third, { eventId }), { status: 409 });
+  assert.throws(() => vote(host), { status: 409 });
+  assert.throws(() => f.model.apply(host, { action: 'reveal', ...shared, eventId: f.id() }), { status: 409 }, 'host controls retain strict CAS');
+  const scores = f.read().game.scoreboard;
+  const second = vote(guest);
+  assert.equal(second.game.phase, 'reveal'); assert.equal(second.game.round!.skipVotes, 2);
+  assert.deepEqual(second.game.scoreboard, scores);
+  assert.deepEqual(second.self.result, { correct: true, awarded: 1000 });
+  assert.equal(second.game.roundNumber, 1); assert.equal(second.game.round!.answer!.title, 'Fictional Signal 1');
+  assert.throws(() => vote(third), { status: 409 });
+  for (const secret of [host.actor, guest.actor, third.actor, 'guestReceipts', 'mediaKey', 'Invented Alias']) assert(!JSON.stringify(second).includes(secret));
+});
+
+test('skip quorum is bounded strict majority for one, two, three, four and sixty-four joined players', () => {
+  for (const size of [1, 2, 3, 4, 64]) {
+    const f = fixture(), roster = [host, ...Array.from({ length: size - 1 }, (_, n) => ({ ...guest, actor: `voter-${n}` }))];
+    for (const player of roster.slice(1)) f.join(player);
+    f.configure({ roundCount: 1 }); f.command('start'); f.setTime(f.current.round!.startsAt);
+    const shared = { sessionId: f.current.sessionId, roundId: f.current.round!.roundId, revision: f.current.revision };
+    const required = Math.floor(size / 2) + 1;
+    for (let n = 0; n < required; n++) {
+      const result = f.model.apply(roster[n], { action: 'skip', ...shared, eventId: f.id() });
+      assert.equal(result.game.round!.skipRequired, required); assert.equal(result.game.round!.skipVotes, n + 1);
+      assert.equal(result.game.phase, n + 1 === required ? 'reveal' : 'round');
+      assert(result.game.scoreboard.every(player => player.total === 0));
+    }
+  }
+});
+
+test('late joins raise skip threshold and new rounds or lobby reset clear all votes', () => {
+  const f = fixture(), third = { ...guest, actor: 'third' }, fourth = { ...guest, actor: 'fourth' };
+  f.join(); f.configure({ roundCount: 2 }); f.command('start'); f.setTime(f.current.round!.startsAt);
+  f.command('skip'); assert.equal(f.current.round!.skipRequired, 2);
+  f.join(third); f.join(fourth);
+  assert.equal(f.current.round!.skipRequired, 3); assert.equal(f.current.round!.skipVotes, 1);
+  f.command('skip', {}, guest); assert.equal(f.current.phase, 'round');
+  f.command('skip', {}, third); assert.equal(f.current.phase, 'reveal');
+  f.command('next'); assert.equal(f.current.round!.skipVotes, 0); assert.equal(f.current.round!.skipRequired, 3);
+  assert.equal(f.read().self.skipVoted, false); assert.equal(f.read(guest).self.skipVoted, false);
+  f.setTime(f.current.round!.startsAt); f.command('skip', {}, guest);
+  f.command('end'); f.command('reset'); assert.equal(f.current.round, null); assert.equal(f.read(guest).self.skipVoted, false);
+});
+
+test('skip rejects early, stale, cross-scope, replayed and deadline votes without spending host reserves', () => {
+  const f = fixture(); f.join(); f.configure({ roundCount: 2 }); f.command('start');
+  const shared = { action: 'skip', sessionId: f.current.sessionId, roundId: f.current.round!.roundId, revision: f.current.revision };
+  const vote = (fields = {}, access = guest) => f.model.apply(access, { ...shared, eventId: f.id(), ...fields });
+  assert.throws(() => vote(), { status: 409 }); assert.equal(f.read().game.round!.skipVotes, 0);
+  f.setTime(f.current.round!.startsAt);
+  for (const fields of [{ sessionId: f.id() }, { roundId: f.id() }, { revision: shared.revision - 1 },
+    { revision: shared.revision + 1 }, { revision: NaN }, { eventId: 'bad' }, { text: 'forged' }]) assert.throws(() => vote(fields));
+  assert.throws(() => vote({}, { ...guest, scopeId: 'ROOM0002' }), { status: 403 });
+  const eventId = f.id(); vote({ eventId });
+  for (let n = 0; n < 300; n++) assert.throws(() => vote({ eventId: n % 2 ? eventId : f.id() }), { status: 409 });
+  f.read(); f.command('reveal'); f.command('next'); f.setTime(f.current.round!.startsAt);
+  assert.throws(() => vote(), { status: 409 });
+  const deadline = f.current.round!.deadline; f.setTime(deadline);
+  assert.throws(() => f.command('skip', {}, guest), { status: 409 });
+  assert.equal(f.read().game.round!.skipVotes, 0); assert(f.current.scoreboard.every(player => player.total === 0));
+  f.command('end'); f.command('reset'); assert.equal(f.current.phase, 'lobby');
+});
+
 test('competitive scoring awards every actor independently using server receipt time and exact trusted aliases', () => {
   const f = fixture(); const other = { ...guest, actor: 'private-third-grant' };
   const green = { ...guest, actor: 'private-fourth-grant' };

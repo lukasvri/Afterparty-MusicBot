@@ -60,6 +60,68 @@ const mutation = (state: Result, action: string, fields: Record<string, unknown>
   action, sessionId: state.game.sessionId, revision: state.game.revision, roundId: state.game.round?.roundId ?? null, eventId: randomUUID(), ...fields,
 });
 
+test('HTTP guest skip uses fresh guild authority, same-round concurrency and artist settings without host privileges', async t => {
+  let clock = Date.now(), revoked = false, membershipChecks = 0;
+  t.mock.method(Date, 'now', () => clock);
+  const oauth = new DiscordOAuth(key, 'synthetic-app', 'synthetic-secret', 'https://site.example', async (_url, init) => {
+    membershipChecks++;
+    const bearer = new Headers(init?.headers).get('Authorization');
+    return Response.json(revoked && bearer !== 'Bearer host' ? [] : [{ id: A, permissions: bearer === 'Bearer host' ? '32' : '0' }]);
+  });
+  const context = (access: string) => ({ scope: 'guild', scopeId: A, tokenCipher: oauth.seal({ access,
+    expiresAt: clock + 3_600_000, user: { id: A, name: 'Private OAuth identity' } }) });
+  const f = await fixture({ oauth, guessCatalog: catalog() }), before = f.state();
+  const result = async (input: Record<string, unknown>) => {
+    const response = await f.call(input); assert.equal(response.status, 200, await response.clone().text());
+    return await response.json() as Result;
+  };
+  try {
+    const actors = await Promise.all(['host', 'blue', 'gold'].map(async name => {
+      const scope = context(name), joined = await result({ ...scope, action: 'join', eventId: randomUUID(), nickname: name });
+      return { ...scope, token: joined.token };
+    }));
+    let host = await result({ ...actors[0], action: 'read' });
+    host = await result({ ...actors[0], ...mutation(host, 'configure', { categoryId: '2010s',
+      settings: { ...DEFAULT_GUESS_SETTINGS, answerMode: 'artist', roundCount: 2 } }) });
+    host = await result({ ...actors[0], ...mutation(host, 'start') });
+    assert.equal(host.game.settings.answerMode, 'artist'); assert.equal(host.game.round!.skipRequired, 2);
+    assert.equal((await f.call({ ...actors[1], ...mutation(host, 'skip') })).status, 409, 'countdown cannot be skipped');
+    clock = host.game.round!.startsAt;
+    const incorrect = await result({ ...actors[1], ...mutation(host, 'guess', { text: 'Fictional Signal 1' }) });
+    assert.deepEqual(incorrect.self.result, { correct: false, awarded: 0 });
+    const correct = await result({ ...actors[1], ...mutation(incorrect, 'guess', { text: 'SÁMPLE---ARTIST!!' }) });
+    assert.deepEqual(correct.self.result, { correct: true, awarded: 1000 });
+    assert.equal((await f.call({ ...actors[1], ...mutation(correct, 'reveal'), host: true })).status, 403);
+    revoked = true; const checks = membershipChecks;
+    assert.equal((await f.call({ ...actors[1], ...mutation(correct, 'skip'), host: true })).status, 403);
+    assert(membershipChecks > checks, 'membership is refreshed for every skip request');
+    revoked = false;
+    assert.equal((await f.call({ ...actors[1], scopeId: B, ...mutation(correct, 'skip') })).status, 403);
+    assert.equal((await f.call({ ...actors[1], token: 'forged', ...mutation(correct, 'skip') })).status, 419);
+    clock = host.game.round!.startsAt + 25_000;
+    host = await result({ ...actors[0], action: 'read' });
+    assert.equal(host.game.round!.skipVotes, 0); assert.deepEqual(host.game.round!.hints, { artistInitial: 'S', artistWordCount: 2 });
+    const shared = mutation(host, 'skip');
+    const votes = await Promise.all(actors.slice(1).map(actor => result({ ...actor, ...shared, eventId: randomUUID(),
+      host: true, skipVotes: 999, skipRequired: 1 })));
+    assert(votes.every(vote => !vote.canManage && vote.self.skipVoted));
+    assert.deepEqual(votes.map(vote => vote.game.round!.skipVotes).sort(), [1, 2]);
+    assert(votes.every(vote => vote.game.round!.skipRequired === 2));
+    host = await result({ ...actors[0], action: 'read' });
+    assert.equal(host.game.phase, 'reveal'); assert.equal(host.game.roundNumber, 1); assert.equal(host.self.skipVoted, false);
+    assert.deepEqual(host.game.scoreboard.map(player => player.total), [1000, 0, 0]);
+    assert.deepEqual(host.game.round!.answer, { title: 'Fictional Signal 1', artist: 'Sample Artist' });
+    const publicGame = JSON.stringify(host.game);
+    for (const secret of ['Private OAuth', 'Private ordinary', 'synthetic_media', 'Invented Alias', 'skipVoted', 'tokenCipher']) assert(!publicGame.includes(secret));
+    assert.equal((await f.call({ ...actors[1], ...shared, eventId: randomUUID() })).status, 409);
+    assert.equal((await f.call({ ...actors[1], ...mutation(host, 'next'), host: true })).status, 403);
+    host = await result({ ...actors[0], ...mutation(host, 'next') });
+    assert.equal(host.game.roundNumber, 2); assert.equal(host.game.round!.skipVotes, 0); assert.equal(host.game.settings.answerMode, 'artist');
+    assert.equal((await result({ ...actors[1], action: 'read' })).self.skipVoted, false);
+    assert.deepEqual(f.state(), before);
+  } finally { await f.close(); }
+});
+
 test('competitive HTTP refreshes roles, scopes grants, hides metadata, preserves playback and cancels OAuth before joining', async t => {
   let clock = Date.now(), revokedRole = false, revokedMembership = false, block = false;
   t.mock.method(Date, 'now', () => clock);

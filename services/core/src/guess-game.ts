@@ -5,8 +5,8 @@ import { UnavailableGuessCatalog, copyGuessMedia, copyGuessSong, normalizeGuess,
 
 /** Trusted handler authority, not request fields or Discord/display identities. */
 export type GuessAccess = { scope: 'room' | 'guild'; scopeId: string; host: boolean; actor: string };
-export type GuessSettings = { durationSeconds: number; roundCount: number; maxPoints: number; minPoints: number; hints: boolean };
-export const DEFAULT_GUESS_SETTINGS: Readonly<GuessSettings> = Object.freeze({ durationSeconds: 30, roundCount: 5, maxPoints: 1000, minPoints: 100, hints: true });
+export type GuessSettings = { durationSeconds: number; roundCount: number; maxPoints: number; minPoints: number; hints: boolean; answerMode?: 'title' | 'artist' };
+export const DEFAULT_GUESS_SETTINGS: Readonly<GuessSettings> = Object.freeze({ durationSeconds: 30, roundCount: 5, maxPoints: 1000, minPoints: 100, hints: true, answerMode: 'title' });
 export type GuessFeedback = { correct: boolean; awarded: number };
 export type GuessPublicState = {
   scope: GuessAccess['scope']; scopeId: string; sessionId: string; gameId: string; revision: number;
@@ -14,13 +14,14 @@ export type GuessPublicState = {
   settings: GuessSettings; categories: GuessCategorySummary[]; roundNumber: number;
   scoreboard: { id: string; nickname: string; total: number; hasAnswered: boolean }[]; answeredCount: number;
   round: null | { roundId: string; startsAt: number; deadline: number;
-    hints: { artistInitial?: string; titleWordCount?: number }; answer?: { title: string; artist: string } };
+    hints: { artistInitial?: string; titleWordCount?: number; artistWordCount?: number };
+    skipVotes?: number; skipRequired?: number; answer?: { title: string; artist: string } };
 };
-export type GuessResult = { game: GuessPublicState; self: { participantId: string; result: GuessFeedback | null } };
+export type GuessResult = { game: GuessPublicState; self: { participantId: string; result: GuessFeedback | null; skipVoted?: boolean } };
 type Participant = { id: string; nickname: string; total: number; lastResult: GuessFeedback | null;
   rate: { until: number; count: number }; guesses: Set<string> };
 type Round = { id: string; startRevision: number; song: GuessSong; startsAt: number; deadline: number;
-  settings: Readonly<GuessSettings>; awards: Map<string, number> };
+  settings: Readonly<GuessSettings>; awards: Map<string, number>; skipVotes: Set<string> };
 type State = {
   scope: GuessAccess['scope']; scopeId: string; sessionId: string; gameId: string; revision: number;
   phase: GuessPublicState['phase']; expires: number; categoryId: string; settings: Readonly<GuessSettings>;
@@ -33,7 +34,7 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const hostActions = new Set(['configure', 'start', 'next', 'reveal', 'end', 'reset']);
 const commonFields = ['action', 'sessionId', 'roundId', 'revision', 'eventId'];
 const extras: Record<string, string[]> = { join: ['nickname'], read: [], configure: ['settings', 'categoryId'],
-  start: [], next: [], reveal: [], end: [], reset: [], guess: ['text'] };
+  start: [], next: [], reveal: [], end: [], reset: [], guess: ['text'], skip: [] };
 
 /**
  * Synchronous, ephemeral competitive authority with no playback or persistence.
@@ -42,8 +43,8 @@ const extras: Record<string, string[]> = { join: ['nickname'], read: [], configu
  * and optional nickname, bootstraps a lobby or recovers the same actor/public ID.
  * read requires an existing joined actor. Every other action requires current
  * sessionId/roundId (null in lobby) and UUID eventId. Host actions require the
- * current revision; guesses accept only revisions from the same active round,
- * so another participant's answer or join cannot invalidate an in-flight guess.
+ * current revision; guesses and skip votes accept revisions from the same active
+ * round, so another participant's answer or join cannot invalidate them.
  * configure takes a complete settings object and categoryId from catalog
  * summaries, in lobby only.
  * The handler strips grant/role fields and rechecks authority after any awaits.
@@ -53,6 +54,8 @@ const extras: Record<string, string[]> = { join: ['nickname'], read: [], configu
  * and end never rescore. reset from results returns to lobby, preserves anonymous roster and
  * lobby settings, clears all scores, and rotates gameId. A scope idle for 30m or
  * process restart loses its session. Stale mutations cannot recreate it.
+ * One skip vote per joined actor reveals on strict majority of the current roster;
+ * disconnected actors remain in that roster, and the host may still reveal.
  *
  * media() is internal authenticated descriptor lookup, not a public endpoint or
  * URL. The default provider has no playable sources. A reviewed transport must
@@ -120,18 +123,22 @@ export class GuessGame {
       typeof settings.durationSeconds !== 'number' || !Number.isInteger(settings.durationSeconds) || settings.durationSeconds < 15 || settings.durationSeconds > 90 ||
       typeof settings.roundCount !== 'number' || !Number.isInteger(settings.roundCount) || settings.roundCount < 1 || settings.roundCount > 20 ||
       typeof settings.maxPoints !== 'number' || !Number.isInteger(settings.maxPoints) || settings.maxPoints < 100 || settings.maxPoints > 2000 ||
-      typeof settings.minPoints !== 'number' || !Number.isInteger(settings.minPoints) || settings.minPoints < 0 || settings.minPoints > settings.maxPoints || typeof settings.hints !== 'boolean')
+      typeof settings.minPoints !== 'number' || !Number.isInteger(settings.minPoints) || settings.minPoints < 0 || settings.minPoints > settings.maxPoints || typeof settings.hints !== 'boolean' ||
+      (settings.answerMode !== undefined && settings.answerMode !== 'title' && settings.answerMode !== 'artist'))
       throw new UserError('Use valid duration, rounds, scoring and hint settings.');
     return Object.freeze({ durationSeconds: settings.durationSeconds, roundCount: settings.roundCount,
-      maxPoints: settings.maxPoints, minPoints: settings.minPoints, hints: settings.hints });
+      maxPoints: settings.maxPoints, minPoints: settings.minPoints, hints: settings.hints, answerMode: settings.answerMode ?? 'title' });
   }
   private snapshot(state: State, actor: string, now: number, categories: GuessCategorySummary[]): GuessResult {
     const round = state.round, participant = state.participants.get(actor)!;
-    const hints: { artistInitial?: string; titleWordCount?: number } = {};
+    const hints: { artistInitial?: string; titleWordCount?: number; artistWordCount?: number } = {};
     if (state.phase === 'round' && round?.settings.hints) {
       const elapsed = now - round.startsAt, duration = round.settings.durationSeconds * 1000;
       if (elapsed >= duration * 20 / 30) hints.artistInitial = Array.from(round.song.artist.trim())[0];
-      if (elapsed >= duration * 25 / 30) hints.titleWordCount = normalizeGuess(round.song.title).split(' ').length;
+      if (elapsed >= duration * 25 / 30) {
+        if (round.settings.answerMode === 'artist') hints.artistWordCount = normalizeGuess(round.song.artist).split(' ').length;
+        else hints.titleWordCount = normalizeGuess(round.song.title).split(' ').length;
+      }
     }
     const game: GuessPublicState = {
       scope: state.scope, scopeId: state.scopeId, sessionId: state.sessionId, gameId: state.gameId,
@@ -141,14 +148,16 @@ export class GuessGame {
         hasAnswered: round?.awards.has(player.id) ?? false })).sort((a, b) => b.total - a.total || a.id.localeCompare(b.id)),
       answeredCount: round?.awards.size ?? 0,
       round: round ? { roundId: round.id, startsAt: round.startsAt, deadline: round.deadline, hints,
+        skipVotes: round.skipVotes.size, skipRequired: Math.floor(state.participants.size / 2) + 1,
         ...(['reveal', 'results'].includes(state.phase) ? { answer: { title: round.song.title, artist: round.song.artist } } : {}) } : null,
     };
-    return { game, self: { participantId: participant.id, result: participant.lastResult ? { ...participant.lastResult } : null } };
+    return { game, self: { participantId: participant.id, result: participant.lastResult ? { ...participant.lastResult } : null,
+      skipVoted: round?.skipVotes.has(participant.id) ?? false } };
   }
   private newRound(state: State, now: number) {
     const settings = Object.freeze({ ...state.activeSettings! });
     state.round = { id: this.id(), startRevision: state.revision + 1, song: state.songs[state.roundNumber], startsAt: now + 1500,
-      deadline: now + 1500 + settings.durationSeconds * 1000, settings, awards: new Map() };
+      deadline: now + 1500 + settings.durationSeconds * 1000, settings, awards: new Map(), skipVotes: new Set() };
     state.roundNumber++; state.phase = 'round'; state.guestReceipts.clear();
     for (const participant of state.participants.values()) { participant.lastResult = null; participant.guesses.clear(); }
   }
@@ -190,7 +199,8 @@ export class GuessGame {
     const categories = this.categories();
     if (action === 'read') { this.budget('read', key, 4096, 480, now); state.expires = now + TTL; return this.snapshot(state, access.actor, now, categories); }
     const revision = input.revision;
-    const validRevision = action === 'guess'
+    const guestAction = action === 'guess' || action === 'skip';
+    const validRevision = guestAction
       ? typeof revision === 'number' && Number.isInteger(revision) && state.round !== null && revision >= state.round.startRevision && revision <= state.revision
       : revision === state.revision;
     if (input.sessionId !== state.sessionId || input.roundId !== (state.round?.id ?? null) || !validRevision)
@@ -199,8 +209,8 @@ export class GuessGame {
     if ([state.joinReceipts, state.guestReceipts, state.hostReceipts, state.moderationReceipts].some(receipts => receipts.has(input.eventId as string)))
       throw new UserError('Game event already received.', 409);
     const moderation = ['reveal', 'end', 'reset'].includes(String(action));
-    const receipts = action === 'guess' ? state.guestReceipts : moderation ? state.moderationReceipts : state.hostReceipts;
-    if (receipts.size >= (action === 'guess' ? 2048 : moderation ? 128 : 256)) throw new UserError('Game action limit reached. Reset or rejoin later.', 429);
+    const receipts = guestAction ? state.guestReceipts : moderation ? state.moderationReceipts : state.hostReceipts;
+    if (receipts.size >= (guestAction ? 2048 : moderation ? 128 : 256)) throw new UserError('Game action limit reached. Reset or rejoin later.', 429);
     let settings: Readonly<GuessSettings> | undefined, plan: GuessSong[] | undefined, answer: string | undefined;
     if (action === 'configure') {
       if (state.phase !== 'lobby') throw new UserError('Return to the lobby before changing settings.', 409);
@@ -222,8 +232,11 @@ export class GuessGame {
       if (state.phase !== 'round' || !state.round || now < state.round.startsAt || state.round.awards.has(state.participants.get(access.actor)!.id))
         throw new UserError('This round is not accepting another answer from you.', 409);
       if (typeof input.text !== 'string' || input.text.length > 120 || CONTROL.test(input.text) || !normalizeGuess(input.text) || normalizeGuess(input.text).length > 120)
-        throw new UserError('Use a short song title without control characters.');
+        throw new UserError('Use a short answer without control characters.');
       answer = normalizeGuess(input.text);
+    } else if (action === 'skip') {
+      if (state.phase !== 'round' || !state.round || now < state.round.startsAt || state.round.skipVotes.has(state.participants.get(access.actor)!.id))
+        throw new UserError('This round is not accepting another skip vote from you.', 409);
     } else if (action === 'next' && state.phase !== 'reveal') throw new UserError('Reveal this round before advancing.', 409);
     else if (action === 'reveal' && state.phase !== 'round') throw new UserError('There is no hidden round to reveal.', 409);
     else if (action === 'end' && state.phase === 'results') throw new UserError('The game has ended.', 409);
@@ -237,11 +250,16 @@ export class GuessGame {
       this.budget('guess', key, 1200, 240, now);
       if (player.rate.until <= now) player.rate = { until: now + 60_000, count: 0 };
       player.rate.count++; player.guesses.add(digest);
-      const correct = [round.song.title, ...round.song.aliases].some(title => normalizeGuess(title) === answer);
+      const accepted = round.settings.answerMode === 'artist' ? [round.song.artist] : [round.song.title, ...round.song.aliases];
+      const correct = accepted.some(value => normalizeGuess(value) === answer);
       const awarded = correct ? Math.max(round.settings.minPoints, Math.floor(round.settings.maxPoints -
         (round.settings.maxPoints - round.settings.minPoints) * (now - round.startsAt) / (round.settings.durationSeconds * 1000))) : 0;
       player.lastResult = { correct, awarded };
       if (correct) { round.awards.set(player.id, awarded); player.total += awarded; }
+    } else if (action === 'skip') {
+      this.budget('skip', key, 1200, 240, now);
+      state.round!.skipVotes.add(state.participants.get(access.actor)!.id);
+      if (state.round!.skipVotes.size >= Math.floor(state.participants.size / 2) + 1) state.phase = 'reveal';
     } else {
       this.budget(moderation ? 'moderation' : 'host', key, moderation ? 256 : 240, moderation ? 128 : 60, now);
       if (action === 'configure') { state.settings = settings!; state.categoryId = input.categoryId as string; }
