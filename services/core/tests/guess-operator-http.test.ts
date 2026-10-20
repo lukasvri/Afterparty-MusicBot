@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { Guilds } from '../src/guilds.ts';
 import { Store } from '../src/store.ts';
 import { Engine } from '../src/engine.ts';
@@ -8,6 +9,7 @@ import { Commands } from '../src/commands.ts';
 import { Providers } from '../src/providers.ts';
 import { createServers } from '../src/server.ts';
 import { prepareOperatorGuessInventory, type OperatorGuessInventoryRecord } from '../src/guess-operator-inventory.ts';
+import { prepareDeezerGuessInventory } from '../src/guess-deezer.ts';
 import { DEFAULT_GUESS_SETTINGS, type GuessResult } from '../src/guess-game.ts';
 import { GUESS_AUDIO_RATE, guessWave, guessWaveSeconds } from '../src/guess-audio-format.ts';
 import type { Sink } from '../src/audio.ts';
@@ -26,8 +28,7 @@ function recordings(expiresAt: number): OperatorGuessInventoryRecord[] {
       wav: guessWave(pcm) };
   });
 }
-async function fixture(records: OperatorGuessInventoryRecord[]) {
-  const inventory = prepareOperatorGuessInventory(records);
+async function fixture(records: OperatorGuessInventoryRecord[], inventory = prepareOperatorGuessInventory(records)) {
   const ids = ['100000000000000001', '100000000000000002'], guilds = new Guilds(ids[0]);
   const resources = ids.map(id => {
     const store = new Store(':memory:');
@@ -143,6 +144,59 @@ test('real HTTP combines authorized inventory with two concurrent scorers across
     assert.equal(seen.size, 2); assert.equal(current.game.phase, 'results');
     assert.deepEqual(current.game.scoreboard.map(player => player.total), [2000, 2000]);
     assert.deepEqual(f.state(), before, 'ordinary music, queues and revisions stay unchanged in both guilds');
+  } finally { await f.close(); }
+});
+
+test('Deezer adapter, real MP3 decoder and private HTTP deliver generated audio to two players without leaking sources', async t => {
+  let clock = Date.now(); t.mock.method(Date, 'now', () => clock);
+  const encoded = spawnSync(process.env.FFMPEG_PATH ?? 'ffmpeg', ['-hide_banner', '-loglevel', 'error',
+    '-f', 'lavfi', '-i', 'sine=frequency=440:duration=31', '-threads', '1',
+    '-metadata', 'title=Hidden Fictional Signal', '-metadata', 'artist=Hidden Fictional Performer',
+    '-c:a', 'libmp3lame', '-b:a', '128k', '-f', 'mp3', 'pipe:1'], { maxBuffer: 2 * 1024 * 1024 });
+  assert.equal(encoded.status, 0, String(encoded.stderr));
+  let requests = 0;
+  const fetcher: typeof fetch = async input => {
+    requests++;
+    const url = new URL(String(input));
+    if (url.hostname === 'api.deezer.com') return Response.json({
+      id: url.pathname.split('/').at(-1), type: 'track', readable: true, duration: 200,
+      title: 'Hidden Fictional Signal', artist: { name: 'Hidden Fictional Performer' },
+      preview: 'https://cdns-preview-a.dzcdn.net/stream/c-' + 'a'.repeat(32) + '-1.mp3',
+    });
+    assert.equal(url.hostname, 'cdns-preview-a.dzcdn.net');
+    return new Response(encoded.stdout, { headers: { 'content-type': 'audio/mpeg' } });
+  };
+  const inventory = await prepareDeezerGuessInventory(['1', '2'].map(trackId => ({
+    trackId, categoryIds: ['2010s'], permission: { approved: true,
+      reference: 'https://evidence.example.test/private-approval', expiresAt: clock + 600_000 },
+  })), { fetcher, signal: new AbortController().signal });
+  const f = await fixture([], inventory), before = f.state();
+  try {
+    assert.equal(requests, 4);
+    const { hostContext, guestContext, latest } = await players(f, clock);
+    clock = latest.game.round!.startsAt;
+    const current = await f.result({ ...guestContext, action: 'read' }); assertPrivate(current);
+    const bytes = await Promise.all([hostContext, guestContext].map(async context => {
+      const response = await f.call(mediaRequest(context, current));
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-type'), 'audio/wav');
+      assert.equal(response.headers.get('cache-control'), 'private, no-store');
+      assertPrivate([...response.headers]);
+      const wav = new Uint8Array(await response.arrayBuffer());
+      assert.equal(guessWaveSeconds(wav), 30);
+      assert(wav.subarray(44).some(value => value !== 0));
+      assertPrivate(Buffer.from(wav).toString('utf8')); return wav;
+    }));
+    assert.deepEqual(bytes[0], bytes[1]);
+    for (const text of ['deezer', 'dzcdn', 'ID3']) assert(!Buffer.from(bytes[0]).includes(Buffer.from(text)));
+    const answered = await f.result({ ...guestContext, ...mutation(current, 'guess', { text: 'Hidden Fictional Signal' }) });
+    assert.equal(answered.self.result?.correct, true); assertPrivate(answered);
+    const hostRead = await f.result({ ...hostContext, action: 'read' });
+    const revealed = await f.result({ ...hostContext, ...mutation(hostRead, 'reveal') });
+    assert.deepEqual(revealed.game.round!.answer, { title: 'Hidden Fictional Signal', artist: 'Hidden Fictional Performer' });
+    assert.equal((await f.call(mediaRequest(guestContext, revealed))).status, 409);
+    assert.deepEqual(f.state(), before);
+    assert.equal(requests, 4, 'serving prepared media must not fetch a provider again');
   } finally { await f.close(); }
 });
 

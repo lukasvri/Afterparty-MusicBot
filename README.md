@@ -54,6 +54,12 @@ shared game using five locally generated tones with fictional **Test Tone One**
 through **Test Tone Five** titles. These are synthetic test sounds, not real songs
 or a licensed catalog. See [synthetic game testing](docs/GUESS_SYNTHETIC_TEST.md).
 
+A separate default-off Deezer preview pilot can prepare up to eight explicitly
+approved tracks through an operator's private local inventory. It does not
+require players to select music files. The snapshot expires within five minutes;
+live provider availability and rights have not been established by the generated
+audio tests. See [local pilot setup](docs/GUESS_CATALOG_SOURCES.md#local-pilot-configuration).
+
 Reviewed server integrations can prepare explicitly approved WAV inventory using
 the [bounded operator catalog adapter](docs/GUESS_CATALOG_SOURCES.md). This does
 not activate a provider or supply approved real music in the default application.

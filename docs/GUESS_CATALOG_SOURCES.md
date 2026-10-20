@@ -17,6 +17,101 @@ documented quiz behavior with an independently documented metadata/playback
 architecture and Afterparty's actual resolver. Optional Deezer metadata matching
 for ordinary music is separate from a playable quiz inventory.
 
+## Deezer preview preparation adapter
+
+`prepareDeezerGuessInventory` in `services/core/src/guess-deezer.ts` is a separate
+trusted preparation function for up to eight explicitly approved Deezer track
+IDs. A caller supplies category membership, the same private permission record
+used by the operator inventory, and a cancellation signal. No browser uploads,
+public URL input or automatic chart discovery is added. The normal catalog
+remains unavailable unless the operator explicitly configures the separate
+pilot below. `DEEZER_METADATA=1` does not activate this adapter.
+
+The function requests fixed `api.deezer.com/track/{id}` metadata, verifies the
+returned track identity, readability, title/artist and preview address, then
+fetches the short MP3. The initial allowlist only accepts exact
+`cdns-preview-0` through `cdns-preview-f.dzcdn.net` hosts and the legacy
+`/stream/c-<32 lowercase hex>-<1 or 2 digits>.mp3` path, without queries,
+credentials or redirects. Newer CDN formats fail closed and require review.
+This is a conservative implementation boundary, not evidence that a particular
+live API response still uses that format.
+
+Metadata is limited to 512 KiB, MP3 input to 2 MiB, each I/O/decode step to ten
+seconds, and the whole preparation to 45 seconds or earlier permission expiry.
+Two preparations can run at once; each processes its tracks sequentially.
+FFmpeg accepts MP3 bytes through a pipe only, with network/file protocols
+disabled. A separate two-process limit, ten-second deadline and cancellation
+kill the subprocess and retain its slot until it closes. Output is canonical
+16 kHz mono 16-bit WAV, measured at 15 through 30 seconds, with a maximum of
+960,044 bytes including the header. No title, artist or original MP3 tags are
+included in the audio envelope.
+
+Preparation is atomic: an invalid or unavailable track rejects the snapshot.
+The existing operator inventory owns copied bytes and random media keys, expires
+at the earliest approval expiry or five minutes from preparation start, and
+supports explicit disposal. The caller's abort signal remains a lifetime signal:
+aborting it after preparation also disposes the inventory. The existing private
+round transport remains responsible for room, server and participant access.
+
+Automated acceptance uses generated MP3 tones, controlled metadata/CDN responses,
+real FFmpeg and the real two-participant HTTP transport. It does not contact
+Deezer, retrieve commercial recordings, prove live availability, establish rights
+or activate a provider in this work. Private rooms and a removal-contact page do not supply
+music permissions. Live source verification and a recording inventory authorized
+for the intended quiz use remain outstanding under the original task's scope.
+
+### Local pilot configuration
+
+The owner can opt into this five-minute pilot on their own test installation
+after establishing permission for the selected recordings and quiz use. This
+does not create a paid account. The startup factory reads an absolute private
+JSON path only when `GUESS_DEEZER_PREVIEWS=1`; it rejects symlinks, non-regular
+files, files above 32 KiB, empty inventories and malformed approvals before any
+provider access. Do not enable `GUESS_SYNTHETIC_TEST` at the same time.
+
+1. Keep `guess-deezer.local.json` outside the public source or in the ignored
+   `.local` directory, readable only by the operator. Supply a JSON array with
+   one to eight entries. Replace every placeholder below locally:
+
+   ```json
+   [
+     {
+       "trackId": "REPLACE_WITH_APPROVED_DEEZER_TRACK_ID",
+       "categoryIds": ["2010s"],
+       "permission": {
+         "approved": true,
+         "reference": "https://REPLACE_WITH_PRIVATE_PERMISSION_REFERENCE",
+         "expiresAt": 0
+       }
+     }
+   ]
+   ```
+
+   `expiresAt` is the actual permission expiry in Unix milliseconds, not zero.
+   Only `2010s` and `edm-classics` are accepted category IDs. Membership is
+   assigned explicitly; the provider does not infer it. The reference is checked
+   for syntax, not legal validity. Do not treat an approval flag as a license.
+2. On the local test installation set `GUESS_DEEZER_PREVIEWS=1` and
+   `GUESS_DEEZER_INVENTORY_PATH` to that file's absolute path. Leave both unset
+   for the default unavailable catalog. This option is separate from ordinary
+   `DEEZER_METADATA` matching.
+3. Start Core through the normal local test workflow. Failed preparation logs
+   one generic warning and leaves the quiz unavailable; ordinary playback stays
+   available. This cloud task does not run the production entry point.
+4. Check capacity in the lobby, choose a duration and round count that fit, and
+   verify with two devices. Test late join, seek alignment, reveal/skip audio
+   cancellation, expired catalog rejection and unchanged ordinary queues. Each
+   participant taps Listen because browsers may block autoplay.
+5. The snapshot lasts at most five minutes from preparation start. There is no
+   automatic refresh or fallback to another provider. Shutdown disposes it;
+   a new reviewed preparation is needed for another pilot. Disable the option
+   to return to the default behavior.
+
+This is a limited pilot, not an always-on hit library. A later paid provider can
+implement the same `GuessCatalog`/`GuessMediaSource` interfaces while keeping game
+rules, player authorization and scoring. Its delivery, reporting and territory
+requirements must be checked before assuming it can use this WAV transport.
+
 Each private record supplies song metadata, explicit category membership,
 canonical WAV bytes and an operator approval with an HTTPS evidence reference
 and permission expiry. References receive syntax checks only. Neither approval

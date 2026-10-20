@@ -57,6 +57,7 @@ without introducing a second Java/Lavalink service or changing queues.
 | Round presets | Quick 15-second and classic 30-second choices fit category capacity, then require the host to save. |
 | Deezer links for ordinary music | Optional metadata lookup for canonical track, album and playlist links, followed by the existing strict source matcher. |
 | Music quiz delivery | Existing private, authenticated per-device WAV transport with source expiry and cancellation checks. |
+| Prepared Deezer quiz previews | Default-off local pilot for at most eight explicitly approved tracks. Fixed metadata/CDN requests, bounded MP3 decoding and the existing private transport are exercised with generated audio only. |
 
 Skip quorum counts the current joined anonymous roster, including disconnected
 tabs. It does not establish unique people or online listeners. The host's reveal
@@ -69,6 +70,15 @@ deadlines; provider pagination URLs are never followed. Returned metadata exclud
 preview URLs and Deezer IDs from the Spotify-specific enrichment contract. This
 does not stream from Deezer or populate the game catalog. Provider reachability,
 availability and live matching have not been established by synthetic fixtures.
+
+The separate `prepareDeezerGuessInventory` function can prepare approved short
+previews without making each player select local files. Startup requires the
+separate `GUESS_DEEZER_PREVIEWS=1` opt-in and an absolute private inventory path;
+`DEEZER_METADATA` does not enable it. Its strict legacy CDN
+allowlist is deliberately conservative; current live URL formats, availability
+and provider permission have not been verified. See the
+[adapter contract](GUESS_CATALOG_SOURCES.md#deezer-preview-preparation-adapter)
+for limits and the synthetic end-to-end acceptance boundary.
 
 ## Remaining work
 
