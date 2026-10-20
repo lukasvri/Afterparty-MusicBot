@@ -54,6 +54,10 @@ shared game using five locally generated tones with fictional **Test Tone One**
 through **Test Tone Five** titles. These are synthetic test sounds, not real songs
 or a licensed catalog. See [synthetic game testing](docs/GUESS_SYNTHETIC_TEST.md).
 
+Reviewed server integrations can prepare explicitly approved WAV inventory using
+the [bounded operator catalog adapter](docs/GUESS_CATALOG_SOURCES.md). This does
+not activate a provider or supply approved real music in the default application.
+
 ## Stable and experimental channels
 
 Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
