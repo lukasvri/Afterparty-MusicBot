@@ -21,7 +21,8 @@ authorization and revision checks. They keep the current playback. Duplicates
 already in the active queue are skipped. A failed addition reports a partial
 result; leaving or switching the room stops further additions, and an old reply
 cannot replace the newly selected room. Discord additions read its current queue
-revision before each command. No background download or autoplay is introduced.
+revision before each command. No background download or autoplay is introduced. Adding to an empty connected
+Discord queue retains its existing behavior of starting the requested music.
 
 The game pack is separate: see [private quiz setup](GUESS_CATALOG_SOURCES.md#prepared-edm-festival-hits-pack).
 
