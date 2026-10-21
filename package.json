@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "2.4.0-alpha.14",
+  "version": "2.4.0-alpha.15",
   "private": true,
   "engines": {
     "node": ">=24.17.0"
@@ -23,14 +23,17 @@
     "test:concert-catalog": "node --test --test-concurrency=1 --test-timeout=45000 scripts/concert-catalog.browser.ts",
     "test:search": "node --test --test-concurrency=1 --test-timeout=45000 scripts/search.browser.ts",
     "test:sync": "node --test --test-concurrency=1 --test-timeout=45000 scripts/sync.browser.ts",
-    "test:unit": "node --test scripts/fullscreen.test.ts scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/live-command.test.ts scripts/native-seek.test.ts scripts/rooms.test.ts scripts/bridge.test.ts scripts/admin-auth.test.ts scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts scripts/radio-catalog-probe.test.ts scripts/queue-order.test.ts scripts/player-readiness.test.ts scripts/guess-authority.test.ts scripts/guess-worker.test.ts scripts/social-authority.test.ts scripts/guess-availability.test.ts scripts/toolchain.test.mjs scripts/playlist-import-worker.test.ts",
+    "test:unit": "node --test scripts/fullscreen.test.ts scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/live-command.test.ts scripts/native-seek.test.ts scripts/rooms.test.ts scripts/bridge.test.ts scripts/admin-auth.test.ts scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts scripts/radio-catalog-probe.test.ts scripts/queue-order.test.ts scripts/player-readiness.test.ts scripts/guess-authority.test.ts scripts/guess-worker.test.ts scripts/social-authority.test.ts scripts/guess-availability.test.ts scripts/toolchain.test.mjs scripts/playlist-import-worker.test.ts scripts/cloudflare-config.test.ts",
     "test:admin-channels": "node scripts/admin-channels.browser.ts",
     "test:guess": "node --test --test-concurrency=1 --test-timeout=90000 scripts/guess.browser.ts scripts/guess-synthetic.browser.ts",
     "test:copyright": "node scripts/copyright.browser.ts",
     "test:social": "node scripts/social.browser.ts",
     "test:guess-pack": "node --test --test-concurrency=1 --test-timeout=120000 scripts/guess-pack.browser.ts",
     "test:playlist-import": "node --test --test-concurrency=1 --test-timeout=60000 scripts/playlist-import.browser.ts",
-    "test:ui-review": "node scripts/ui-review.browser.ts"
+    "test:ui-review": "node scripts/ui-review.browser.ts",
+    "build:cloudflare": "node scripts/cloudflare.ts build",
+    "deploy:cloudflare": "node scripts/cloudflare.ts deploy",
+    "verify:cloudflare": "node scripts/cloudflare.ts verify"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

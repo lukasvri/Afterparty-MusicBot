@@ -4,6 +4,15 @@
 
 Core and the website run in different processes. Setting a value in one does not automatically configure the other. Copy only the example files; fill in real values locally.
 
+## Cloudflare build configuration
+
+The optional Cloudflare target uses `CF_WORKER_NAME`, `CF_D1_DATABASE_NAME` and
+`CF_D1_DATABASE_ID` to generate ignored `wrangler.cloudflare.local.json`. These
+are private build identity settings, not runtime secrets. `npm run build:cloudflare`
+selects that target; the default build preserves Sites rollback support. See
+[Cloudflare preparation](CLOUDFLARE.md) for runtime settings, isolated staging,
+D1 migration precautions and the separately approved GitHub build setup.
+
 ## Core variables
 
 File: `services/core/.env`. Docker Compose loads this file. After editing it, run `docker compose up -d --force-recreate` from `services/core/`.
