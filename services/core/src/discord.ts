@@ -182,7 +182,7 @@ export class DiscordBot {
     }
     async connectVoice(channel: VoiceBasedChannel) { if (this.connection?.joinConfig.channelId === channel.id && this.engine.connected)
         return; const me = channel.guild.members.me; if (!me || !channel.permissionsFor(me).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]))
-        throw new UserError('The bot needs permission to connect and speak in this voice channel.'); this.connection?.destroy(); this.connection = joinVoiceChannel({ guildId: this.guildId, channelId: channel.id, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: !this.engine.settings.turnDownVolumeWhenPeopleSpeak }); const connection = this.connection; this.watchVoiceErrors(connection); try {
+        throw new UserError('The bot needs permission to connect and speak in this voice channel.'); const previous = this.connection; this.connection = null; previous?.destroy(); this.connection = joinVoiceChannel({ guildId: this.guildId, channelId: channel.id, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: !this.engine.settings.turnDownVolumeWhenPeopleSpeak }); const connection = this.connection; this.watchVoiceErrors(connection); try {
         await entersState(connection, VoiceConnectionStatus.Ready, 20000);
     }
     catch {
@@ -203,6 +203,11 @@ export class DiscordBot {
         connection.on('stateChange', (_before, after) => {
             if (after.status === VoiceConnectionStatus.Destroyed) {
                 clearDeadline();
+                if (this.connection === connection) {
+                    this.engine.lastError = 'The Discord voice connection was closed. Use /play to try again.';
+                    this.engine.diagnostics.note('voice-error');
+                    this.disconnect();
+                }
                 return;
             }
             if (this.connection !== connection) return;
