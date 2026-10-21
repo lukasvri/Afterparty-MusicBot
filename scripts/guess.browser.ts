@@ -106,6 +106,8 @@ try {
   await page.getByRole('heading', { name: '2010s', exact: true }).waitFor();
   assert.equal(actions.filter(a => a.endsWith(':join')).length, 0, 'Opening the dedicated tab does not join a game');
   await host.join(); assert(await page.getByRole('button', { name: 'Start game', exact: true }).isDisabled());
+  await page.getByText('Connect an updated Core to load quiz songs from the lobby.', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Load quiz songs', exact: true }).count(), 0, 'Legacy Core never advertises unsupported preparation');
   for (const name of ['Quick (15 seconds)', 'Classic (30 seconds)']) assert(await page.getByRole('button', { name, exact: true }).isDisabled());
   await page.getByLabel('Round seconds', { exact: true }).fill('45'); await page.getByLabel('Rounds', { exact: true }).fill('3');
   await page.getByRole('button', { name: 'Save game settings' }).click();

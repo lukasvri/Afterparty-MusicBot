@@ -1,6 +1,19 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Loading quiz songs…":["Laster inn quizlåter…","Loading quiz songs…"],
+ "Quiz songs ready":["Quizlåtene er klare","Quiz songs ready"],
+ "Quiz songs are disabled on this Core.":["Quizlåter er slått av på denne Core-installasjonen.","Quiz songs are disabled on this Core."],
+ "Quiz songs are not loaded yet.":["Quizlåtene er ikke lastet inn ennå.","Quiz songs are not loaded yet."],
+ "Quiz songs need an updated Core.":["Quizlåter krever en oppdatert Core.","Quiz songs need an updated Core."],
+ "Join a room. The host can load the quiz songs in the lobby.":["Bli med i et rom. Verten kan laste inn quizlåtene i lobbyen.","Join a room. The host can load the quiz songs in the lobby."],
+ "Not loaded":["Ikke lastet inn","Not loaded"],
+ "The host loads the quiz songs in the lobby. Playback stays separate from the music queue.":["Verten laster inn quizlåtene i lobbyen. Avspillingen holdes adskilt fra musikkøen.","The host loads the quiz songs in the lobby. Playback stays separate from the music queue."],
+ "Load quiz songs":["Last inn quizlåter","Load quiz songs"],
+ "Retry loading quiz songs":["Prøv å laste inn quizlåtene igjen","Retry loading quiz songs"],
+ "Connect an updated Core to load quiz songs from the lobby.":["Koble til en oppdatert Core for å laste inn quizlåter fra lobbyen.","Connect an updated Core to load quiz songs from the lobby."],
+ "The host can load the quiz songs for everyone.":["Verten kan laste inn quizlåtene for alle.","The host can load the quiz songs for everyone."],
+ "Quiz audio is not ready. Ask the host to load the songs in the lobby.":["Quizlyden er ikke klar. Be verten laste inn låtene i lobbyen.","Quiz audio is not ready. Ask the host to load the songs in the lobby."],
  "Playlist":["Spilleliste","Playlist"],
  "Import a playlist":["Importer en spilleliste","Import a playlist"],
  "Paste a YouTube or Spotify playlist link, then choose what to add to the queue.":["Lim inn en lenke til en YouTube- eller Spotify-spilleliste, og velg hva du vil legge i køen.","Paste a YouTube or Spotify playlist link, then choose what to add to the queue."],
