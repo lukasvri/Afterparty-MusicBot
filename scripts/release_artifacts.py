@@ -190,7 +190,7 @@ class Client:
             if not (target.is_file() and target.stat().st_size == assets[name]['size'] and
                     digest(target) == assets[name]['digest'][7:]):
                 self.download(assets[name], target)
-        validate_image(directory / 'core-image.tar.gz', manifest)
+        manifest['verified_image_ids'] = sorted(validate_image(directory / 'core-image.tar.gz', manifest))
         validate_website(directory / 'website.tar.gz')
         return manifest
 
@@ -254,18 +254,66 @@ def verify_provenance(directory, commit, run_id, attempt, assets):
 
 
 def validate_image(path, manifest):
+    """Return equivalent content IDs derived from the already verified archive.
+
+    Classic Docker reports the configuration digest as Id. The containerd store
+    may report a manifest digest instead. Only descriptors whose exact bytes,
+    config and layer references match this single saved image are equivalents.
+    """
     with tarfile.open(path, 'r:gz') as archive:
-        safe_members(archive)
+        members = safe_members(archive)
+        names = {m.name for m in members}
         images = json.loads(read_member(archive, 'manifest.json'))
         if len(images) != 1 or images[0].get('RepoTags') != [manifest['image_tag']]:
             raise ReleaseError('Image archive contains unexpected tags or images')
-        config_raw = read_member(archive, images[0]['Config'])
+        image = images[0]
+        config_raw = read_member(archive, image['Config'])
+        config_id = 'sha256:' + hashlib.sha256(config_raw).hexdigest()
         config = json.loads(config_raw)
-        if ('sha256:' + hashlib.sha256(config_raw).hexdigest() != manifest['image_id'] or
-                config.get('os') != 'linux' or config.get('architecture') != 'amd64' or
+        if (config.get('os') != 'linux' or config.get('architecture') != 'amd64' or
                 config.get('config', {}).get('Labels', {}).get('org.opencontainers.image.revision') != manifest['commit'] or
                 config.get('config', {}).get('User') not in ('node', '1000', '1000:1000')):
-            raise ReleaseError('Image digest, source revision, platform or user differs')
+            raise ReleaseError('Image source revision, platform or user differs')
+        identities = {config_id}
+        if 'index.json' in names:
+            if json.loads(read_member(archive, 'oci-layout')) != {'imageLayoutVersion': '1.0.0'}:
+                raise ReleaseError('Unsupported OCI archive layout')
+            index_raw = read_member(archive, 'index.json')
+            index = json.loads(index_raw)
+            descriptors = index.get('manifests', [])
+            if index.get('schemaVersion') != 2 or len(descriptors) != 1:
+                raise ReleaseError('Expected one unambiguous OCI image manifest')
+            descriptor = descriptors[0]
+            descriptor_id = descriptor.get('digest', '')
+            if (descriptor.get('mediaType') not in ('application/vnd.oci.image.manifest.v1+json',
+                    'application/vnd.docker.distribution.manifest.v2+json') or
+                    not re.fullmatch(r'sha256:[0-9a-f]{64}', descriptor_id)):
+                raise ReleaseError('Invalid OCI image descriptor')
+            raw = read_member(archive, 'blobs/sha256/' + descriptor_id[7:])
+            if ('sha256:' + hashlib.sha256(raw).hexdigest() != descriptor_id or
+                    descriptor.get('size') != len(raw)):
+                raise ReleaseError('OCI manifest bytes differ from their descriptor')
+            oci = json.loads(raw)
+            referenced = oci.get('config', {})
+            if (oci.get('schemaVersion') != 2 or referenced.get('digest') != config_id or
+                    referenced.get('size') != len(config_raw) or
+                    image['Config'] != 'blobs/sha256/' + config_id[7:]):
+                raise ReleaseError('OCI manifest references another image configuration')
+            layers = oci.get('layers', [])
+            saved_layers = image.get('Layers', [])
+            if len(layers) != len(saved_layers):
+                raise ReleaseError('OCI manifest layers differ from the saved image')
+            for layer, saved in zip(layers, saved_layers):
+                value = layer.get('digest', '')
+                if (not re.fullmatch(r'sha256:[0-9a-f]{64}', value) or
+                        saved != 'blobs/sha256/' + value[7:] or
+                        layer.get('size') != archive.getmember(saved).size):
+                    raise ReleaseError('OCI layer descriptor differs from the saved image')
+            identities.add(descriptor_id)
+            identities.add('sha256:' + hashlib.sha256(index_raw).hexdigest())
+        if manifest['image_id'] not in identities:
+            raise ReleaseError('Image digest differs from the tested GitHub image')
+        return identities
 
 
 def validate_website(path):

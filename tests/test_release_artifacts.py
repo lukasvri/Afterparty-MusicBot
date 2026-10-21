@@ -256,7 +256,7 @@ class Bundle(unittest.TestCase):
         class Context:
             def wrap(self,args):
                 return args
-        with patch.object(deployer,'validation_resources',return_value=contextlib.nullcontext(Context())), patch.object(dep,'command',side_effect=command), patch.object(artifacts.Client,'fetch',return_value=self.manifest), patch.object(artifacts,'digest',return_value='fixture'):
+        with patch.object(deployer,'validation_resources',return_value=contextlib.nullcontext(Context())), patch.object(dep,'command',side_effect=command), patch.object(artifacts.Client,'fetch',return_value={**self.manifest,'verified_image_ids':[self.manifest['image_id']]}), patch.object(artifacts,'digest',return_value='fixture'):
             # The deployer imports its sibling module, so substitute the module loader.
             class Loader:
                 def create_module(self,spec):

@@ -427,13 +427,13 @@ class Deployer:
         self.emit('loading tested image from GitHub')
         self.command(self.docker + ['load', '--input', str(cache / 'core-image.tar.gz')])
         self.new_image_id = self.command(self.docker + ['image', 'inspect', '--format', '{{.Id}}', self.new_image], capture=True)
-        if self.new_image_id != manifest['image_id']:
+        if self.new_image_id not in manifest['verified_image_ids']:
             raise DeployError('Imported image ID differs from the tested GitHub image.')
         self.emit('checking production image without starting Core')
         self.validate_runtime_image()
         proof = json.dumps({
             'commit': self.target, 'run_id': manifest['run_id'], 'run_attempt': manifest['run_attempt'],
-            'image_id': self.new_image_id, 'manifest_sha256': artifacts.digest(cache / 'release.json'),
+            'image_id': self.new_image_id, 'release_image_id': manifest['image_id'], 'manifest_sha256': artifacts.digest(cache / 'release.json'),
             'website_sha256': manifest['files']['website.tar.gz']['sha256'],
             'verified_at': time.time(), 'mode': 'github-tested-build',
             'provenance_verified': True, 'provenance_sha256': artifacts.digest(cache / 'provenance.json')

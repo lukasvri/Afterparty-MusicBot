@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.7: Docker image identity compatibility for verified updates
+
+2026-10-21
+
+- Deployment checks recognize Docker 29 containerd image stores that expose an OCI manifest digest instead of the signed image configuration digest. The updater proves their relationship from the verified archive and local image metadata; unknown or mismatched identities remain rejected.
+- The signed release image identity remains separate from the actual local runtime image identity. Exact source commit, artifact signatures and workflow provenance are still required before the isolated runtime probe or any later production switch.
+- Operators can install the corrected pinned host helper and run --check against an existing signed 2.4.0-alpha.6 build without rebuilding the bot, restarting it or deploying. This source preview does not claim that a production update occurred or enable automatic updates.
+
 ## v2.4.0-alpha.6: Verified GitHub builds for bounded server updates
 
 2026-10-21
