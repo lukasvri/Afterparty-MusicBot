@@ -10,6 +10,7 @@ import { Commands } from "./commands.ts";
 import { UserError, publicTrack } from "./types.ts";
 import { Rooms } from "./rooms.ts";
 import { GuessHttp } from "./guess-http.ts";
+import { PlaylistImports } from "./playlist-import.ts";
 import type { GuessCatalog } from "./guess-catalog.ts";
 import type { GuessMediaSource } from "./guess-media.ts";
 import { Social } from "./social.ts";
@@ -68,6 +69,7 @@ export async function createServers(
 ) {
   if (!options.key) throw new Error("The bridge connection is missing a secret.");
   const rooms = new Rooms(engine.store);
+  const playlists = new PlaylistImports((url, signal) => engine.providers.importPlaylist(url, signal));
   const social = new Social(engine.store, options.key);
   const socialClients = new Map<ServerResponse, { key: string; host: boolean }>();
   social.on("change", (key, state, reaction) => {
@@ -169,6 +171,20 @@ export async function createServers(
     );
     try {
       const url = new URL(request.url ?? "/", "http://core");
+      if (url.pathname === "/v1/playlists") {
+        authenticate(request);
+        if (request.method !== "POST") throw new UserError("Method not allowed.", 405);
+        limit("playlist:" + request.socket.remoteAddress, 180);
+        const input = await body(request, 4096);
+        if (input.action === "start") {
+          if (Object.keys(input).some(key => !["action", "url"].includes(key))) throw new UserError("Invalid playlist request.");
+          json(response, 202, playlists.start(input.url));
+        } else if (input.action === "read" || input.action === "cancel") {
+          if (Object.keys(input).some(key => !["action", "id", "token"].includes(key))) throw new UserError("Invalid playlist request.");
+          json(response, 200, playlists.read(input.id, input.token, input.action === "cancel"));
+        } else throw new UserError("Invalid playlist action.");
+        return;
+      }
       if (url.pathname === "/v1/guess") { await guessing.handle(request, response); return; }
       if (url.pathname === "/v1/social") {
         // Invalid bridge callers cannot consume the allowance reserved for social
@@ -803,6 +819,7 @@ export async function createServers(
       clearInterval(roomClock);
       clearInterval(roomAdvance);
       rooms.dispose();
+      playlists.close();
       for (const client of socialClients.keys()) client.end();
       socialClients.clear();
       social.removeAllListeners();
