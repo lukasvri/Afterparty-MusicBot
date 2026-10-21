@@ -1,8 +1,9 @@
 import { normalized, type CatalogSong } from './matching.ts';
 import { isRadioTitle, radioArtist, radioGenre, radioTitle, specificRadioGenre } from './radio.ts';
 import type { PublicTrack, Track } from './types.ts';
+import { metadataAiGenerated } from './music-content.ts';
 
-type Candidate = { track: Track; related: boolean; index: number };
+type Candidate = { track: Track; related: boolean; index: number; themeMatch?: boolean };
 export type FavoriteRecording = { source: 'youtube'; id: string } | { source: 'soundcloud'; url: string };
 /** Resolve only recognized identities locally. Favorite search text is never fetched or treated as an identity. */
 export function favoriteRecording(query: unknown): FavoriteRecording | null {
@@ -27,7 +28,7 @@ const text = (value: unknown, maximum: number): value is string => typeof value 
 export function copyRadioDescriptor(value: unknown): CatalogSong | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const song = value as CatalogSong;
-  if (!text(song.title, 320) || !text(song.artist, 200) || !isRadioTitle(song.title) ||
+  if (!text(song.title, 320) || !text(song.artist, 200) || !isRadioTitle(song.title) || metadataAiGenerated(song.title, song.artist) === true ||
     !Number.isFinite(song.duration) || song.duration < 0 || song.duration > 86400 ||
     (song.id !== undefined && !text(song.id, 128)) || (song.isrc !== undefined && !text(song.isrc, 128)) ||
     (song.artistCredit !== undefined && !text(song.artistCredit, 300))) return null;
@@ -75,7 +76,7 @@ export function createRecommendationRanking(seed: Track, recent: readonly Public
       return ordered;
     },
     compare(a: Candidate, b: Candidate): number {
-      const quality = (item: Candidate) => (genre && radioGenre(item.track) === genre) || item.related ? 3 : 2;
+      const quality = (item: Candidate) => genre && radioGenre(item.track) === genre ? 5 : item.themeMatch ? 4 : item.related ? 3 : 2;
       const official = (track: Track) => /\b(official audio|official music video|provided to youtube)\b/i.test(track.title) || /Topic$|VEVO$/i.test(track.artist);
       return quality(b) - quality(a) || compareArtists(radioArtist(a.track), radioArtist(b.track)) ||
         Number(favoriteTrack(b.track)) - Number(favoriteTrack(a.track)) ||

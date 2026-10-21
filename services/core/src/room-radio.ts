@@ -71,7 +71,7 @@ export async function roomRecommendation(
   const next = result.track;
   return next ? {
     id: next.id, title: next.title, artist: next.artist, genres: next.genres,
-    music: next.music, radioRelatedTo: seed.id, image: next.image,
+    music: next.music, ...(next.aiGenerated === true ? { aiGenerated: true } : {}), radioRelatedTo: seed.id, image: next.image,
     duration: next.duration, live: next.live, embeddable: next.embeddable,
   } : null;
 }
