@@ -64,6 +64,11 @@ export function listGuessPacks(): GuessPackSummary[] {
 export function getGuessPack(id: string): GuessPack {
   const pack = bundledPack(); if (id !== pack.id) throw unavailable(); return pack;
 }
+/** Server-selected bundled recording metadata only. Does not create approval or licensing records. */
+export function getGuessPackClips(id: string): Omit<YoutubeGuessRecord, 'permission'>[] {
+  return getGuessPack(id).tracks.map(track => ({ videoId: track.videoId, title: track.title, artist: track.artist,
+    aliases: [...track.aliases!], categoryIds: [...track.categoryIds], startSeconds: track.startSeconds, durationSeconds: track.durationSeconds }));
+}
 
 /** Official-source verification never supplies permission. Omitted approvals deliberately produce an inactive template. */
 export function buildGuessPackInventory(id: string): GuessPackTemplate[];

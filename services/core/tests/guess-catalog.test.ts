@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OperatorGuessCatalog, UnavailableGuessCatalog, normalizeGuess, type OperatorGuessRecord } from '../src/guess-catalog.ts';
+import { OperatorGuessCatalog, PreparedGuessCatalog, UnavailableGuessCatalog, normalizeGuess, type OperatorGuessRecord } from '../src/guess-catalog.ts';
 
 function record(n: number): OperatorGuessRecord {
   const key = `synthetic_media_${String(n).padStart(4, '0')}`;
@@ -87,4 +87,14 @@ test('catalog copies and freezes private metadata and normalizes only exact spel
   for (const durationSeconds of [14, 91, 30.5, '30' as unknown as number]) {
     assert.throws(() => catalog.select('2010s', { exclude: [], durationSeconds }), /selection/);
   }
+});
+
+test('prepared server catalog validates recording capacity without constructing an operator rights attestation', () => {
+  const input = record(1), { rightsCleared: _assertion, ...prepared } = input; void _assertion;
+  const catalog = new PreparedGuessCatalog([prepared], () => 0);
+  assert.equal(catalog.categories()[0].count, 1);
+  const selected = catalog.select('2010s', { exclude: [], durationSeconds: 30 });
+  assert.equal(selected.title, input.song.title); assert(!('rightsCleared' in selected));
+  assert.throws(() => new OperatorGuessCatalog([prepared as OperatorGuessRecord]), { status: 503 }, 'the legacy operator API still requires its explicit assertion');
+  assert.throws(() => new PreparedGuessCatalog([{ ...prepared, categoryIds: ['unknown'] }]), { status: 503 });
 });

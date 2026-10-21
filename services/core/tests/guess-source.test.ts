@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { prepareConfiguredGuessSource } from '../src/guess-source.ts';
 import { guessWave, GUESS_AUDIO_RATE } from '../src/guess-audio-format.ts';
+import { getGuessPackClips } from '../src/guess-packs.ts';
 
 const signal = () => new AbortController().signal;
 const unavailable = { status: 503, message: 'The configured game preview source is unavailable.' };
@@ -121,4 +123,63 @@ test('private YouTube clip configuration reaches only its adapter and expires th
   assert.equal(source.catalog.media(selected.mediaKey).durationSeconds, 15);
   lifetime.abort(); assert(source.catalog.categories().every(category => !category.available));
   await assert.rejects(source.media.read(selected.mediaKey, signal()), { status: 503 });
+});
+
+test('explicit bundled preset prepares all eight fixed recordings with actual FFmpeg and no private approval file', async t => {
+  let clock = Date.now(); t.mock.method(Date, 'now', () => clock);
+  const clips = getGuessPackClips('edm-festival-hits'), lifetime = new AbortController();
+  const encoded = spawnSync(process.env.FFMPEG_PATH ?? 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
+    '-i', 'sine=frequency=440:duration=61', '-threads', '1', '-c:a', 'libopus', '-f', 'webm', 'pipe:1'], { maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(encoded.status, 0, String(encoded.stderr));
+  const extracted: string[] = [], fetched: string[] = [];
+  const source = await prepareConfiguredGuessSource({ GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: 'edm-festival-hits' }, {
+    signal: lifetime.signal, youtube: {
+      extract: async args => {
+        const id = new URL(args.at(-1)!).searchParams.get('v')!;
+        assert(clips.some(clip => clip.videoId === id)); extracted.push(id);
+        return { id, is_live: false, duration: 61, vcodec: 'none', acodec: 'opus', ext: 'webm',
+          title: 'Untrusted alternate title', url: 'https://rr1---synthetic.googlevideo.com/videoplayback?mime=audio%2Fwebm' };
+      }, fetcher: async input => { fetched.push(String(input)); return new Response(encoded.stdout, { headers: { 'content-type': 'audio/webm' } }); },
+      // Deliberately use the production default decoder over generated local media.
+    },
+  });
+  assert(source); t.after(source.dispose);
+  assert.deepEqual(extracted, clips.map(clip => clip.videoId)); assert.equal(fetched.length, 8);
+  assert(source.catalog.categories().every(category => category.available && category.count === 8));
+  const summary = JSON.stringify(source.catalog.categories());
+  for (const secret of clips.flatMap(clip => [clip.title, clip.artist, clip.videoId])) assert(!summary.includes(secret), secret);
+  for (const secret of ['permission', 'approved', 'rightsCleared', 'reference', 'https:']) assert(!summary.includes(secret));
+  const excluded: string[] = [];
+  for (let index = 0; index < 8; index++) {
+    const song = source.catalog.select('edm-festival-hits', { exclude: excluded, durationSeconds: 30 }); excluded.push(song.id);
+    assert(clips.some(clip => clip.title === song.title && clip.artist === song.artist));
+    assert(!clips.some(clip => clip.videoId === song.id)); assert(!('permission' in song));
+    const bytes = await source.media.read(song.mediaKey, signal());
+    assert.equal(source.catalog.media(song.mediaKey).durationSeconds, 30);
+    assert.equal(bytes.length, 44 + 30 * GUESS_AUDIO_RATE * 2); assert(bytes.subarray(44).some(value => value !== 0));
+  }
+  assert.equal(new Set(excluded).size, 8);
+  assert.throws(() => source.catalog.select('edm-festival-hits', { exclude: excluded, durationSeconds: 30 }), { status: 503 });
+  const key = source.catalog.select('edm-festival-hits', { exclude: [], durationSeconds: 30 }).mediaKey;
+  clock += 1_800_000;
+  await assert.rejects(source.media.read(key, signal()), { status: 503 });
+  assert(source.catalog.categories().every(category => !category.available));
+  assert.deepEqual([extracted.length, fetched.length], [8, 8], 'serving and expiry never refresh a provider implicitly');
+});
+
+test('bundled preset remains default-off and rejects unknown IDs, paths and conflicting modes before any I/O', async () => {
+  let called = 0;
+  const options = { signal: signal(), youtube: {
+    extract: async () => { called++; throw Error('must not extract'); },
+    fetcher: async () => { called++; throw Error('must not download'); },
+  } };
+  for (const flag of [undefined, '0', 'true']) assert.equal(await prepareConfiguredGuessSource({
+    GUESS_YOUTUBE_CLIPS: flag, GUESS_YOUTUBE_PACK: 'edm-festival-hits',
+  }, options), undefined);
+  for (const config of [{ GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: '../quiz-playlists.json' },
+    { GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: 'edm-festival-hits', GUESS_YOUTUBE_INVENTORY_PATH: '/private/unused.json' },
+    { GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: 'edm-festival-hits', GUESS_SYNTHETIC_TEST: '1' },
+    { GUESS_DEEZER_PREVIEWS: '1', GUESS_YOUTUBE_PACK: 'edm-festival-hits', GUESS_DEEZER_INVENTORY_PATH: '/private/unused.json' }])
+    await assert.rejects(prepareConfiguredGuessSource(config, options), unavailable);
+  assert.equal(called, 0);
 });

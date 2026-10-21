@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { OperatorGuessCatalog, type GuessCatalog, type GuessSong, type OperatorGuessRecord } from './guess-catalog.ts';
+import { PreparedGuessCatalog, type GuessCatalog, type GuessSong, type PreparedGuessRecord } from './guess-catalog.ts';
 import { GUESS_AUDIO_MAX_BYTES, guessWaveSeconds } from './guess-audio-format.ts';
 import type { GuessMediaSource } from './guess-media.ts';
 import { UserError } from './types.ts';
@@ -11,9 +11,12 @@ export type OperatorGuessInventoryRecord = {
   permission: { approved: true; reference: string; expiresAt: number };
   wav: Uint8Array;
 };
-const unavailable = () => new UserError('The authorized game inventory is unavailable.', 503);
+const unavailable = () => new UserError('The prepared game audio inventory is unavailable.', 503);
 const DEFAULT_TTL_MS = 300_000, MAX_TTL_MS = 1_800_000;
 export type OperatorGuessInventoryOptions = { lifetimeMs?: number };
+/** Internal copied audio and availability deadline, with no rights/permission assertion. */
+export type TrustedGuessInventoryRecord = Omit<OperatorGuessInventoryRecord, 'permission'>;
+export type TrustedGuessInventoryOptions = OperatorGuessInventoryOptions & { expiresAt: number };
 
 function permissionExpires(permission: OperatorGuessInventoryRecord['permission'], now: number): number {
   if (!permission || permission.approved !== true || !Number.isSafeInteger(permission.expiresAt) ||
@@ -40,11 +43,28 @@ export function prepareOperatorGuessInventory(records: readonly OperatorGuessInv
   const lifetimeMs = options.lifetimeMs === undefined ? DEFAULT_TTL_MS : options.lifetimeMs;
   if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs < 1 || lifetimeMs > MAX_TTL_MS) throw unavailable();
   if (!Array.isArray(records) || records.length > 8) throw unavailable();
-  const clips = new Map<string, Uint8Array>();
   let expiresAt = now + lifetimeMs;
-  const prepared: OperatorGuessRecord[] = records.map(record => {
-    if (!record || !(record.wav instanceof Uint8Array) || record.wav.byteLength > GUESS_AUDIO_MAX_BYTES) throw unavailable();
+  const prepared = [...records].map(record => {
+    if (!record) throw unavailable();
     expiresAt = Math.min(expiresAt, permissionExpires(record.permission, now));
+    return { song: record.song, categoryIds: record.categoryIds, wav: record.wav };
+  });
+  return prepareTrustedGuessInventory(prepared, { lifetimeMs, expiresAt });
+}
+
+/** Internal server-only WAV storage. A configured preset supplies availability, never fabricated permission. */
+export function prepareTrustedGuessInventory(records: readonly TrustedGuessInventoryRecord[], options: TrustedGuessInventoryOptions): {
+  catalog: GuessCatalog; media: GuessMediaSource; dispose(): void;
+} {
+  const now = Date.now();
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw unavailable();
+  const lifetimeMs = options.lifetimeMs === undefined ? DEFAULT_TTL_MS : options.lifetimeMs;
+  if (!Number.isSafeInteger(lifetimeMs) || lifetimeMs < 1 || lifetimeMs > MAX_TTL_MS ||
+    !Number.isSafeInteger(options.expiresAt) || options.expiresAt <= now || !Array.isArray(records) || records.length > 8) throw unavailable();
+  const clips = new Map<string, Uint8Array>();
+  const expiresAt = Math.min(now + lifetimeMs, options.expiresAt);
+  const prepared: PreparedGuessRecord[] = [...records].map(record => {
+    if (!record || !(record.wav instanceof Uint8Array) || record.wav.byteLength > GUESS_AUDIO_MAX_BYTES) throw unavailable();
     // Uint8Array construction copies Buffer inputs too; Buffer.slice() would retain caller-owned memory.
     const bytes = new Uint8Array(record.wav);
     let durationSeconds: number;
@@ -52,10 +72,10 @@ export function prepareOperatorGuessInventory(records: readonly OperatorGuessInv
     if (durationSeconds < 15) throw unavailable();
     const mediaKey = randomUUID().replaceAll('-', '');
     clips.set(mediaKey, bytes);
-    return { rightsCleared: true, categoryIds: record.categoryIds,
+    return { categoryIds: record.categoryIds,
       song: { ...record.song, mediaKey }, media: { key: mediaKey, mimeType: 'audio/wav', durationSeconds } };
   });
-  const stored = new OperatorGuessCatalog(prepared);
+  const stored = new PreparedGuessCatalog(prepared);
   let disposed = false;
   const dispose = () => { disposed = true; clips.clear(); clearTimeout(timer); };
   const active = () => {

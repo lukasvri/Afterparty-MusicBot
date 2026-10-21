@@ -5,7 +5,7 @@ import type { GuessCatalog } from './guess-catalog.ts';
 import type { GuessMediaSource } from './guess-media.ts';
 import { SyntheticGuessSource } from './guess-synthetic.ts';
 import { prepareDeezerGuessInventory, type DeezerGuessOptions } from './guess-deezer.ts';
-import { prepareYoutubeGuessInventory, type YoutubeGuessOptions } from './guess-youtube.ts';
+import { prepareYoutubeGuessInventory, prepareYoutubeGuessPack, type YoutubeGuessOptions } from './guess-youtube.ts';
 import { UserError } from './types.ts';
 
 type Source = { catalog: GuessCatalog; media: GuessMediaSource; dispose(): void };
@@ -23,6 +23,11 @@ export async function prepareConfiguredGuessSource(env: NodeJS.ProcessEnv, optio
       return { catalog: source, media: source, dispose() {} };
     }
     const youtube = env.GUESS_YOUTUBE_CLIPS === '1';
+    const pack = env.GUESS_YOUTUBE_PACK;
+    if (pack !== undefined && pack !== '') {
+      if (!youtube || env.GUESS_YOUTUBE_INVENTORY_PATH) throw unavailable();
+      return await prepareYoutubeGuessPack(pack, { ...options.youtube, signal: options.signal });
+    }
     const path = youtube ? env.GUESS_YOUTUBE_INVENTORY_PATH : env.GUESS_DEEZER_INVENTORY_PATH;
     if (!path || !isAbsolute(path) || path.length > 4096 || /[\p{Cc}\p{Cf}]/u.test(path)) throw unavailable();
     // Nonblocking open avoids waiting on a FIFO; symlinks and non-regular files are rejected.

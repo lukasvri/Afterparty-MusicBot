@@ -55,24 +55,21 @@ export class UnavailableGuessCatalog implements GuessCatalog {
   media(_mediaKey: string): GuessMediaDescriptor { void _mediaKey; throw new UserError('No eligible game media is configured.', 503); }
 }
 
-export type OperatorGuessRecord = {
-  rightsCleared: true; categoryIds: readonly string[]; song: GuessSong; media: GuessMediaDescriptor;
-};
+export type PreparedGuessRecord = { categoryIds: readonly string[]; song: GuessSong; media: GuessMediaDescriptor };
+export type OperatorGuessRecord = PreparedGuessRecord & { rightsCleared: true };
 /**
- * Trusted operator configuration only, never a public request/upload constructor.
- * Explicit category assignments and eligibility are supplied by the operator.
- * This adapter does no provider search, genre inference, downloads or URL serving.
- * A real catalog and media transport require a separate reviewed integration.
+ * Trusted server-prepared metadata only, never a public request/upload constructor.
+ * Validates recording/category capacity without asserting recording rights or licensing.
  */
-export class OperatorGuessCatalog implements GuessCatalog {
-  private records: readonly OperatorGuessRecord[];
+export class PreparedGuessCatalog implements GuessCatalog {
+  private records: readonly PreparedGuessRecord[];
   private summaries: readonly GuessCategorySummary[];
   private random: () => number;
-  constructor(records: readonly OperatorGuessRecord[], random = Math.random) {
+  constructor(records: readonly PreparedGuessRecord[], random = Math.random) {
     if (!Array.isArray(records) || records.length > 1000) throw new UserError('Invalid operator catalog.', 503);
     const ids = new Set<string>(), keys = new Set<string>();
     this.records = records.map(record => {
-      if (!record || record.rightsCleared !== true || !Array.isArray(record.categoryIds) ||
+      if (!record || !Array.isArray(record.categoryIds) ||
         !record.categoryIds.length || record.categoryIds.length > CATEGORY_EXAMPLES.length ||
         new Set(record.categoryIds).size !== record.categoryIds.length ||
         !record.categoryIds.every((id: unknown) => CATEGORY_EXAMPLES.some(category => category.id === id)))
@@ -81,7 +78,7 @@ export class OperatorGuessCatalog implements GuessCatalog {
       if (ids.has(song.id) || keys.has(song.mediaKey) || song.mediaKey !== media.key)
         throw new UserError('Invalid duplicate operator recording.', 503);
       ids.add(song.id); keys.add(song.mediaKey);
-      return Object.freeze({ rightsCleared: true as const, categoryIds: Object.freeze([...record.categoryIds]), song, media: Object.freeze(media) });
+      return Object.freeze({ categoryIds: Object.freeze([...record.categoryIds]), song, media: Object.freeze(media) });
     });
     this.summaries = CATEGORY_EXAMPLES.map(category => {
       const histogram = new Map<number, number>();
@@ -115,5 +112,14 @@ export class OperatorGuessCatalog implements GuessCatalog {
     const record = this.records.find(candidate => candidate.song.mediaKey === mediaKey);
     if (!record) throw new UserError('Eligible game media not found.', 503);
     return copyGuessMedia(record.media);
+  }
+}
+
+/** Legacy private operator configuration retains its explicit attestation requirement. */
+export class OperatorGuessCatalog extends PreparedGuessCatalog {
+  constructor(records: readonly OperatorGuessRecord[], random = Math.random) {
+    if (!Array.isArray(records) || records.length > 1000) throw new UserError('Invalid operator catalog.', 503);
+    if (![...records].every(record => record?.rightsCleared === true)) throw new UserError('Invalid operator catalog eligibility.', 503);
+    super(records, random);
   }
 }

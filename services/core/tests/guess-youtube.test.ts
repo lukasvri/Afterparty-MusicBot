@@ -13,7 +13,7 @@ const record = (id = videoId): YoutubeGuessRecord => ({ videoId: id, title: 'Fic
 const metadata = (id = videoId, extra: Record<string, unknown> = {}) => ({ id, is_live: false, live_status: 'not_live', duration: 200, ext: 'webm', vcodec: 'none', acodec: 'opus', url: cdn,
   title: 'Untrusted provider title', http_headers: { Authorization: 'private-provider-secret', Cookie: 'private-provider-secret' }, ...extra });
 const selection = { exclude: [], durationSeconds: 30 };
-const safeError = (error: unknown) => error instanceof UserError && error.status === 503 && error.message === 'The approved YouTube game audio inventory is unavailable.';
+const safeError = (error: unknown) => error instanceof UserError && error.status === 503 && error.message === 'The YouTube game audio inventory is unavailable.';
 function options(extra: Partial<YoutubeGuessOptions> = {}): YoutubeGuessOptions {
   return { signal: new AbortController().signal, extract: async args => metadata(args.at(-1)!.split('v=')[1]),
     fetcher: async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'audio/webm' } }),

@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildGuessPackInventory, getGuessPack, listGuessPacks, validateGuessPack } from '../src/guess-packs.ts';
+import { buildGuessPackInventory, getGuessPack, getGuessPackClips, listGuessPacks, validateGuessPack } from '../src/guess-packs.ts';
 import { runGuessPack } from '../src/guess-pack.ts';
 import { prepareConfiguredGuessSource } from '../src/guess-source.ts';
 import { checkConfiguredGuessSource } from '../src/guess-check.ts';
@@ -38,6 +38,19 @@ test('the bundled verified pack contains eight distinct canonical sources and no
   pack.tracks[0].title = 'Changed'; pack.tracks[0].categoryIds = [];
   assert.equal(getGuessPack(id).tracks[0].title, 'Heroes Tonight');
   assert.throws(() => getGuessPack('../quiz-playlists.json'), { status: 503 });
+});
+
+test('the trusted preset entry point copies only curated clip metadata and makes no approval claim', () => {
+  const clips = getGuessPackClips(id);
+  assert.deepEqual(clips.map(clip => clip.videoId), ids);
+  for (const clip of clips) {
+    assert.deepEqual(Object.keys(clip).sort(), ['aliases', 'artist', 'categoryIds', 'durationSeconds', 'startSeconds', 'title', 'videoId']);
+    assert(!('permission' in clip)); assert(!('rightsCleared' in clip));
+  }
+  clips[0].title = 'Mutated'; clips[0].categoryIds = [];
+  assert.equal(getGuessPackClips(id)[0].title, 'Heroes Tonight');
+  assert(getGuessPackClips(id)[0].categoryIds.includes(id));
+  assert.throws(() => getGuessPackClips('../other.json'), { status: 503 });
 });
 
 test('manifest validation rejects malformed, duplicate, unverified or unbounded recordings and copies only known fields', () => {

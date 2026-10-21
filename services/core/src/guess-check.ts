@@ -51,6 +51,7 @@ export async function checkConfiguredGuessSource(env: NodeJS.ProcessEnv, options
   prepare: GuessCheckFactory = prepareConfiguredGuessSource): Promise<GuessCheckResult> {
   const config = { GUESS_DEEZER_PREVIEWS: env.GUESS_DEEZER_PREVIEWS, GUESS_SYNTHETIC_TEST: env.GUESS_SYNTHETIC_TEST,
     GUESS_DEEZER_INVENTORY_PATH: env.GUESS_DEEZER_INVENTORY_PATH, GUESS_YOUTUBE_CLIPS: env.GUESS_YOUTUBE_CLIPS,
+    GUESS_YOUTUBE_PACK: env.GUESS_YOUTUBE_PACK,
     GUESS_YOUTUBE_INVENTORY_PATH: env.GUESS_YOUTUBE_INVENTORY_PATH };
   const provider: Provider = config.GUESS_DEEZER_PREVIEWS === '1' ? 'deezer' : config.GUESS_YOUTUBE_CLIPS === '1' ? 'youtube'
     : config.GUESS_SYNTHETIC_TEST === '1' ? 'synthetic' : 'disabled';

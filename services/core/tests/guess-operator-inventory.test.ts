@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GUESS_AUDIO_RATE, GUESS_AUDIO_MAX_BYTES, guessWave } from '../src/guess-audio-format.ts';
-import { prepareOperatorGuessInventory, type OperatorGuessInventoryOptions, type OperatorGuessInventoryRecord } from '../src/guess-operator-inventory.ts';
+import { prepareOperatorGuessInventory, prepareTrustedGuessInventory, type OperatorGuessInventoryOptions, type OperatorGuessInventoryRecord } from '../src/guess-operator-inventory.ts';
 
 function record(n = 1, seconds = 30): OperatorGuessInventoryRecord {
   return { song: { id: `owned-${n}`, title: `Fictional Signal ${n}`, artist: 'Fictional Performer', aliases: ['Invented Alias'] },
@@ -136,4 +136,21 @@ test('an extended lifetime never extends the earliest recording permission', asy
   t.mock.timers.tick(1);
   await assert.rejects(inventory.media.read(key, new AbortController().signal), { status: 503 });
   assert(inventory.catalog.categories().every(category => !category.available));
+});
+
+test('trusted prepared WAVs have an availability deadline without fabricated approvals, and still own copied bytes', async t => {
+  let clock = 100_000; t.mock.method(Date, 'now', () => clock);
+  const { permission: _permission, ...input } = record(); void _permission;
+  const options = { expiresAt: clock + 1000, lifetimeMs: 1_800_000 };
+  const source = prepareTrustedGuessInventory([input], options); t.after(source.dispose);
+  const song = source.catalog.select('2010s', select); assert(!('permission' in song));
+  input.wav.fill(255); options.expiresAt = clock + 1_800_000;
+  const bytes = await source.media.read(song.mediaKey, new AbortController().signal);
+  assert.equal(bytes[0], 82); bytes.fill(255);
+  assert.equal((await source.media.read(song.mediaKey, new AbortController().signal))[0], 82);
+  const pending = source.media.read(song.mediaKey, new AbortController().signal); clock += 1000;
+  await assert.rejects(pending, { status: 503 }); assert(source.catalog.categories().every(category => !category.available));
+  assert.throws(() => prepareOperatorGuessInventory([input as OperatorGuessInventoryRecord]), { status: 503 });
+  for (const expiresAt of [clock, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+    assert.throws(() => prepareTrustedGuessInventory([input], { expiresAt }), { status: 503 });
 });
