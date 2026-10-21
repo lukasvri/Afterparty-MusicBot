@@ -18,11 +18,23 @@ type SyntheticSource = {
   send: (payload: unknown) => void;
   fail: (terminal: boolean) => void;
 };
+type SyntheticPlayer = Player & {
+  scrub: (seconds: number) => void;
+  emit: (state: number) => void;
+  calls: { action: string; position?: number }[];
+  events: {
+    onReady: () => void;
+    onStateChange: (event: { data: number }) => void;
+    onError: (event: { data: number }) => void;
+    onAutoplayBlocked: () => void;
+  };
+};
 
 declare global {
   interface Window {
     afterpartySyncStreams: SyntheticSource[];
-    afterpartySyncPlayer?: Player & { scrub: (seconds: number) => void };
+    afterpartySyncPlayer?: SyntheticPlayer;
+    afterpartySyncPlayers: SyntheticPlayer[];
   }
 }
 
@@ -54,7 +66,7 @@ function gate(): Gate {
   return { started, wait, seen, release };
 }
 
-async function fixture(kind: "room" | "discord", failDiscovery = false, manager = false) {
+async function fixture(kind: "room" | "discord", failDiscovery = false, manager = false, delayClock = false) {
   const browser = await chromium.launch({
     headless: true,
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
@@ -87,17 +99,19 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
       send(payload: unknown) { this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(payload) })); }
       fail(terminal: boolean) { this.readyState = terminal ? 2 : 0; this.dispatchEvent(new Event("error")); }
     }
-    Object.assign(window, { EventSource: Source, afterpartySyncStreams: streams });
+    Object.assign(window, { EventSource: Source, afterpartySyncStreams: streams, afterpartySyncPlayers: [] });
     class VideoPlayer implements Player {
       position = 0;
       state = 5;
       at = performance.now();
       volume = 77;
       muted = false;
-      events: { onReady: () => void; onStateChange: (event: { data: number }) => void };
+      calls: SyntheticPlayer["calls"] = [];
+      events: SyntheticPlayer["events"];
       constructor(_target: HTMLElement, options: Record<string, unknown>) {
         this.events = options.events as typeof this.events;
         window.afterpartySyncPlayer = this;
+        window.afterpartySyncPlayers.push(this);
         queueMicrotask(() => this.events.onReady());
       }
       emit(state: number) {
@@ -106,11 +120,11 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
         this.at = performance.now();
         this.events.onStateChange({ data: state });
       }
-      loadVideoById(value: { startSeconds: number }) { this.position = value.startSeconds; this.at = performance.now(); this.emit(1); }
-      cueVideoById(value: { startSeconds: number }) { this.position = value.startSeconds; this.at = performance.now(); this.emit(5); }
-      playVideo() { if (this.state !== 1) this.emit(1); }
-      pauseVideo() { if (this.state !== 2) this.emit(2); }
-      seekTo(value: number) { this.position = value; this.at = performance.now(); }
+      loadVideoById(value: { startSeconds: number }) { this.calls.push({ action: "load", position: value.startSeconds }); this.position = value.startSeconds; this.at = performance.now(); this.emit(1); }
+      cueVideoById(value: { startSeconds: number }) { this.calls.push({ action: "cue", position: value.startSeconds }); this.position = value.startSeconds; this.at = performance.now(); this.emit(5); }
+      playVideo() { this.calls.push({ action: "play" }); if (this.state !== 1) this.emit(1); }
+      pauseVideo() { this.calls.push({ action: "pause" }); if (this.state !== 2) this.emit(2); }
+      seekTo(value: number) { this.calls.push({ action: "seek", position: value }); this.position = value; this.at = performance.now(); }
       getCurrentTime() { return this.position + (this.state === 1 ? (performance.now() - this.at) / 1000 : 0); }
       getPlayerState() { return this.state; }
       setVolume(value: number) { this.volume = value; }
@@ -119,15 +133,19 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
       unMute() { this.muted = false; }
       isMuted() { return this.muted; }
       setPlaybackRate() {}
-      destroy() {}
+      destroy() { this.calls.push({ action: "destroy" }); }
       scrub(seconds: number) { this.emit(3); this.position = seconds; this.at = performance.now(); this.emit(1); }
     }
     window.YT = { Player: VideoPlayer };
   });
   const commands: string[] = [], errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  let discoveryCalls = 0, roomCalls = 0, closed = false, discoveryUnavailable = failDiscovery;
+  let discoveryCalls = 0, roomCalls = 0, clockCalls = 0, closed = false, discoveryUnavailable = failDiscovery;
   const roomGates = new Map<string, Gate>(), discordGates = new Map<string, Gate>(), allGates: Gate[] = [];
+  const initialClock = delayClock ? gate() : undefined;
+  const scopedClock = delayClock ? gate() : undefined;
+  let holdClockSamples = delayClock;
+  if (initialClock) allGates.push(initialClock);
   const hold = (map: Map<string, Gate>, key: string) => {
     const value = gate();
     map.set(key, value);
@@ -174,7 +192,16 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
         : deliver(route, { url: "wss://core.invalid/live" });
     }
     const now = await page.evaluate(() => Date.now());
-    if (url.pathname === "/api/realtime/clock") return deliver(route, { serverTime: now });
+    if (url.pathname === "/api/realtime/clock") {
+      clockCalls++;
+      if (holdClockSamples && initialClock) {
+        initialClock.seen();
+        // Startup first opens the global hook, then the selected room/guild hook.
+        if (clockCalls >= 2) scopedClock!.seen();
+        await initialClock.wait;
+      }
+      return deliver(route, { serverTime: now });
+    }
     if (url.pathname.startsWith("/api/rooms/")) {
       const code = url.pathname.split("/").at(-1)!;
       roomCalls++;
@@ -219,6 +246,10 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
     discoveryCalls: () => discoveryCalls,
     allowDiscovery: () => { discoveryUnavailable = false; },
     roomCalls: () => roomCalls,
+    clockCalls: () => clockCalls,
+    initialClock,
+    scopedClock,
+    allowClockSamples: () => { holdClockSamples = false; },
     holdRoom: (code: string, snapshot?: Room) => {
       const pending = hold(roomGates, code);
       pending.snapshot = snapshot;
@@ -268,6 +299,33 @@ test("room hooks reject delayed fallback, stale revisions and duplicate lease re
     await f.page.waitForSelector('[data-live-state="connecting:room"]');
     assert(f.roomCalls() >= 3, "Expired live state must resume room polling");
     assert.deepEqual(f.commands, [], "Transport failures must never pause or seek playback");
+    assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
+for (const kind of ["room", "discord"] as const) test(`${kind} epoch recovery replaces an outstanding clock request immediately`, async () => {
+  const f = await fixture(kind, false, false, true);
+  try {
+    await f.scopedClock!.started;
+    const index = await sourceIndex(f.page, kind === "room" ? "room=TESTROOM" : "guildId=" + guildA);
+    const time = await f.page.evaluate(() => Date.now());
+    const initial = kind === "room"
+      ? { type: "room", room: { ...browserRoom(time), syncSource: "live", syncEpoch: "old-core", syncValidForMs: 5000, version: 8, current: video("Before restart") } }
+      : { type: "state", state: { ...discordState(guildA, "Before restart", time), epoch: "old-core", sequence: 8 } };
+    await send(f.page, index, initial); await titleVisible(f.page, "Before restart");
+    const callsBeforeRestart = f.clockCalls();
+    f.allowClockSamples();
+    const sampled = f.page.waitForResponse(response => new URL(response.url()).pathname === "/api/realtime/clock" && response.ok(), { timeout: 3000 });
+    const restarted = kind === "room"
+      ? { type: "room", room: { ...browserRoom(time), syncSource: "live", syncEpoch: "new-core", syncValidForMs: 5000, version: 1, current: video("After restart") } }
+      : { type: "state", state: { ...discordState(guildA, "After restart", time), epoch: "new-core", sequence: 1 } };
+    await send(f.page, index, restarted);
+    await sampled; await titleVisible(f.page, "After restart");
+    assert.equal(f.clockCalls(), callsBeforeRestart + 1, "the new Core lease must not wait for the retired clock request");
+    f.initialClock!.release();
+    await f.page.clock.runFor(150);
+    await titleVisible(f.page, "After restart");
+    assert.deepEqual(f.commands, [], "clock recovery never sends playback commands");
     assert.deepEqual(f.errors, []);
   } finally { await f.close(); }
 });
@@ -350,6 +408,98 @@ test("confirmed Discord seeking retains a newer live timeline when its follow-up
     const position = await f.page.evaluate(() => window.afterpartySyncPlayer!.getCurrentTime());
     assert(position >= 79 && position < 85, "The old bridge position must not undo the confirmed seek");
     assert.deepEqual(f.commands, ["/api/admin/control"]);
+    assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
+async function startConcert(f: Awaited<ReturnType<typeof fixture>>) {
+  const index = await sourceIndex(f.page, "guildId=" + guildA);
+  await concertFrame(f.page, index, 8, { playing: true });
+  await titleVisible(f.page, "Buffer recovery concert");
+  await f.page.locator(".stage-intro button").click();
+  await f.page.waitForFunction(() => window.afterpartySyncPlayer?.getPlayerState() === 1);
+  await f.page.clock.runFor(1600);
+  await f.page.evaluate(() => { window.afterpartySyncPlayer!.calls.length = 0; });
+  return index;
+}
+async function concertFrame(page: Page, index: number, sequence: number, change: Partial<LiveState>) {
+  await send(page, index, { type: "state", state: {
+    ...discordState(guildA, "Buffer recovery concert", await page.evaluate(() => Date.now())), sequence, ...change,
+  } });
+}
+
+test("iframe buffering preserves buffered data and recovery settles before correcting persistent drift", async () => {
+  const f = await fixture("discord");
+  try {
+    const index = await startConcert(f);
+    const baseline = await f.page.evaluate(() => ({ at: Date.now(), position: window.afterpartySyncPlayer!.getCurrentTime() }));
+    await f.page.evaluate(() => window.afterpartySyncPlayer!.emit(3));
+    for (let sequence = 9; sequence <= 12; sequence++) {
+      const now = await f.page.evaluate(() => Date.now());
+      await concertFrame(f.page, index, sequence, { playing: true, position: baseline.position + (now - baseline.at) / 1000 });
+      await f.page.clock.runFor(900);
+    }
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayer!.getPlayerState()), 3);
+    assert.deepEqual(await f.page.evaluate(() => window.afterpartySyncPlayer!.calls), [], "a fresh shared clock must not seek, reload, pause or force play during iframe buffering");
+    await f.page.evaluate(() => window.afterpartySyncPlayer!.emit(1));
+    await f.page.clock.runFor(1800);
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayer!.calls.filter(call => call.action === "seek").length), 0, "recovery gets its settling period");
+    const now = await f.page.evaluate(() => Date.now());
+    await concertFrame(f.page, index, 13, { playing: true, position: baseline.position + (now - baseline.at) / 1000 });
+    await f.page.clock.runFor(1500);
+    const seeks = await f.page.evaluate(() => window.afterpartySyncPlayer!.calls.filter(call => call.action === "seek"));
+    assert.equal(seeks.length, 1, "persistent drift is corrected once after recovery");
+    const recoveredPosition = baseline.position + (now - baseline.at) / 1000;
+    assert(seeks[0].position! >= recoveredPosition && seeks[0].position! < recoveredPosition + 2);
+    assert.deepEqual(f.commands, [], "local recovery cannot change shared playback");
+    assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
+test("a shared pause during iframe buffering stops pending playback and a fresh resume starts it again", async () => {
+  const f = await fixture("discord");
+  try {
+    const index = await startConcert(f);
+    await f.page.evaluate(() => window.afterpartySyncPlayer!.emit(3));
+    const position = await f.page.evaluate(() => window.afterpartySyncPlayer!.getCurrentTime());
+    await concertFrame(f.page, index, 9, { playing: false, buffering: true, position });
+    await f.page.clock.runFor(200);
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayer!.getPlayerState()), 2, "shared pause must cancel a buffering iframe before it can start playing");
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayer!.calls.filter(call => call.action === "seek").length), 0, "pausing a buffering iframe must preserve buffered data");
+    await concertFrame(f.page, index, 10, { playing: true, position });
+    await f.page.clock.runFor(200);
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayer!.getPlayerState()), 1);
+    assert.deepEqual(f.commands, [], "authoritative pause and resume do not echo commands back to Core");
+    assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
+test("retrying a stalled iframe retires its callbacks without affecting the replacement player", async () => {
+  const f = await fixture("discord");
+  try {
+    const index = await startConcert(f);
+    await f.page.evaluate(() => window.afterpartySyncPlayer!.emit(3));
+    for (let sequence = 9; sequence <= 13; sequence++) {
+      await concertFrame(f.page, index, sequence, { playing: true, position: 22 });
+      await f.page.clock.runFor(1800);
+    }
+    await f.page.locator(".buffer-notice").getByRole("button", { name: "Try again", exact: true }).click();
+    await f.page.waitForFunction(() => window.afterpartySyncPlayers.length === 2 && window.afterpartySyncPlayer!.getPlayerState() === 1);
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayers[0].calls.filter(call => call.action === "destroy").length), 1);
+    const readsBefore = f.roomCalls();
+    await f.page.evaluate(() => {
+      const retired = window.afterpartySyncPlayers[0];
+      retired.events.onError({ data: 150 });
+      retired.emit(3); retired.emit(0); retired.emit(1);
+      retired.events.onAutoplayBlocked(); retired.events.onReady();
+    });
+    await f.page.clock.runFor(300);
+    assert.equal(await f.page.locator(".stage-intro").count(), 0, "late error/ready callbacks cannot hide the replacement");
+    assert.equal(await f.page.locator(".buffer-notice").count(), 0);
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayer!.getPlayerState()), 1);
+    assert.equal(f.roomCalls(), readsBefore, "late ended callbacks cannot refresh the active room");
+    assert.equal(await f.page.evaluate(() => window.afterpartySyncPlayer!.calls.filter(call => ["seek", "pause"].includes(call.action)).length), 0);
+    assert.deepEqual(f.commands, []);
     assert.deepEqual(f.errors, []);
   } finally { await f.close(); }
 });

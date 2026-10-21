@@ -3,6 +3,11 @@ import { ConcertQueue } from './concert-queue.ts';
 import { Engine } from './engine.ts';
 import { UserError, type Track, type Settings, type SavedQueue } from './types.ts';
 
+const REVISION_ACTIONS = new Set([
+    'pause', 'resume', 'skip', 'next', 'seek', 'seek-relative', 'replay', 'unskip',
+    'remove', 'move', 'jump', 'clear', 'shuffle', 'cleanup-duplicates', 'snapshot-restore', 'snapshot-load',
+]);
+
 function replayTrack(track: Track): Track {
     // Restoring history or a saved queue is an explicit selection, so automatic
     // radio exclusions must not discard the chosen recording later in the queue.
@@ -47,7 +52,7 @@ export class Commands {
         if(scope==='public'&&['pause','resume','skip'].includes(action)&&(!e.current?.concert||input.playbackKey!=='core:'+e.current.entryId))throw new UserError('The concert has changed. Refresh the page and try again.',409);
         if (scope === 'public' && !['pause', 'resume', 'skip', 'enqueue'].includes(action))
             throw new UserError('This action requires administrator access.', 403);
-        if (['skip', 'seek', 'remove', 'move', 'jump'].includes(action) && typeof input.queueRevision === 'string' && input.queueRevision !== e.revision())
+        if (REVISION_ACTIONS.has(action) && typeof input.queueRevision === 'string' && input.queueRevision !== e.revision())
             throw new UserError('The queue has changed. Refresh and try again.', 409);
         if (['pause', 'resume', 'skip', 'enqueue', 'seek'].includes(action) && !e.connected)
             throw new UserError('Start the bot in a Discord voice channel first.', 409);

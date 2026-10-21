@@ -20,6 +20,26 @@ flowchart LR
 
 The selector treats the supplied lookup context as read-only and builds a fresh selection context for each call. It filters known seed/history/rejected catalog recordings before spending playback-matching slots, gathers bounded candidate pools and ranks eligible choices together. Artist diversity takes precedence over a favorite among otherwise suitable choices; favorites still break comparable choices. A provider's first match does not automatically win. Candidate relationship evidence is checked per candidate and tied to the original seed, never granted to an entire search pool because one catalog track was related.
 
+The recommendation ranking spreads the existing catalog hydration budget across
+artists before retrying another song by an attempted artist. This prevents three
+unavailable recordings from one artist from hiding a later usable candidate.
+Final ranking first retains genre/relationship quality, then considers artist
+frequency in the last five tracks and a short preference against the immediately
+previous artists. A cooldown is a preference: the only eligible result can still
+play. Comparable candidates may prefer a stored favorite and an official upload,
+with stable provider order as the final tie-breaker. No new request budget,
+service, audio analysis or cross-server listening profile is introduced.
+
+Core favorites use recognized recording identities from the private server's
+stored favorite queries: YouTube IDs or canonical SoundCloud track URLs. Custom
+favorite names and title substrings do not identify recordings. These identities
+are parsed locally without following links or fetching favorite search text, and
+only affect already admitted candidates. Genre, history, exclusion, visibility
+and recording-version checks still take precedence. Browser rooms share the
+diversity/cooldown policy without importing Discord favorites. Discovery and
+cached descriptors are bounded, copied and stripped of unrelated nested fields
+before they can enter matching.
+
 Last.fm's [track.getSimilar](https://www.last.fm/api/show/track.getSimilar) supplies listening-based track relationships. Its [artist.getTopTracks](https://www.last.fm/api/show/artist.getTopTracks) supplies popular tracks by the original artist as a bounded fallback. Artist popularity does not establish a relationship to an unrelated artist. Catalog matching must still identify the actual recording, and every playback result passes the same content, style, history and visibility checks. Last.fm remains optional; adapters without a configured catalog use the shared safe search stages instead. No new provider account is required.
 
 Successful nonempty recommendation results retain the 24-hour cache lifetime. Successful empty results expire after 60 seconds so later retries can recover. Errors are not recorded as successful empty results. Versioned cache keys prevent older data from bypassing the updated parser and policy.

@@ -1,6 +1,17 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Approve {title}":["Godkjenn {title}","Approve {title}"],
+ "Reject {title}":["Avvis {title}","Reject {title}"],
+ "Move down {title}":["Flytt ned {title}","Move down {title}"],
+ "Radio finds related songs and avoids recent repeats.":["Radio finner lignende sanger og unngår nylige gjentakelser.","Radio finds related songs and avoids recent repeats."],
+ "Frå":["Fra","From"],
+ "Updating queue…":["Oppdaterer køen…","Updating queue…"],
+ "1 track":["1 sang","1 track"],
+ "Loading queue …":["Laster køen …","Loading queue …"],
+ "{count} tracks":["{count} sanger","{count} tracks"],
+ "Connect the bot to a Discord voice channel before adding music.":["Koble boten til en talekanal i Discord før du legger til musikk.","Connect the bot to a Discord voice channel before adding music."],
+ "This video cannot be played in a browser room.":["Denne videoen kan ikke spilles i et nettleserrom.","This video cannot be played in a browser room."],
  "Artist test answer: Synthetic Test Generator.":["Testsvar for artist: Synthetic Test Generator.","Artist test answer: Synthetic Test Generator."],
  "Listen, then answer with the song title or artist.":["Lytt, og svar med sangtittelen eller artisten.","Listen, then answer with the song title or artist."],
  "Use a short answer without control characters.":["Skriv et kort svar uten kontrolltegn.","Use a short answer without control characters."],

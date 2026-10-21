@@ -1360,7 +1360,7 @@ export default function Afterparty() {
     ) {
       p.playVideo();
     }
-    if (!target.playing && state === 1) {
+    if (!target.playing && [1, 3].includes(state)) {
       p.pauseVideo();
     }
   }
@@ -2174,7 +2174,10 @@ export default function Afterparty() {
                     {discordMode && concertQueue.error && (
                       <p role="alert">{t(concertQueue.error)}</p>
                     )}
-                    {!queueRoom?.queue.length && (
+                    {discordMode && !concertQueue.data && (
+                      <p role="status">{t("Loading queue …")}</p>
+                    )}
+                    {(!discordMode || concertQueue.data) && !queueRoom?.queue.length && (
                       <div className="empty-queue">
                         <h3>{t("Køa er tom")}</h3>
                         <button
@@ -2350,7 +2353,7 @@ export default function Afterparty() {
               );
             }}
           >
-            Kø {queueRoom?.queue.length ?? 0}
+            {t("Kø")} {queueRoom?.queue.length ?? 0}
           </button>
           <button
             onClick={() => {

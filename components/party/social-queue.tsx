@@ -29,8 +29,8 @@ export function SocialQueue({
     unknown ||= v.live;
   }
   return (
-    <section className="social-queue" aria-label={t("Felles spelekø")}>
-      {!room.current && room.radio !== false && !!room.history?.length && room.isHost && <div className="radio-retry">
+    <section className="social-queue" aria-label={t("Felles spelekø")} aria-busy={busy}>
+      {!room.current && room.mode !== "discord" && room.radio !== false && !!room.history?.length && room.isHost && <div className="radio-retry">
         <p>{t("Radioen fann ikkje neste låt.")}</p>
         <button disabled={busy} onClick={() => onAction("radio", { enabled: true })}>{t("Prøv radio igjen")}</button>
       </div>}
@@ -63,6 +63,13 @@ export function SocialQueue({
                   ↑
                 </button>
                 <button
+                  disabled={busy || i === entries.length - 1}
+                  aria-label={t("Move down {title}", { title: v.title })}
+                  onClick={() => onAction("move", { videoId: v.entryId ?? v.id, to: i + 1 })}
+                >
+                  ↓
+                </button>
+                <button
                   disabled={busy}
                   aria-label={t("Fjern ") + v.title}
                   onClick={() => onAction("remove", { videoId: v.entryId ?? v.id })}
@@ -74,6 +81,9 @@ export function SocialQueue({
           </article>
         );
       })}
+      {room.mode !== "discord" && room.radio === true && (
+        <p className="queue-help">{t("Radio finds related songs and avoids recent repeats.")}</p>
+      )}
       {room.current && !room.isHost && (
         <button
           className="button subtle"
@@ -90,18 +100,20 @@ export function SocialQueue({
             <article className="social-track" key={v.entryId ?? v.id}>
               <div>
                 <strong>{v.title}</strong>
-                <small>Frå {v.requestedBy ?? t("Gjest")}</small>
+                <small>{t("Frå")} {v.requestedBy ?? t("Gjest")}</small>
               </div>
               {room.isHost ? (
                 <>
                   <button
                     disabled={busy}
+                    aria-label={t("Approve {title}", { title: v.title })}
                     onClick={() => onAction("approve", { videoId: v.entryId ?? v.id })}
                   >
                     {t("Godkjenn")}
                   </button>
                   <button
                     disabled={busy}
+                    aria-label={t("Reject {title}", { title: v.title })}
                     onClick={() => onAction("reject", { videoId: v.entryId ?? v.id })}
                   >
                     {t("Avvis")}
