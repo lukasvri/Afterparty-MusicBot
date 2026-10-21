@@ -1,6 +1,6 @@
 {
   "name": "gutta-krutt-core",
-  "version": "2.4.0-alpha.10",
+  "version": "2.4.0-alpha.11",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node src/main.ts",
+    "guess:check": "node src/guess-check.ts",
     "check": "tsc --noEmit",
     "test": "node --test --test-concurrency=1 --test-timeout=30000 tests/*.test.ts"
   },

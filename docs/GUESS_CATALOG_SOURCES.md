@@ -112,6 +112,36 @@ implement the same `GuessCatalog`/`GuessMediaSource` interfaces while keeping ga
 rules, player authorization and scoring. Its delivery, reporting and territory
 requirements must be checked before assuming it can use this WAV transport.
 
+### Check the configuration before startup
+
+Use the isolated source check before changing a running Core. With the intended
+quiz environment already loaded, run this from `services/core/`:
+
+```sh
+npm run guess:check
+```
+
+To load the existing private local environment file explicitly instead:
+
+```sh
+node --env-file=.env src/guess-check.ts
+```
+
+With both quiz modes disabled, the check reports disabled without reading the
+inventory or contacting a provider. `GUESS_SYNTHETIC_TEST=1` checks only the
+fictional generated-tone source. The Deezer mode uses the same private-file
+validation, bounded metadata/CDN requests and FFmpeg normalization as startup;
+it requires the configured approved inventory and a local FFmpeg installation.
+
+The JSON result contains source readiness and bounded category capacities and
+durations. It excludes song answers, recording IDs, preview addresses, permission
+references and local paths. An unavailable or invalid source exits unsuccessfully
+with a generic result. Successful and failed checks dispose temporary resources;
+the command never starts a Discord client, opens a Core server, changes a queue
+or installs/refreshes the snapshot in an existing process. A successful check is
+evidence for that attempt, not a guarantee of later availability or verified
+permissions.
+
 Each private record supplies song metadata, explicit category membership,
 canonical WAV bytes and an operator approval with an HTTPS evidence reference
 and permission expiry. References receive syntax checks only. Neither approval

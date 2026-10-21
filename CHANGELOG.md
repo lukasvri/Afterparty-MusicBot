@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.11: Deezer sharing links and isolated quiz source checks
+
+2026-10-21
+
+- Optional Deezer metadata matching accepts supported sharing links and canonical track, album and playlist links with bounded standard tracking fields. Tracking is discarded, redirect requests stay within approved Deezer share paths with deadlines and concurrency limits, and metadata from a different requested track is rejected. Matching remains default-off and uses the existing recording matcher.
+- Core adds guess:check to validate the configured quiz source before startup without connecting to Discord, opening servers or changing playback. Its JSON summary reports bounded readiness and category capacities without song answers, media addresses, private inventory paths or permission references, and releases the temporary source after checking.
+- The Deezer quiz pilot remains a separate default-off, explicitly configured inventory with the existing five-minute expiry. The check does not refresh a running Core, establish a playable commercial hit catalog or enable Deezer full-audio streaming. Live provider access and real-device listening remain unverified.
+
 ## v2.4.0-alpha.10: Patched website and Core dependencies
 
 2026-10-21
