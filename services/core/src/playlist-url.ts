@@ -21,7 +21,7 @@ export function normalizePlaylistUrl(input: string): PlaylistUrl {
     return { url: 'https://www.youtube.com/playlist?list=' + lists[0], source: 'youtube' };
   }
   if (parsed.hostname === 'open.spotify.com') {
-    const match = /^\/(?:intl-[a-z]{2}\/)?(playlist|album)\/([A-Za-z0-9]{22})$/.exec(parsed.pathname);
+    const match = /^\/(?:intl-[a-z]{2}\/)?(playlist|album)\/([A-Za-z0-9]{22})\/?$/.exec(parsed.pathname);
     if (!match) throw invalid();
     return { url: `https://open.spotify.com/${match[1]}/${match[2]}`, source: 'spotify' };
   }

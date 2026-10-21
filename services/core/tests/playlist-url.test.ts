@@ -20,8 +20,8 @@ test('YouTube playlist links and watch links normalize to the same canonical pla
 
 test('Spotify canonical, localized and short share links retain only supported identities', () => {
   for (const kind of ['playlist', 'album']) {
-    for (const locale of ['', 'intl-no/', 'intl-en/']) assert.deepEqual(
-      normalizePlaylistUrl(`https://open.spotify.com/${locale}${kind}/${spotifyId}?si=tracking&utm_source=share`),
+    for (const locale of ['', 'intl-no/', 'intl-en/']) for (const slash of ['', '/']) assert.deepEqual(
+      normalizePlaylistUrl(`https://open.spotify.com/${locale}${kind}/${spotifyId}${slash}?si=tracking&utm_source=share`),
       { source: 'spotify', url: `https://open.spotify.com/${kind}/${spotifyId}` },
     );
   }
@@ -62,7 +62,7 @@ test('YouTube requires exactly one bounded playlist identity regardless of video
 test('Spotify rejects other entities, malformed IDs, nested shares and encoded path separators', () => {
   for (const suffix of [
     '/track/' + spotifyId, '/artist/' + spotifyId, '/playlist/short', '/playlist/' + spotifyId + 'a',
-    '/playlist/' + spotifyId.slice(0, -1) + '_', '/playlist/' + spotifyId + '/', '/intl-nor/album/' + spotifyId,
+    '/playlist/' + spotifyId.slice(0, -1) + '_', '/playlist/' + spotifyId + '//', '/intl-nor/album/' + spotifyId,
     '/playlist%2f' + spotifyId, '/playlist/' + spotifyId + '%2fmore',
   ]) assert.throws(() => normalizePlaylistUrl('https://open.spotify.com' + suffix), suffix);
   for (const suffix of ['', '/', '/nested/share', '/..', '/a%2fb', '/a.b', '/' + 'a'.repeat(101)])
