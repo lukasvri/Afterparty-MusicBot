@@ -32,23 +32,23 @@ def ready():
         return False
 
 
-def docker(*args, **kwargs):
-    return subprocess.run(['docker','--context','default',*args],check=True,**kwargs)
+def docker(*args, context='default', **kwargs):
+    return subprocess.run(['docker','--context',context,*args],check=True,**kwargs)
 
 
-def captured(*args):
-    return docker(*args,capture_output=True,text=True).stdout.strip()
+def captured(*args, context='default'):
+    return docker(*args,context=context,capture_output=True,text=True).stdout.strip()
 
 
-def info(name):
-    return json.loads(captured('inspect',name))[0]
+def info(name, context='default'):
+    return json.loads(captured('inspect',name,context=context))[0]
 
 
 def protected(config):
     result = {}
     names = [config.get('container','gutta-krutt-core'), *config.get('protected_containers',[])]
     for name in dict.fromkeys(names):
-        item = info(name)
+        item = info(name, context=config.get('docker_context','default'))
         result[name] = [item['Id'],item['Image'],item['State']['StartedAt'],item['RestartCount'],item['State']['Running']]
     compose = Path(config['compose_file'])
     result['compose'] = hashlib.sha256(compose.read_bytes()).hexdigest()
@@ -72,6 +72,7 @@ def check_limits(item, cpu):
 
 def probe(config_path, args):
     config=json.loads(Path(config_path).read_text())
+    context=config.get('docker_context','default')
     prefix=['run','--rm','--network','none','--read-only','--cpus=0.5',
             '--memory=256m','--memory-swap=256m','--pids-limit=64','--entrypoint','node']
     if (args[:len(prefix)] != prefix or len(args)!=len(prefix)+4 or
@@ -85,24 +86,25 @@ def probe(config_path, args):
     options=['--name',name,'--label','afterparty.runtime.run='+config['run_id'],
              '--cpuset-cpus',str(config['cpu']),'--cpu-shares=32','--ulimit','core=0:0',
              '-e','NODE_OPTIONS=--max-old-space-size=128']
-    container=captured('create',*options,*args[2:])
+    container=captured('create',*options,*args[2:],context=context)
     try:
-        check_limits(info(container),config['cpu'])
+        check_limits(info(container,context=context),config['cpu'])
         if (directory/'aborted').exists():
             raise RuntimeError('Runtime probe was canceled before starting')
-        result=subprocess.run(['docker','--context','default','start','--attach',container])
-        state=info(container)['State']
+        result=subprocess.run(['docker','--context',context,'start','--attach',container])
+        state=info(container,context=context)['State']
         save(directory/'probe.json',{'exit_code':state['ExitCode'],'oom_killed':state['OOMKilled']})
         return result.returncode or int(state['ExitCode'])
     finally:
-        if info(container)['State']['Running']:
-            docker('stop','--time=1',container,stdout=subprocess.DEVNULL)
-        docker('rm',container,stdout=subprocess.DEVNULL)
+        if info(container,context=context)['State']['Running']:
+            docker('stop','--time=1',container,context=context,stdout=subprocess.DEVNULL)
+        docker('rm',container,context=context,stdout=subprocess.DEVNULL)
 
 
 class RuntimeSession:
     def __init__(self,config):
         self.config=config
+        self.context=config.get('docker_context','default')
         self.failed=threading.Event()
         self.finished=threading.Event()
         self.reason=None
@@ -125,7 +127,8 @@ class RuntimeSession:
             self.directory.mkdir(mode=0o700)
             self.cpu=max(os.sched_getaffinity(0))
             self.path=self.directory/'probe-config.json'
-            save(self.path,{'run_id':self.run_id,'directory':str(self.directory),'cpu':self.cpu})
+            save(self.path,{'run_id':self.run_id,'directory':str(self.directory),'cpu':self.cpu,
+                            'docker_context':self.context})
             self.minimum=free
             self.guard=threading.Thread(target=self.watch,daemon=True)
             self.guard.start()
@@ -137,11 +140,12 @@ class RuntimeSession:
     def wrap(self,args):
         if self.failed.is_set():
             raise RuntimeError('Runtime checks canceled: '+str(self.reason))
-        if args[:1]==['docker'] and args[:3]!=['docker','--context','default']:
-            raise RuntimeError('Only the default Docker context is permitted')
-        if args[:4]==['docker','--context','default','run']:
+        prefix=['docker','--context',self.context]
+        if args[:1]==['docker'] and args[:3]!=prefix:
+            raise RuntimeError('Only the configured Docker context is permitted')
+        if args[:4]==prefix+['run']:
             return [sys.executable,str(Path(__file__).resolve()),'--probe',str(self.path),*args[3:]]
-        if args[:3]==['docker','--context','default']:
+        if args[:3]==prefix:
             if args[3:5]==['image','inspect']:
                 return args
             if args[3:5]==['load','--input'] and len(args)==6:
@@ -153,14 +157,14 @@ class RuntimeSession:
         return args
 
     def owned(self):
-        return captured('ps','-q','--filter','label=afterparty.runtime.run='+self.run_id).split()
+        return captured('ps','-q','--filter','label=afterparty.runtime.run='+self.run_id,context=self.context).split()
 
     def abort(self,reason):
         self.reason=reason
         self.failed.set()
         (self.directory/'aborted').touch(mode=0o600)
         for container in self.owned():
-            docker('stop','--time=1',container,stdout=subprocess.DEVNULL)
+            docker('stop','--time=1',container,context=self.context,stdout=subprocess.DEVNULL)
 
     def watch(self):
         ticks=0
@@ -171,7 +175,7 @@ class RuntimeSession:
                     self.abort('Less than 512 MiB available during runtime checks')
                     return
                 for container in self.owned():
-                    check_limits(info(container),self.cpu)
+                    check_limits(info(container,context=self.context),self.cpu)
                 ticks+=1
                 if ticks%10==0 and not ready():
                     self.abort('Core health failed during runtime checks')

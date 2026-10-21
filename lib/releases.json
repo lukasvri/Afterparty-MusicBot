@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.4.0-alpha.6",
+    "date": "2026-10-21",
+    "title": "Verified GitHub builds for bounded server updates",
+    "items": [
+      "Core and website updates reuse the exact build outputs produced after the canonical main workflow passes. The deployment host no longer installs dependencies, reruns the full test suites or rebuilds those outputs; missing or invalid release artifacts stop the update.",
+      "Every release asset requires cryptographically verified GitHub build provenance tied to the expected workflow, refs/heads/main, exact source commit and workflow run attempt. Matching release checksums and the shared GitHub Actions bot identity alone are not sufficient to authorize an image.",
+      "Operators must install the updated pinned deployment consumer and a GitHub CLI version supporting the required attestation verification flags. Merge this change and wait for its first successful signed main build before using the new update path. Existing unsigned builds are rejected without a local rebuild fallback.",
+      "The isolated local runtime probe respects the configured Docker context and retains its 256 MiB memory limit, no swap and half-CPU quota. Existing health, backup, playback and rollback safeguards still apply before an explicitly authorized production update.",
+      "This preparation alpha describes the source candidate, not an accepted v3 release or a production deployment. Automatic updates are not enabled by this change."
+    ]
+  },
+  {
     "version": "2.4.0-alpha.5",
     "date": "2026-10-21",
     "title": "Visible queues and neutral control surfaces",

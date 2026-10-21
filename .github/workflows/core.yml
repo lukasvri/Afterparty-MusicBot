@@ -64,6 +64,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -71,6 +73,20 @@ jobs:
           pattern: tested-*
           path: release-assets
           merge-multiple: true
+      - name: Prepare the exact manifest before signing
+        run: python3 scripts/build_release.py prepare
+      - name: Attest all release asset digests from the canonical main workflow
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            release-assets/core-image.tar.gz
+            release-assets/website.tar.gz
+            release-assets/release.json
+      - name: Preserve the signed bundle for token-free host verification
+        env:
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: cp -- "$PROVENANCE_BUNDLE" release-assets/provenance.json
       - name: Publish immutable-by-policy commit-addressed build assets
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,6 +1,5 @@
 """Package CI outputs and publish commit-addressed build assets, never production."""
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,7 +8,7 @@ import tarfile
 import urllib.error
 import urllib.request
 
-from release_artifacts import REPOSITORY, digest, sha, validate_image, validate_website
+from release_artifacts import REPOSITORY, ASSETS, digest, sha, validate_image, validate_website, verify_provenance
 
 
 def run(*args):
@@ -61,7 +60,7 @@ def api(path, token, body=None, content_type='application/json', method=None):
         return json.load(response)
 
 
-def publish(directory, commit):
+def prepare(directory, commit):
     commit = sha(commit)
     if (os.environ.get('GITHUB_REPOSITORY') != REPOSITORY or
             os.environ.get('GITHUB_EVENT_NAME') != 'push' or
@@ -80,6 +79,18 @@ def publish(directory, commit):
                 'files':{name:{'sha256':digest(directory/name),'size':(directory/name).stat().st_size}
                          for name in ['core-image.tar.gz','website.tar.gz']}}
     (directory/'release.json').write_text(json.dumps(manifest,indent=2)+'\n')
+
+
+def publish(directory, commit):
+    # Recreate and compare the manifest so publication cannot change signed bytes.
+    signed_manifest = (directory / 'release.json').read_bytes()
+    prepare(directory, commit)
+    if (directory / 'release.json').read_bytes() != signed_manifest:
+        raise RuntimeError('Release manifest changed after signing')
+    manifest = json.loads(signed_manifest)
+    assets = {name: {'digest': 'sha256:' + digest(directory/name)} for name in ASSETS}
+    verify_provenance(directory, commit, int(os.environ['GITHUB_RUN_ID']),
+                      int(os.environ['GITHUB_RUN_ATTEMPT']), assets)
     token = os.environ['GH_TOKEN']  # Supplied only to this CI job by GitHub.
     tag = 'build-'+commit
     try:
@@ -89,10 +100,7 @@ def publish(directory, commit):
             raise
         previous = None
     if previous:
-        # Never replace assets of a published build. Reruns retain its evidence.
-        if previous.get('draft') is False and previous.get('target_commitish') == commit:
-            return
-        raise RuntimeError('An incomplete or conflicting build release needs manual review')
+        raise RuntimeError('An existing build release requires manual review; never adopt or overwrite it')
     release = api('/releases',token,{'tag_name':tag,'target_commitish':commit,
                   'name':'Tested build '+commit[:12],'draft':True,'prerelease':True,
                   'make_latest':'false','body':'CI build assets only. No production deployment.\nWorkflow run: https://github.com/'+REPOSITORY+'/actions/runs/'+str(manifest['run_id'])})
@@ -100,7 +108,7 @@ def publish(directory, commit):
     import http.client
     from urllib.parse import urlsplit, quote
     upload = release['upload_url'].split('{',1)[0]
-    for name in ['core-image.tar.gz','website.tar.gz','release.json']:
+    for name in sorted(ASSETS):
         url = urlsplit(upload+'?name='+quote(name))
         if url.hostname != 'uploads.github.com' or url.scheme != 'https':
             raise RuntimeError('Unexpected GitHub upload endpoint')
@@ -125,7 +133,7 @@ def publish(directory, commit):
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('operation',choices=['core','website','publish'])
+    parser.add_argument('operation',choices=['core','website','prepare','publish'])
     parser.add_argument('--directory',type=Path,default=Path('release-assets'))
     parser.add_argument('--commit',default=os.environ.get('GITHUB_SHA'))
     args=parser.parse_args()
@@ -134,5 +142,7 @@ if __name__ == '__main__':
         core(args.directory,args.commit)
     elif args.operation=='website':
         website(args.directory)
+    elif args.operation=='prepare':
+        prepare(args.directory,args.commit)
     else:
         publish(args.directory,args.commit)

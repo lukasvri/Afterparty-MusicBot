@@ -435,7 +435,8 @@ class Deployer:
             'commit': self.target, 'run_id': manifest['run_id'], 'run_attempt': manifest['run_attempt'],
             'image_id': self.new_image_id, 'manifest_sha256': artifacts.digest(cache / 'release.json'),
             'website_sha256': manifest['files']['website.tar.gz']['sha256'],
-            'verified_at': time.time(), 'mode': 'github-tested-build'
+            'verified_at': time.time(), 'mode': 'github-tested-build',
+            'provenance_verified': True, 'provenance_sha256': artifacts.digest(cache / 'provenance.json')
         }, indent=2) + '\n'
         atomic_write(cache / 'verified.json', proof)
         atomic_write(self.state / 'ci-build.json', proof)

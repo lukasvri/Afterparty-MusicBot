@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import sys
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 SCRIPTS=Path(__file__).parents[1]/'scripts'
@@ -59,6 +60,7 @@ class Bundle(unittest.TestCase):
         self.manifest['files']={n:{'sha256':artifacts.digest(self.root/n),'size':(self.root/n).stat().st_size}
                                for n in ('core-image.tar.gz','website.tar.gz')}
         (self.root/'release.json').write_text(json.dumps(self.manifest))
+        (self.root/'provenance.json').write_text('{"synthetic_bundle":true}')
         self.assets={n:{'name':n,'state':'uploaded','uploader':{'login':'github-actions[bot]'},'digest':'sha256:'+artifacts.digest(self.root/n),
                        'size':(self.root/n).stat().st_size,'browser_download_url':
                        'https://github.com/'+artifacts.REPOSITORY+'/releases/download/build-'+COMMIT+'/'+n}
@@ -77,6 +79,18 @@ class Bundle(unittest.TestCase):
                 return owner.jobs if '/jobs?' in path else owner.run
             def response(self,url):
                 return io.BytesIO((owner.root/url.rsplit('/',1)[-1]).read_bytes())
+        self.proof=[{'verificationResult':{'signature':{'certificate':{
+            'subjectAlternativeName':'https://github.com/'+artifacts.REPOSITORY+'/'+artifacts.WORKFLOW+'@refs/heads/main',
+            'sourceRepositoryURI':'https://github.com/'+artifacts.REPOSITORY,
+            'sourceRepositoryRef':'refs/heads/main','sourceRepositoryDigest':COMMIT,
+            'buildSignerDigest':COMMIT,'buildTrigger':'push','runnerEnvironment':'github-hosted',
+            'runInvocationURI':'https://github.com/'+artifacts.REPOSITORY+'/actions/runs/123/attempts/1'}},
+            'statement':{'predicateType':'https://slsa.dev/provenance/v1',
+                'subject':[{'name':n,'digest':{'sha256':self.assets[n]['digest'][7:]}} for n in sorted(artifacts.SIGNED_ASSETS)]}}}]
+        self.verify_code=0
+        self.verifier=self.enterContext(patch.object(artifacts.subprocess,'run',side_effect=lambda *a,**kw:
+            SimpleNamespace(returncode=self.verify_code,stdout=json.dumps(self.proof))))
+        self.enterContext(patch.object(artifacts.shutil,'which',return_value='/reviewed/gh'))
         self.client=Client()
         self.destination=self.root/'download'
 
@@ -84,6 +98,59 @@ class Bundle(unittest.TestCase):
         result=self.client.fetch(COMMIT,self.destination)
         self.assertEqual(result['image_id'],self.manifest['image_id'])
         self.assertEqual(artifacts.digest(self.destination/'website.tar.gz'),self.manifest['files']['website.tar.gz']['sha256'])
+
+    def test_ref_qualified_workflow_paths_accept_only_trusted_main(self):
+        for path in (artifacts.WORKFLOW, artifacts.WORKFLOW+'@main', artifacts.WORKFLOW+'@refs/heads/main'):
+            self.run['path']=path
+            self.client.describe(COMMIT,self.destination)
+        for path in (artifacts.WORKFLOW+'@feature',artifacts.WORKFLOW+'@refs/pull/98/merge',
+                     'other.yml@main',artifacts.WORKFLOW+'@main@evil'):
+            self.run['path']=path
+            with self.assertRaises(artifacts.ReleaseError):
+                self.client.describe(COMMIT,self.destination)
+
+    def test_signed_asset_digests_and_certificate_bind_the_exact_run(self):
+        self.client.fetch(COMMIT,self.destination)
+        args,kwargs=self.verifier.call_args
+        command=args[0]
+        for flag,value in (('--source-ref','refs/heads/main'),('--source-digest',COMMIT),
+                           ('--signer-digest',COMMIT),('--cert-identity','https://github.com/'+artifacts.REPOSITORY+'/'+artifacts.WORKFLOW+'@refs/heads/main')):
+            self.assertEqual(command[command.index(flag)+1],value)
+        self.assertIn('--bundle',command)
+        self.assertIn('--deny-self-hosted-runners',command)
+        self.assertNotIn('GH_TOKEN',kwargs['env'])
+        self.assertNotIn('GITHUB_TOKEN',kwargs['env'])
+        original=json.loads(json.dumps(self.proof))
+        for change in ({'sourceRepositoryRef':'refs/heads/feature'},
+                       {'subjectAlternativeName':'https://github.com/other/workflow@refs/heads/main'},
+                       {'sourceRepositoryDigest':'b'*40},{'buildSignerDigest':'b'*40},
+                       {'runInvocationURI':'https://github.com/'+artifacts.REPOSITORY+'/actions/runs/999/attempts/1'},
+                       {'runInvocationURI':'https://github.com/'+artifacts.REPOSITORY+'/actions/runs/123/attempts/2'},
+                       {'buildTrigger':'pull_request'},{'runnerEnvironment':'self-hosted'}):
+            self.proof=json.loads(json.dumps(original))
+            self.proof[0]['verificationResult']['signature']['certificate'].update(change)
+            with self.assertRaises(artifacts.ReleaseError):
+                self.client.fetch(COMMIT,self.destination)
+        self.proof=original
+        self.proof[0]['verificationResult']['statement']['subject'][0]['digest']={'sha256':'0'*64}
+        with self.assertRaises(artifacts.ReleaseError):
+            self.client.describe(COMMIT,self.destination)
+
+    def test_forged_unsigned_missing_or_failed_proof_never_downloads_an_image(self):
+        self.verify_code=1
+        with self.assertRaises(artifacts.ReleaseError):
+            self.client.fetch(COMMIT,self.destination)
+        self.assertFalse((self.destination/'core-image.tar.gz').exists())
+        self.verify_code=0
+        self.proof=[]
+        with self.assertRaises(artifacts.ReleaseError):
+            self.client.describe(COMMIT,self.destination)
+        with patch.object(artifacts.shutil,'which',return_value=None),patch.object(Path,'is_file',return_value=False):
+            with self.assertRaisesRegex(artifacts.ReleaseError,'verifier first'):
+                self.client.describe(COMMIT,self.destination)
+        self.release['assets']=[a for a in self.release['assets'] if a['name']!='provenance.json']
+        with self.assertRaises(artifacts.ReleaseError):
+            self.client.describe(COMMIT,self.destination)
 
     def test_no_release_never_falls_back_to_source_build(self):
         with patch.object(self.client,'get',side_effect=artifacts.ReleaseError('No build')):
@@ -239,6 +306,91 @@ class CIProducer(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     self.producer.publish(self.fixture.root,COMMIT)
                 api.assert_not_called()
+
+    @contextlib.contextmanager
+    def prepared_main_release(self):
+        root=self.fixture.root
+        metadata={key:self.fixture.manifest[key] for key in ('commit','image_tag','image_id','platform')}
+        (root/'core.json').write_text(json.dumps(metadata))
+        values={'GITHUB_REPOSITORY':artifacts.REPOSITORY,'GITHUB_EVENT_NAME':'push',
+                'GITHUB_REF':'refs/heads/main','GITHUB_SHA':COMMIT,
+                'GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1','GH_TOKEN':'synthetic-ci-token'}
+        with patch.dict(os.environ,values,clear=True):
+            self.producer.prepare(root,COMMIT)
+            yield root
+
+    def test_signed_release_uploads_exact_assets_before_becoming_public(self):
+        import urllib.parse
+        events=[]
+        uploads={}
+        owner=self
+        def verify(directory,commit,run_id,attempt,assets):
+            owner.assertEqual((commit,run_id,attempt),(COMMIT,123,1))
+            owner.assertEqual(set(assets),artifacts.ASSETS)
+            events.append('verified')
+        def api(path,token,body=None,**kwargs):
+            owner.assertEqual(token,'synthetic-ci-token')
+            if path.startswith('/releases/tags/'):
+                owner.assertEqual(events,['verified'])
+                raise self.producer.urllib.error.HTTPError(path,404,'not found',{},None)
+            if path=='/releases':
+                owner.assertEqual(body['target_commitish'],COMMIT)
+                owner.assertTrue(body['draft'])
+                owner.assertIn('/actions/runs/123',body['body'])
+                events.append('draft')
+                return {'id':456,'upload_url':'https://uploads.github.com/repos/example/releases/456/assets{?name,label}'}
+            owner.assertEqual(path,'/releases/456')
+            owner.assertEqual(kwargs,{'method':'PATCH'})
+            owner.assertEqual(body,{'draft':False,'make_latest':'false'})
+            owner.assertEqual(set(uploads),artifacts.ASSETS)
+            events.append('published')
+        class Connection:
+            def __init__(self,hostname,timeout):
+                owner.assertEqual(hostname,'uploads.github.com')
+                self.content=bytearray()
+                self.headers={}
+            def putrequest(self,method,path):
+                owner.assertEqual(method,'POST')
+                self.name=urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)['name'][0]
+            def putheader(self,name,value):
+                self.headers[name]=value
+            def endheaders(self):
+                owner.assertEqual(self.headers['Authorization'],'Bearer synthetic-ci-token')
+            def send(self,chunk):
+                self.content.extend(chunk)
+            def getresponse(self):
+                owner.assertEqual(int(self.headers['Content-Length']),len(self.content))
+                uploads[self.name]=bytes(self.content)
+                events.append('upload:'+self.name)
+                return SimpleNamespace(status=201,read=lambda:json.dumps(
+                    {'digest':'sha256:'+hashlib.sha256(self.content).hexdigest()}).encode())
+            def close(self):
+                pass
+        with self.prepared_main_release() as root:
+            signed_manifest=(root/'release.json').read_bytes()
+            with patch.object(self.producer,'verify_provenance',side_effect=verify), \
+                    patch.object(self.producer,'api',side_effect=api), \
+                    patch('http.client.HTTPSConnection',Connection):
+                self.producer.publish(root,COMMIT)
+            self.assertEqual((root/'release.json').read_bytes(),signed_manifest)
+            self.assertEqual(uploads,{name:(root/name).read_bytes() for name in artifacts.ASSETS})
+        self.assertEqual(events,['verified','draft',
+                                *['upload:'+name for name in sorted(artifacts.ASSETS)],'published'])
+
+    def test_existing_release_is_never_adopted_overwritten_or_republished(self):
+        with self.prepared_main_release() as root:
+            for existing in ({'draft':False,'target_commitish':COMMIT},
+                             {'draft':True,'target_commitish':COMMIT},
+                             {'draft':False,'target_commitish':'b'*40}):
+                with self.subTest(existing=existing), \
+                        patch.object(self.producer,'verify_provenance') as verify, \
+                        patch.object(self.producer,'api',return_value=existing) as api, \
+                        patch('http.client.HTTPSConnection') as upload:
+                    with self.assertRaisesRegex(RuntimeError,'never adopt or overwrite'):
+                        self.producer.publish(root,COMMIT)
+                    verify.assert_called_once()
+                    api.assert_called_once_with('/releases/tags/build-'+COMMIT,'synthetic-ci-token')
+                    upload.assert_not_called()
 
     def test_core_is_built_once_and_that_exact_final_image_is_saved(self):
         import gzip

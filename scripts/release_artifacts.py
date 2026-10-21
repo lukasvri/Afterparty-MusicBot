@@ -1,6 +1,9 @@
 """Read verified, commit-addressed CI builds. No build or deployment fallback."""
 import hashlib
 import json
+import os
+import subprocess
+import tempfile
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -11,7 +14,8 @@ from urllib.parse import urlsplit
 
 REPOSITORY = 'lukasvri/Afterparty-MusicBot'
 WORKFLOW = '.github/workflows/core.yml'
-ASSETS = {'release.json', 'core-image.tar.gz', 'website.tar.gz'}
+SIGNED_ASSETS = {'release.json', 'core-image.tar.gz', 'website.tar.gz'}
+ASSETS = SIGNED_ASSETS | {'provenance.json'}
 MAX_JSON = 2 * 1024 * 1024
 MAX_ASSET = 2 * 1024 * 1024 * 1024
 
@@ -107,7 +111,7 @@ class Client:
         for asset in assets:
             name = asset['name']
             expected = 'https://github.com/' + self.repository + '/releases/download/build-' + commit + '/' + name
-            maximum = MAX_JSON if name == 'release.json' else MAX_ASSET
+            maximum = MAX_JSON if name in ('release.json', 'provenance.json') else MAX_ASSET
             if (asset.get('state') != 'uploaded' or asset.get('browser_download_url') != expected or
                     asset.get('uploader', {}).get('login') != 'github-actions[bot]' or
                     type(asset.get('size')) is not int or not 0 < asset['size'] <= maximum or
@@ -141,6 +145,7 @@ class Client:
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         assets = self.assets(commit)
         self.download(assets['release.json'], directory / 'release.json')
+        self.download(assets['provenance.json'], directory / 'provenance.json')
         manifest = json.loads((directory / 'release.json').read_text())
         if (manifest.get('schema') != 1 or manifest.get('repository') != self.repository or
                 manifest.get('commit') != commit or manifest.get('platform') != 'linux/amd64'):
@@ -148,9 +153,11 @@ class Client:
         run_id, attempt = manifest.get('run_id'), manifest.get('run_attempt')
         if type(run_id) is not int or run_id <= 0 or type(attempt) is not int or attempt <= 0:
             raise ReleaseError('Missing workflow provenance')
+        verify_provenance(directory, commit, run_id, attempt, assets)
         run = self.get('/actions/runs/' + str(run_id))
         if (run.get('head_sha') != commit or run.get('head_branch') != 'main' or
-                run.get('event') != 'push' or run.get('path') != WORKFLOW or
+                run.get('event') != 'push' or run.get('path') not in
+                (WORKFLOW, WORKFLOW + '@main', WORKFLOW + '@refs/heads/main') or
                 run.get('status') != 'completed' or run.get('conclusion') != 'success'):
             raise ReleaseError('Exact main commit has not passed the release workflow')
         jobs = self.get('/actions/runs/' + str(run_id) + '/attempts/' + str(attempt) + '/jobs?per_page=100')
@@ -186,6 +193,64 @@ class Client:
         validate_image(directory / 'core-image.tar.gz', manifest)
         validate_website(directory / 'website.tar.gz')
         return manifest
+
+
+def verify_provenance(directory, commit, run_id, attempt, assets):
+    """Verify the signed manifest and every asset digest before image import.
+
+    GitHub's CLI verifies Sigstore signatures, transparency evidence and the
+    certificate identity. Policy below uses signed certificate claims, including
+    the invocation URI, rather than trusting a run ID written by an uploader.
+    """
+    directory = Path(directory)
+    executable = shutil.which('gh')
+    if not executable:
+        pinned = Path(__file__).with_name('bin') / 'gh'
+        if pinned.is_file() and os.access(pinned, os.X_OK):
+            executable = str(pinned)
+    if not executable:
+        raise ReleaseError('GitHub CLI with attestation verification is required; install the reviewed verifier first')
+    identity = 'https://github.com/' + REPOSITORY + '/' + WORKFLOW + '@refs/heads/main'
+    invocation = 'https://github.com/' + REPOSITORY + '/actions/runs/' + str(run_id) + '/attempts/' + str(attempt)
+    command = [executable, 'attestation', 'verify', str(directory / 'release.json'),
+               '--bundle', str(directory / 'provenance.json'), '--repo', REPOSITORY,
+               '--cert-identity', identity, '--source-ref', 'refs/heads/main',
+               '--source-digest', sha(commit), '--signer-digest', commit,
+               '--cert-oidc-issuer', 'https://token.actions.githubusercontent.com',
+               '--deny-self-hosted-runners', '--predicate-type', 'https://slsa.dev/provenance/v1',
+               '--format', 'json', '--hostname', 'github.com']
+    try:
+        # Local bundles need no GitHub login. Do not expose existing CLI credentials.
+        with tempfile.TemporaryDirectory(prefix='verifier-', dir=directory) as temporary:
+            env = os.environ.copy()
+            for key in ('GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'):
+                env.pop(key, None)
+            env.update(GH_CONFIG_DIR=temporary, GH_PROMPT_DISABLED='1', GH_NO_UPDATE_NOTIFIER='1')
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=90)
+        if result.returncode or len(result.stdout) > 4 * MAX_JSON:
+            raise ReleaseError('Cryptographic build provenance verification failed')
+        verified = json.loads(result.stdout)
+        expected = {name: {'sha256': assets[name]['digest'][7:]} for name in SIGNED_ASSETS}
+        for item in verified:
+            value = item['verificationResult']
+            cert = value['signature']['certificate']
+            statement = value['statement']
+            subjects = statement['subject']
+            if (cert.get('subjectAlternativeName') == identity and
+                    cert.get('sourceRepositoryURI') == 'https://github.com/' + REPOSITORY and
+                    cert.get('sourceRepositoryRef') == 'refs/heads/main' and
+                    cert.get('sourceRepositoryDigest') == commit and
+                    cert.get('buildSignerDigest') == commit and
+                    cert.get('runInvocationURI') == invocation and
+                    cert.get('buildTrigger') == 'push' and
+                    cert.get('runnerEnvironment') == 'github-hosted' and
+                    statement.get('predicateType') == 'https://slsa.dev/provenance/v1' and
+                    len(subjects) == len(expected) and
+                    {s['name']: s['digest'] for s in subjects} == expected):
+                return
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+        raise ReleaseError('Cryptographic build provenance could not be verified') from None
+    raise ReleaseError('Signed build identity, invocation or asset digests differ')
 
 
 def validate_image(path, manifest):

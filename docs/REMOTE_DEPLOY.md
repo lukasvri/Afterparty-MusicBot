@@ -7,7 +7,7 @@ on the bot host. Tests and production builds run once in GitHub Actions.
 ## What the command does
 
 1. Acquires a deployment lock and requires a healthy bot and matching private
-   data bindings. Music continues during validation and builds.
+   data bindings. Music continues during validation.
 2. Fetches `origin/main` and exports tracked source into a temporary directory.
    Local edits, staged files, untracked files and ignored configuration are not
    exported or mounted in tests. The working branch and local files stay unchanged.
@@ -15,7 +15,10 @@ on the bot host. Tests and production builds run once in GitHub Actions.
 3. Requires the exact commit's successful canonical main-push workflow, including
    the Core, website, deployer and release jobs. Downloads its commit-addressed
    build assets and verifies GitHub's asset digests, the manifest, image ID,
-   revision label, platform and runtime user. There is no local source-build or
+   revision label, platform and runtime user. A Sigstore attestation must bind
+   all three payload digests to this workflow, `refs/heads/main`, the exact source
+   and signer commit and the successful run attempt. Certificate claims, not an
+   unsigned manifest or shared bot identity, establish that binding. There is no local source-build or
    test fallback when CI or assets are missing.
 4. Imports the tested image and runs a short, unprivileged, read-only runtime
    probe with no network, secrets or production data. The probe is limited to
@@ -49,9 +52,16 @@ Automated tests and readiness checks do not replace listening in a real voice ch
 
 ## One-time setup on the bot host
 
-Requirements: Linux, Python 3.11+, Git, Docker with Compose, and Docker access for
+Requirements: Linux, Python 3.11+, Git, GitHub CLI with `gh attestation verify`,
+Docker with Compose, and Docker access for
 an ordinary deployment user who owns the production data. This initial version
 supports one Core service with a host bind mount at `/data`.
+The reviewed GitHub CLI must support `--bundle`, `--source-ref`, `--source-digest`,
+`--signer-digest`, `--cert-identity` and `--deny-self-hosted-runners`. Install it
+from the official GitHub CLI release or trusted OS packages before checking.
+The consumer searches `PATH` and its sibling `bin/gh`; it never downloads or
+installs a verifier automatically. Local signed bundles require no GitHub login
+or host token. Missing tools or unsupported flags stop before image import.
 
 1. Keep the production Compose file, referenced environment files and data
    outside the Git checkout. Preserve existing paths; do not copy them into Git.
@@ -103,7 +113,7 @@ real switch, as described above.
 A normal deployment skips the restart if its recorded commit and actual running
 image already match. `--redeploy` explicitly repeats deployment of the same commit.
 An already current deployment and `--check` do not pause music. Actual updates
-and `--redeploy` pause active playback only after validation and building finish,
+and `--redeploy` pause active playback only after validation finishes,
 then resume it after the new bot is healthy or the previous bot is recovered.
 If someone changes the track, disconnects, or sends a newer transport command
 through the website during this interval, automatic resume leaves that server
@@ -129,7 +139,10 @@ update. Do not run `docker compose down -v`.
 
 The release job runs only after all three CI validation jobs succeed on a push
 to canonical main. It publishes a prerelease named `build-<full commit SHA>`
-containing `core-image.tar.gz`, `website.tar.gz` and `release.json`. These are
+containing `core-image.tar.gz`, `website.tar.gz`, `release.json` and
+`provenance.json`. The signed Sigstore bundle covers all three payload digests.
+The publisher verifies it before upload; consumers verify it before trusting
+the manifest or importing the image. These are
 public, secret-free build assets, not a production deployment or an application
 release announcement. The release is excluded from GitHub's latest-release
 selection. Published assets are never overwritten by this workflow.
@@ -138,10 +151,12 @@ Pull requests run validation and upload temporary workflow artifacts, but do not
 publish build releases or deploy anything. A host needs no GitHub token to read
 the public build releases. Missing assets, failed/pending CI, wrong revisions,
 partial job results and checksum failures stop before playback or Core is touched.
-Incomplete draft build releases require review rather than automatic replacement.
+Any existing build release requires manual review rather than automatic
+replacement or adoption, including a published release claiming the same commit.
 
 After merging this workflow change, wait for its first main-push run and build
-release to succeed. Older commits have no reusable build assets and are
+release to succeed. Verify the pinned host consumer and GitHub CLI prerequisite
+first. Older commits have no signed reusable build assets and are
 deliberately unavailable to the new update path. Reinstall all three pinned
 deployer files together. For development changes, `npm run setup:cloud` followed
 by `npm run check:all` remains the full validation workflow; production hosts do
