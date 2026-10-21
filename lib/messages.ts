@@ -1,6 +1,8 @@
 import {partyMessages} from "./party-messages";
 export type Language = "nb" | "en";
 export const messages: Record<string, readonly [string, string]> = {
+ "Import playlist":["Importer spilleliste","Import playlist"],
+ "Library backup and import":["Sikkerhetskopi og import av bibliotek","Library backup and import"],
  "Loading quiz songs…":["Laster inn quizlåter…","Loading quiz songs…"],
  "Quiz songs ready":["Quizlåtene er klare","Quiz songs ready"],
  "Quiz songs are disabled on this Core.":["Quizlåter er slått av på denne Core-installasjonen.","Quiz songs are disabled on this Core."],

@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.14: A calmer, consistent interface across Afterparty
+
+2026-10-21
+
+- Music, rooms, player settings, games, administration and information pages share neutral dark surfaces, clearer typography, consistent spacing and visible keyboard focus. Red is reserved for primary actions and meaningful status instead of tinting everyday fields and secondary controls.
+- Search groups its input and playlist action, keeps all four suggested queries in compact rows and aligns history sorting with the result count. Suggestions retain their full accessible labels and exact queries. Track rows have readable metadata and neutral 44-pixel add controls; result pagination, AI exclusions and queue commands keep their existing behavior.
+- Queue and saved-library actions use consistent icons with their existing accessible names. Festival sets have a bounded list, local library backup tools open on request, and playlist imports remain directly accessible. Shared controls and dialogs retain usable touch targets on narrow screens.
+- Games, server administration, support, installation, patch notes and copyright forms use the same visual hierarchy. Server permissions, queue revisions, playback synchronization, source selection and audio behavior are unchanged. This is an alpha interface update; local visual and browser checks do not establish production deployment or live listening quality.
+
 ## v2.4.0-alpha.13: Alpha-ready quiz, playlist imports and 2026 festival concerts
 
 2026-10-21
