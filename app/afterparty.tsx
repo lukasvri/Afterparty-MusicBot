@@ -1360,7 +1360,7 @@ export default function Afterparty() {
     ) {
       p.playVideo();
     }
-    if (!target.playing && state === 1) {
+    if (!target.playing && [1, 3].includes(state)) {
       p.pauseVideo();
     }
   }
