@@ -4,10 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
-## v2.4.0-alpha.12: YouTube audio clips for multiplayer quizzes
+## v2.4.0-alpha.12: Themed radio, richer search and quiz audio
 
 2026-10-21
 
+- Radio uses named melodic NCS and Lost Sky station recordings to discover relevant songs across artists when upload genre labels are missing. The original manual song stays the station anchor; exact recording matches, style checks and history exclusions still apply. Known themed candidates outrank related recordings with unknown style.
+- Automatic radio rejects explicit AI music and cover declarations in titles, uploaders, descriptions, tags and provider synthetic-media flags. These are metadata filters, not a guarantee that an unlabelled upload is human-made. Manual requests retain their existing playback behavior.
+- Music search returns up to 30 results with ten-at-a-time display and contextual artist or song suggestions from existing listening history. More results and suggestions require no background provider searches. Editing a query cancels stale searches so old results cannot replace a newer choice.
+- Browser-room radio gets its own visitor allowance and a bounded 20-result music search instead of the eight-result user fallback. Empty searches retry after one minute; source caches refresh for the new metadata and isolate user/radio modes. Core rejects excess concurrent searches before contacting a provider.
 - An optional YouTube quiz source uses yt-dlp and FFmpeg to prepare up to eight privately curated audio-only clips, with selectable offsets and 15–30-second durations. Each participant receives canonical answer-safe WAV audio through the existing private game transport, without a YouTube iframe or changes to ordinary music queues.
 - GUESS_YOUTUBE_CLIPS=1 selects the source with an absolute private GUESS_YOUTUBE_INVENTORY_PATH. Quiz source modes are mutually exclusive. Video identity, audio format, CDN destination, bytes, time and process concurrency are bounded; the existing inventory permissions and five-minute lifetime remain in place. guess:check reports the new source's capacity without revealing answers or addresses.
 - The shared FFmpeg decoder supports bounded WebM and MP4 clips while retaining pipe-only input and metadata-free output. Sample-based timestamps preserve exact clip lengths on FFmpeg 5 and 7 without padding short recordings. A valid longer MP3 can now finish its 30-second preview when FFmpeg closes the unused input tail; other input/process failures still reject the preview.

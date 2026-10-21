@@ -32,6 +32,10 @@ The evening library is device-local, with validated JSON import/export. It is no
 
 Mobile controls keep player, search, queue and saved evenings reachable. Search moves focus into the visible input. Navigation uses browser history, and TV mode is a shareable URL state. TV mode keeps guest QR sharing visible while hiding editing panels. YouTube consent and autoplay restrictions still apply; the app does not bypass them.
 
+Music search requests up to 30 results in one bounded lookup. The panel reveals ten at a time locally and preserves keyboard focus when more appear. Up to four suggestions use the already loaded current artist and listening history; they start a search only when selected. Known AI declarations are excluded from automatic suggestions. Editing the input cancels and retires the previous request, so old results or errors cannot replace the new query.
+
+The website fallback separates radio music searches (20 candidates) from user searches (30), and radio does not spend the user's search allowance. Empty search results expire after one minute; global provider quota limits still apply.
+
 ## Validation
 
 Run `npm run check:all` with Node.js 24.17+, Python and FFmpeg. Tests include isolated SQLite room clocks, radio races, moderation, vote privacy, single-use and cross-room invitations, ownership transfer, revoked cohosts and blocked browser storage.
@@ -44,7 +48,9 @@ CHROMIUM_PATH=/path/to/chromium \
 node scripts/party.browser.ts
 ```
 
-It uses the locked Playwright dependency and exercises private setup, first-song search, focus and scrolling, adding tracks, moderation, saved evenings, favorites, QR generation, TV mode and browser back navigation. Welcome checks span 360, 390, 768, 1440 and 2560 pixel widths, including centring, performer visibility, overflow, motion preferences and dialog hit-testing above scenery. Automated audio and browser tests do not establish what people hear on a production Discord voice connection.
+Run `PREVIEW_URL=http://127.0.0.1:8787 CHROMIUM_PATH=/usr/bin/chromium npm run test:search` against a local preview for the focused search, keyboard, pagination, cancellation and mobile scenarios. It uses synthetic APIs without provider requests.
+
+The party workflow uses the locked Playwright dependency and exercises private setup, first-song search, focus and scrolling, adding tracks, moderation, saved evenings, favorites, QR generation, TV mode and browser back navigation. Welcome checks span 360, 390, 768, 1440 and 2560 pixel widths, including centring, performer visibility, overflow, motion preferences and dialog hit-testing above scenery. Automated audio and browser tests do not establish what people hear on a production Discord voice connection.
 
 ## Playback recovery and radio (2.0.1)
 

@@ -1,4 +1,4 @@
-# Radio 2.0: discovery, selection and the original song
+# Radio: themed discovery, selection and the original song
 
 [Documentation](README.md) · [Own rooms](OWN_ROOMS.md) · [Music sources](../services/core/docs/music-sources.md)
 
@@ -25,10 +25,54 @@ artists before retrying another song by an attempted artist. This prevents three
 unavailable recordings from one artist from hiding a later usable candidate.
 Final ranking first retains genre/relationship quality, then considers artist
 frequency in the last five tracks and a short preference against the immediately
-previous artists. A cooldown is a preference: the only eligible result can still
-play. Comparable candidates may prefer a stored favorite and an official upload,
-with stable provider order as the final tie-breaker. No new request budget,
-service, audio analysis or cross-server listening profile is introduced.
+previous artists. A known matching specific genre or named station recording ranks
+ahead of a catalog-related recording whose style is unknown. A cooldown is a
+preference: the only eligible result can still play. Comparable candidates may
+prefer a stored favorite and an official upload, with stable provider order as
+the final tie-breaker. No audio analysis or cross-server listening profile is
+introduced.
+
+### NCS stations without a provider key
+
+An untagged `Janji - Heroes Tonight` or Lost Sky recording previously fell back
+to an artist search. That could repeat one artist and admit unrelated uploads
+whose title looked like `Artist - Song`. The shared selector now recognizes two
+small, explicit recording groups in `services/core/src/radio-stations.ts`:
+melodic NCS EDM and melodic NCS trap. These are editorial relationships between
+named songs, rather than inferred genre labels or a whitelist of the NCS channel.
+
+The selector searches for unheard named recordings across artists, using the
+same diversity preference as catalog matching. Actual artist, title, version and
+feature credits must match. Conflicting explicit styles, AI declarations,
+non-music, live uploads, cover versions, excluded IDs and recent recordings still
+fail. An arbitrary upload from Janji, Lost Sky or NoCopyrightSounds does not gain
+station membership. The original manual song remains the anchor after advancing
+or restoring a room. The finite groups cannot guarantee unlimited discovery.
+
+At most three targeted station searches run, inspecting at most twelve results
+each. These share the existing four-attempt budget with catalog hydration;
+`curatedSearches` reports their count separately from the two generic discovery
+searches. They work in Core, browser rooms and the website fallback without
+Last.fm credentials. Generic artist searches are omitted for a recognized station
+when they cannot provide useful theme evidence.
+
+### Declared AI content
+
+Automatic radio rejects explicit AI-generation, AI-cover, synthetic-vocal and
+Suno/Udio declarations from titles, artist/uploader names, descriptions and tags.
+The YouTube synthetic-media flag also counts as negative evidence. The bounded
+classifier is shared with provider ingestion and local search suggestions.
+Negative evidence survives metadata caching, public recording copies and room
+persistence, so a clean title cannot erase a declaration in the description.
+Versioned caches require fresh metadata instead of reusing the older format.
+
+These are conservative metadata filters. A missing declaration is unknown, and
+neither a Topic/VEVO name nor an official-looking title establishes human
+authorship. The editorial lists are not provider provenance attestations. An
+unlabelled or misleading upload can evade metadata checks, so this is not a
+guarantee of zero AI audio. Explicit manual playback retains its existing behavior.
+
+### Stored favorites and optional discovery
 
 Core favorites use recognized recording identities from the private server's
 stored favorite queries: YouTube IDs or canonical SoundCloud track URLs. Custom
@@ -44,7 +88,7 @@ Last.fm's [track.getSimilar](https://www.last.fm/api/show/track.getSimilar) supp
 
 Successful nonempty recommendation results retain the 24-hour cache lifetime. Successful empty results expire after 60 seconds so later retries can recover. Errors are not recorded as successful empty results. Versioned cache keys prevent older data from bypassing the updated parser and policy.
 
-The fixed limits per selection are one metadata-refinement search inspecting at most 12 results, at most 15 descriptors per catalog source, four catalog hydration attempts in total with at most three spent on similar tracks, and two discovery searches inspecting at most 20 results each. At least one hydration slot remains available for original-artist recovery when needed; it can also use slots the similar-track stage did not spend. At most 60 playback candidates are admitted to inspection. These count adapter calls and candidates, not every lower-level HTTP or extractor operation inside an adapter. Search hydration stays sequential so different queries can reuse completed video metadata instead of racing duplicate requests.
+The fixed limits per selection are one metadata-refinement search inspecting at most 12 results, at most 15 descriptors per catalog source, four combined catalog/station attempts in total with at most three spent on similar tracks or station searches, and two generic discovery searches inspecting at most 20 results each. A recognized station can use the remaining budget for named themed recordings. Other seeds retain original-artist recovery. At most 60 playback candidates are admitted to inspection. These count adapter calls and candidates, not every lower-level HTTP or extractor operation inside an adapter. Named-recording hydration stays sequential. The two generic discovery pools run concurrently and share overlapping metadata lookups.
 
 ### Decision and trade-offs
 
