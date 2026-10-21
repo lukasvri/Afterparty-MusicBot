@@ -169,3 +169,19 @@ test('a valid long MP3 can finish its 30-second preview without consuming the un
   assert(bytes.byteLength < GUESS_MP3_MAX_BYTES);
   assert.equal(guessWaveSeconds(await decodeGuessMp3(bytes, signal())), 30);
 });
+
+
+test('zero-offset WebM measures the exact 15/30-second sample boundaries without padding a shorter source', async () => {
+  const bytes = container('webm');
+  // FFmpeg 5.1 previously counted Opus/container start timestamps against -t:
+  // this valid 15-second selection emitted 14.9925 seconds and failed the minimum.
+  for (const seconds of [15, 30]) {
+    const wav = await decodeGuessClip(bytes, clip('webm', 0, seconds), signal());
+    assert.equal(guessWaveSeconds(wav), seconds);
+    assert.equal(wav.byteLength, 44 + seconds * 16000 * 2);
+    assert(Math.abs(frequency(wav) - 440) < 2);
+  }
+  const tail = await decodeGuessClip(bytes, clip('webm', 20, 30), signal());
+  assert(guessWaveSeconds(tail) >= 15 && guessWaveSeconds(tail) < 17, 'a shorter valid tail must not be padded to the requested duration');
+  await assert.rejects(decodeGuessClip(bytes, clip('webm', 24, 15), signal()), unavailable);
+});

@@ -39,7 +39,10 @@ async function decode(input: Uint8Array, options: DecodeOptions, signal: AbortSi
         '-analyzeduration', '1000000', '-protocol_whitelist', 'pipe', '-format_whitelist', options.formats, '-f', options.demuxer, '-i', 'pipe:0',
         // Output-side seeking consumes a pipe sequentially instead of attempting input seeks.
         ...(options.startSeconds ? ['-ss', options.startSeconds.toFixed(6)] : []),
-        '-map', '0:a:0', '-vn', '-sn', '-dn', '-t', String(options.durationSeconds),
+        '-map', '0:a:0', '-vn', '-sn', '-dn',
+        // Opus pre-skip/container timestamps differ across FFmpeg versions. Time the
+        // output from decoded samples, without padding or changing the PCM length.
+        '-af', 'asetpts=N/SR/TB', '-t', String(options.durationSeconds),
         '-map_metadata', '-1', '-ac', '1', '-ar', String(GUESS_AUDIO_RATE),
         '-c:a', 'pcm_s16le', '-threads', '1', '-f', 's16le', 'pipe:1',
       ], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
