@@ -183,3 +183,33 @@ test('bundled preset remains default-off and rejects unknown IDs, paths and conf
     await assert.rejects(prepareConfiguredGuessSource(config, options), unavailable);
   assert.equal(called, 0);
 });
+
+test('switching to the YouTube preset ignores a configured private path for disabled Deezer previews', async t => {
+  let inactivePathReads = 0, extractions = 0, downloads = 0;
+  const configuration = {
+    GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: 'edm-festival-hits', GUESS_DEEZER_PREVIEWS: '0',
+    get GUESS_DEEZER_INVENTORY_PATH() {
+      inactivePathReads++;
+      return '/private/unused-deezer-inventory-does-not-exist.json';
+    },
+  };
+  const source = await prepareConfiguredGuessSource(configuration, {
+    signal: signal(),
+    fetcher: async () => { assert.fail('a disabled Deezer source must never fetch'); },
+    decode: async () => { assert.fail('a disabled Deezer source must never decode'); },
+    youtube: {
+      extract: async args => {
+        extractions++; const id = new URL(args.at(-1)!).searchParams.get('v');
+        return { id, is_live: false, duration: 180, ext: 'webm', vcodec: 'none', acodec: 'opus',
+          url: 'https://rr1---synthetic.googlevideo.com/videoplayback?mime=audio%2Fwebm' };
+      },
+      fetcher: async () => { downloads++; return new Response(new Uint8Array([1]), { headers: { 'content-type': 'audio/webm' } }); },
+      decode: async () => guessWave(new Uint8Array(GUESS_AUDIO_RATE * 2 * 30)),
+    },
+  });
+  assert(source); t.after(source.dispose);
+  assert.deepEqual([inactivePathReads, extractions, downloads], [0, 8, 8], 'the inactive path is never consulted or opened');
+  const song = source.catalog.select('edm-festival-hits', { exclude: [], durationSeconds: 30 });
+  assert.equal(source.catalog.categories().find(category => category.id === 'edm-festival-hits')?.count, 8);
+  assert.equal((await source.media.read(song.mediaKey, signal())).length, 44 + GUESS_AUDIO_RATE * 2 * 30);
+});
