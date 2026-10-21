@@ -34,9 +34,10 @@ test('Worker media proxy serves authorized synthetic WAV and rejects redirects w
   const before = music(), source = new SyntheticGuessSource();
   let server: Awaited<ReturnType<typeof createServers>> | undefined;
   let worker: Miniflare | undefined;
-  let redirect = 0, mediaRequests = 0;
+  let redirect = 0, mediaRequests = 0, preparations = 0;
   try {
-    server = await createServers(engine, commands, { key, origin: 'https://site.example', host: '127.0.0.1', publicPort: 0, guessCatalog: source, guessMedia: source });
+    server = await createServers(engine, commands, { key, origin: 'https://site.example', host: '127.0.0.1', publicPort: 0, guessCatalog: source, guessMedia: source,
+      prepareSource: async () => { preparations++; return true; }, sourceState: () => 'ready' });
     const core = `http://127.0.0.1:${(server.publicServer.address() as { port: number }).port}`;
     const bundle = await build({
       stdin: { contents: `import { POST as game } from './app/api/guess/route.ts';
@@ -54,6 +55,9 @@ test('Worker media proxy serves authorized synthetic WAV and rejects redirects w
           assert.equal(request.method, 'POST');
           assert.equal(request.headers.get('authorization'), 'Bearer ' + key);
           const input = await request.json() as Record<string, unknown>;
+          if (input.action === 'prepare') {
+            for (const field of ['providerUrl', 'inventoryPath', 'pack', 'sourceState', 'canPrepare']) assert.equal(field in input, false, field);
+          }
           if (input.action === 'media') {
             mediaRequests++;
             assert.equal(input.host, false, 'guest media authority comes from D1, not supplied host:true');
@@ -87,6 +91,16 @@ test('Worker media proxy serves authorized synthetic WAV and rejects redirects w
       const guest = await action({ action: 'join', eventId: randomUUID() });
       const hostToken = host.token, guestToken = guest.token;
       host = await action({ action: 'read', token: hostToken }, owner);
+      const prepare = { action: 'prepare', token: hostToken, eventId: randomUUID(), sessionId: host.game.sessionId,
+        roundId: null, revision: host.game.revision, providerUrl: 'https://untrusted.example/source',
+        inventoryPath: '/private/source.json', pack: 'forged', sourceState: 'ready', canPrepare: true, host: true };
+      const previousPreparations = preparations;
+      assert.equal((await call('/api/guess', { ...prepare, token: guestToken })).status, 403);
+      assert.equal(preparations, previousPreparations, 'forged guest authority cannot prepare audio');
+      host = await action(prepare, owner);
+      assert.equal(preparations, previousPreparations + 1, 'the real Worker route reaches the fixed source callback');
+      assert.equal((await call('/api/guess', prepare, owner)).status, 409, 'replayed preparation cannot reach the callback again');
+      assert.equal(preparations, previousPreparations + 1);
       host = await action({ action: 'start', token: hostToken, eventId: randomUUID(), sessionId: host.game.sessionId, roundId: null, revision: host.game.revision }, owner);
       assert.equal(host.game.phase, 'round');
       await delay(Math.max(0, host.game.round!.startsAt - Date.now()));
