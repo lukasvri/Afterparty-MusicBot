@@ -118,12 +118,12 @@ test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions an
   const p=new Providers(t.store,{LASTFM_API_KEY:'test'}),seed=track();
   p.search=async()=>[];p.recommendations.topTracks=async()=>[];
   p.recommendations.similar=async()=>[{title:'Other',artist:'Artist',duration:200},{title:'Favorite',artist:'Artist',duration:200}];
-  p.matchSong=async song=>track('Artist - '+song.title,song.title);
-  t.store.favorite('listener','Artist - Favorite','https://youtube.com/watch?v=Favorite');
-  assert.equal((await p.radio(seed,[]))?.id,'Favorite');
-  t.store.set('radio-skips',{Favorite:Date.now()});assert.equal((await p.radio(seed,[]))?.id,'Other');
-  p.recommendations.similar=async()=>{throw Error('Last.fm unavailable')};p.search=async()=>[track('Artist - Fallback','fallback')];
-  assert.equal((await p.radio(seed,[]))?.id,'fallback');
+  p.matchSong=async song=>track('Artist - '+song.title,song.title==='Favorite'?'favorite001':'other000001');
+  t.store.favorite('listener','Artist - Favorite','https://youtube.com/watch?v=favorite001');
+  assert.equal((await p.radio(seed,[]))?.id,'favorite001');
+  t.store.set('radio-skips',{favorite001:Date.now()});assert.equal((await p.radio(seed,[]))?.id,'other000001');
+  p.recommendations.similar=async()=>{throw Error('Last.fm unavailable')};p.search=async()=>[track('Artist - Fallback','fallback001')];
+  assert.equal((await p.radio(seed,[]))?.id,'fallback001');
  }finally{t.close();}
 });
 
