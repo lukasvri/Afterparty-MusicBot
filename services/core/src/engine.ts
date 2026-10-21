@@ -681,6 +681,8 @@ export class Engine extends EventEmitter {
   remove(index: number, count = 1) {
     if (!Number.isInteger(index) || index < 0 || index >= this.queue.length)
       throw new UserError("The queue has changed. Refresh and try again.");
+    if (!Number.isInteger(count) || count < 1 || count > this.queue.length - index)
+      throw new UserError("Invalid number of songs.");
     this.rejectRadio(this.queue.splice(index, count));
     this.mixer?.invalidateNext();
     this.persist();

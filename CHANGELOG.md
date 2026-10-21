@@ -4,6 +4,17 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.4: More reliable playback, queue controls and radio suggestions
+
+2026-10-21
+
+- Established Discord voice reconnections now share a 20-second deadline to reach Ready, including reconnects that skip the Disconnected state. Successful recovery preserves pause and playback; a failed recovery disconnects cleanly with an actionable error instead of remaining in buffering indefinitely. Old connections cannot tear down replacements or another server.
+- Browser clock calibration restarts immediately when Core changes epoch, cancels the old sample and prevents late old replies from releasing or replacing a newer clock sample. Existing playback leases, stale-state protection and buffering guards remain in place.
+- Queue and transport actions carrying a stale queue revision now reject consistently, including clear, shuffle, replay, relative seek and saved-queue restore. Invalid removal ranges are rejected before changing the queue. Legacy commands without a revision remain compatible.
+- Concert queues cancel old requests when switching servers and reject delayed reads or errors after newer mutations. Fresh polling clears polling errors while preserving action failures. Hosts can move songs in either direction, with named moderation controls and 44-pixel touch targets; initial queue loading is distinct from an empty queue.
+- Music discovery reports result counts and queue updates, explains unavailable additions, exposes the selected history sort to assistive technology, and provides larger add controls on touch screens.
+- Radio now spreads its existing metadata-matching budget across artists, reduces immediate artist repetition and uses stored recording identities for comparable favorites. Genre and recording quality, exclusions and recent-history gates remain authoritative. Discovery metadata is bounded and copied; no new music service or cross-server listening profile is added.
+
 ## v2.4.0-alpha.3: More quiz modes, source matching and copyright requests
 
 2026-10-21

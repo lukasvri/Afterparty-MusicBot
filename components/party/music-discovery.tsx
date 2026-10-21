@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { useId } from "react";
 import { LoaderCircle, Plus, Search, X } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import { time, type Video, type HistoryVideo } from "@/lib/types";
@@ -37,12 +38,14 @@ export function MusicDiscovery({
   onAdd,
 }: Props) {
   const { t } = useLanguage();
+  const descriptionId = useId();
   return (
     <section
       id="music-content"
       role="tabpanel"
       aria-labelledby="music-tab"
       className="discovery"
+      aria-busy={searching || adding}
     >
       <form
         className="search-form"
@@ -77,12 +80,14 @@ export function MusicDiscovery({
           <>
             <button
               className={historySort === "recent" ? "selected" : ""}
+              aria-pressed={historySort === "recent"}
               onClick={() => onSort("recent")}
             >
               {t("Nyleg spelt")}
             </button>
             <button
               className={historySort === "popular" ? "selected" : ""}
+              aria-pressed={historySort === "popular"}
               onClick={() => onSort("popular")}
             >
               {t("Mest spelt")}
@@ -94,13 +99,21 @@ export function MusicDiscovery({
           </button>
         )}
       </div>
+      <p className="discovery-summary" role="status" aria-live="polite" aria-atomic="true">
+        {adding ? t("Updating queue…") : !searching && shown.length > 0
+          ? t(shown.length === 1 ? "1 track" : "{count} tracks", { count: shown.length }) : ""}
+      </p>
       {searching ? (
         <div className="search-status" role="status">
           <LoaderCircle className="spin" size={22} /> {t("Søker …")}
         </div>
       ) : shown.length ? (
         <div className="music-list">
-          {shown.map((v) => (
+          {shown.map((v, index) => {
+            const unavailable = discordMode && !discordConnected
+              ? t("Connect the bot to a Discord voice channel before adding music.")
+              : !discordMode && !v.embeddable ? t("This video cannot be played in a browser room.") : "";
+            return (
             <article className="music-row" key={v.id}>
               <div className="music-art">
                 <Image unoptimized width={320} height={180} src={v.image} alt="" loading="lazy" />
@@ -114,6 +127,7 @@ export function MusicDiscovery({
                     {Number(v.plays)} {t("avspillinger")}
                   </small>
                 )}
+                {unavailable && <small id={`${descriptionId}-${index}`} className="music-unavailable">{unavailable}</small>}
               </div>
               <button
                 className="icon-button add-track"
@@ -127,6 +141,7 @@ export function MusicDiscovery({
                     ? t("addDiscord", { title: v.title })
                     : t("addRoom", { title: v.title })
                 }
+                aria-describedby={unavailable ? `${descriptionId}-${index}` : undefined}
                 title={
                   discordMode ? t("Legg i Discord-kø") : t("Legg i rommet")
                 }
@@ -135,7 +150,7 @@ export function MusicDiscovery({
                 <Plus size={19} />
               </button>
             </article>
-          ))}
+          ); })}
         </div>
       ) : (
         <div className="search-status">
