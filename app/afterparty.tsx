@@ -191,6 +191,7 @@ export default function Afterparty() {
     busy = useRef(false),
     pollGeneration = useRef(0),
     searchGeneration = useRef(0),
+    searchFocusRequested = useRef(false),
     searchRequest = useRef<AbortController | null>(null),
     lastEnded = useRef(""),
     actionRef = useRef<
@@ -396,6 +397,7 @@ export default function Afterparty() {
             ),
       );
       setSharing(false);
+      searchFocusRequested.current = true;
       setPanel("music");
       if (firstQuery.trim()) void find(firstQuery);
       if (queuedVideo.current) {
@@ -720,11 +722,13 @@ export default function Afterparty() {
     };
   }, [join, accept]);
   useEffect(() => {
+    const focusRequested = searchFocusRequested.current;
+    searchFocusRequested.current = false;
     if (panel === "music" && !directoryOpen && !tv) {
       requestAnimationFrame(() => {
         const input =
           document.querySelector<HTMLInputElement>(".search-form input");
-        input?.focus({ preventScroll: true });
+        if (focusRequested) input?.focus({ preventScroll: true });
         input?.scrollIntoView({
           block: "center",
           behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -733,7 +737,7 @@ export default function Afterparty() {
         });
       });
     }
-  }, [panel, directoryOpen, tv]);
+  }, [panel, directoryOpen, tv, room?.code]);
   const toggleTV = () => {
     const next = !tv;
     setTV(next);

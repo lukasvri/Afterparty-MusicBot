@@ -1,9 +1,10 @@
 @font-face{font-family:Afterparty;src:url('/fonts/inter-latin-wght-normal.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap}
 :root {
-  --bg:#09090c; --panel:#121214; --panel2:#1a1a1e; --line:#343438;
-  --text:#f4f4f5; --muted:#b6b6bd; --accent:#ff263e; --red-button:#d71931;
+  --bg:#0a0a0d; --panel:#111114; --panel2:#19191d; --line:#2d2d34;
+  --text:#f4f4f5; --muted:#a8a8b2; --accent:#ff263e; --red-button:#d71931;
+  --line-strong:#484851; --surface-hover:#232329;
   --font-body:Afterparty,Arial,Helvetica,sans-serif; --font-display:Afterparty,'Arial Black',Arial,sans-serif;
-  --radius-control:8px; --radius-panel:12px; --focus-ring:#f4f4f5;
+  --radius-control:10px; --radius-panel:16px; --focus-ring:#f4f4f5;
   --ease-out:cubic-bezier(.22,.68,.22,1);
   color-scheme:dark;
 }

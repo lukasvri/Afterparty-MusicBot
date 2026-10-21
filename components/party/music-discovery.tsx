@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useId, useState } from "react";
-import { LoaderCircle, Plus, Search, X } from "lucide-react";
+import { ListMusic, LoaderCircle, Plus, Search, X } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import { time, type Video, type HistoryVideo } from "@/lib/types";
 import { radioArtist } from "@/services/core/src/radio";
@@ -52,6 +52,7 @@ export function MusicDiscovery({
   const { t } = useLanguage();
   const descriptionId = useId();
   const [expanded, setExpanded] = useState({ key: "", count: 10 });
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const resultKey = resultQuery + ":" + shown.map(video => video.id).join(",");
   const visibleCount = searched && expanded.key === resultKey ? expanded.count : 10;
   const visible = searched ? shown.slice(0, visibleCount) : shown;
@@ -75,78 +76,98 @@ export function MusicDiscovery({
       className="discovery"
       aria-busy={searching || adding}
     >
-      <form
-        className="search-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setExpanded({ key: "", count: 10 });
-          onSearch();
-        }}
-      >
-        <input
-          aria-label={t("Søk etter låt, artist eller YouTube-lenkje")}
-          placeholder={t("Låt, artist eller YouTube-lenkje")}
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          maxLength={2000}
-          minLength={2}
-          required
-        />
-        <button
-          className="button primary"
-          aria-label={t("Søk etter musikk")}
-          disabled={searching}
+      <div className="discovery-search-area"
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setSuggestionsOpen(false); }}
+        onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.querySelector<HTMLInputElement>("input")?.focus(); setSuggestionsOpen(false); } }}>
+      <div className="discovery-search-tools">
+        <form
+          className="search-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setExpanded({ key: "", count: 10 });
+            setSuggestionsOpen(false);
+            onSearch();
+          }}
         >
-          {searching ? (
-            <LoaderCircle className="spin" size={17} />
-          ) : (
-            <Search size={17} />
-          )}
-        </button>
-      </form>
-      {onPlaylist && <button className="button subtle" type="button" onClick={onPlaylist}>YouTube / Spotify {t("Playlist")}</button>}
-      {suggestions.length > 0 && (
+          <input
+            aria-label={t("Søk etter låt, artist eller YouTube-lenkje")}
+            placeholder={t("Låt, artist eller YouTube-lenkje")}
+            value={query}
+            onFocus={() => setSuggestionsOpen(true)}
+            onClick={() => setSuggestionsOpen(true)}
+            onChange={(e) => { setSuggestionsOpen(true); onQuery(e.target.value); }}
+            maxLength={2000}
+            minLength={2}
+            required
+          />
+          <button
+            className="button primary"
+            aria-label={t("Søk etter musikk")}
+            disabled={searching}
+          >
+            {searching ? (
+              <LoaderCircle className="spin" size={17} />
+            ) : (
+              <Search size={17} />
+            )}
+          </button>
+        </form>
+        {onPlaylist && (
+          <button className="button subtle discovery-playlist" type="button" onClick={onPlaylist}
+            aria-label={t("Import playlist")} title={`YouTube / Spotify ${t("Playlist")}`}>
+            <ListMusic size={18} aria-hidden="true" />
+            <span>{t("Playlist")}</span>
+          </button>
+        )}
+      </div>
+      {suggestionsOpen && !searching && suggestions.length > 0 && (
         <div className="search-suggestions" role="group" aria-label={t("Suggested searches")}>
           <span>{t("Suggested searches")}</span>
           <div>
             {suggestions.map(suggestion => (
-              <button type="button" key={suggestion} onClick={() => { setExpanded({ key: "", count: 10 }); onSuggestion(suggestion); }}
-                aria-label={t("Search for {query}", { query: suggestion })}>
-                {suggestion}
+              <button type="button" key={suggestion} onClick={() => { setSuggestionsOpen(false); setExpanded({ key: "", count: 10 }); onSuggestion(suggestion); }}
+                aria-label={t("Search for {query}", { query: suggestion })} title={suggestion}>
+                <Search size={12} aria-hidden="true" />
+                <span>{suggestion}</span>
               </button>
             ))}
           </div>
         </div>
       )}
-      <div className="search-chips">
-        {!searched ? (
-          <>
-            <button
-              className={historySort === "recent" ? "selected" : ""}
-              aria-pressed={historySort === "recent"}
-              onClick={() => onSort("recent")}
-            >
-              {t("Nyleg spelt")}
-            </button>
-            <button
-              className={historySort === "popular" ? "selected" : ""}
-              aria-pressed={historySort === "popular"}
-              onClick={() => onSort("popular")}
-            >
-              {t("Mest spelt")}
-            </button>
-          </>
-        ) : (
-          <button onClick={onHistory}>
-            {t("Historikk")} <X size={12} />
-          </button>
-        )}
       </div>
-      {searched && <p className="search-result-query">{t("Results for {query}", { query: resultQuery })}</p>}
-      <p className="discovery-summary" role="status" aria-live="polite" aria-atomic="true">
-        {adding ? t("Updating queue…") : !searching && shown.length > 0
-          ? t(shown.length === 1 ? "1 track" : "{count} tracks", { count: shown.length }) : ""}
-      </p>
+      <div className="discovery-results-header">
+        {searched && <p className="search-result-query" title={resultQuery}>{t("Results for {query}", { query: resultQuery })}</p>}
+        <div className="discovery-results-controls">
+          <div className="search-chips" role={!searched ? "group" : undefined} aria-label={!searched ? t("Historikk") : undefined}>
+            {!searched ? (
+              <>
+                <button
+                  className={historySort === "recent" ? "selected" : ""}
+                  aria-pressed={historySort === "recent"}
+                  onClick={() => onSort("recent")}
+                >
+                  {t("Nyleg spelt")}
+                </button>
+                <button
+                  className={historySort === "popular" ? "selected" : ""}
+                  aria-pressed={historySort === "popular"}
+                  onClick={() => onSort("popular")}
+                >
+                  {t("Mest spelt")}
+                </button>
+              </>
+            ) : (
+              <button onClick={onHistory}>
+                {t("Historikk")} <X size={12} />
+              </button>
+            )}
+          </div>
+          <p className="discovery-summary" role="status" aria-live="polite" aria-atomic="true">
+            {adding ? t("Updating queue…") : !searching && shown.length > 0
+              ? t(shown.length === 1 ? "1 track" : "{count} tracks", { count: shown.length }) : ""}
+          </p>
+        </div>
+      </div>
       {searching ? (
         <div className="search-status" role="status">
           <LoaderCircle className="spin" size={22} /> {t("Søker …")}
@@ -164,8 +185,8 @@ export function MusicDiscovery({
                 <span>{v.live ? "LIVE" : time(v.duration)}</span>
               </div>
               <div className="music-copy">
-                <h3>{v.title}</h3>
-                <p>{v.artist}</p>
+                <h3 title={v.title}>{v.title}</h3>
+                <p title={v.artist}>{v.artist}</p>
                 {!searched && "plays" in v && (
                   <small>
                     {Number(v.plays)} {t("avspillinger")}

@@ -1,0 +1,230 @@
+/* Saved music and queue controls share the same quiet, compact visual rhythm. */
+.evening-library {
+  min-width:0;
+  padding:20px;
+}
+.evening-library > .playlist-import,
+.evening-library > .concert-catalog {
+  margin:0 0 28px;
+  padding:0 0 28px;
+  border-bottom:1px solid var(--line);
+}
+.evening-library h2 {
+  margin:0;
+  font-size:19px;
+  line-height:1.3;
+  letter-spacing:-.025em;
+  font-weight:650;
+}
+.evening-library h3 {
+  margin:0;
+  font-size:14px;
+  line-height:1.4;
+  font-weight:600;
+}
+.evening-library p {
+  margin:10px 0;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.65;
+}
+.library-section-heading {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+.library-section-heading > svg { flex-shrink:0; color:var(--muted); }
+.evening-library .button { margin:0; min-height:44px; }
+.evening-library :is(button, summary, label.button) { touch-action:manipulation; }
+.evening-library :is(button, a, select, summary, input):focus-visible {
+  outline:2px solid var(--focus-ring);
+  outline-offset:3px;
+}
+.evening-library .button.subtle {
+  border-color:var(--line);
+  background:var(--panel2);
+}
+.evening-library .button.subtle:hover:not(:disabled) {
+  border-color:var(--muted);
+  background:color-mix(in srgb, var(--panel2) 90%, var(--text));
+}
+.evening-library svg,
+.social-queue button svg,
+.queue-options button svg { flex-shrink:0; }
+.evening-library .playlist-import form { margin-top:18px; gap:8px; }
+.evening-library .playlist-import-input { gap:8px; }
+.evening-library .playlist-import-note,
+.evening-library .concert-catalog-note { font-size:11px; line-height:1.6; }
+.evening-library .concert-catalog-filters { gap:10px; margin:18px 0 14px; }
+.evening-library .concert-catalog-filters label { color:var(--muted); font-size:11px; font-weight:600; }
+.evening-library .concert-catalog-filters select { padding:10px 12px; border-radius:var(--radius-control); }
+.evening-library .concert-catalog-year { gap:10px; margin:14px 0; }
+.evening-library .concert-catalog-year > p { font-size:11px; }
+.evening-library .concert-catalog-year .button { justify-content:flex-start; }
+.evening-library .concert-catalog-list {
+  display:grid;
+  gap:0;
+  max-height:480px;
+  max-height:min(56svh, 480px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+  margin:14px 0;
+  padding:0 12px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-panel);
+  background:var(--panel);
+}
+.evening-library .concert-catalog-list > li {
+  margin:0;
+  padding:16px 0;
+  border:0;
+  border-bottom:1px solid var(--line);
+  border-radius:0;
+  background:none;
+}
+.evening-library .concert-catalog-list > li:last-child { border-bottom:0; }
+.evening-library .concert-catalog-list h3 { margin:0; font-size:13px; }
+.evening-library .concert-set-title { margin:6px 0; font-size:12px; line-height:1.5; }
+.evening-library .concert-set-source { margin:6px 0 10px; color:var(--muted); font-size:11px; }
+.evening-library .concert-set-actions { gap:6px 12px; }
+.evening-library .concert-set-actions .button { justify-content:flex-start; font-size:11px; padding:9px 11px; }
+.evening-library .concert-set-actions a { font-size:11px; color:var(--muted); }
+.evening-library .concert-set-actions a:hover { color:var(--text); }
+.local-library { min-width:0; }
+.evening-library .library-save-form {
+  display:grid;
+  gap:10px;
+  margin-top:18px;
+}
+.library-save-form > label { color:var(--muted); font-size:11px; font-weight:600; }
+.library-save-form > label input { margin:0; color:var(--text); font-size:13px; font-weight:400; }
+.library-save-form > .button { justify-content:flex-start; white-space:normal; text-align:left; }
+.evening-library .library-transfer-tools,
+.evening-library .library-evening {
+  padding:0;
+  margin:16px 0 0;
+  border:1px solid var(--line);
+  border-radius:var(--radius-control);
+  background:var(--panel);
+}
+.evening-library :is(.library-transfer-tools, .library-evening) > summary {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-height:48px;
+  padding:12px;
+  list-style:none;
+  color:var(--text);
+  font-size:12px;
+  font-weight:500;
+}
+.evening-library :is(.library-transfer-tools, .library-evening) > summary::-webkit-details-marker { display:none; }
+.evening-library :is(.library-transfer-tools, .library-evening) > summary > svg { flex-shrink:0; color:var(--muted); }
+.evening-library :is(.library-transfer-tools, .library-evening)[open] > summary > svg { transform:rotate(180deg); }
+.evening-library .library-transfer-tools > summary { color:var(--muted); font-size:11px; }
+.evening-library .library-transfer {
+  display:grid;
+  gap:10px;
+  margin:0;
+  padding:0 12px 12px;
+}
+.evening-library .library-transfer .button { justify-content:flex-start; font-size:11px; }
+.evening-library .library-transfer label.button { display:grid; gap:10px; min-width:0; width:100%; }
+.library-transfer label > span { display:flex; align-items:center; gap:8px; }
+.evening-library .library-transfer input { max-width:100%; min-width:0; margin:0; border:0; padding:0; background:none; font-size:11px; }
+.evening-library .library-transfer input::file-selector-button {
+  min-height:44px;
+  margin-right:8px;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-control);
+  background:var(--panel);
+  color:var(--text);
+  font:inherit;
+  cursor:pointer;
+}
+.library-evenings { display:grid; gap:8px; margin-top:16px; }
+.evening-library .library-evening { margin:0; }
+.library-evening-content { display:grid; gap:10px; padding:0 12px 12px; }
+.library-evening-content > label { color:var(--muted); font-size:11px; }
+.library-evening-content > .button { justify-content:flex-start; white-space:normal; font-size:11px; }
+.library-shelf { margin-top:24px; padding-top:20px; border-top:1px solid var(--line); }
+.library-shelf > h3 { margin:0 0 12px; }
+.evening-library .library-track-list { margin:0; padding:0; }
+.library-evening-content > .library-track-list { max-height:320px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.evening-library .library-track-list > :is(li, .saved-track) {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  min-width:0;
+  margin:0;
+  padding:6px 0;
+  border-bottom:1px solid var(--line);
+}
+.evening-library .library-track-list > :last-child { border-bottom:0; }
+.evening-library .library-track-list > :is(li, .saved-track) > span { min-width:0; padding-right:8px; font-size:12px; line-height:1.5; }
+.evening-library button.library-track-control {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 44px;
+  min-width:44px;
+  min-height:44px;
+  border-color:transparent;
+  background:transparent;
+  color:var(--muted);
+}
+.evening-library button.library-track-control:hover:not(:disabled) { border-color:var(--line); background:var(--panel2); color:var(--text); }
+.evening-library .library-favorite[aria-pressed=true],
+.evening-library .library-favorite:not([aria-pressed]) { color:var(--text); }
+.social-queue { padding:0; }
+.social-queue .afterparty-queue-track {
+  grid-template-columns:18px 44px minmax(44px, 1fr) 44px 44px;
+  gap:6px;
+  padding:16px 0 12px;
+  border-bottom:1px solid var(--line);
+}
+.social-queue .queue-number { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; text-align:center; }
+.social-queue .afterparty-queue-track .queue-art { width:44px; height:44px; border-radius:6px; }
+.social-queue .afterparty-queue-track > .queue-track-copy { min-width:0; grid-column:3/-1; }
+.social-queue .afterparty-queue-track strong { font-size:13px; font-weight:600; line-height:1.5; }
+.social-queue .afterparty-queue-track small { margin-top:3px; font-size:11px; line-height:1.5; color:var(--muted); }
+.social-queue .afterparty-queue-track > button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:44px;
+  min-width:44px;
+  min-height:44px;
+  padding:8px;
+  border-color:transparent;
+  background:transparent;
+  color:var(--muted);
+}
+.social-queue .afterparty-queue-track > button:hover:not(:disabled) { border-color:var(--line); background:var(--panel2); color:var(--text); }
+.social-queue .afterparty-queue-track > .queue-vote { grid-column:2; width:auto; justify-self:start; padding-inline:9px; border-color:var(--line); background:var(--panel); color:var(--text); font-size:11px; font-variant-numeric:tabular-nums; }
+.social-queue .afterparty-queue-track > .queue-move-up { grid-column:3; justify-self:end; }
+.social-queue .afterparty-queue-track > .queue-move-down { grid-column:4; }
+.social-queue .afterparty-queue-track > .queue-remove { grid-column:5; }
+.social-queue .queue-help { margin:14px 0; color:var(--muted); font-size:11px; }
+.queue-requests { margin-top:24px; }
+.queue-requests > h3 { margin:0; color:var(--text); font-size:13px; font-weight:600; }
+.social-queue .queue-request > .queue-track-copy { grid-column:1/-1; }
+.social-queue .queue-request > button.queue-approve,
+.social-queue .queue-request > button.queue-reject { width:auto; padding:8px 12px; font-size:11px; border-color:var(--line); background:var(--panel); }
+.social-queue .queue-request > button.queue-approve { grid-column:1/4; justify-self:start; }
+.social-queue .queue-request > button.queue-reject { grid-column:4/6; justify-self:end; }
+.social-queue .queue-request > span { grid-column:1/-1; color:var(--muted); font-size:11px; }
+.queue-options .queue-summary { gap:8px; margin:0; }
+.queue-options .queue-summary .button { min-height:44px; padding:9px 12px; font-size:11px; }
+.queue-options .approval-choice { line-height:1.6; }
+@media(max-width:450px) {
+  .evening-library { padding:18px 14px; }
+  .evening-library .concert-catalog-filters { grid-template-columns:minmax(0, 1.5fr) minmax(78px, 1fr); gap:8px; }
+  .evening-library .concert-catalog-list { padding-inline:10px; }
+}

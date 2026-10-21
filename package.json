@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "2.4.0-alpha.13",
+  "version": "2.4.0-alpha.14",
   "private": true,
   "engines": {
     "node": ">=24.17.0"
@@ -29,7 +29,8 @@
     "test:copyright": "node scripts/copyright.browser.ts",
     "test:social": "node scripts/social.browser.ts",
     "test:guess-pack": "node --test --test-concurrency=1 --test-timeout=120000 scripts/guess-pack.browser.ts",
-    "test:playlist-import": "node --test --test-concurrency=1 --test-timeout=60000 scripts/playlist-import.browser.ts"
+    "test:playlist-import": "node --test --test-concurrency=1 --test-timeout=60000 scripts/playlist-import.browser.ts",
+    "test:ui-review": "node scripts/ui-review.browser.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

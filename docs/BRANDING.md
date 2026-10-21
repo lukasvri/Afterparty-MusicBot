@@ -30,6 +30,16 @@ pages and administration use the same navigation proportions and action
 hierarchy as music and rooms; keep mobile links and primary actions usable
 without wrapping the navigation or shrinking touch targets.
 
+Shared application chrome lives in `app/interface.css`, loaded after the feature
+styles. Discovery and library styles stay scoped to their own surfaces. Use the
+shared neutral surface, border and muted-text tokens for everyday fields,
+secondary buttons and selected tabs. Selected controls keep a restrained red
+indicator. Reserve the red accent for active controls, primary actions,
+meaningful playback/status indicators and destructive intent. Keep short labels
+readable, preserve full accessible names when display text is truncated, and use
+at least 44-pixel targets for the main touch controls. See the
+[alpha.14 interface review](UI_REVIEW.md) for the reviewed surfaces and evidence.
+
 The decorative stage remains code-native SVG, separate from the logo. Its two
 decks share one component and projected control plane around a centered
 four-channel mixer. Preserve that geometry, align the hands with the controls,

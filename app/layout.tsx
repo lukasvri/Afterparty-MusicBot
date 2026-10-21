@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { LanguageProvider } from "@/components/language";
 import "./globals.css";
 import "./concert.css";
-import "./interface.css";
 import "./party.css";
 import "./guess.css";
 import "./social.css";
+import "./interface.css";
+import "./discovery.css";
+import "./library.css";
 export const metadata: Metadata = {
   title: "Afterparty",
   description: "Find music, share video rooms and follow the music from Discord.",

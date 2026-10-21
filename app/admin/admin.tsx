@@ -570,7 +570,7 @@ export default function Admin() {
                           {current ? (
                             <Image unoptimized width={320} height={320} src={current.image} alt="" />
                           ) : (
-                            <div className="bot-empty-art">GK</div>
+                            <div className="bot-empty-art"><Image unoptimized src="/afterparty-mark.svg" alt="" width={64} height={64} /></div>
                           )}
                           <div>
                             <span className="party-kicker">
