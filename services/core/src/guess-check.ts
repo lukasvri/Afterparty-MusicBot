@@ -3,8 +3,9 @@ import { fileURLToPath } from 'node:url';
 import { guessAbort } from './guess-audio-format.ts';
 import { UnavailableGuessCatalog } from './guess-catalog.ts';
 import { prepareConfiguredGuessSource, type GuessSourceOptions } from './guess-source.ts';
+import { selectGuessSource, type GuessSourceProvider } from './guess-source-config.ts';
 
-type Provider = 'disabled' | 'synthetic' | 'deezer' | 'youtube';
+type Provider = GuessSourceProvider;
 type Source = Exclude<Awaited<ReturnType<typeof prepareConfiguredGuessSource>>, undefined>;
 export type GuessCheckFactory = (env: NodeJS.ProcessEnv, options: GuessSourceOptions) => Source | undefined | Promise<Source | undefined>;
 export type GuessCheckCategory = { id: string; count: number; durations: { seconds: number; count: number }[] };
@@ -49,13 +50,14 @@ function categories(value: unknown, provider: Provider): GuessCheckCategory[] {
 /** Private preflight only. Never starts Core, logs source details, retains audio or refreshes the inventory. */
 export async function checkConfiguredGuessSource(env: NodeJS.ProcessEnv, options: GuessSourceOptions,
   prepare: GuessCheckFactory = prepareConfiguredGuessSource): Promise<GuessCheckResult> {
-  const config = { GUESS_DEEZER_PREVIEWS: env.GUESS_DEEZER_PREVIEWS, GUESS_SYNTHETIC_TEST: env.GUESS_SYNTHETIC_TEST,
-    GUESS_DEEZER_INVENTORY_PATH: env.GUESS_DEEZER_INVENTORY_PATH, GUESS_YOUTUBE_CLIPS: env.GUESS_YOUTUBE_CLIPS,
-    GUESS_YOUTUBE_PACK: env.GUESS_YOUTUBE_PACK,
-    GUESS_YOUTUBE_INVENTORY_PATH: env.GUESS_YOUTUBE_INVENTORY_PATH };
-  const provider: Provider = config.GUESS_DEEZER_PREVIEWS === '1' ? 'deezer' : config.GUESS_YOUTUBE_CLIPS === '1' ? 'youtube'
-    : config.GUESS_SYNTHETIC_TEST === '1' ? 'synthetic' : 'disabled';
+  let provider: Provider;
+  try { provider = selectGuessSource(env).provider; } catch { return unavailable('disabled'); }
   if (provider === 'disabled') return { provider, status: 'disabled', categories: [] };
+  const config = { GUESS_DEEZER_PREVIEWS: env.GUESS_DEEZER_PREVIEWS, GUESS_SYNTHETIC_TEST: env.GUESS_SYNTHETIC_TEST,
+    GUESS_YOUTUBE_CLIPS: env.GUESS_YOUTUBE_CLIPS,
+    GUESS_YOUTUBE_PACK: env.GUESS_YOUTUBE_PACK,
+    ...(provider === 'deezer' ? { GUESS_DEEZER_INVENTORY_PATH: env.GUESS_DEEZER_INVENTORY_PATH } : {}),
+    ...(provider === 'youtube' ? { GUESS_YOUTUBE_INVENTORY_PATH: env.GUESS_YOUTUBE_INVENTORY_PATH } : {}) };
   const lifetime = new AbortController();
   let source: Source | undefined, result = unavailable(provider);
   const released = new WeakSet<object>();
