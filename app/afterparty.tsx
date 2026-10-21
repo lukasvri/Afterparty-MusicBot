@@ -66,6 +66,7 @@ import { OpenRooms } from "@/components/open-rooms";
 import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
 import releases from "@/lib/releases.json";
+import { normalizePlaylistUrl } from "@/services/core/src/playlist-url";
 
 export default function Afterparty() {
   const { t, language } = useLanguage();
@@ -119,6 +120,7 @@ export default function Afterparty() {
     }
   };
   const [room, setRoom] = useState<Room | null>(null),
+    [playlistUrl, setPlaylistUrl] = useState(""),
     [query, setQuery] = useState(""),
     [resultQuery, setResultQuery] = useState(""),
     [results, setResults] = useState<Video[]>([]),
@@ -517,7 +519,19 @@ export default function Afterparty() {
   };
   const find = async (q = query) => {
     q = q.trim();
-    if (q.length < 2 || q.length > 120) return;
+    let playlist;
+    try { playlist = normalizePlaylistUrl(q); } catch { /* Continue ordinary track search. */ }
+    if (playlist) {
+      changeQuery(q);
+      setPlaylistUrl(playlist.url);
+      setPanel("library");
+      requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".playlist-import input")?.focus());
+      return;
+    }
+    if (q.length < 2 || q.length > 120) {
+      setError(t("Skriv mellom 2 og 120 tegn."));
+      return;
+    }
     const generation = ++searchGeneration.current;
     searchRequest.current?.abort();
     const controller = new AbortController();
@@ -566,47 +580,63 @@ export default function Afterparty() {
     return data.token;
   };
   const restoring = useRef(false);
-  const restoreEvening = async (tracks: Video[]) => {
+  const restoreEvening = async (tracks: readonly Pick<Video, "id">[]) => {
     if (restoring.current) return;
+    const ids = [...new Set(tracks.map(video => video.id))];
+    if (!ids.length || ids.length > 50 || ids.some(id => !/^[\w-]{11}$/.test(id))) return;
     restoring.current = true;
     busy.current = true;
     setPending(true);
     try {
-      for (const video of tracks) {
+      if (!roomRef.current && !(await create())) return;
+      const target = roomRef.current, generation = pollGeneration.current;
+      if (!target) return;
+      const valid = () => mounted.current && generation === pollGeneration.current &&
+        activeCode.current === target.code && roomRef.current?.code === target.code &&
+        roomRef.current?.mode === target.mode && roomRef.current?.guildId === target.guildId;
+      for (const id of ids) {
+        if (!valid()) return;
         const active = roomRef.current;
         if (
-          active?.current?.id === video.id ||
-          active?.queue.some((v) => v.id === video.id)
+          active?.current?.id === id ||
+          active?.queue.some((v) => v.id === id)
         )
           continue;
         try {
-          if (active?.mode === "discord") {
-            if (!(await botCommand("enqueue", { videoId: video.id }))) return;
+          if (target.mode === "discord") {
+            const latest = await request<{ state: DiscordState | null }>(
+              "/api/discord" + (target.guildId ? "?guildId=" + target.guildId : ""),
+            );
+            if (!valid()) return;
+            if (!latest.state?.queueRevision || latest.state.guildId !== target.guildId)
+              throw Error(t("Discord queue is unavailable. Refresh and try again."));
+            if (!(await botCommand("enqueue", { videoId: id, queueRevision: latest.state.queueRevision })) || !valid()) return;
           } else {
-            const code = active?.code ?? (await create());
-            if (!code) return;
+            const code = target.code;
             const data = await request<{ room: Room }>(`/api/rooms/${code}`, {
               method: "POST",
               headers: headers(code),
               body: JSON.stringify({
                 action: "add",
-                videoId: video.id,
+                videoId: id,
                 version: roomRef.current?.version,
                 displayName:
                   storage.get("afterparty-display-name") ?? t("Gjest"),
               }),
             });
+            if (!valid() || data.room.code !== target.code) return;
             accept({
               ...data.room,
               viewers: roomRef.current?.viewers ?? data.room.viewers,
             });
           }
         } catch (e) {
+          if (!valid()) return;
           setError("Settet er delvis lagt til. " + (e as Error).message);
           return;
         }
       }
-      announce(t("Settet er lagt i køen."));
+      if (valid()) announce(t("Settet er lagt i køen."));
     } finally {
       restoring.current = false;
       busy.current = false;
@@ -2247,6 +2277,9 @@ export default function Afterparty() {
                     history={room?.history ?? []}
                     onAdd={(v) => void add(v)}
                     onRestore={(v) => void restoreEvening(v)}
+                    onEnqueueConcerts={(ids) => void restoreEvening(ids.map(id => ({ id })))}
+                    playlistUrl={playlistUrl}
+                    queueCapacity={Math.max(0, 50 - (room?.queue.length ?? 0) - (room?.requests?.length ?? 0))}
                     busy={adding}
                   />
                 </section>
@@ -2265,6 +2298,10 @@ export default function Afterparty() {
                   discordConnected={Boolean(botOnline && discord?.connected)}
                   onQuery={changeQuery}
                   onSearch={() => void find()}
+                  onPlaylist={() => {
+                    setPanel("library");
+                    requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".playlist-import input")?.focus());
+                  }}
                   onSuggestion={(q) => void find(q)}
                   onSort={setHistorySort}
                   onHistory={() => {

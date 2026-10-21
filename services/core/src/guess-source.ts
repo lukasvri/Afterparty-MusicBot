@@ -5,24 +5,28 @@ import type { GuessCatalog } from './guess-catalog.ts';
 import type { GuessMediaSource } from './guess-media.ts';
 import { SyntheticGuessSource } from './guess-synthetic.ts';
 import { prepareDeezerGuessInventory, type DeezerGuessOptions } from './guess-deezer.ts';
-import { prepareYoutubeGuessInventory, type YoutubeGuessOptions } from './guess-youtube.ts';
+import { prepareYoutubeGuessInventory, prepareYoutubeGuessPack, type YoutubeGuessOptions } from './guess-youtube.ts';
+import { selectGuessSource } from './guess-source-config.ts';
 import { UserError } from './types.ts';
 
 type Source = { catalog: GuessCatalog; media: GuessMediaSource; dispose(): void };
 export type GuessSourceOptions = DeezerGuessOptions & { youtube?: Omit<YoutubeGuessOptions, 'signal'> };
 const unavailable = () => new UserError('The configured game preview source is unavailable.', 503);
 
-/** Startup-only private configuration. This is never a browser request or public upload path. */
+/** Server configuration only, including the alpha preset default. Never a browser request or public upload path. */
 export async function prepareConfiguredGuessSource(env: NodeJS.ProcessEnv, options: GuessSourceOptions): Promise<Source | undefined> {
-  const modes = [env.GUESS_DEEZER_PREVIEWS, env.GUESS_YOUTUBE_CLIPS, env.GUESS_SYNTHETIC_TEST].filter(flag => flag === '1');
-  if (!modes.length) return undefined;
   try {
-    if (modes.length !== 1 || options.signal.aborted) throw unavailable();
-    if (env.GUESS_SYNTHETIC_TEST === '1') {
+    const selection = selectGuessSource(env);
+    if (selection.provider === 'disabled') return undefined;
+    if (options.signal.aborted) throw unavailable();
+    if (selection.provider === 'synthetic') {
       const source = new SyntheticGuessSource();
       return { catalog: source, media: source, dispose() {} };
     }
-    const youtube = env.GUESS_YOUTUBE_CLIPS === '1';
+    const youtube = selection.provider === 'youtube';
+    if (selection.pack) {
+      return await prepareYoutubeGuessPack(selection.pack, { ...options.youtube, signal: options.signal });
+    }
     const path = youtube ? env.GUESS_YOUTUBE_INVENTORY_PATH : env.GUESS_DEEZER_INVENTORY_PATH;
     if (!path || !isAbsolute(path) || path.length > 4096 || /[\p{Cc}\p{Cf}]/u.test(path)) throw unavailable();
     // Nonblocking open avoids waiting on a FIFO; symlinks and non-regular files are rejected.

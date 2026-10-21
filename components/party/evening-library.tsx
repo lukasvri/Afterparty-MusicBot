@@ -4,18 +4,26 @@ import { useState } from "react";
 import type { Video } from "@/lib/types";
 import { useEveningLibrary } from "@/hooks/use-evening-library";
 import { uniqueEveningTracks } from "@/lib/evening-library";
+import { ConcertCatalog } from "./concert-catalog";
+import { PlaylistImport } from "./playlist-import";
 export function EveningLibrary({
   tracks,
   history,
   onAdd,
   onRestore,
   busy,
+  onEnqueueConcerts,
+  playlistUrl,
+  queueCapacity = 50,
 }: {
   tracks: Video[];
   history: Video[];
   onAdd: (v: Video) => void;
   onRestore: (v: Video[]) => void;
   busy: boolean;
+  onEnqueueConcerts?: (ids: readonly string[]) => void;
+  playlistUrl?: string;
+  queueCapacity?: number;
 }) {
   const { t } = useLanguage();
 
@@ -37,6 +45,8 @@ export function EveningLibrary({
   };
   return (
     <section className="evening-library" aria-label={t("Kveldane våre")}>
+      <PlaylistImport busy={busy} onEnqueue={onEnqueueConcerts} capacity={queueCapacity} initialUrl={playlistUrl} />
+      <ConcertCatalog busy={busy} onEnqueue={onEnqueueConcerts} />
       <h2>{t("Kveldane våre")}</h2>
       <p>
         {t(

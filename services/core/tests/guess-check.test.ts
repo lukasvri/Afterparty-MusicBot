@@ -10,6 +10,8 @@ import { checkConfiguredGuessSource, type GuessCheckFactory } from '../src/guess
 import { prepareConfiguredGuessSource } from '../src/guess-source.ts';
 import { UnavailableGuessCatalog, type GuessCategorySummary } from '../src/guess-catalog.ts';
 import { deferred } from './deferred.ts';
+import { getGuessPackClips } from '../src/guess-packs.ts';
+import { GUESS_AUDIO_RATE, guessWave } from '../src/guess-audio-format.ts';
 
 const env = { GUESS_DEEZER_PREVIEWS: '1', GUESS_DEEZER_INVENTORY_PATH: '/private/synthetic-inventory.json' };
 const signal = () => new AbortController().signal;
@@ -32,10 +34,10 @@ async function privateFile(t: TestContext) {
   return { ...env, GUESS_DEEZER_INVENTORY_PATH: path };
 }
 
-test('default-off check never invokes a factory, reads a file or asks for provider credentials', async () => {
+test('explicitly disabled check never invokes a factory, reads a file or asks for provider credentials', async () => {
   const prepare: GuessCheckFactory = () => { assert.fail('disabled check must not prepare a source'); };
   for (const flag of [undefined, '0', 'true']) {
-    assert.deepEqual(await checkConfiguredGuessSource({ ...env, GUESS_DEEZER_PREVIEWS: flag, DEEZER_METADATA: '1' }, {
+    assert.deepEqual(await checkConfiguredGuessSource({ ...env, GUESS_YOUTUBE_CLIPS: '0', GUESS_DEEZER_PREVIEWS: flag, DEEZER_METADATA: '1' }, {
       signal: signal(), fetcher: async () => { assert.fail('must not fetch'); }, decode: async () => { assert.fail('must not decode'); },
     }, prepare), { provider: 'disabled', status: 'disabled', categories: [] });
   }
@@ -58,6 +60,44 @@ test('YouTube preflight forwards only its private configuration and reports boun
   assert.equal(f.disposed(), 1); assert(!JSON.stringify(result).includes('/private/'));
 });
 
+test('unconfigured alpha preflight prepares the bundled eight-track source and reports capacity without approvals or private answers', async () => {
+  const clips = getGuessPackClips('edm-festival-hits'); let extracted = 0, fetched = 0;
+  const result = await checkConfiguredGuessSource({}, {
+    signal: signal(), youtube: {
+      extract: async args => {
+        const id = new URL(args.at(-1)!).searchParams.get('v')!; assert(clips.some(clip => clip.videoId === id)); extracted++;
+        return { id, is_live: false, duration: 180, ext: 'webm', vcodec: 'none', acodec: 'opus',
+          url: 'https://rr1---synthetic.googlevideo.com/videoplayback?mime=audio%2Fwebm' };
+      }, fetcher: async () => { fetched++; return new Response(new Uint8Array([1]), { headers: { 'content-type': 'audio/webm' } }); },
+      decode: async () => guessWave(new Uint8Array(GUESS_AUDIO_RATE * 2 * 30)),
+    },
+  });
+  assert.deepEqual(result, { provider: 'youtube', status: 'ready', categories: ['2010s', 'edm-classics', 'edm-festival-hits']
+    .map(id => ({ id, count: 8, durations: [{ seconds: 30, count: 8 }] })) });
+  assert.deepEqual([extracted, fetched], [8, 8]);
+  const text = JSON.stringify(result);
+  for (const secret of [...clips.flatMap(clip => [clip.videoId, clip.title, clip.artist]), 'approved', 'permission', 'reference', 'https:']) assert(!text.includes(secret), secret);
+  const failed = await checkConfiguredGuessSource({ GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: 'unknown-pack' }, {
+    signal: signal(), youtube: { extract: async () => { assert.fail('invalid preset must not extract'); } },
+  });
+  assert.deepEqual(failed, { provider: 'youtube', status: 'unavailable', categories: [], error: 'The configured game preview source is unavailable.' });
+});
+
+test('alpha preflight and its factory share selection without consulting inactive Deezer paths', async () => {
+  const f = fixture();
+  const result = await checkConfiguredGuessSource({
+    get GUESS_DEEZER_INVENTORY_PATH(): string { return assert.fail('inactive Deezer paths must not be inspected or copied'); },
+  }, { signal: signal() }, (config) => {
+    assert(!('GUESS_DEEZER_INVENTORY_PATH' in config)); return f.source;
+  });
+  assert.equal(result.provider, 'youtube'); assert.equal(result.status, 'ready'); assert.equal(f.disposed(), 1);
+  for (const config of [{ GUESS_YOUTUBE_CLIPS: '1', GUESS_DEEZER_PREVIEWS: '1' },
+    { GUESS_YOUTUBE_PACK: 'edm-festival-hits', GUESS_YOUTUBE_INVENTORY_PATH: '/private/conflicting.json' }]) {
+    const failed = await checkConfiguredGuessSource(config, { signal: signal() }, () => { assert.fail('invalid selection must not invoke a factory'); });
+    assert.equal(failed.status, 'unavailable'); assert.deepEqual(failed.categories, []);
+  }
+});
+
 test('private-file preflight decodes generated MP3 with real FFmpeg, reports measured capacity and disposes copied audio', async t => {
   const config = await privateFile(t), calls: string[] = [];
   const generated = spawnSync(process.env.FFMPEG_PATH ?? 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
@@ -76,7 +116,7 @@ test('private-file preflight decodes generated MP3 with real FFmpeg, reports mea
     },
   }, async (config, options) => prepared = await prepareConfiguredGuessSource(config, options));
   assert.deepEqual(result, { provider: 'deezer', status: 'ready', categories: [{ id: '2010s', count: 1, durations: [{ seconds: 16, count: 1 }] },
-    { id: 'edm-classics', count: 0, durations: [] }] });
+    { id: 'edm-classics', count: 0, durations: [] }, { id: 'edm-festival-hits', count: 0, durations: [] }] });
   assert.equal(calls.length, 2);
   const source = prepared as Awaited<ReturnType<typeof prepareConfiguredGuessSource>>;
   assert(source); assert(source.catalog.categories().every(category => !category.available));

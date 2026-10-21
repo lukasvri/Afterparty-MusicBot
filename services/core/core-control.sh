@@ -14,7 +14,8 @@ case "${1:-status}" in
  start) compose up -d --no-build ;;
  stop) compose stop core ;;
  logs) compose logs --tail=200 -f core ;;
+ guess-reload) compose kill --signal SIGHUP core ;;
  admin) printf "Open /admin on your configured PUBLIC_SITE_URL.\n" ;;
  status) compose ps; curl --fail --silent http://127.0.0.1:3990/health; printf '\n' ;;
- *) printf 'Usage: %s start|stop|logs|admin|status\n' "$0"; exit 2 ;;
+ *) printf 'Usage: %s start|stop|logs|admin|status|guess-reload\n' "$0"; exit 2 ;;
 esac

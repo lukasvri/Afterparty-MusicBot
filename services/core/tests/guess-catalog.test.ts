@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OperatorGuessCatalog, UnavailableGuessCatalog, normalizeGuess, type OperatorGuessRecord } from '../src/guess-catalog.ts';
+import { OperatorGuessCatalog, PreparedGuessCatalog, UnavailableGuessCatalog, normalizeGuess, type OperatorGuessRecord } from '../src/guess-catalog.ts';
 
 function record(n: number): OperatorGuessRecord {
   const key = `synthetic_media_${String(n).padStart(4, '0')}`;
@@ -13,6 +13,7 @@ test('production catalog shows unavailable example categories and contains no in
   assert.deepEqual(catalog.categories(), [
     { id: '2010s', name: '2010s', available: false, count: 0 },
     { id: 'edm-classics', name: 'EDM classics', available: false, count: 0 },
+    { id: 'edm-festival-hits', name: 'EDM festival hits', available: false, count: 0 },
   ]);
   assert.throws(() => catalog.select('2010s', { exclude: [], durationSeconds: 30 }), { status: 503 });
   assert.throws(() => catalog.media('anything'), { status: 503 });
@@ -54,7 +55,7 @@ test('operator duration histograms floor measured lengths, clamp at 90 and count
   const changed = catalog.categories(); changed[0].durations![0].count = 999; changed[0].durations!.push({ seconds: 20, count: 1 });
   inputs[0].media.durationSeconds = 90;
   assert.deepEqual(catalog.categories()[0].durations, durations, 'cached histograms are isolated from input and response mutations');
-  assert.deepEqual(new OperatorGuessCatalog([]).categories().map(c => c.durations), [[], []]);
+  assert.deepEqual(new OperatorGuessCatalog([]).categories().map(c => c.durations), [[], [], []]);
 });
 test('operator catalog rejects absent eligibility, unknown categories, duplicate IDs, URLs and malformed metadata', () => {
   const invalid: unknown[] = [
@@ -86,4 +87,14 @@ test('catalog copies and freezes private metadata and normalizes only exact spel
   for (const durationSeconds of [14, 91, 30.5, '30' as unknown as number]) {
     assert.throws(() => catalog.select('2010s', { exclude: [], durationSeconds }), /selection/);
   }
+});
+
+test('prepared server catalog validates recording capacity without constructing an operator rights attestation', () => {
+  const input = record(1), { rightsCleared: _assertion, ...prepared } = input; void _assertion;
+  const catalog = new PreparedGuessCatalog([prepared], () => 0);
+  assert.equal(catalog.categories()[0].count, 1);
+  const selected = catalog.select('2010s', { exclude: [], durationSeconds: 30 });
+  assert.equal(selected.title, input.song.title); assert(!('rightsCleared' in selected));
+  assert.throws(() => new OperatorGuessCatalog([prepared as OperatorGuessRecord]), { status: 503 }, 'the legacy operator API still requires its explicit assertion');
+  assert.throws(() => new PreparedGuessCatalog([{ ...prepared, categoryIds: ['unknown'] }]), { status: 503 });
 });

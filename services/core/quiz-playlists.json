@@ -1,0 +1,146 @@
+{
+  "id": "edm-festival-hits",
+  "name": "EDM festival hits",
+  "tracks": [
+    {
+      "videoId": "3nQNiWdeH2Q",
+      "title": "Heroes Tonight",
+      "artist": "Janji",
+      "aliases": [],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=3nQNiWdeH2Q",
+      "uploaderName": "NoCopyrightSounds",
+      "evidenceUrl": "https://ncs.io/ht",
+      "verifiedAt": "2026-10-21"
+    },
+    {
+      "videoId": "SHFTHDncw0g",
+      "title": "Dreams",
+      "artist": "Lost Sky",
+      "aliases": [],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=SHFTHDncw0g",
+      "uploaderName": "NoCopyrightSounds",
+      "evidenceUrl": "https://www.youtube.com/watch?v=SHFTHDncw0g",
+      "verifiedAt": "2026-10-21"
+    },
+    {
+      "videoId": "UtF6Jej8yb4",
+      "title": "The Nights",
+      "artist": "Avicii",
+      "aliases": [
+        "Nights"
+      ],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=UtF6Jej8yb4",
+      "uploaderName": "Avicii",
+      "evidenceUrl": "https://www.youtube.com/watch?v=UtF6Jej8yb4",
+      "verifiedAt": "2026-10-21"
+    },
+    {
+      "videoId": "IcrbM1l_BoI",
+      "title": "Wake Me Up",
+      "artist": "Avicii",
+      "aliases": [],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=IcrbM1l_BoI",
+      "uploaderName": "Avicii",
+      "evidenceUrl": "https://www.youtube.com/watch?v=IcrbM1l_BoI",
+      "verifiedAt": "2026-10-21"
+    },
+    {
+      "videoId": "DuFUtL8zUAk",
+      "title": "Animals",
+      "artist": "Martin Garrix",
+      "aliases": [],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=DuFUtL8zUAk",
+      "uploaderName": "Spinnin’ Records",
+      "evidenceUrl": "https://www.youtube.com/watch?v=DuFUtL8zUAk",
+      "verifiedAt": "2026-10-21"
+    },
+    {
+      "videoId": "l9Q7GISatW0",
+      "title": "Clarity",
+      "artist": "Zedd",
+      "aliases": [],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=l9Q7GISatW0",
+      "uploaderName": "Zedd",
+      "evidenceUrl": "https://www.youtube.com/watch?v=l9Q7GISatW0",
+      "verifiedAt": "2026-10-21"
+    },
+    {
+      "videoId": "1y6smkh6c-0",
+      "title": "Don’t You Worry Child",
+      "artist": "Swedish House Mafia",
+      "aliases": [
+        "Dont You Worry Child"
+      ],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=1y6smkh6c-0",
+      "uploaderName": "Swedish House Mafia",
+      "evidenceUrl": "https://www.youtube.com/watch?v=1y6smkh6c-0",
+      "verifiedAt": "2026-10-21"
+    },
+    {
+      "videoId": "JRfuAukYTKg",
+      "title": "Titanium",
+      "artist": "David Guetta",
+      "aliases": [],
+      "categoryIds": [
+        "2010s",
+        "edm-classics",
+        "edm-festival-hits"
+      ],
+      "startSeconds": 30,
+      "durationSeconds": 30,
+      "sourceUrl": "https://www.youtube.com/watch?v=JRfuAukYTKg",
+      "uploaderName": "David Guetta",
+      "evidenceUrl": "https://www.youtube.com/watch?v=JRfuAukYTKg",
+      "verifiedAt": "2026-10-21"
+    }
+  ]
+}

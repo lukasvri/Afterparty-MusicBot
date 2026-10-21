@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.4.0-alpha.13",
+    "date": "2026-10-21",
+    "title": "Alpha-ready quiz, playlist imports and 2026 festival concerts",
+    "items": [
+      "Paste a YouTube or Spotify playlist link into search or the evening library to load a preview of up to 500 entries. Long imports run as cancellable metadata jobs, show available/skipped entries and partial-source limits, and keep the full preview with page navigation. Queue additions are explicit selections within the existing 50-track queue limit; loading a playlist never changes playback. Spotify metadata is matched through existing playback sources, without streaming Spotify audio.",
+      "The evening library adds 49 curated official festival sets, including 25 from 2026 and 21 Tomorrowland Belgium 2026 performances. Event and performance-year filters, uploader attribution and direct video links cover Ultra Miami, Tomorrowland Belgium, EDC Las Vegas, Creamfields and Amsterdam RAI. Selected sets append without replacing saved evenings or interrupting current playback.",
+      "Alpha builds prepare the eight-song EDM festival hits quiz pack automatically without environment setup or a hand-built song file. Explicit source overrides and GUESS_YOUTUBE_CLIPS=0 are respected; stable, beta and rc builds remain default-off. Answers stay on Core until reveal, and each participant receives the selected audio through the private game transport. Custom approval-aware inventories remain supported separately; modes and pack/path selectors are mutually exclusive.",
+      "Quiz button presses take priority over background status reads. Starting a game or sending an answer while a poll is pending no longer silently drops the action. Cancelled or late reads cannot overwrite the newer game response.",
+      "Quiz navigation and categories remain visible during alpha testing. Loading, ready, disabled and unavailable audio states replace development-only catalog placeholders. The host can prepare songs in the lobby; Start is enabled only when the actual source has enough recordings. Existing Core versions retain their compatibility behavior without claiming unavailable audio is playable.",
+      "The game lobby host can load or retry quiz songs directly from the website, with visible preparation progress, fresh authority and game-revision checks. A local SIGHUP through core-control.sh guess-reload remains an operator alternative. A healthy snapshot remains unchanged; overlapping reloads share one bounded preparation, and shutdown rejects late publication. Guests cannot trigger preparation, disabled sources remain disabled, and the action cannot accept provider URLs or change source configuration. No automatic timed refresh is added.",
+      "Playlist additions keep their original room or Discord server while metadata is resolved. Leaving or switching rooms stops the remaining additions, late replies cannot restore a previous room, and each Discord append reads a fresh queue revision. Videos are added sequentially, so an unavailable item can leave a reported partial addition.",
+      "YouTube quiz snapshots last up to 30 minutes from preparation start, allowing eight rounds plus lobby and reveal pauses to finish. Earlier custom recording expiry, cancellation and disposal still revoke access. Generic and Deezer inventories retain their five-minute default. The private guess:pack export still creates an exclusive 0600 inactive template unless existing approvals are supplied.",
+      "Festival links and quiz recording identities were checked against primary publication metadata. This does not establish current regional access, sustained provider availability, licensing or audible device quality. No live source activation, deployment or production configuration is included."
+    ]
+  },
+  {
     "version": "2.4.0-alpha.12",
     "date": "2026-10-21",
     "title": "Themed radio, richer search and quiz audio",

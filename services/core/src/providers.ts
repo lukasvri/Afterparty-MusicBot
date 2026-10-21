@@ -4,6 +4,7 @@ import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
+import { normalizePlaylistUrl } from "./playlist-url.ts";
 import { metadataAiGenerated } from "./music-content.ts";
 import { deezerRef, deezerShareUrl, expandDeezerLink, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
@@ -95,6 +96,11 @@ function validSearchTrack(value: unknown): value is Track {
 }
 const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
   ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) });
+export type PlaylistImportResult = { videos: Track[]; total?: number; skipped: number; limited: boolean };
+const importObject = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+const unavailablePlaylistEntry = (entry: Record<string, unknown>) =>
+  entry.is_unavailable === true || entry.availability !== undefined && !["public", "unlisted"].includes(String(entry.availability)) ||
+  typeof entry.title === "string" && /^\[?(?:deleted|private|unavailable) video\]?$/i.test(entry.title.trim());
 
 export class Providers {
   store: Store;
@@ -119,17 +125,21 @@ export class Providers {
     );
     this.recommendations = new Recommendations(store, env.LASTFM_API_KEY ?? "");
   }
-  async youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) {
+  async youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     const url = new URL("https://www.googleapis.com/youtube/v3/" + path);
     for (const [k, v] of Object.entries({ ...params, key: this.key }))
       url.searchParams.set(k, v);
-    const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    const response = await fetch(url, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000) });
+    signal?.throwIfAborted();
     if (!response.ok)
       throw new UserError(
         "YouTube search is temporarily unavailable.",
         response.status === 403 || response.status === 429 ? 429 : 502,
       );
-    return response.json() as Promise<YouTubeResponses[K]>;
+    const value = await response.json() as YouTubeResponses[K];
+    signal?.throwIfAborted();
+    return value;
   }
   async extract(args: string[], signal?: AbortSignal, priority = false) {
     return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority);
@@ -306,6 +316,97 @@ export class Providers {
     }
     const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
     return this.video(unique, true);
+  }
+  /** Metadata-only import. Its 500-entry budget is independent of ordinary queue settings. */
+  async importPlaylist(input: string, signal: AbortSignal): Promise<PlaylistImportResult> {
+    signal.throwIfAborted();
+    let ref = normalizePlaylistUrl(input);
+    if (new URL(ref.url).hostname === "spotify.link") {
+      const expanded = await expandSpotifyLink(ref.url, fetch, signal);
+      signal.throwIfAborted();
+      ref = normalizePlaylistUrl(expanded);
+      if (ref.source !== "spotify" || new URL(ref.url).hostname !== "open.spotify.com") throw new UserError("Invalid Spotify playlist URL.");
+    }
+    if (ref.source === "spotify") {
+      const spotify = spotifyRef(ref.url);
+      if (!spotify || !["playlist", "album"].includes(spotify.kind)) throw new UserError("Invalid Spotify playlist URL.");
+      const source = await this.spotifyCatalog.loadWithSummary(spotify.kind, spotify.id, 500, signal);
+      signal.throwIfAborted();
+      const items = source.items.slice(0, 500), results = new Array<Track | undefined>(items.length);
+      let next = 0;
+      // Await all raw work before returning, even if a dependency ignores cancellation.
+      await Promise.all(Array.from({ length: Math.min(3, items.length) }, async () => {
+        while (!signal.aborted && next < items.length) {
+          const index = next++;
+          try {
+            signal.throwIfAborted();
+            const found = await this.matchSong(items[index]);
+            signal.throwIfAborted();
+            if (validSearchTrack(found) && found.embeddable && (found.source === undefined || found.source === "youtube")) results[index] = copySearchTrack(found);
+          } catch { if (signal.aborted) return; }
+        }
+      }));
+      signal.throwIfAborted();
+      const seen = new Set<string>(), videos = results.filter((track): track is Track => {
+        if (!track || seen.has(track.id)) return false;
+        seen.add(track.id); return true;
+      });
+      return { videos, ...(source.total !== undefined ? { total: source.total } : {}),
+        skipped: source.skipped + items.length - videos.length, limited: source.limited || source.items.length > 500 };
+    }
+    const ids: string[] = [], seen = new Set<string>();
+    let skipped = 0, total: number | undefined, limited = false;
+    const remember = (value: unknown, unavailable = false) => {
+      if (unavailable || typeof value !== "string" || !/^[A-Za-z0-9_-]{11}$/.test(value) || seen.has(value)) { skipped++; return; }
+      seen.add(value); ids.push(value);
+    };
+    try {
+      if (!this.key) throw new UserError("YouTube API access is not configured.");
+      const playlistId = new URL(ref.url).searchParams.get("list")!, visited = new Set<string>();
+      let page = "", entries = 0;
+      do {
+        signal.throwIfAborted();
+        visited.add(page);
+        const data = importObject(await this.youtube("playlistItems", { playlistId, part: "contentDetails,snippet,status", maxResults: "50", ...(page ? { pageToken: page } : {}) }, signal));
+        signal.throwIfAborted();
+        if (!data || !Array.isArray(data.items) || data.items.length > 50) throw new UserError("Invalid YouTube playlist response.");
+        const count = importObject(data.pageInfo)?.totalResults;
+        if (total === undefined && typeof count === "number" && Number.isSafeInteger(count) && count >= 0) total = count;
+        for (const raw of data.items) {
+          const item = importObject(raw), snippet = importObject(item?.snippet), status = importObject(item?.status);
+          entries++;
+          remember(importObject(item?.contentDetails)?.videoId, !item || status?.privacyStatus === "private" || Boolean(snippet && unavailablePlaylistEntry(snippet)));
+        }
+        if (data.nextPageToken !== undefined && (typeof data.nextPageToken !== "string" || data.nextPageToken.length > 512 || /[\p{Cc}\p{Cf}]/u.test(data.nextPageToken))) throw new UserError("Invalid YouTube playlist page.");
+        page = typeof data.nextPageToken === "string" ? data.nextPageToken : "";
+        if (page && (entries >= 500 || visited.has(page) || visited.size >= 10)) { limited = true; break; }
+      } while (page);
+      limited ||= total !== undefined && total > entries;
+    } catch {
+      signal.throwIfAborted();
+      ids.length = 0; seen.clear(); skipped = 0; total = undefined;
+      const raw = await this.extract(["--flat-playlist", "--dump-single-json", "--skip-download", "--ignore-config", "--no-cache-dir", "--js-runtimes", "node", "--playlist-end", "501", "--", ref.url], signal);
+      signal.throwIfAborted();
+      const data = importObject(raw);
+      if (!data || !Array.isArray(data.entries)) throw new UserError("The playlist is unavailable.", 502);
+      const count = data.playlist_count;
+      if (typeof count === "number" && Number.isSafeInteger(count) && count >= 0) total = count;
+      limited = data.entries.length > 500 || total !== undefined && total > Math.min(data.entries.length, 500);
+      for (const raw of data.entries.slice(0, 500)) {
+        const entry = importObject(raw); remember(entry?.id, !entry || unavailablePlaylistEntry(entry));
+      }
+    }
+    const found = new Map<string, Track>();
+    for (let index = 0; index < ids.length; index += 50) {
+      signal.throwIfAborted();
+      const batch = ids.slice(index, index + 50), requested = new Set(batch);
+      const tracks = await this.video(batch, true);
+      signal.throwIfAborted();
+      for (const track of tracks) if (validSearchTrack(track) && requested.has(track.id) && track.embeddable &&
+        (track.source === undefined || track.source === "youtube") && !found.has(track.id)) found.set(track.id, copySearchTrack(track));
+    }
+    const videos = ids.map(id => found.get(id)).filter((track): track is Track => Boolean(track));
+    return { videos, ...(total !== undefined ? { total } : {}), skipped: skipped + ids.length - videos.length, limited };
   }
   async resolve(query: string): Promise<Track[]> {
     query = query.trim();

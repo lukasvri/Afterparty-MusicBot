@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { GuessGame, type GuessAccess } from './guess-game.ts';
 import { UnavailableGuessCatalog, type GuessCatalog } from './guess-catalog.ts';
 import type { GuessMediaSource } from './guess-media.ts';
+import type { GuessSourceState } from './guess-source-manager.ts';
 import { guessWaveSeconds, guessAbort } from './guess-audio-format.ts';
 import { UserError } from './types.ts';
 type Dependencies = {
@@ -11,8 +12,9 @@ type Dependencies = {
   json: (response: ServerResponse, status: number, data: unknown) => void;
   guild: (grant: unknown, id: string, signal?: AbortSignal) => Promise<{ canManage: boolean }>;
   browserRoom: (id: string) => boolean; catalog?: GuessCatalog; media?: GuessMediaSource;
+  prepareSource?: () => Promise<boolean>; sourceState?: () => GuessSourceState;
 };
-const controls = new Set(['configure', 'start', 'next', 'reveal', 'end', 'reset']);
+const controls = new Set(['configure', 'start', 'next', 'reveal', 'end', 'reset', 'prepare']);
 /** Anonymous scoped game transport. Bounded private media transport, without queue/room imports or playback dependency. */
 export class GuessHttp {
   private game: GuessGame;
@@ -21,6 +23,7 @@ export class GuessHttp {
   private deps: Dependencies;
   private mediaReads = 0;
   private mediaReceipts = new Map<string, { expires: number; ids: Set<string> }>();
+  private prepareReceipts = new Map<string, { expires: number; ids: Set<string> }>();
   constructor(deps: Dependencies) { this.deps = deps; this.catalog = deps.catalog ?? new UnavailableGuessCatalog(); this.game = new GuessGame({ catalog: this.catalog }); }
   private limit(key: string, max: number) {
     const now = Date.now();
@@ -39,6 +42,16 @@ export class GuessHttp {
       if (data.scope !== scope || data.expires <= Date.now() || data.expires > Date.now() + 1800000 || typeof data.id !== 'string' || !/^[a-f0-9-]{36}$/.test(data.id)) throw Error(); return { id: data.id as string, expires: Number(data.expires) };
     } catch { throw new UserError('Rejoin the game.', 419); }
   }
+  private sourceState(): GuessSourceState {
+    try {
+      if (this.deps.sourceState) {
+        const state = this.deps.sourceState();
+        return ['disabled', 'unavailable', 'loading', 'ready'].includes(state) ? state : 'unavailable';
+      }
+      return this.deps.media && this.catalog.categories().some(category => category.available) ? 'ready'
+        : this.deps.prepareSource ? 'unavailable' : 'disabled';
+    } catch { return 'unavailable'; }
+  }
   async handle(request: IncomingMessage, response: ServerResponse) {
     const peer = request.socket.remoteAddress ?? 'unknown';
     const connection = new AbortController(), onClose = () => connection.abort();
@@ -54,6 +67,7 @@ export class GuessHttp {
         const categories = this.catalog.categories();
         if (!request.aborted && !response.destroyed) this.deps.json(response, 200, {
           categories, playable: Boolean(this.deps.media && categories.some(category => category.available)),
+          sourceState: this.sourceState(), canPrepare: false,
           ...(this.catalog.syntheticTest === true ? { syntheticTest: true } : {}),
         });
         return;
@@ -72,6 +86,29 @@ export class GuessHttp {
       if (input.action === 'join') { this.limit('join:' + key, 30); this.limit('join-global', 120); if (!token) token = this.grant(key); }
       actor ??= this.actor(token, key);
       const access: GuessAccess = { scope, scopeId, host, actor: actor.id };
+      if (input.action === 'prepare') {
+        if (Object.keys(input).some(name => !['scope', 'scopeId', 'action', 'host', 'roomExpiresAt', 'tokenCipher', 'token', 'sessionId', 'roundId', 'revision', 'eventId'].includes(name))) throw new UserError('Invalid game preparation request.');
+        const result = this.game.apply(access, { action: 'read' });
+        if (!['lobby', 'results'].includes(result.game.phase)) throw new UserError('Finish this game before preparing its audio.', 409);
+        if (input.sessionId !== result.game.sessionId || input.roundId !== (result.game.round?.roundId ?? null) || input.revision !== result.game.revision)
+          throw new UserError('The game changed. Refresh before preparing its audio.', 409);
+        if (typeof input.eventId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(input.eventId)) throw new UserError('Invalid game preparation event.');
+        if (!this.deps.prepareSource || this.sourceState() === 'disabled') throw new UserError('Game preparation is unavailable.', 503);
+        const now = Date.now(), receiptKey = `${key}:${actor.id}`;
+        for (const [id, receipt] of this.prepareReceipts) if (receipt.expires <= now) this.prepareReceipts.delete(id);
+        const receipt = this.prepareReceipts.get(receiptKey) ?? { expires: now + 1_800_000, ids: new Set<string>() };
+        if (receipt.ids.has(input.eventId)) throw new UserError('Game preparation event already received.', 409);
+        if (receipt.ids.size >= 64 || !this.prepareReceipts.has(receiptKey) && this.prepareReceipts.size >= 1024) throw new UserError('Game preparations are busy. Try again shortly.', 429);
+        this.limit('prepare:' + receiptKey, 3); this.limit('prepare-global', 12);
+        receipt.ids.add(input.eventId); receipt.expires = now + 1_800_000; this.prepareReceipts.set(receiptKey, receipt);
+        // A host starts one bounded manager attempt. Its lifetime is independent of this short HTTP response.
+        try { void Promise.resolve(this.deps.prepareSource()).catch(() => {}); }
+        catch { throw new UserError('Game preparation is unavailable.', 503); }
+        const sourceState = this.sourceState();
+        if (!request.aborted && !response.destroyed) this.deps.json(response, 200, { ...result, canManage: true,
+          mediaAvailable: false, sourceState, canPrepare: sourceState !== 'disabled' && sourceState !== 'loading' });
+        return;
+      }
       if (input.action === 'media') {
         const controller = new AbortController(), abort = () => controller.abort();
         response.once('close', abort); request.once('aborted', abort);
@@ -113,7 +150,10 @@ export class GuessHttp {
       const names = input.action === 'join' ? ['nickname', 'sessionId', 'eventId'] : input.action === 'read' ? [] : ['sessionId', 'revision', 'roundId', 'eventId', ...(input.action === 'guess' ? ['text'] : input.action === 'configure' ? ['settings', 'categoryId'] : [])];
       for (const name of names) if (input[name] !== undefined) fields[name] = input[name];
       const result = this.game.apply(access, fields);
-      if (!request.aborted && !response.destroyed) this.deps.json(response, 200, { ...result, canManage: host, mediaAvailable: Boolean(this.deps.media && result.game.phase === 'round'), ...(input.action === 'join' || token !== input.token ? { token } : {}) });
+      const sourceState = this.sourceState();
+      if (!request.aborted && !response.destroyed) this.deps.json(response, 200, { ...result, canManage: host, mediaAvailable: Boolean(this.deps.media && result.game.phase === 'round'), sourceState,
+        canPrepare: Boolean(host && this.deps.prepareSource && sourceState !== 'disabled' && sourceState !== 'loading' && ['lobby', 'results'].includes(result.game.phase)),
+        ...(input.action === 'join' || token !== input.token ? { token } : {}) });
     } catch (error) {
       // Denied callers cannot spend valid participants' game or playback capacity.
       if (request.aborted || response.destroyed) return;

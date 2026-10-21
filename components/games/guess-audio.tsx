@@ -52,5 +52,5 @@ export function GuessAudio({ available, fetchAudio, roundId, active, elapsed, re
     }
   };
   const engaged = phase === 'playing' || phase === 'loading';
-  return <div className="guess-audio"><button className="button" disabled={!available || !active || remaining <= 0} onClick={() => void listen()}>{engaged ? <VolumeX size={17} /> : <Volume2 size={17} />}{t(phase === 'loading' ? 'Cancel preview' : phase === 'playing' ? 'Stop preview' : 'Listen to preview')}</button><small>{t(available ? 'Preview audio is private to this game round.' : 'Music preview awaits a reviewed catalog adapter.')}</small>{error && <p role="status">{t(error)}</p>}</div>;
+  return <div className="guess-audio"><button className="button" disabled={!available || !active || remaining <= 0} onClick={() => void listen()}>{engaged ? <VolumeX size={17} /> : <Volume2 size={17} />}{t(phase === 'loading' ? 'Cancel preview' : phase === 'playing' ? 'Stop preview' : 'Listen to preview')}</button><small>{t(available ? 'Preview audio is private to this game round.' : 'Quiz audio is not ready. Ask the host to load the songs in the lobby.')}</small>{error && <p role="status">{t(error)}</p>}</div>;
 }

@@ -78,6 +78,8 @@ services/core/data/
 /.openai/hosting.local.json
 /.local/
 **/guess-deezer.local.json
+**/guess-youtube.local.json
+**/guess-approvals.local.json
 
 __pycache__/
 *.pyc

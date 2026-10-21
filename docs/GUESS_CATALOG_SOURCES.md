@@ -5,7 +5,10 @@ for at most eight preapproved recordings. It returns the existing `GuessCatalog`
 and `GuessMediaSource` interfaces plus `dispose()` to release the prepared bytes.
 It does not configure the application, activate a provider, download media, read
 files, expose an upload endpoint or supply a real-song inventory. The default
-application catalog stays unavailable.
+application automatically selects the bundled [EDM pack](#play-the-bundled-pack)
+for alpha builds when no explicit override is present. Stable, beta and rc builds
+remain default-off; custom operator inventories retain the approval-aware path
+described below.
 
 The release target requires recognizable commercial hits. A freely licensed
 independent or classical catalog can support development, but does not replace
@@ -89,7 +92,7 @@ the same time.
    ```
 
    `expiresAt` is the actual permission expiry in Unix milliseconds, not zero.
-   Only `2010s` and `edm-classics` are accepted category IDs. Membership is
+   The `2010s`, `edm-classics` and `edm-festival-hits` category IDs are accepted. Membership is
    assigned explicitly; the provider does not infer it. The reference is checked
    for syntax, not legal validity. Do not treat an approval flag as a license.
 2. On the local test installation set `GUESS_DEEZER_PREVIEWS=1` and
@@ -105,7 +108,7 @@ the same time.
    participant taps Listen because browsers may block autoplay.
 5. The snapshot lasts at most five minutes from preparation start. There is no
    automatic refresh or fallback to another provider. Shutdown disposes it;
-   a new reviewed preparation is needed for another pilot. Disable the option
+   an explicit [local reload](#reload-without-restarting-music) can prepare another snapshot without restarting music. Disable the option
    to return to the default behavior.
 
 This is a limited pilot, not an always-on hit library. A later paid provider can
@@ -153,7 +156,9 @@ uses no network/file protocols and produces only the selected 15–30-second,
 the existing private round transport. The quiz uses its audio player without a
 YouTube iframe, and never plays through or alters the ordinary Discord queue.
 
-Keep a private inventory outside public source and point
+For the bundled eight-song selection, use [direct pack setup](#play-the-bundled-pack)
+instead of creating a private file. For a custom selection, leave
+`GUESS_YOUTUBE_PACK` empty, keep a private inventory outside public source and point
 `GUESS_YOUTUBE_INVENTORY_PATH` at its absolute path. The regular-file, symlink and
 32 KiB limits are shared with the Deezer pilot. Supply one to eight records:
 
@@ -195,8 +200,8 @@ deadlines and one preparation has a sixty-second deadline. At most two
 preparations run concurrently. All providers share two FFmpeg decoder slots,
 retained until each process closes. A long or large recording can fail these
 limits even when its requested segment is short. Preparation is atomic, and the
-snapshot expires at the earliest permission expiry or after five minutes.
-There is no automatic refresh of a running pilot.
+snapshot expires at the earliest permission expiry or after thirty minutes from
+preparation start. There is no automatic refresh of a running pilot.
 
 This separate source avoids relying on YouTube's embedded player for the quiz.
 It does not establish permission under YouTube or recording-rights terms, and
@@ -214,8 +219,9 @@ Preparation copies and validates mono 16 kHz, 16-bit PCM WAV envelopes between
 15 and 30 seconds. Actual decoded PCM length determines catalog duration. Input
 metadata cannot supply duration or media keys; random opaque keys are generated
 internally. Buffers and metadata are copied, and each read returns fresh bytes.
-The entire snapshot expires at the earliest permission expiry or after five
-minutes. Expiration/disposal makes categories unavailable, rejects selection and
+Generic and Deezer snapshots expire at the earliest permission expiry or after
+five minutes. The YouTube adapter uses a bounded thirty-minute lifetime instead.
+It cannot extend any recording permission. Expiration/disposal makes categories unavailable, rejects selection and
 media access, and releases stored bytes. Authorization and cancellation are
 checked before and after the asynchronous read boundary. Revocation before
 expiry requires calling `dispose()` and preparing a new reviewed snapshot.
@@ -234,6 +240,145 @@ inventory before starting. Expired inventories report no available bins. This
 public capacity information contains no recording IDs, titles, aliases, media
 keys or permission references. The server remains authoritative and older
 catalogs without histograms retain their existing compatibility.
+
+## Prepared EDM festival hits pack
+
+The Core-only `services/core/quiz-playlists.json` contains eight official-source
+recordings: Janji, Lost Sky, Avicii, Martin Garrix, Zedd, Swedish House Mafia and
+David Guetta. It supplies canonical answers and a 30-second segment starting at
+30 seconds. The named `EDM festival hits` category becomes available when its
+prepared inventory is loaded. The public festival catalog is separate and does
+not import these answers, clip offsets or approval references into the browser.
+
+### Play the bundled pack
+
+Alpha builds prepare the eight-song pack automatically when no explicit quiz
+source or disable override is configured. Matching website/Core builds are still
+required, but players do not need to set environment variables or create a song
+file. Open **Games**, enter the existing room code or follow its Discord game
+link, and join with a nickname.
+
+When audio is ready, the host chooses **EDM festival hits**, **Classic
+(30 seconds)**, and up to eight rounds, then saves settings and starts. The
+pack's default five 30-second rounds also fit without editing. Each participant
+taps **Listen to preview** and answers; the host advances after reveal. Source
+loading status is shown honestly, and Start stays disabled until enough clips
+are available.
+
+If preparation failed or the snapshot expired, the lobby host can choose
+**Load quiz songs** to retry from the website. Loading does not change ordinary
+music, and a healthy snapshot is never replaced. Guests cannot start preparation.
+The button uses the server's existing selected pack or custom source, not
+browser-supplied provider links, files or approval records. Loading reports
+progress through the ordinary game poll and does not hold a browser request open
+for provider preparation. End an expired active game and return to the lobby
+before retrying; its old media keys cannot be resurrected.
+
+For operator overrides, `GUESS_YOUTUBE_CLIPS=0` explicitly disables the automatic
+alpha source. `GUESS_YOUTUBE_CLIPS=auto` or an unset value follows the build's
+stage: alpha uses the default pack, stable/beta/rc stays off. An explicit Deezer
+or synthetic mode is retained. Conflicting enabled modes and pack/path selectors
+fail closed. An explicit YouTube custom inventory path retains its existing
+per-record validation. Source publication is not treated as a license or an
+invented approval record.
+
+Outside alpha, the pack can still be selected explicitly with
+`GUESS_YOUTUBE_CLIPS=1` and `GUESS_YOUTUBE_PACK=edm-festival-hits`. The isolated
+`node --env-file=.env src/guess-check.ts` command in `services/core/` follows the
+same effective selection as startup and reports readiness without starting the
+bot. Its temporary audio is disposed afterward; it does not change a running
+source.
+
+The source downloads and normalizes the selected clips using the existing
+bounded yt-dlp/FFmpeg pipeline. A provider failure leaves the source unavailable
+and does not claim playback succeeded. Opening the game or reading the catalog
+never starts a provider download or enables a source. This source change is not
+an installation or deployment.
+
+### Custom approval-aware inventory
+
+The existing export command remains available for operators who use a private
+per-record approval inventory. Run from the repository root:
+
+```sh
+npm --prefix services/core run guess:pack -- --list
+mkdir -p .local
+npm --prefix services/core run guess:pack -- \
+  --pack edm-festival-hits \
+  --out /absolute/path/to/Afterparty/.local/guess-youtube.local.json
+```
+
+This creates an inactive template, never fabricated permission. The file is
+created with mode `0600`, and an existing file is never overwritten. Review and
+complete the existing per-record approval fields locally. Alternatively provide
+`--approval-file /absolute/private/guess-approvals.local.json` to generate a
+complete inventory from existing approvals. That private file must contain all
+eight exact video IDs, each once, with this shape:
+
+```json
+[
+  {
+    "videoId": "REPLACE_WITH_ONE_PACK_VIDEO_ID",
+    "permission": {
+      "approved": true,
+      "reference": "https://REPLACE_WITH_PRIVATE_PERMISSION_REFERENCE",
+      "expiresAt": 0
+    }
+  }
+]
+```
+
+Use actual existing references and a future Unix-millisecond expiry for each
+record. Missing, duplicate, foreign or expired approvals reject the entire
+operation before output. The manifest's source verification is metadata evidence,
+not an approval record. The CLI does not download audio, connect to Discord or
+activate a source. Paths and answers are omitted from its status output.
+
+Leave `GUESS_YOUTUBE_PACK` empty. Set `GUESS_YOUTUBE_CLIPS=1` and the absolute generated file path as
+`GUESS_YOUTUBE_INVENTORY_PATH` on the intended local installation. Disable other
+quiz modes and run `npm --prefix services/core run guess:check` before Core starts.
+An inactive template deliberately fails this check. Actual media/provider
+availability is determined during preparation, not by the playlist file.
+
+The bounded YouTube snapshot lasts at most thirty minutes from preparation start,
+or less if a recording approval expires. An eight-round, two-player generated
+30-second match with lobby and reveal pauses is tested across the former
+five-minute boundary. Expiry and disposal still revoke pending and future media
+reads. There is no automatic refresh or promise of uninterrupted indefinite play.
+
+## Reload without restarting music
+
+The game lobby host can retry an unavailable or expired source with
+**Load quiz songs**, without changing local environment variables or restarting
+the bot. Fresh host/participant authority, lobby phase and revision checks apply.
+Preparation is bounded, coalesced and rate-limited; guests and stale commands
+cannot trigger it. There is no arbitrary source configuration or upload route.
+
+An explicit local `SIGHUP` remains available as an operator alternative. For the supplied Compose control script, run:
+
+```sh
+services/core/core-control.sh guess-reload
+```
+
+This uses the existing selected Compose file, including an ignored local override.
+For a directly managed Node process, send `SIGHUP` to that Core process using its
+normal process manager. Use this only after installing the build with the reload
+handler; older builds may terminate on that signal.
+
+A healthy snapshot is kept unchanged, so a reload cannot replace active round
+keys. Concurrent signals share one bounded preparation. Failed preparation stays
+unavailable, and shutdown cancels pending work and prevents late publication.
+The manager changes only private quiz catalog/media references, without restarting
+the bot, logging into Discord again, changing queues or touching playback.
+
+An expired match cannot resume its old media keys: end it and start a new game
+after a successful reload. The same selected configuration is retried. Private
+inventory files are reread, but environment variables remain those of the running
+process. Changing the selected mode or pack still requires a normal locally
+managed configuration update. There is no timed/background refresh. The scoped game preparation action
+only retries an already configured source; it cannot enable a disabled mode or
+select another provider. `guess:check` remains an isolated check and does not reload the
+running source.
 
 ## Source choices and unresolved rights
 

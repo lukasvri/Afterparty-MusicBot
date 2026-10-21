@@ -13,7 +13,7 @@ const record = (id = videoId): YoutubeGuessRecord => ({ videoId: id, title: 'Fic
 const metadata = (id = videoId, extra: Record<string, unknown> = {}) => ({ id, is_live: false, live_status: 'not_live', duration: 200, ext: 'webm', vcodec: 'none', acodec: 'opus', url: cdn,
   title: 'Untrusted provider title', http_headers: { Authorization: 'private-provider-secret', Cookie: 'private-provider-secret' }, ...extra });
 const selection = { exclude: [], durationSeconds: 30 };
-const safeError = (error: unknown) => error instanceof UserError && error.status === 503 && error.message === 'The approved YouTube game audio inventory is unavailable.';
+const safeError = (error: unknown) => error instanceof UserError && error.status === 503 && error.message === 'The YouTube game audio inventory is unavailable.';
 function options(extra: Partial<YoutubeGuessOptions> = {}): YoutubeGuessOptions {
   return { signal: new AbortController().signal, extract: async args => metadata(args.at(-1)!.split('v=')[1]),
     fetcher: async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'audio/webm' } }),
@@ -166,13 +166,14 @@ test('permission expiry before and after each preparation step cannot publish st
   }
 });
 
-test('earliest approval expiry, five-minute TTL, lifetime cancellation and explicit disposal stop pending reads', async t => {
+test('earliest approval expiry, thirty-minute TTL, lifetime cancellation and explicit disposal stop pending reads', async t => {
   t.mock.timers.enable({ apis: ['Date'], now: 100_000 });
   for (const reason of ['expiry', 'ttl', 'abort', 'dispose']) {
     const controller = new AbortController(), first = record(), second = record('synthetic02'); if (reason === 'expiry') second.permission.expiresAt = Date.now() + 1000;
+    if (reason === 'ttl') { first.permission.expiresAt = Date.now() + 3_600_000; second.permission.expiresAt = first.permission.expiresAt; }
     const inventory = await prepareYoutubeGuessInventory([first, second], options({ signal: controller.signal })); t.after(inventory.dispose);
     const song = inventory.catalog.select('2010s', selection), pending = inventory.media.read(song.mediaKey, new AbortController().signal);
-    if (reason === 'expiry') t.mock.timers.tick(1000); if (reason === 'ttl') t.mock.timers.tick(300_000); if (reason === 'abort') controller.abort(); if (reason === 'dispose') inventory.dispose();
+    if (reason === 'expiry') t.mock.timers.tick(1000); if (reason === 'ttl') t.mock.timers.tick(1_800_000); if (reason === 'abort') controller.abort(); if (reason === 'dispose') inventory.dispose();
     await assert.rejects(pending); assert(inventory.catalog.categories().every(category => !category.available && category.count === 0)); await assert.rejects(inventory.media.read(song.mediaKey, new AbortController().signal)); inventory.dispose();
   }
 });

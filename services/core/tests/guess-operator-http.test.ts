@@ -11,6 +11,8 @@ import { createServers } from '../src/server.ts';
 import { prepareOperatorGuessInventory, type OperatorGuessInventoryRecord } from '../src/guess-operator-inventory.ts';
 import { prepareDeezerGuessInventory } from '../src/guess-deezer.ts';
 import { prepareYoutubeGuessInventory } from '../src/guess-youtube.ts';
+import { buildGuessPackInventory, getGuessPack } from '../src/guess-packs.ts';
+import type { GuessSong } from '../src/guess-catalog.ts';
 import { DEFAULT_GUESS_SETTINGS, type GuessResult } from '../src/guess-game.ts';
 import { GUESS_AUDIO_RATE, guessWave, guessWaveSeconds } from '../src/guess-audio-format.ts';
 import type { Sink } from '../src/audio.ts';
@@ -70,7 +72,7 @@ const mutation = (state: Result, action: string, fields: Context = {}) => ({ act
   roundId: state.game.round?.roundId ?? null, eventId: randomUUID(), ...fields });
 const mediaRequest = (context: Context, state: Result) => ({ ...context, action: 'media',
   sessionId: state.game.sessionId, roundId: state.game.round!.roundId, eventId: randomUUID() });
-async function players(f: Awaited<ReturnType<typeof fixture>>, clock: number, durationSeconds = 30) {
+async function players(f: Awaited<ReturnType<typeof fixture>>, clock: number, durationSeconds = 30, categoryId = '2010s') {
   const scope = { scope: 'room', scopeId: 'OPERATR1', roomExpiresAt: clock + 3_600_000 };
   const host = await f.result({ ...scope, host: true, action: 'join', eventId: randomUUID(), nickname: 'Red' });
   const guest = await f.result({ ...scope, host: false, action: 'join', eventId: randomUUID(), nickname: 'Blue' });
@@ -79,7 +81,7 @@ async function players(f: Awaited<ReturnType<typeof fixture>>, clock: number, du
   const hostContext = { ...scope, host: true, token: host.token }, guestContext = { ...scope, host: false, token: guest.token };
   let latest = await f.result({ ...hostContext, action: 'read' });
   latest = await f.result({ ...hostContext, ...mutation(latest, 'configure', {
-    categoryId: '2010s', settings: { ...DEFAULT_GUESS_SETTINGS, durationSeconds, roundCount: 2 },
+    categoryId, settings: { ...DEFAULT_GUESS_SETTINGS, durationSeconds, roundCount: 2 },
   }) });
   latest = await f.result({ ...hostContext, ...mutation(latest, 'start') });
   return { hostContext, guestContext, latest };
@@ -295,6 +297,67 @@ test('YouTube adapter and real container decoder privately serve two players wit
       assert.deepEqual(extracted, ids); assert.equal(fetched.length, 2, 'private delivery never refetches the source');
     } finally { await f.close(); }
   });
+});
+
+test('the bundled festival pack serves private generated audio to two players without exposing its answers or changing music', async t => {
+  let clock = Date.now(); t.mock.method(Date, 'now', () => clock);
+  const pack = getGuessPack('edm-festival-hits');
+  const records = buildGuessPackInventory(pack.id, pack.tracks.map(track => ({ videoId: track.videoId,
+    permission: { approved: true, reference: 'https://permission.example.test/synthetic-pack-test', expiresAt: clock + 3_600_000 } })));
+  const encoded = spawnSync(process.env.FFMPEG_PATH ?? 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
+    '-i', 'sine=frequency=440:duration=61', '-threads', '1', '-c:a', 'libopus', '-f', 'webm', 'pipe:1'], { maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(encoded.status, 0, String(encoded.stderr));
+  let preparing = true, extracts = 0, fetches = 0;
+  const inventory = await prepareYoutubeGuessInventory(records, { signal: new AbortController().signal,
+    extract: async args => {
+      assert(preparing); const videoId = new URL(args.at(-1)!).searchParams.get('v');
+      assert(pack.tracks.some(track => track.videoId === videoId)); extracts++;
+      return { id: videoId, is_live: false, duration: 61, ext: 'webm', vcodec: 'none', acodec: 'opus',
+        url: 'https://rr1---synthetic.googlevideo.com/videoplayback?mime=audio%2Fwebm' };
+    }, fetcher: async () => {
+      assert(preparing); fetches++;
+      return new Response(encoded.stdout, { headers: { 'content-type': 'audio/webm' } });
+    },
+    // Real default FFmpeg decoder cuts the requested 30..60 second clip from generated audio.
+  });
+  preparing = false;
+  const selected: GuessSong[] = [], select = inventory.catalog.select.bind(inventory.catalog);
+  inventory.catalog.select = (category, options) => { const song = select(category, options); selected.push(song); return song; };
+  const f = await fixture([], inventory), before = f.state();
+  const hidden = (value: unknown) => {
+    const text = typeof value === 'string' ? value : JSON.stringify(value);
+    for (const secret of pack.tracks.flatMap(track => [track.videoId, track.title, track.artist, track.sourceUrl])) assert(!text.includes(secret), secret);
+    for (const secret of ['mediaKey', 'googlevideo', 'synthetic-pack-test', 'sourceUrl', 'uploaderName']) assert(!text.includes(secret), secret);
+  };
+  try {
+    const catalog = await (await f.call({ action: 'catalog' })).json() as { categories: { id: string; count: number }[] };
+    assert.equal(catalog.categories.find(category => category.id === pack.id)?.count, 8); hidden(catalog);
+    const { hostContext, guestContext, latest } = await players(f, clock, 30, pack.id);
+    assert.equal(selected.length, 2); assert.notEqual(selected[0].id, selected[1].id);
+    let current = latest;
+    for (let round = 0; round < 2; round++) {
+      clock = current.game.round!.startsAt;
+      current = await f.result({ ...guestContext, action: 'read' }); hidden(current);
+      const audio = await Promise.all([hostContext, guestContext].map(async context => {
+        const response = await f.call(mediaRequest(context, current));
+        assert.equal(response.status, 200); assert.equal(response.headers.get('content-type'), 'audio/wav');
+        assert.equal(response.headers.get('cache-control'), 'private, no-store'); hidden([...response.headers]);
+        const bytes = new Uint8Array(await response.arrayBuffer()); assert.equal(guessWaveSeconds(bytes), 30);
+        assert(bytes.subarray(44).some(value => value !== 0)); hidden(Buffer.from(bytes).toString('utf8')); return bytes;
+      }));
+      assert.deepEqual(audio[0], audio[1]);
+      const shared = mutation(current, 'guess', { text: selected[round].title });
+      const answers = await Promise.all([hostContext, guestContext].map(context => f.result({ ...context, ...shared, eventId: randomUUID() })));
+      for (const answer of answers) { assert.deepEqual(answer.self.result, { correct: true, awarded: 1000 }); hidden(answer); }
+      current = await f.result({ ...hostContext, action: 'read' });
+      current = await f.result({ ...hostContext, ...mutation(current, 'reveal') });
+      assert.deepEqual(current.game.round!.answer, { title: selected[round].title, artist: selected[round].artist });
+      current = await f.result({ ...hostContext, ...mutation(current, 'next') });
+    }
+    assert.equal(current.game.phase, 'results'); assert.deepEqual(current.game.scoreboard.map(player => player.total), [2000, 2000]);
+    assert.deepEqual([extracts, fetches], [8, 8], 'the prepared pack serves all round media without provider lookups');
+    assert.deepEqual(f.state(), before, 'neither guild music state changes during the private pack game');
+  } finally { await f.close(); }
 });
 
 test('HTTP catalog and active media fail closed after inventory disposal or permission expiry', async t => {
