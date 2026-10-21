@@ -83,3 +83,6 @@ services/core/data/
 
 __pycache__/
 *.pyc
+
+# Generated Cloudflare deployment identity stays local.
+/wrangler.cloudflare.local.json

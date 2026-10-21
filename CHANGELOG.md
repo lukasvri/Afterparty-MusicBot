@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.15: Prepare an opt-in Cloudflare website build
+
+2026-10-21
+
+- Operators can explicitly build the website for native Cloudflare Workers with a DB binding and host-local deployment identity. The existing Sites build remains the default and is preserved for rollback; generated Cloudflare settings and deployment IDs stay out of source control.
+- Cloudflare builds validate their target and output before a separate explicit deployment command. Builds do not apply remote database migrations, change Core, switch DNS or configure automatic deployment. The migration guide describes isolated staging, database migration-history reconciliation and an owner-approved cutover.
+- This alpha is source preparation only. No Cloudflare account, live website, database, production bridge, Discord login or production deployment has been changed or verified.
+
 ## v2.4.0-alpha.14: A calmer, consistent interface across Afterparty
 
 2026-10-21

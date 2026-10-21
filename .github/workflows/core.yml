@@ -83,6 +83,7 @@ jobs:
           npm run lint
           node node_modules/typescript/bin/tsc --noEmit --incremental false
           npm run test:unit
+          CF_WORKER_NAME=afterparty-ci CF_D1_DATABASE_NAME=afterparty-ci-db CF_D1_DATABASE_ID=12345678-1234-4123-8123-123456789abc npm run build:cloudflare
           npm run build
       - name: Package the tested website output without rebuilding
         run: python3 scripts/build_release.py website

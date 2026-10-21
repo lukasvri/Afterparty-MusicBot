@@ -139,6 +139,11 @@ Replace the example hostname first. The expected response is the same as the loc
 
 ### Website hosting
 
+For a direct GitHub-to-Cloudflare Workers setup without Sites or Codex, use the
+[Cloudflare preparation guide](CLOUDFLARE.md). It provides the explicit build target
+and separates local validation from approved account setup, data migration and
+live cutover. Existing Sites databases must not receive fresh-database SQL blindly.
+
 The repository includes Sites/Vinext/Workers integration. Deployment still requires a hosting account and a real D1 database. This guide does not claim a tested one-click deploy to every Workers provider setup.
 
 For your chosen Sites or Workers deployment:

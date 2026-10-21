@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.4.0-alpha.15",
+    "date": "2026-10-21",
+    "title": "Prepare an opt-in Cloudflare website build",
+    "items": [
+      "Operators can explicitly build the website for native Cloudflare Workers with a DB binding and host-local deployment identity. The existing Sites build remains the default and is preserved for rollback; generated Cloudflare settings and deployment IDs stay out of source control.",
+      "Cloudflare builds validate their target and output before a separate explicit deployment command. Builds do not apply remote database migrations, change Core, switch DNS or configure automatic deployment. The migration guide describes isolated staging, database migration-history reconciliation and an owner-approved cutover.",
+      "This alpha is source preparation only. No Cloudflare account, live website, database, production bridge, Discord login or production deployment has been changed or verified."
+    ]
+  },
+  {
     "version": "2.4.0-alpha.14",
     "date": "2026-10-21",
     "title": "A calmer, consistent interface across Afterparty",
