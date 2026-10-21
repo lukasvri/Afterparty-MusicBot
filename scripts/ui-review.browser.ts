@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Locator } from "playwright";
+import type { Player } from "../lib/youtube-player.ts";
 import type { Room, Video } from "../lib/types.ts";
 import { GuessGame } from "../services/core/src/guess-game.ts";
 import { OperatorGuessCatalog, UnavailableGuessCatalog } from "../services/core/src/guess-catalog.ts";
@@ -12,6 +13,8 @@ const base = new URL(process.env.PREVIEW_URL ?? "http://127.0.0.1:8793").origin;
 assert(["localhost", "127.0.0.1"].includes(new URL(base).hostname), "Only a local preview is allowed");
 const phase = process.env.UI_REVIEW_PHASE ?? "after";
 assert(["before", "after"].includes(phase));
+const scope = process.env.UI_REVIEW_SCOPE ?? "all";
+assert(["all", "cinema"].includes(scope));
 const output = resolve(process.env.UI_REVIEW_OUTPUT ?? "outputs/ui-review", phase);
 await mkdir(output, { recursive: true });
 const track = (index: number): Video => ({ id: `audit${String(index).padStart(6, "0")}`, title: index === 1 ? "Synthetic Artist - A very long evening song title with extended festival recording and encore details" : `Synthetic Artist - Evening recording ${index}`, artist: "Synthetic Artist - Topic", image: "/afterparty-mark.svg", duration: 213, live: false, embeddable: true });
@@ -22,6 +25,7 @@ const captures: { surface: string; language: string; width: number; screenshot: 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH, args: ["--no-sandbox"] });
 try {
   for (const [width, height, language] of [[1440, 1000, "en"], [390, 844, "nb"], [360, 800, "en"], [768, 1024, "nb"]] as const) {
+    if (scope === "cinema" && width !== 1440) continue;
     if (process.env.UI_REVIEW_WIDTHS && !process.env.UI_REVIEW_WIDTHS.split(",").includes(String(width))) continue;
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" });
     const errors: string[] = [], commands: string[] = [], unexpected: string[] = [];
@@ -33,6 +37,24 @@ try {
       localStorage.setItem("afterparty-motion", "off");
       localStorage.setItem("afterparty-visitor", "a".repeat(32));
       localStorage.setItem("afterparty-host:TESTROOM", "synthetic-ui-host");
+      class AuditPlayer implements Player {
+        position = 47; volume = 60; muted = false; state = 5;
+        constructor(target: HTMLElement, options: Record<string, unknown>) {
+          const frame = document.createElement("iframe"); frame.dataset.auditPlayer = "synthetic";
+          frame.title = "Synthetic local 16:9 video surface";
+          frame.srcdoc = '<style>html,body{margin:0;width:100%;height:100%;background:#101014;color:#aaa}body{display:grid;place-items:center;font:20px sans-serif}</style>Synthetic local video surface';
+          target.replaceWith(frame);
+          queueMicrotask(() => (options.events as { onReady: () => void }).onReady());
+        }
+        loadVideoById(value: { startSeconds: number }) { this.position = value.startSeconds; this.state = 1; }
+        cueVideoById(value: { startSeconds: number }) { this.position = value.startSeconds; this.state = 5; }
+        playVideo() { this.state = 1; } pauseVideo() { this.state = 2; }
+        seekTo(value: number) { this.position = value; } getCurrentTime() { return this.position; }
+        getPlayerState() { return this.state; } setVolume(value: number) { this.volume = value; }
+        getVolume() { return this.volume; } mute() { this.muted = true; } unMute() { this.muted = false; }
+        isMuted() { return this.muted; } setPlaybackRate() {} destroy() {}
+      }
+      window.YT = { Player: AuditPlayer };
     }, { language });
     await context.route("**/*", async route => {
       const request = route.request(), url = new URL(request.url());
@@ -51,9 +73,10 @@ try {
         }
       } else if (url.pathname === "/api/rooms/TESTROOM") {
         if (input) {
-          assert.equal(input.action, "add");
-          room = { ...room, queue: [...room.queue, track(9)], version: room.version + 1 };
-          commands.push("room:add");
+          assert(["add", "play", "played"].includes(input.action), "Only exercised room commands receive a fixture");
+          room = input.action === "add" ? { ...room, queue: [...room.queue, track(9)], version: room.version + 1 }
+            : input.action === "play" ? { ...room, playing: true, version: room.version + 1 } : room;
+          commands.push(`room:${input.action}`);
           data = { room };
         } else data = { ...room, serverTime: Date.now() };
       } else if (url.pathname === "/api/rooms") {
@@ -80,7 +103,7 @@ try {
     page.setDefaultTimeout(12000);
     page.on("pageerror", error => errors.push(error.message));
     let surface = "";
-    const check = (condition: boolean, issue: string) => { if (!condition) findings.push({ surface, language, width, issue }); };
+    const check = (condition: boolean, issue: string) => { if (!condition) findings.push({ surface, language, width: page.viewportSize()?.width ?? width, issue }); };
     const inspect = async (name: string, targets = "") => {
       surface = name;
       await page.evaluate(() => document.fonts.ready);
@@ -91,9 +114,10 @@ try {
         }).map(element => ({ text: (element.getAttribute("aria-label") || element.textContent || "").trim().slice(0, 80), width: Math.round(element.getBoundingClientRect().width), height: Math.round(element.getBoundingClientRect().height) })));
         check(small.length === 0, `Primary touch targets below 44px: ${JSON.stringify(small)}`);
       }
-      const screenshot = resolve(output, `${name}-${language}-${width}.png`);
-      await page.screenshot({ path: screenshot, fullPage: name !== "patch-notes", animations: "disabled" });
-      captures.push({ surface, language, width, screenshot });
+      const screenshot = resolve(output, `${name}-${language}-${page.viewportSize()?.width ?? width}.png`);
+      await page.screenshot({ path: screenshot, fullPage: !["patch-notes", "cinema-fullscreen"].includes(name), animations: "disabled" });
+      captures.push({ surface, language, width: page.viewportSize()?.width ?? width, screenshot });
+      if (name === "search-long-titles" && (width === 1440 || width === 390)) await page.locator(".library-panel").screenshot({ path: resolve(output, `search-panel-${language}-${width}.png`), animations: "disabled" });
     };
     const goto = async (path: string, ready: string) => {
       const response = await page.goto(base + path, { waitUntil: "networkidle" });
@@ -106,6 +130,7 @@ try {
       check(await target.evaluate(element => { const style = getComputedStyle(element); return document.activeElement === element && (style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0 || style.boxShadow !== "none"); }), "Keyboard focus indicator is absent");
     };
     try {
+      if (scope === "all") {
       await goto("/", ".welcome-start");
       await inspect("welcome", ".welcome-start,.top-actions .button,.language-switch button");
       const start = page.locator(".welcome-start");
@@ -185,11 +210,39 @@ try {
           }
         }
       }
+      }
+      if (width === 1440) {
+        room = { ...room, isHost: false, isOwner: false };
+        await page.setViewportSize({ width: 1280, height: 480 });
+        await goto("/?room=TESTROOM", ".stage-intro .button.primary");
+        await page.locator(".stage-intro .button.primary").click();
+        const player = page.locator("[data-audit-player]"); await player.waitFor({ state: "attached" });
+        const handle = await player.elementHandle(); assert(handle);
+        surface = "stage-short-viewport";
+        check(await page.locator(".stage").evaluate(element => { const box = element.getBoundingClientRect(); return Math.abs(box.width / box.height - 16 / 9) < .02; }), "Active stage does not preserve a 16:9 slot");
+        await inspect("stage-short-viewport");
+        await page.locator("[data-fullscreen-button]").click();
+        await page.locator(".stage-panel[data-immersive=true]").waitFor();
+        surface = "cinema-fullscreen";
+        check(await page.locator(".cinema-toolbar").evaluate(element => { const box = element.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight; }), "Fullscreen controls exceed short viewport");
+        await page.locator(".cinema-toolbar .video-settings > summary").click();
+        check(await page.locator(".cinema-toolbar .video-settings-body").evaluate(element => { const box = element.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight; }), "Fullscreen settings exceed short viewport");
+        await inspect("cinema-fullscreen");
+        await page.getByRole("button", { name: "Exit fullscreen", exact: true }).click();
+        if (!await page.locator(".video-settings").evaluate(element => (element as HTMLDetailsElement).open)) await page.locator(".video-settings > summary").click();
+        await page.locator(".tv-mode-button").click();
+        await page.locator(".tv-invite").waitFor();
+        surface = "tv-short-viewport";
+        check(await page.locator(".stage").evaluate(element => { const box = element.getBoundingClientRect(); return Math.abs(box.width / box.height - 16 / 9) < .02; }), "TV stage does not preserve a 16:9 slot");
+        check(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1), "TV layout requires vertical scrolling at a short wide viewport");
+        check(await handle.evaluate(element => element.isConnected), "Fullscreen and TV navigation replaced the source player");
+        await inspect("tv-short-viewport");
+      }
       assert.deepEqual(errors, [], "No uncaught browser errors");
       assert.deepEqual(unexpected, [], "Every API call is explicitly controlled");
     } finally { await context.close(); }
   }
-  await writeFile(resolve(output, "checks.json"), JSON.stringify({ phase, captures, findings }, null, 2) + "\n");
+  await writeFile(resolve(output, scope === "cinema" ? "checks-cinema.json" : "checks.json"), JSON.stringify({ phase, captures, findings }, null, 2) + "\n");
   console.log(JSON.stringify({ phase, captures: captures.length, findings, output }, null, 2));
   if (phase === "after") assert.equal(findings.length, 0, "UI acceptance findings remain; see checks.json");
 } finally { await browser.close(); }
