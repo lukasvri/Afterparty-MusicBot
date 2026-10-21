@@ -32,7 +32,7 @@ The evening library is device-local, with validated JSON import/export. It is no
 
 Mobile controls keep player, search, queue and saved evenings reachable. Search moves focus into the visible input. Navigation uses browser history, and TV mode is a shareable URL state. TV mode keeps guest QR sharing visible while hiding editing panels. YouTube consent and autoplay restrictions still apply; the app does not bypass them.
 
-Music search requests up to 30 results in one bounded lookup. The panel reveals ten at a time locally and preserves keyboard focus when more appear. Up to four suggestions use the already loaded current artist and listening history; they start a search only when selected. Known AI declarations are excluded from automatic suggestions. Editing the input cancels and retires the previous request, so old results or errors cannot replace the new query.
+Music search requests up to 30 results in one bounded lookup. The panel reveals ten at a time locally and preserves keyboard focus when more appear. Up to four suggestions use the already loaded current artist and listening history; they start a search only when selected. Known AI declarations are excluded from automatic suggestions. Cold searches have a 35-second browser deadline so responses within the Core bridge's 25-second window can arrive. Editing the input cancels and retires the previous request immediately, so old results or errors cannot replace the new query.
 
 The website fallback separates radio music searches (20 candidates) from user searches (30), and radio does not spend the user's search allowance. Empty search results expire after one minute; global provider quota limits still apply.
 
