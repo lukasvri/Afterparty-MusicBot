@@ -1,5 +1,5 @@
 import {importPreviousData} from './data-import.ts';
-import {prepareConfiguredGuessSource} from './guess-source.ts';
+import {GuessSourceManager} from './guess-source-manager.ts';
 import {join} from 'node:path';
 import {Client,Events,GatewayIntentBits,ActivityType} from 'discord.js';
 import {UserError} from './types.ts';
@@ -29,9 +29,15 @@ client.on(Events.ShardDisconnect,()=>ready(false));client.on(Events.ShardResume,
 if(!shadow){await client.login(env.DISCORD_TOKEN??'');if(!client.isReady())await new Promise<void>(r=>client.once(Events.ClientReady,()=>r()));ready(true);for(const id of client.guilds.cache.keys())await ensure(id);}
 const oauth=new DiscordOAuth(key,client.user?.id??env.DISCORD_CLIENT_ID??'',env.DISCORD_CLIENT_SECRET??'',new URL(site).origin);
 const guessLifetime=new AbortController();
-let guessSource:Awaited<ReturnType<typeof prepareConfiguredGuessSource>>;
-try{guessSource=await prepareConfiguredGuessSource(env,{signal:guessLifetime.signal});}catch{console.warn('The configured game preview source is unavailable. Ordinary playback remains available.');}
-const servers=await createServers(engine,commands,{key,origin:new URL(site).origin,publicPort:Number(env.CORE_PORT??3990),isReady:()=>client.isReady(),guilds,oauth,guessCatalog:guessSource?.catalog,guessMedia:guessSource?.media,applicationId:()=>client.user?.id??'',onRequest:ms=>metrics.request(ms)});
-const presence=setInterval(()=>client.user?.setActivity(`${[...guilds.sessions.values()].filter(s=>s.engine.snapshot().playing).length} servers playing · Afterparty`,{type:ActivityType.Listening}),15000);
-console.log('Afterparty is ready for multiple servers. Manage it on the website.');
-const close=async()=>{if(closing)return;closing=true;guessLifetime.abort();guessSource?.dispose();clearInterval(presence);for(const p of publishers.values())p.close();for(const s of guilds.sessions.values()){s.engine.checkpoint();await s.bot.close();s.commands.close();s.engine.close();if(s.id!==defaultId)s.engine.store.close();}if(!guilds.sessions.has(defaultId)){commands.close();engine.close();}await client.destroy();metrics.close();await servers.close();store.close();process.exit(0);};process.on('SIGTERM',()=>void close());process.on('SIGINT',()=>void close());
+const guessSource=new GuessSourceManager({env,signal:guessLifetime.signal});
+let servers:Awaited<ReturnType<typeof createServers>>|undefined,presence:ReturnType<typeof setInterval>|undefined;
+const reloadGuess=async()=>{const available=await guessSource.reload();if(!closing&&guessSource.configured){if(available)console.log('The configured game preview source is ready.');else console.warn('The configured game preview source is unavailable. Ordinary playback remains available.');}};
+const onGuessReload=()=>{void reloadGuess();};
+const close=async()=>{if(closing)return;closing=true;process.off('SIGHUP',onGuessReload);guessLifetime.abort();guessSource.dispose();clearInterval(presence);for(const p of publishers.values())p.close();for(const s of guilds.sessions.values()){s.engine.checkpoint();await s.bot.close();s.commands.close();s.engine.close();if(s.id!==defaultId)s.engine.store.close();}if(!guilds.sessions.has(defaultId)){commands.close();engine.close();}await client.destroy();metrics.close();await servers?.close();store.close();process.exit(0);};process.on('SIGTERM',()=>void close());process.on('SIGINT',()=>void close());
+process.on('SIGHUP',onGuessReload);
+await reloadGuess();
+if(!closing){
+ servers=await createServers(engine,commands,{key,origin:new URL(site).origin,publicPort:Number(env.CORE_PORT??3990),isReady:()=>client.isReady(),guilds,oauth,guessCatalog:guessSource.catalog,guessMedia:guessSource.media,applicationId:()=>client.user?.id??'',onRequest:ms=>metrics.request(ms)});
+ presence=setInterval(()=>client.user?.setActivity(`${[...guilds.sessions.values()].filter(s=>s.engine.snapshot().playing).length} servers playing · Afterparty`,{type:ActivityType.Listening}),15000);
+ console.log('Afterparty is ready for multiple servers. Manage it on the website.');
+}
