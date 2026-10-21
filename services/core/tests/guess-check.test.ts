@@ -47,6 +47,17 @@ test('synthetic mode reports local capacity without selecting songs or decoding 
   }), { provider: 'synthetic', status: 'ready', categories: [{ id: 'synthetic-test', count: 5, durations: [{ seconds: 30, count: 5 }] }] });
 });
 
+test('YouTube preflight forwards only its private configuration and reports bounded capacity', async () => {
+  const f = fixture(), extract = async () => { throw Error('the injected factory must not extract'); };
+  const result = await checkConfiguredGuessSource({ GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_INVENTORY_PATH: '/private/youtube.json',
+    DISCORD_TOKEN: 'private-unused-token' }, { signal: signal(), youtube: { extract } }, (config, options) => {
+    assert.equal(config.GUESS_YOUTUBE_CLIPS, '1'); assert.equal(config.GUESS_YOUTUBE_INVENTORY_PATH, '/private/youtube.json');
+    assert(!('DISCORD_TOKEN' in config)); assert.equal(options.youtube?.extract, extract); return f.source;
+  });
+  assert.deepEqual(result, { provider: 'youtube', status: 'ready', categories: [{ id: '2010s', count: 1, durations: [{ seconds: 30, count: 1 }] }] });
+  assert.equal(f.disposed(), 1); assert(!JSON.stringify(result).includes('/private/'));
+});
+
 test('private-file preflight decodes generated MP3 with real FFmpeg, reports measured capacity and disposes copied audio', async t => {
   const config = await privateFile(t), calls: string[] = [];
   const generated = spawnSync(process.env.FFMPEG_PATH ?? 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
@@ -148,16 +159,19 @@ test('expired permission in the real private-file factory never reports ready or
 
 test('CLI emits one safe JSON object without bot credentials and returns the expected status codes', () => {
   const script = fileURLToPath(new URL('../src/guess-check.ts', import.meta.url));
-  for (const mode of ['disabled', 'synthetic', 'unavailable']) {
+  for (const mode of ['disabled', 'synthetic', 'unavailable', 'youtube-unavailable']) {
     const child = spawnSync(process.execPath, [script], { timeout: 10000, encoding: 'utf8', env: { ...process.env,
       GUESS_DEEZER_PREVIEWS: mode === 'unavailable' ? '1' : '0', GUESS_SYNTHETIC_TEST: mode === 'synthetic' ? '1' : '0',
+      GUESS_YOUTUBE_CLIPS: mode === 'youtube-unavailable' ? '1' : '0', GUESS_YOUTUBE_INVENTORY_PATH: '/nonexistent/private-youtube.json',
       GUESS_DEEZER_INVENTORY_PATH: '/nonexistent/private-inventory.json', DISCORD_TOKEN: '', DISCORD_GUILD_ID: '', PUBLIC_SITE_ADMIN_KEY: '', PUBLIC_SITE_URL: '',
     } });
-    assert.equal(child.status, mode === 'unavailable' ? 1 : 0, child.stderr); assert.equal(child.stderr, '');
+    const unavailable = mode.endsWith('unavailable');
+    assert.equal(child.status, unavailable ? 1 : 0, child.stderr); assert.equal(child.stderr, '');
     const output = JSON.parse(child.stdout);
-    assert.equal(output.status, mode === 'synthetic' ? 'ready' : mode);
-    assert.equal(output.provider, mode === 'unavailable' ? 'deezer' : mode);
+    assert.equal(output.status, unavailable ? 'unavailable' : mode === 'synthetic' ? 'ready' : mode);
+    assert.equal(output.provider, mode === 'youtube-unavailable' ? 'youtube' : mode === 'unavailable' ? 'deezer' : mode);
     assert(!child.stdout.includes('private-inventory'));
+    assert(!child.stdout.includes('private-youtube'));
     assert.equal(child.stdout.trim().split('\n').length, 1);
   }
 });

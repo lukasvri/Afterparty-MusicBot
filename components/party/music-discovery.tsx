@@ -1,12 +1,17 @@
 "use client";
 import Image from "next/image";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { LoaderCircle, Plus, Search, X } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import { time, type Video, type HistoryVideo } from "@/lib/types";
+import { radioArtist } from "@/services/core/src/radio";
+import { metadataAiGenerated } from "@/services/core/src/music-content";
 
 type Props = {
   query: string;
+  resultQuery: string;
+  current: Video | null | undefined;
+  history: HistoryVideo[];
   searching: boolean;
   searched: boolean;
   historySort: "recent" | "popular";
@@ -16,6 +21,7 @@ type Props = {
   discordConnected: boolean;
   onQuery: (query: string) => void;
   onSearch: () => void;
+  onSuggestion: (query: string) => void;
   onSort: (sort: "recent" | "popular") => void;
   onHistory: () => void;
   onAdd: (video: Video) => void;
@@ -24,6 +30,9 @@ type Props = {
 /** Discovery owns its presentation; room commands remain at the room boundary. */
 export function MusicDiscovery({
   query,
+  resultQuery,
+  current,
+  history,
   searching,
   searched,
   historySort,
@@ -33,12 +42,29 @@ export function MusicDiscovery({
   discordConnected,
   onQuery,
   onSearch,
+  onSuggestion,
   onSort,
   onHistory,
   onAdd,
 }: Props) {
   const { t } = useLanguage();
   const descriptionId = useId();
+  const [expanded, setExpanded] = useState({ key: "", count: 10 });
+  const resultKey = resultQuery + ":" + shown.map(video => video.id).join(",");
+  const visibleCount = searched && expanded.key === resultKey ? expanded.count : 10;
+  const visible = searched ? shown.slice(0, visibleCount) : shown;
+  const normalize = (value: string) => value.normalize("NFKC").toLowerCase().trim();
+  const needle = normalize(query);
+  const eligible = (video: Video) => video.aiGenerated !== true && metadataAiGenerated(video.title, video.artist) !== true;
+  const suggestions = /^https?:\/\//i.test(query.trim()) ? [] : [
+    ...(current && eligible(current) ? [radioArtist(current)] : []),
+    ...history.filter(eligible).flatMap(video => [radioArtist(video), video.title]),
+  ].filter((value, index, values) => {
+    const clean = value.trim(), normalized = normalize(clean);
+    return clean.length >= 2 && clean.length <= 120 && !/[\p{Cc}\p{Cf}]/u.test(clean) &&
+      normalized !== needle && (!needle || normalized.includes(needle)) &&
+      values.findIndex(candidate => normalize(candidate) === normalized) === index;
+  }).slice(0, 4);
   return (
     <section
       id="music-content"
@@ -51,6 +77,7 @@ export function MusicDiscovery({
         className="search-form"
         onSubmit={(e) => {
           e.preventDefault();
+          setExpanded({ key: "", count: 10 });
           onSearch();
         }}
       >
@@ -75,6 +102,19 @@ export function MusicDiscovery({
           )}
         </button>
       </form>
+      {suggestions.length > 0 && (
+        <div className="search-suggestions" role="group" aria-label={t("Suggested searches")}>
+          <span>{t("Suggested searches")}</span>
+          <div>
+            {suggestions.map(suggestion => (
+              <button type="button" key={suggestion} onClick={() => { setExpanded({ key: "", count: 10 }); onSuggestion(suggestion); }}
+                aria-label={t("Search for {query}", { query: suggestion })}>
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="search-chips">
         {!searched ? (
           <>
@@ -99,6 +139,7 @@ export function MusicDiscovery({
           </button>
         )}
       </div>
+      {searched && <p className="search-result-query">{t("Results for {query}", { query: resultQuery })}</p>}
       <p className="discovery-summary" role="status" aria-live="polite" aria-atomic="true">
         {adding ? t("Updating queue…") : !searching && shown.length > 0
           ? t(shown.length === 1 ? "1 track" : "{count} tracks", { count: shown.length }) : ""}
@@ -109,7 +150,7 @@ export function MusicDiscovery({
         </div>
       ) : shown.length ? (
         <div className="music-list">
-          {shown.map((v, index) => {
+          {visible.map((v, index) => {
             const unavailable = discordMode && !discordConnected
               ? t("Connect the bot to a Discord voice channel before adding music.")
               : !discordMode && !v.embeddable ? t("This video cannot be played in a browser room.") : "";
@@ -157,6 +198,15 @@ export function MusicDiscovery({
           {searched
             ? t("Ingen treff. Prøv eit anna søk.")
             : t("Ingen låtar i historikken enno.")}
+        </div>
+      )}
+      {searched && !searching && shown.length > 10 && (
+        <div className="search-pagination">
+          <span role="status" aria-live="polite">{t("Showing {shown} of {total}", { shown: visible.length, total: shown.length })}</span>
+          <button type="button" className="button subtle" aria-disabled={visible.length >= shown.length}
+            onClick={() => { if (visible.length < shown.length) setExpanded({ key: resultKey, count: visible.length + 10 }); }}>
+            {visible.length < shown.length ? t("Show {count} more", { count: Math.min(10, shown.length - visible.length) }) : t("All results shown")}
+          </button>
         </div>
       )}
       <p className="library-note">

@@ -1,4 +1,5 @@
 import type { PublicTrack, Track } from "./types.ts";
+import { metadataAiGenerated } from "./music-content.ts";
 
 const normalize = (s: string) =>
   s
@@ -46,6 +47,7 @@ export function metadataMusic(category: unknown, categories?: unknown): boolean 
 export function isRadioTitle(title: string) {
   const text = normalize(title);
   return (
+    metadataAiGenerated(title, undefined) !== true &&
     !/\b(reactions?|reacts|interviews?|tutorials?|howto|podcasts?|compilations?|playlist|full album|full set|dj set|live set|concert|hours?|best of|top \d+|karaoke|remake|recreation|recreated|bootleg|fanmade|sped up|slowed|lessons?|masterclass|walkthrough|walk through|step by step|sound design|production tips|production lesson|fl studio|ableton|logic pro|garageband|behind the scenes|making of|breakdown|explained|vlogs?|gameplay|unboxing|documentary|documentaries|studio tour|room tour|music news|album review|song review|track review|pranks?|challenge video|funny moments|memes?|trailer|teaser|shorts)\b/i.test(
       text,
     ) &&
@@ -73,6 +75,7 @@ export function isRadioTitle(title: string) {
 export function isRadioMusic(track: RadioTrack) {
   return (
     track.music !== false &&
+    track.aiGenerated !== true && metadataAiGenerated(track.title, track.artist) !== true &&
     !track.live &&
     Number.isFinite(track.duration) &&
     track.duration >= 90 &&

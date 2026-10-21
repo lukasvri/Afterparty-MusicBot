@@ -14,6 +14,8 @@ export type Video = {
   url?: string;
   genres?: string[];
   music?: boolean;
+  /** Explicit provider/upload declaration, not a general provenance detector. */
+  aiGenerated?: boolean;
   requestedBy?: string;
   radio?: boolean;
 };

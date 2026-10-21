@@ -58,6 +58,7 @@ without introducing a second Java/Lavalink service or changing queues.
 | Deezer links for ordinary music | Optional metadata lookup for canonical track, album and playlist links, followed by the existing strict source matcher. |
 | Music quiz delivery | Existing private, authenticated per-device WAV transport with source expiry and cancellation checks. |
 | Prepared Deezer quiz previews | Default-off local pilot for at most eight explicitly approved tracks. Fixed metadata/CDN requests, bounded MP3 decoding and the existing private transport are exercised with generated audio only. |
+| YouTube audio-only quiz clips | Separate default-off pilot using yt-dlp and FFmpeg with curated video IDs, clip offsets and 15–30-second WAV output. Private per-participant audio uses the existing game transport without an embedded video player. Tests use generated WebM/M4A and controlled responses. |
 
 Skip quorum counts the current joined anonymous roster, including disconnected
 tabs. It does not establish unique people or online listeners. The host's reveal
@@ -88,6 +89,13 @@ allowlist is deliberately conservative; current live URL formats, availability
 and provider permission have not been verified. See the
 [adapter contract](GUESS_CATALOG_SOURCES.md#deezer-preview-preparation-adapter)
 for limits and the synthetic end-to-end acceptance boundary.
+
+`GUESS_YOUTUBE_CLIPS=1` selects the separate audio-only source with a private
+`GUESS_YOUTUBE_INVENTORY_PATH`. It shares the existing inventory expiry and
+private round authorization while retaining independent decoding/resource limits.
+Only one quiz source can be selected. This source does not establish live
+YouTube availability or recording/provider permissions. See the
+[YouTube pilot setup](GUESS_CATALOG_SOURCES.md#youtube-audio-clip-pilot).
 
 ## Remaining work
 

@@ -294,16 +294,18 @@ export async function createServers(
       }
       if (url.pathname === "/v1/catalog") {
         authenticate(request);
-        const query = url.searchParams.get("q"),
-          ids = url.searchParams.get("ids");
-        if (query && (query.length < 2 || query.length > 120))
+        const query = url.searchParams.get("q")?.trim(),
+          ids = url.searchParams.get("ids"), mode = url.searchParams.get("mode");
+        if (url.searchParams.getAll("mode").length > 1 || mode !== null && mode !== "radio")
+          throw new UserError("Invalid catalog search mode.");
+        if (query !== undefined && (query.length < 2 || query.length > 120))
           throw new UserError("Enter between 2 and 120 characters.");
         if (ids && !/^[\w,-]{11,600}$/.test(ids))
           throw new UserError("Invalid video IDs.");
         const tracks = ids
           ? await engine.providers.video(ids.split(",").slice(0, 50))
           : query
-            ? await engine.providers.search(query, 8)
+            ? await engine.providers.search(query, mode === "radio" ? 20 : 30, mode === "radio")
             : [];
         json(response, 200, { videos: tracks.map((t) => publicTrack(t)) });
         return;

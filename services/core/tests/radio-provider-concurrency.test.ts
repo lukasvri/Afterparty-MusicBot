@@ -111,7 +111,7 @@ test("128 pending IDs bound saturation while cached/pending joins survive and ca
   try {
     const providers = new Providers(store, {}), requested: string[][] = [];
     const cachedId = "cache000001";
-    store.set("metadata:v4:" + cachedId, { at: Date.now(), track: { id: cachedId, title: "Artist - Cached", artist: "Artist",
+    store.set("metadata:v5:" + cachedId, { at: Date.now(), track: { id: cachedId, title: "Artist - Cached", artist: "Artist",
       entryId: "old-entry", duration: 210, image: "", live: false, embeddable: true } });
     providers.youtube = async <K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) => {
       assert.equal(path, "videos"); const batch = params.id.split(","); requested.push(batch);

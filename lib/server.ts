@@ -1,5 +1,6 @@
 import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
+import { metadataAiGenerated } from "../services/core/src/music-content.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { env as cloudEnv } from "cloudflare:workers";
 import type { Video, RoomState, Room } from "./types";
@@ -200,7 +201,7 @@ export function videoId(input: string) {
   return id;
 }
 const inFlight = new Map<string, Promise<unknown>>();
-async function cached<T>(key: string, provider: () => Promise<T>): Promise<T> {
+async function cached<T>(key: string, provider: () => Promise<T>, lifetime: (result: T) => number = () => 3600000): Promise<T> {
   const row = await db()
     .prepare("SELECT data FROM cached WHERE key=? AND expires_at>?")
     .bind(key, Date.now())
@@ -220,7 +221,7 @@ async function cached<T>(key: string, provider: () => Promise<T>): Promise<T> {
       .prepare(
         "INSERT INTO cached(key,data,expires_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data, expires_at=excluded.expires_at",
       )
-      .bind(key, JSON.stringify(result), Date.now() + 3600000)
+      .bind(key, JSON.stringify(result), Date.now() + lifetime(result))
       .run();
     return result;
   })();
@@ -267,7 +268,7 @@ export async function videos(
   ids: string[],
 ): Promise<Video[]> {
   if (!ids.length) return [];
-  return cached(`videos:v3:${ids.join(",")}`, async () => {
+  return cached(`videos:v4:${ids.join(",")}`, async () => {
     if (coreUrl()) {
       try {
         return (
@@ -288,6 +289,7 @@ export async function videos(
       id: v.id,
       genres: metadataGenres(v.snippet.description, v.snippet.tags),
       music: metadataMusic(v.snippet.categoryId),
+      aiGenerated: metadataAiGenerated(v.snippet.title, v.snippet.channelTitle, v.snippet.description, v.snippet.tags, v.status.containsSyntheticMedia),
       title: decode(v.snippet.title),
       artist: decode(v.snippet.channelTitle),
       image: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
@@ -298,20 +300,25 @@ export async function videos(
   });
 }
 export async function search(request: Request, query: string) {
+  return searchVideos(request, query, false);
+}
+/** Only room handlers can select the internal radio mode; public search has a fixed budget. */
+async function searchVideos(request: Request, query: string, radio: boolean) {
   query = query.trim();
   if (query.length < 2 || query.length > 120)
     fail(400, "Skriv mellom 2 og 120 tegn.");
-  await limit(request, "search-visitor", 20, 600000);
+  await limit(request, radio ? "radio-visitor" : "search-visitor", radio ? 120 : 20, 600000);
   if (/^https?:\/\//.test(query))
     return { videos: await videos(request, [videoId(query)]) };
-  const result = await cached(`search:v3:${query.toLowerCase()}`, async () => {
+  const count = radio ? 20 : 30;
+  const result = await cached(`search:v5:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async () => {
     if (coreUrl()) {
       try {
         return (
           await coreRequest<{ videos: Video[] }>(
-            "/v1/catalog?q=" + encodeURIComponent(query),
+            "/v1/catalog?q=" + encodeURIComponent(query) + (radio ? "&mode=radio" : ""),
           )
-        ).videos;
+        ).videos.slice(0, count);
       } catch {
         /* retain the direct metadata API */
       }
@@ -321,15 +328,16 @@ export async function search(request: Request, query: string) {
       part: "snippet",
       q: query,
       type: "video",
-      maxResults: "8",
+      maxResults: String(count),
       videoEmbeddable: "true",
       safeSearch: "moderate",
+      ...(radio ? { videoCategoryId: "10" } : {}),
     });
     return videos(
       request,
-      data.items.map((v) => v.id.videoId),
+      [...new Set(data.items.map((v) => v.id.videoId).filter(id => /^[\w-]{11}$/.test(id)))].slice(0, count),
     );
-  });
+  }, videos => videos.length ? 3600000 : 60000);
   return { videos: result };
 }
 type Row = {
@@ -404,7 +412,7 @@ export async function publicRoom(
     try {
       recommended = await roomRecommendation(
         state,
-        async (query) => (await search(request, query)).videos,
+        async (query) => (await searchVideos(request, query, true)).videos,
       );
     } catch {
       /* end cleanly when radio is unavailable */
@@ -676,7 +684,7 @@ export async function mutate(
   if (needsRecommendation(state, command))
     recommended = await roomRecommendation(
       { ...state, ...(command.action === "radio" ? { radio: command.enabled === true } : {}) },
-      async (query) => (await search(request, query)).videos,
+      async (query) => (await searchVideos(request, query, true)).videos,
     );
   const now = Date.now(),
     position =
