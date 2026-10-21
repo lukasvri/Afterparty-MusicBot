@@ -7,12 +7,80 @@ const locales=new Set(['en','us','gb','fr','de','es','it','pt','br','nl','pl','n
 const maxBytes=512*1024,maxPages=10,pageSize=50;
 const unavailable=()=>new UserError('Deezer metadata is unavailable. Try again later.',502);
 const object=(value:unknown):Record<string,unknown>|null=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;
+const tracking=new Set(['utm_source','utm_medium','utm_campaign','utm_content','utm_term']);
+const control=/[\p{Cc}\p{Cf}]/u;
+const sharingUnavailable=()=>new UserError('Could not open this Deezer sharing link. Try again later.',502);
+let sharingRequests=0;
+
+/** Tracking is inert metadata: validate it, then remove it before constructing any request. */
+function cleanLink(value:string):string|null{
+ if(value.length>2048||control.test(value)||value.includes('#'))return null;
+ const question=value.indexOf('?');if(question<0)return value;
+ const parts=value.slice(question+1).split('&'),seen=new Set<string>();
+ if(parts.length>5)return null;
+ for(const part of parts){
+  const equal=part.indexOf('='),key=part.slice(0,equal);
+  if(equal<1||!tracking.has(key)||seen.has(key)||/%(?![0-9a-f]{2})/i.test(part))return null;
+  const decoded=new URLSearchParams(part).get(key);
+  if(!decoded||decoded.length>256||control.test(decoded)||!decoded.trim())return null;
+  seen.add(key);
+ }
+ return value.slice(0,question);
+}
 
 /** Only canonical public links are accepted, before URL normalization can hide traversal. */
 export function deezerRef(query:string):DeezerRef|null{
- const match=/^https:\/\/(?:www\.)?deezer\.com\/(?:(?<locale>[a-z]{2})\/)?(?<kind>track|album|playlist)\/(?<id>[1-9][0-9]{0,19})\/?$/.exec(query);
+ const clean=cleanLink(query);if(!clean)return null;
+ const match=/^https:\/\/(?:www\.)?deezer\.com\/(?:(?<locale>[a-z]{2})\/)?(?<kind>track|album|playlist)\/(?<id>[1-9][0-9]{0,19})\/?$/.exec(clean);
  if(!match?.groups||match.groups.locale&&!locales.has(match.groups.locale))return null;
  return {kind:match.groups.kind as DeezerRef['kind'],id:match.groups.id};
+}
+
+export function deezerShareUrl(query:string):string|null{
+ const clean=cleanLink(query);
+ return clean&&/^https:\/\/link\.deezer\.com\/s\/[A-Za-z0-9_-]{1,128}$/.test(clean)?clean:null;
+}
+
+function sharingAbort<T>(pending:Promise<T>,signal:AbortSignal):Promise<T>{
+ return new Promise((resolve,reject)=>{
+  const abort=()=>{signal.removeEventListener('abort',abort);reject(sharingUnavailable());};
+  pending.then(value=>{signal.removeEventListener('abort',abort);if(signal.aborted)reject(sharingUnavailable());else resolve(value);},()=>{signal.removeEventListener('abort',abort);reject(sharingUnavailable());});
+  if(signal.aborted)abort();else signal.addEventListener('abort',abort,{once:true});
+ });
+}
+
+/** At most three GETs to the exact share endpoint. Canonical targets never need a web-page fetch. */
+export async function expandDeezerLink(value:string,fetcher:typeof fetch=fetch,externalSignal?:AbortSignal):Promise<DeezerRef>{
+ if(externalSignal?.aborted)throw sharingUnavailable();
+ const direct=deezerRef(value);if(direct)return direct;
+ let next=deezerShareUrl(value);if(!next)throw new UserError('Invalid Deezer sharing link.');
+ if(sharingRequests>=4)throw new UserError('Deezer sharing links are busy. Try again shortly.',503);
+ sharingRequests++;
+ const controller=new AbortController(),overall=externalSignal?AbortSignal.any([controller.signal,externalSignal]):controller.signal;
+ const timer=setTimeout(()=>controller.abort(),10000),visited=new Set<string>(),pending=new Set<Promise<Response>>();
+ try{
+  for(let hop=0;hop<3;hop++){
+   if(overall.aborted||visited.has(next))throw sharingUnavailable();visited.add(next);
+   const signal=AbortSignal.any([overall,AbortSignal.timeout(5000)]),endpoint=next;
+   let response:Response|undefined;
+   try{
+    const raw=fetcher(endpoint,{redirect:'manual',credentials:'omit',referrerPolicy:'no-referrer',headers:{Accept:'text/html'},signal});
+    pending.add(raw);void raw.then(()=>pending.delete(raw),()=>pending.delete(raw));
+    await sharingAbort(raw.then(result=>{response=result;if(signal.aborted)void result.body?.cancel().catch(()=>{});return result;}),signal);
+    if(!response||signal.aborted||response.redirected||response.url&&response.url!==endpoint||![301,302,303,307,308].includes(response.status))throw sharingUnavailable();
+    const location=response.headers.get('location');if(!location||location.length>2048)throw sharingUnavailable();
+    const canonical=deezerRef(location);if(canonical)return canonical;
+    // Only a raw, validated /s/token relative path can be resolved against the fixed share host.
+    const sharing=deezerShareUrl(location.startsWith('/')&&!location.startsWith('//')?'https://link.deezer.com'+location:location);
+    if(!sharing)throw sharingUnavailable();next=sharing;
+   }finally{void response?.body?.cancel().catch(()=>{});}
+  }
+  throw sharingUnavailable();
+ }catch{throw sharingUnavailable();}
+ finally{
+  controller.abort();clearTimeout(timer);
+  if(pending.size)void Promise.allSettled([...pending]).then(()=>{sharingRequests--;});else sharingRequests--;
+ }
 }
 
 function text(value:unknown,max:number):string|null{
@@ -79,7 +147,7 @@ export async function loadDeezer(ref:DeezerRef,limit:number,fetcher:typeof fetch
    if(ref.kind!=='track'&&!Array.isArray(data.data))throw unavailable();
    const entries=ref.kind==='track'?[data]:data.data as unknown[];
    if(entries.length>pageSize)throw unavailable();
-   for(const entry of entries){const candidate=song(entry);if(candidate&&!seen.has(candidate.id)){seen.add(candidate.id);songs.push(candidate.song);}if(songs.length===limit)break;}
+   for(const entry of entries){const candidate=song(entry);if(ref.kind==='track'&&candidate&&candidate.id!==ref.id)throw unavailable();if(candidate&&!seen.has(candidate.id)){seen.add(candidate.id);songs.push(candidate.song);}if(songs.length===limit)break;}
    if(ref.kind==='track'||entries.length<pageSize)break;
    if(typeof data.total==='number'&&Number.isSafeInteger(data.total)&&data.total>=0&&(page+1)*pageSize>=data.total)break;
   }
