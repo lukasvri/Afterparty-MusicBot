@@ -3,7 +3,7 @@ export type YouTubeVideo = {
   id: string;
   snippet: {title: string; channelTitle: string; description?: string; tags?: string[]; categoryId?: string; liveBroadcastContent?: string};
   contentDetails: {duration: string};
-  status: {embeddable?: boolean};
+  status: {embeddable?: boolean; containsSyntheticMedia?: boolean};
 };
 export type YouTubeResponses = {
   videos: {items: YouTubeVideo[]};

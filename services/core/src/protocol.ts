@@ -9,6 +9,8 @@ export type RoomVideo = {
   embeddable: boolean;
   genres?: string[];
   music?: boolean;
+  /** Explicit provider/upload declaration, not a general provenance detector. */
+  aiGenerated?: boolean;
   requestedBy?: string;
   radio?: boolean;
   /** Private room recommendation proof; removed from publicPlayback snapshots. */

@@ -784,3 +784,140 @@ for (const candidateTitle of ["Oasis - Song Live Wembley", "Oasis - Song Live Gl
     } finally { f.close(); }
   });
 }
+
+test('D1 user discovery returns thirty unique results in one bounded search and metadata batch', async () => {
+  const f = fixture();
+  try {
+    const ids = Array.from({ length: 35 }, (_, index) => `s${String(index).padStart(10, '0')}`);
+    const calls: string[] = [];
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      calls.push(url.pathname);
+      if (url.pathname.endsWith('/search')) {
+        assert.equal(url.searchParams.get('maxResults'), '30');
+        assert.equal(url.searchParams.has('videoCategoryId'), false);
+        return Response.json({ items: [ids[0], ...ids].map(videoId => ({ id: { videoId } })) });
+      }
+      const requested = url.searchParams.get('id')!.split(',');
+      assert.deepEqual(requested, ids.slice(0, 30));
+      return Response.json({ items: requested.map(id => ({ id,
+        snippet: { title: 'Artist - Original', channelTitle: 'Artist', categoryId: '10' },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true },
+      })) });
+    };
+    assert.deepEqual((await searchHandler(f.request, 'bounded discovery')).videos.map(video => video.id), ids.slice(0, 30));
+    assert.equal((await searchHandler(f.request, 'bounded discovery')).videos.length, 30);
+    assert.equal(calls.length, 2, 'Repeating a search reuses metadata without fetching another page');
+  } finally { f.close(); }
+});
+
+test('D1 empty searches expire after one minute and errors do not become cached empties', async () => {
+  const f = fixture(), now = Date.now;
+  let clock = now(), calls = 0, fail = true;
+  Date.now = () => clock;
+  try {
+    globalThis.fetch = async target => {
+      assert.equal(new URL(String(target)).pathname.endsWith('/search'), true);
+      calls++;
+      if (fail) return new Response('', { status: 503 });
+      return Response.json({ items: [] });
+    };
+    await assert.rejects(searchHandler(f.request, 'temporary empty'));
+    fail = false;
+    assert.deepEqual((await searchHandler(f.request, 'temporary empty')).videos, []);
+    assert.deepEqual((await searchHandler(f.request, 'temporary empty')).videos, []);
+    assert.equal(calls, 2);
+    clock += 61000;
+    assert.deepEqual((await searchHandler(f.request, 'temporary empty')).videos, []);
+    assert.equal(calls, 3);
+  } finally { Date.now = now; f.close(); }
+});
+
+test('D1 radio uses twenty music results and its own visitor allowance after user search is exhausted', async () => {
+  const f = fixture();
+  try {
+    await f.save('TESTROOM', { current: seed, queue: [], playing: true, position: 20 });
+    const provider = globalThis.fetch;
+    let radioSearches = 0;
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      if (url.pathname.endsWith('/search') && url.searchParams.get('q') !== 'user results') {
+        radioSearches++;
+        assert.equal(url.searchParams.get('maxResults'), '20');
+        assert.equal(url.searchParams.get('videoCategoryId'), '10');
+      }
+      return provider(target);
+    };
+    for (let index = 0; index < 20; index++) await searchHandler(f.request, 'user results');
+    await assert.rejects(searchHandler(f.request, 'user results'), error => error instanceof Error && 'status' in error && error.status === 429);
+    const result = await mutate(f.request, 'TESTROOM', { action: 'radio', enabled: true, version: 1 });
+    assert.equal(result.room.queue[0]?.id, next.id);
+    assert(radioSearches > 0);
+    const userBudget = f.sqlite.prepare("SELECT count FROM limits WHERE key LIKE 'search-visitor:%'").get();
+    assert.equal(userBudget?.count, 20, 'Internal radio lookups never spend the user search allowance');
+  } finally { f.close(); }
+});
+
+test('D1 retains description, tags and synthetic-media AI declarations for radio revalidation', async () => {
+  const f = fixture();
+  try {
+    const ids = ['ai000000001', 'ai000000002', 'ai000000003'];
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      if (url.pathname.endsWith('/search')) return Response.json({ items: ids.map(videoId => ({ id: { videoId } })) });
+      return Response.json({ items: ids.map((id, index) => ({ id,
+        snippet: { title: 'Artist - Quiet song', channelTitle: 'Artist', categoryId: '10',
+          ...(index === 0 ? { description: 'Created using Suno' } : index === 1 ? { tags: ['AI generated'] } : {}) },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true, ...(index === 2 ? { containsSyntheticMedia: true } : {}) },
+      })) });
+    };
+    const result = await searchHandler(f.request, 'negative metadata');
+    assert.equal(result.videos.length, 3);
+    assert(result.videos.every(video => video.aiGenerated === true));
+    const state: RoomState = { current: seed, queue: result.videos.map(video => ({ ...video, radio: true })), playing: true, position: 20 };
+    await f.save('TESTROOM', state);
+    assert.deepEqual((await publicRoom(f.request, f.roomRow())).queue, [], 'Automatic entries are revalidated after persistence');
+  } finally { f.close(); }
+});
+
+for (const example of [
+  { title: 'Janji - Heroes Tonight (feat. Johnning) [NCS Release]', artist: 'Janji', first: 'Jim Yosef', firstTitle: 'Firefly', next: 'Tobu', nextTitle: 'Hope' },
+  { title: 'Lost Sky - Dreams [NCS Release]', artist: 'Lost Sky', first: 'Unknown Brain', firstTitle: 'Superhero (feat. Chris Linton)', next: 'Rival x Cadmium', nextTitle: 'Seasons (feat. Harley Bird)' },
+]) test(`D1 ${example.artist} station crosses artists, rejects declared AI and preserves current playback`, async () => {
+  const f = fixture();
+  try {
+    const original = { ...seed, title: example.title, artist: 'NoCopyrightSounds', radio: false };
+    const junk = { ...next, id: 'junk0000001', title: `${example.artist} - Latest Channel News`, artist: example.artist };
+    const marked = { ...next, id: 'aiclip00001', title: `${example.first} - ${example.firstTitle}`, artist: example.first + ' - Topic', aiGenerated: true };
+    const safe = { ...next, id: 'safeclip001', title: `${example.next} - ${example.nextTitle} [NCS Release]`, artist: 'NoCopyrightSounds' };
+    const recordings = [junk, marked, safe];
+    await f.save('TESTROOM', { current: original, queue: [], playing: true, position: 20, playbackKey: 'station-current' });
+    let lookups = 0;
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      if (url.pathname.endsWith('/search')) {
+        lookups++;
+        assert.equal(url.searchParams.get('maxResults'), '20');
+        assert.equal(url.searchParams.get('videoCategoryId'), '10');
+        const query = url.searchParams.get('q')!;
+        const selected = query.startsWith(example.first) ? [junk, marked] : query.startsWith(example.next) ? [junk, safe] : [junk];
+        return Response.json({ items: selected.map(video => ({ id: { videoId: video.id } })) });
+      }
+      return Response.json({ items: url.searchParams.get('id')!.split(',').map(id => {
+        const video = recordings.find(item => item.id === id); assert(video);
+        return { id, snippet: { title: video.title, channelTitle: video.artist, categoryId: '10' },
+          contentDetails: { duration: 'PT3M20S' }, status: { embeddable: true, containsSyntheticMedia: 'aiGenerated' in video && video.aiGenerated === true } };
+      }) });
+    };
+    const { room } = await mutate(f.request, 'TESTROOM', { action: 'radio', enabled: true, version: 1 });
+    assert.equal(room.queue[0]?.id, safe.id);
+    assert.equal(room.current?.id, original.id);
+    assert.equal(room.playbackKey, 'station-current');
+    assert(room.position >= 20 && room.position < 22);
+    assert(lookups <= 5, `Station discovery must stay bounded, used ${lookups}`);
+    assert.equal(f.roomState().radioSeed?.id, original.id);
+    assert(!JSON.stringify(room).includes('radioRelatedTo'));
+  } finally { f.close(); }
+});
