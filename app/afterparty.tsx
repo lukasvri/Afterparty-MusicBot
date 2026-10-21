@@ -120,6 +120,7 @@ export default function Afterparty() {
   };
   const [room, setRoom] = useState<Room | null>(null),
     [query, setQuery] = useState(""),
+    [resultQuery, setResultQuery] = useState(""),
     [results, setResults] = useState<Video[]>([]),
     [featured, setFeatured] = useState<HistoryVideo[]>([]),
     [searching, setSearching] = useState(false),
@@ -188,6 +189,7 @@ export default function Afterparty() {
     busy = useRef(false),
     pollGeneration = useRef(0),
     searchGeneration = useRef(0),
+    searchRequest = useRef<AbortController | null>(null),
     lastEnded = useRef(""),
     actionRef = useRef<
       (action: string, extras?: Record<string, unknown>) => Promise<boolean>
@@ -499,17 +501,37 @@ export default function Afterparty() {
     }
     await action("add", { videoId: video.id });
   };
+  useEffect(() => () => {
+    searchGeneration.current++;
+    searchRequest.current?.abort();
+  }, []);
+  const changeQuery = (q: string) => {
+    searchGeneration.current++;
+    searchRequest.current?.abort();
+    searchRequest.current = null;
+    setSearching(false);
+    setSearched(false);
+    setResults([]);
+    setResultQuery("");
+    setQuery(q);
+  };
   const find = async (q = query) => {
     q = q.trim();
-    if (!q) return;
+    if (q.length < 2 || q.length > 120) return;
     const generation = ++searchGeneration.current;
+    searchRequest.current?.abort();
+    const controller = new AbortController();
+    searchRequest.current = controller;
     setQuery(q);
+    setResultQuery(q);
+    setResults([]);
     setSearching(true);
     setSearched(true);
     setError("");
     try {
       const data = await request<{ videos: Video[] }>(
         `/api/search?q=${encodeURIComponent(q)}`,
+        { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]) },
       );
       if (generation === searchGeneration.current) setResults(data.videos);
     } catch (e) {
@@ -519,6 +541,7 @@ export default function Afterparty() {
       }
     } finally {
       if (generation === searchGeneration.current) setSearching(false);
+      if (searchRequest.current === controller) searchRequest.current = null;
     }
   };
   const closeModal = () => {
@@ -2230,6 +2253,9 @@ export default function Afterparty() {
               ) : (
                 <MusicDiscovery
                   query={query}
+                  resultQuery={resultQuery}
+                  current={current}
+                  history={featured}
                   searching={searching}
                   searched={searched}
                   historySort={historySort}
@@ -2237,14 +2263,12 @@ export default function Afterparty() {
                   adding={adding}
                   discordMode={discordMode}
                   discordConnected={Boolean(botOnline && discord?.connected)}
-                  onQuery={setQuery}
+                  onQuery={changeQuery}
                   onSearch={() => void find()}
+                  onSuggestion={(q) => void find(q)}
                   onSort={setHistorySort}
                   onHistory={() => {
-                    searchGeneration.current++;
-                    setSearching(false);
-                    setSearched(false);
-                    setQuery("");
+                    changeQuery("");
                   }}
                   onAdd={(video) => void add(video)}
                 />

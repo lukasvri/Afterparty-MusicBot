@@ -571,6 +571,12 @@ export const messages: Record<string, readonly [string, string]> = {
     "Søk etter musikk",
     "Search music"
   ],
+  "Suggested searches": ["Søkeforslag", "Suggested searches"],
+  "Search for {query}": ["Søk etter {query}", "Search for {query}"],
+  "Results for {query}": ["Resultater for {query}", "Results for {query}"],
+  "Showing {shown} of {total}": ["Viser {shown} av {total}", "Showing {shown} of {total}"],
+  "Show {count} more": ["Vis {count} flere", "Show {count} more"],
+  "All results shown": ["Alle resultater vises", "All results shown"],
   "Nyleg spelt": [
     "Nylig spilt",
     "Recently played"
