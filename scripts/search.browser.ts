@@ -67,7 +67,6 @@ async function fixture(width: number, language = "en") {
   });
   await page.goto(base + "/?room=TESTROOM");
   await page.locator("#music-tab").click();
-  await page.getByRole("button", { name: language === "en" ? "Search for Current Artist" : "Søk etter Current Artist", exact: true }).waitFor();
   await page.locator(".music-row").filter({ hasText: "History Artist - Earlier Song" }).waitFor();
   return { page, errors, searches, writes, results,
     hold(query: string) { const held = gate(); holds.set(query, held); allHolds.push(held); return held; },
@@ -80,6 +79,27 @@ for (const [width, language] of [[1440, "en"], [390, "en"], [390, "nb"]] as cons
     const f = await fixture(width, language);
     try {
       const { page } = f, suggestion = page.getByRole("button", { name: language === "en" ? "Search for Current Artist" : "Søk etter Current Artist", exact: true });
+      const searchInput = page.locator(".search-form input");
+      assert.equal(await page.locator(".search-suggestions").count(), 0, "entering Search does not open suggestions before input intent");
+      assert(await page.locator("#music-tab").evaluate(tab => tab === document.activeElement), "tab navigation retains focus until the search input is activated");
+      await searchInput.focus(); await suggestion.waitFor();
+      await page.keyboard.press("Tab");
+      assert.equal(await page.locator(".search-suggestions").count(), 1, "keyboard movement within the search tools keeps suggestions available");
+      await page.locator(".search-chips button").first().click();
+      await page.locator(".search-suggestions").waitFor({ state: "hidden" });
+      await searchInput.focus(); await suggestion.waitFor();
+      await suggestion.focus();
+      await page.keyboard.press("Escape");
+      await page.locator(".search-suggestions").waitFor({ state: "hidden" });
+      assert(await searchInput.evaluate(input => input === document.activeElement), "Escape returns keyboard focus to the search input");
+      await searchInput.click(); await suggestion.waitFor();
+      await searchInput.fill("Current"); await suggestion.waitFor();
+      await searchInput.fill("");
+      await page.locator("#queue-tab").click();
+      assert.equal(await page.locator(".search-suggestions").count(), 0);
+      await page.locator("#music-tab").click();
+      assert.equal(await page.locator(".search-suggestions").count(), 0, "returning to Search starts with suggestions closed");
+      await page.locator(".search-form input").focus(); await suggestion.waitFor();
       assert.equal(f.searches.length, 0, "showing suggestions cannot start provider searches");
       assert(await page.locator(".search-suggestions button").count() <= 4);
       assert.equal(await page.locator(".search-suggestions").getByText("Trap Nation", { exact: true }).count(), 0);
@@ -95,11 +115,13 @@ for (const [width, language] of [[1440, "en"], [390, "en"], [390, "nb"]] as cons
         }
       }
       await page.screenshot({ path: `/tmp/afterparty-search-suggestions-${width}-${language}.png`, fullPage: true });
+      await page.locator(".library-panel").screenshot({ path: `/tmp/afterparty-focused-search-panel-${width}-${language}.png` });
       await suggestion.focus(); await page.keyboard.press("Enter");
       await page.locator(".search-result-query").getByText(language === "en" ? "Results for Current Artist" : "Resultater for Current Artist", { exact: true }).waitFor();
       await page.locator(".music-row").nth(9).waitFor();
       assert.equal(await page.locator(".music-row").count(), 10);
       assert.deepEqual(f.searches, ["Current Artist"]);
+      assert.equal(await page.locator(".search-suggestions").count(), 0, "choosing a suggestion closes it without altering the exact request");
       const more = page.getByRole("button", { name: language === "en" ? "Show 10 more" : "Vis 10 flere", exact: true });
       await more.focus(); await page.keyboard.press("Enter");
       await page.locator(".music-row").nth(19).waitFor(); assert.equal(await page.locator(".music-row").count(), 20);

@@ -293,7 +293,7 @@ try {
   assert.equal(page.url(), previous);
   await page.getByRole("tab", { name: "Kveldar", exact: true }).click();
   assert(
-    await page.getByText("Kvelden vår · 2 låtar", { exact: true }).count(),
+    await page.getByText("Kvelden vår · 2 sanger", { exact: true }).count(),
   );
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth),

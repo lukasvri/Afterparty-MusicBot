@@ -157,6 +157,8 @@ try {
       await page.locator("#queue-tab").click(); await page.locator(".afterparty-queue-track").first().waitFor();
       await inspect("room-queue");
       await page.locator("#music-tab").click();
+      assert.equal(await page.locator(".search-suggestions").count(), 0, "Suggestions stay closed until input focus");
+      await page.locator(".search-form input").focus();
       await page.locator(".search-suggestions button").first().waitFor();
       await inspect("search-suggestions", ".search-suggestions button,.search-form button");
       const suggestion = page.locator(".search-suggestions button").first();

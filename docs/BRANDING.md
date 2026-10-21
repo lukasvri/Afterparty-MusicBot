@@ -33,7 +33,8 @@ without wrapping the navigation or shrinking touch targets.
 Shared application chrome lives in `app/interface.css`, loaded after the feature
 styles. Discovery and library styles stay scoped to their own surfaces. Use the
 shared neutral surface, border and muted-text tokens for everyday fields,
-secondary buttons and selected tabs. Reserve the red accent for primary actions,
+secondary buttons and selected tabs. Selected controls keep a restrained red
+indicator. Reserve the red accent for active controls, primary actions,
 meaningful playback/status indicators and destructive intent. Keep short labels
 readable, preserve full accessible names when display text is truncated, and use
 at least 44-pixel targets for the main touch controls. See the

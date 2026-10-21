@@ -8,7 +8,7 @@ The scope is the existing website, with its current routes, permissions and musi
 | Shared navigation and controls | Mixed pink/red control surfaces, inconsistent sizes and small mobile targets | Neutral shared tokens, consistent controls, visible keyboard focus and 44-pixel main targets |
 | Welcome and room entry | Competing accent colors and inconsistent heading/control proportions | Calmer typography, neutral secondary actions and consistent dialog fields |
 | Player and room settings | Large title overlays, tinted everyday fields and nested extras cards | Smaller title overlays, neutral settings, flat extras disclosure and retained player controls |
-| Search and history | Long stacked suggestions, detached playlist action, disconnected sorting/count and red add buttons | Grouped search/import tools, bounded suggestion rows, one results header and neutral add controls |
+| Search and history | Long stacked suggestions, detached playlist action, disconnected sorting/count and red add buttons | Grouped search/import tools, focus-triggered suggestion rows, one results header and neutral add controls |
 | Queue and saved evenings | Mixed text glyph controls and dense local tools | Consistent icons with existing accessible labels, clearer rows, bounded festival scrolling and on-demand local backup tools |
 | Games | Oversized headings, decorative category boxes and joined heading words in compact mode | Smaller headings, simpler categories, neutral status surfaces and corrected word spacing |
 | Administration | Legacy red surfaces, tiny supporting text and an obsolete idle mark | Neutral operational controls, bounded fields, clearer groups and the canonical monogram |
@@ -18,6 +18,11 @@ The scope is the existing website, with its current routes, permissions and musi
 Search matching, suggested query values, AI exclusions, pagination and queue
 commands are preserved. Server authorization, queue revisions, playback clocks,
 audio source selection and the alpha quiz configuration remain unchanged.
+Suggestions open while the search input is active, remain keyboard-reachable,
+and close on Escape, search submission, selection or leaving the search tools.
+Returning to the Search tab does not reopen them automatically. Red accents
+remain on active controls and primary actions; fields and secondary surfaces
+stay neutral.
 
 The reproducible local audit is `npm run test:ui-review`, with `PREVIEW_URL`
 pointing to a loopback preview and `CHROMIUM_PATH` set when needed. It covers
@@ -32,10 +37,14 @@ check includes lint, both typechecks, website/Core/recovery tests and the
 production build. Review screenshots represent controlled fixtures, not a
 production deployment or real-device listening test.
 
-The final production Worker passed the complete 81-capture audit with zero
+The broad production Worker review passed the complete 81-capture audit with zero
 findings. The shared full check passed 737 Core tests, 158 website tests and 93
 recovery tests, both typechecks, zero-warning lint and production build. The TV
 height regression found during the first audit was repaired and rechecked.
+The focused-search follow-up passed five search browser cases, 20 narrow/tablet
+and 32 desktop audit captures, the room-setup workflow including first-search
+focus, and responsive canonical notes checks. Active tabs retain red indicators;
+the screenshot below shows results with the suggestions closed.
 
 [Search panel](assets/ui-search-alpha14.png) ·
 [Short landscape TV layout](assets/ui-tv-short-alpha14.png)

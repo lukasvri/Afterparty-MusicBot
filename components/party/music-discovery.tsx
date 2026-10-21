@@ -52,6 +52,7 @@ export function MusicDiscovery({
   const { t } = useLanguage();
   const descriptionId = useId();
   const [expanded, setExpanded] = useState({ key: "", count: 10 });
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const resultKey = resultQuery + ":" + shown.map(video => video.id).join(",");
   const visibleCount = searched && expanded.key === resultKey ? expanded.count : 10;
   const visible = searched ? shown.slice(0, visibleCount) : shown;
@@ -75,12 +76,16 @@ export function MusicDiscovery({
       className="discovery"
       aria-busy={searching || adding}
     >
+      <div className="discovery-search-area"
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setSuggestionsOpen(false); }}
+        onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.querySelector<HTMLInputElement>("input")?.focus(); setSuggestionsOpen(false); } }}>
       <div className="discovery-search-tools">
         <form
           className="search-form"
           onSubmit={(e) => {
             e.preventDefault();
             setExpanded({ key: "", count: 10 });
+            setSuggestionsOpen(false);
             onSearch();
           }}
         >
@@ -88,7 +93,9 @@ export function MusicDiscovery({
             aria-label={t("Søk etter låt, artist eller YouTube-lenkje")}
             placeholder={t("Låt, artist eller YouTube-lenkje")}
             value={query}
-            onChange={(e) => onQuery(e.target.value)}
+            onFocus={() => setSuggestionsOpen(true)}
+            onClick={() => setSuggestionsOpen(true)}
+            onChange={(e) => { setSuggestionsOpen(true); onQuery(e.target.value); }}
             maxLength={2000}
             minLength={2}
             required
@@ -113,12 +120,12 @@ export function MusicDiscovery({
           </button>
         )}
       </div>
-      {suggestions.length > 0 && (
+      {suggestionsOpen && !searching && suggestions.length > 0 && (
         <div className="search-suggestions" role="group" aria-label={t("Suggested searches")}>
           <span>{t("Suggested searches")}</span>
           <div>
             {suggestions.map(suggestion => (
-              <button type="button" key={suggestion} onClick={() => { setExpanded({ key: "", count: 10 }); onSuggestion(suggestion); }}
+              <button type="button" key={suggestion} onClick={() => { setSuggestionsOpen(false); setExpanded({ key: "", count: 10 }); onSuggestion(suggestion); }}
                 aria-label={t("Search for {query}", { query: suggestion })} title={suggestion}>
                 <Search size={12} aria-hidden="true" />
                 <span>{suggestion}</span>
@@ -127,6 +134,7 @@ export function MusicDiscovery({
           </div>
         </div>
       )}
+      </div>
       <div className="discovery-results-header">
         {searched && <p className="search-result-query" title={resultQuery}>{t("Results for {query}", { query: resultQuery })}</p>}
         <div className="discovery-results-controls">
