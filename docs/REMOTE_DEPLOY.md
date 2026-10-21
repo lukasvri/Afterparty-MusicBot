@@ -15,7 +15,11 @@ on the bot host. Tests and production builds run once in GitHub Actions.
 3. Requires the exact commit's successful canonical main-push workflow, including
    the Core, website, deployer and release jobs. Downloads its commit-addressed
    build assets and verifies GitHub's asset digests, the manifest, image ID,
-   revision label, platform and runtime user. A Sigstore attestation must bind
+   revision label, platform and runtime user. Classic config IDs and containerd
+   manifest IDs are accepted only when their equivalence is derived from the
+   same signed single-image archive. The verified record retains both the signed
+   release ID and the actual local Docker ID for switch and recovery checks.
+   A Sigstore attestation must bind
    all three payload digests to this workflow, `refs/heads/main`, the exact source
    and signer commit and the successful run attempt. Certificate claims, not an
    unsigned manifest or shared bot identity, establish that binding. There is no local source-build or

@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.4.0-alpha.7",
+    "date": "2026-10-21",
+    "title": "Docker image identity compatibility for verified updates",
+    "items": [
+      "Deployment checks recognize Docker 29 containerd image stores that expose an OCI manifest digest instead of the signed image configuration digest. The updater proves their relationship from the verified archive and local image metadata; unknown or mismatched identities remain rejected.",
+      "The signed release image identity remains separate from the actual local runtime image identity. Exact source commit, artifact signatures and workflow provenance are still required before the isolated runtime probe or any later production switch.",
+      "Operators can install the corrected pinned host helper and run --check against an existing signed 2.4.0-alpha.6 build without rebuilding the bot, restarting it or deploying. This source preview does not claim that a production update occurred or enable automatic updates."
+    ]
+  },
+  {
     "version": "2.4.0-alpha.6",
     "date": "2026-10-21",
     "title": "Verified GitHub builds for bounded server updates",
