@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.9: Dependency review and repository security scanning
+
+2026-10-21
+
+- Pull requests targeting main receive a read-only dependency review using the official, commit-pinned Node 24 action. Newly introduced or changed vulnerable dependencies with high or critical advisories block the check across runtime, development and unknown scopes.
+- Dependency review reads the pull-request dependency diff without checking out or executing proposed code, writing pull-request comments or introducing a new license policy. Existing source validation and the separate signed-release verification remain required.
+- Repository CodeQL default setup adds GitHub-hosted analysis of Actions, JavaScript/TypeScript and Python with default query precision for main pushes, pull requests and scheduled weekly scans. This administrative configuration is separate from the versioned workflow source.
+- This preparation alpha records repository security controls, not a change to the installed production version or an accepted v3 release. It does not deploy, restart the bot, merge dependency proposals or enable automatic bot updates.
+
 ## v2.4.0-alpha.8: Bounded, cached and reviewable GitHub workflows
 
 2026-10-21
