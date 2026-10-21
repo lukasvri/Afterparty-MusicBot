@@ -33,6 +33,28 @@ retain the signed assets independently of temporary workflow artifact retention.
 Build caches speed up validation; they do not replace the tests or signed source
 and asset checks enforced by the server.
 
+## Security analysis
+
+The separate `dependency-review` job compares dependency snapshots on every PR
+to `main`. It blocks newly introduced or changed dependencies with known high or
+critical vulnerabilities, including runtime, development and unknown scopes.
+Existing untouched dependencies are not a new finding in this comparison. It
+does not introduce a license allowlist, post PR comments, check out PR code or
+install packages. Its workflow token is read-only and the action is pinned to a
+Node.js 24 release. Run it on all main PRs, including documentation-only changes,
+so a required check is never missing because of a path filter.
+
+CodeQL uses GitHub's default setup with the default high-precision query suite
+for GitHub Actions, JavaScript/TypeScript and Python. Standard GitHub-hosted
+runners scan pushes and PRs to `main` and protected branches, plus a weekly scan.
+This configuration is managed in repository security settings rather than a
+second CodeQL workflow in this repository. An enabled configuration is not proof
+of a clean scan; inspect the completed analyses and triage their findings.
+
+These checks use GitHub compute, not the host running Core. Neither check
+deploys or restarts production. After the new dependency-review job passes,
+add its GitHub Actions identity to the default branch's required status checks.
+
 ## Repository settings
 
 Protect the default branch with a pull request, resolved review conversations,
