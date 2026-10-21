@@ -23,7 +23,17 @@ test('concurrent identical searches share one lookup and return independent queu
   await p.search('Artist audio',8,true);assert.equal(calls,1);
  }finally{gate.resolve();t.close();}
 });
-
+test('YouTube HTML entities decode without double-unescaping ampersands',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{});
+  p.youtube=async <K extends keyof YouTubeResponses>(path: K)=>path==='search'
+   ? {items:[{id:{videoId:'abcdefghijk'}}]} as YouTubeResponses[K]
+   : {items:[{id:'abcdefghijk',snippet:{title:'&amp;quot;Quoted&amp;quot;',channelTitle:'A &amp; B',description:'',categoryId:'10',liveBroadcastContent:'none'},contentDetails:{duration:'PT3M'},status:{embeddable:true}}]} as YouTubeResponses[K];
+  const [result]=await p.search('encoded entities',1);
+  assert.equal(result.title,'&quot;Quoted&quot;');
+  assert.equal(result.artist,'A & B');
+ }finally{t.close();}
+});
 test('a failed shared search is released so the next request can recover',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{});let calls=0;
