@@ -4,6 +4,7 @@ import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
+import { metadataAiGenerated } from "./music-content.ts";
 import { deezerRef, deezerShareUrl, expandDeezerLink, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
@@ -83,6 +84,18 @@ export function youtubeId(query: string) {
   } catch {}
   return null;
 }
+function validSearchTrack(value: unknown): value is Track {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const t = value as Track;
+  return typeof t.id === "string" && /^[\w-]{11}$/.test(t.id) && typeof t.title === "string" && typeof t.artist === "string" &&
+    typeof t.image === "string" && Number.isFinite(t.duration) && t.duration >= 0 && typeof t.live === "boolean" && typeof t.embeddable === "boolean" &&
+    (t.aiGenerated === undefined || typeof t.aiGenerated === "boolean") &&
+    (t.genres === undefined || Array.isArray(t.genres) && t.genres.every(genre => typeof genre === "string")) &&
+    (t.catalog === undefined || Boolean(t.catalog) && typeof t.catalog === "object" && typeof t.catalog.title === "string" && typeof t.catalog.artist === "string" && Number.isFinite(t.catalog.duration));
+}
+const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
+  ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) });
+
 export class Providers {
   store: Store;
   key: string;
@@ -129,7 +142,7 @@ export class Providers {
       missing: string[] = [];
     for (const id of ids) {
       const cached = this.store.get<{ at: number; track: Track } | null>(
-        "metadata:v4:" + id,
+        "metadata:v5:" + id,
         null,
       );
       if (cached && Date.now() - cached.at < 86400000)
@@ -150,7 +163,7 @@ export class Providers {
         // Another caller or earlier batch may have populated this cache while
         // we waited. Reserve only this <=50-ID batch, never a whole playlist.
         if (index > 0) {
-          const cached = this.store.get<{ at: number; track: Track } | null>("metadata:v4:" + id, null);
+          const cached = this.store.get<{ at: number; track: Track } | null>("metadata:v5:" + id, null);
           if (cached && Date.now() - cached.at < 86400000) { found.set(id, cached.track); continue; }
         }
         let lookup = this.videoLookups.get(id);
@@ -184,7 +197,7 @@ export class Providers {
   private async hydrateVideoBatch(batch: string[], complete: (id: string, value: Track | Error | undefined) => void): Promise<void> {
     const found = new Map<string, Track>();
     const remember = (track: Track) => {
-      this.store.set("metadata:v4:" + track.id, { at: Date.now(), track });
+      this.store.set("metadata:v5:" + track.id, { at: Date.now(), track });
       found.set(track.id, track);
     };
     try {
@@ -198,6 +211,7 @@ export class Providers {
           genres: metadataGenres(v.snippet.description, v.snippet.tags),
           music: metadataMusic(v.snippet.categoryId),
           title: decode(v.snippet.title), artist: decode(v.snippet.channelTitle),
+          aiGenerated: metadataAiGenerated(decode(v.snippet.title), decode(v.snippet.channelTitle), v.snippet.description, v.snippet.tags, v.status.containsSyntheticMedia),
           image: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
           duration: parts ? Number(parts[1] ?? 0) * 3600 + Number(parts[2] ?? 0) * 60 + Number(parts[3] ?? 0) : 0,
           live: v.snippet.liveBroadcastContent === "live", embeddable: v.status.embeddable !== false,
@@ -215,6 +229,7 @@ export class Providers {
           remember({
             id, genres: metadataGenres(v.description, v.tags), music: metadataMusic(undefined, v.categories),
             title: v.title ?? "YouTube", artist: v.artist ?? v.uploader ?? "YouTube",
+            aiGenerated: metadataAiGenerated(v.title, [v.artist, v.uploader].filter(Boolean).join(" "), v.description, v.tags),
             image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, duration: Number(v.duration) || 0,
             live: v.is_live === true, embeddable: v.playable_in_embed === true,
             source: "youtube", entryId: randomUUID(),
@@ -225,9 +240,12 @@ export class Providers {
       });
     }
   }
-  async search(query: string, count = 8, musicOnly = false): Promise<Track[]> {
+  async search(query: string, count = 30, musicOnly = false): Promise<Track[]> {
+    query = query.trim();
+    if (!query || query.length > 2000 || !Number.isInteger(count) || count < 1 || count > 50 || typeof musicOnly !== "boolean")
+      throw new UserError("Invalid music search.");
     const key =
-        "search:v5:" +
+        "search:v6:" +
         JSON.stringify([
           query.trim().normalize("NFKC").toLowerCase(),
           count,
@@ -237,22 +255,23 @@ export class Providers {
         key,
         null,
       );
-    if (cached?.tracks.length && Date.now() - cached.at < 3600000)
-      return cached.tracks.map((t) => ({ ...t, entryId: randomUUID() }));
+    const now = Date.now();
+    if (cached && Number.isFinite(cached.at) && cached.at <= now && now - cached.at < 3600000 && Array.isArray(cached.tracks) &&
+      cached.tracks.length > 0 && cached.tracks.length <= count && cached.tracks.every(validSearchTrack) &&
+      new Set(cached.tracks.map(track => track.id)).size === cached.tracks.length)
+      return cached.tracks.map(copySearchTrack);
     let lookup = this.searches.get(key);
     if (!lookup) {
+      if (this.searches.size >= 64) throw new UserError("The music source is busy. Try again shortly.", 503);
       lookup = this.searchUncached(query, count, musicOnly).then((tracks) => {
         if (tracks.length) this.store.set(key, { at: Date.now(), tracks });
         return tracks;
       });
-      // Coalesce bursts without retaining an unlimited set of distinct queries.
-      if (this.searches.size < 64) this.searches.set(key, lookup);
+      // Coalesce bursts and bound the number of distinct provider lookups in flight.
+      this.searches.set(key, lookup);
     }
     try {
-      return (await lookup).map((track) => ({
-        ...track,
-        entryId: randomUUID(),
-      }));
+      return (await lookup).map(copySearchTrack);
     } finally {
       if (this.searches.get(key) === lookup) this.searches.delete(key);
     }
@@ -285,7 +304,8 @@ export class Providers {
         .map((t) => t?.id)
         .filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id));
     }
-    return this.video(ids, true);
+    const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
+    return this.video(unique, true);
   }
   async resolve(query: string): Promise<Track[]> {
     query = query.trim();
