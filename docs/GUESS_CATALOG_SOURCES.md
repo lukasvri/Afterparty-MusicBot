@@ -195,8 +195,8 @@ deadlines and one preparation has a sixty-second deadline. At most two
 preparations run concurrently. All providers share two FFmpeg decoder slots,
 retained until each process closes. A long or large recording can fail these
 limits even when its requested segment is short. Preparation is atomic, and the
-snapshot expires at the earliest permission expiry or after five minutes.
-There is no automatic refresh of a running pilot.
+snapshot expires at the earliest permission expiry or after thirty minutes from
+preparation start. There is no automatic refresh of a running pilot.
 
 This separate source avoids relying on YouTube's embedded player for the quiz.
 It does not establish permission under YouTube or recording-rights terms, and
@@ -214,8 +214,9 @@ Preparation copies and validates mono 16 kHz, 16-bit PCM WAV envelopes between
 15 and 30 seconds. Actual decoded PCM length determines catalog duration. Input
 metadata cannot supply duration or media keys; random opaque keys are generated
 internally. Buffers and metadata are copied, and each read returns fresh bytes.
-The entire snapshot expires at the earliest permission expiry or after five
-minutes. Expiration/disposal makes categories unavailable, rejects selection and
+Generic and Deezer snapshots expire at the earliest permission expiry or after
+five minutes. The YouTube adapter uses a bounded thirty-minute lifetime instead.
+It cannot extend any recording permission. Expiration/disposal makes categories unavailable, rejects selection and
 media access, and releases stored bytes. Authorization and cancellation are
 checked before and after the asynchronous read boundary. Revocation before
 expiry requires calling `dispose()` and preparing a new reviewed snapshot.
@@ -234,6 +235,63 @@ inventory before starting. Expired inventories report no available bins. This
 public capacity information contains no recording IDs, titles, aliases, media
 keys or permission references. The server remains authoritative and older
 catalogs without histograms retain their existing compatibility.
+
+## Prepared EDM festival hits pack
+
+The Core-only `services/core/quiz-playlists.json` contains eight official-source
+recordings: Janji, Lost Sky, Avicii, Martin Garrix, Zedd, Swedish House Mafia and
+David Guetta. It supplies canonical answers and a 30-second segment starting at
+30 seconds. The named `EDM festival hits` category becomes available when its
+prepared inventory is loaded. The public festival catalog is separate and does
+not import these answers, clip offsets or approval references into the browser.
+
+Run from the repository root:
+
+```sh
+npm --prefix services/core run guess:pack -- --list
+mkdir -p .local
+npm --prefix services/core run guess:pack -- \
+  --pack edm-festival-hits \
+  --out /absolute/path/to/Afterparty/.local/guess-youtube.local.json
+```
+
+This creates an inactive template, never fabricated permission. The file is
+created with mode `0600`, and an existing file is never overwritten. Review and
+complete the existing per-record approval fields locally. Alternatively provide
+`--approval-file /absolute/private/guess-approvals.local.json` to generate a
+complete inventory from existing approvals. That private file must contain all
+eight exact video IDs, each once, with this shape:
+
+```json
+[
+  {
+    "videoId": "REPLACE_WITH_ONE_PACK_VIDEO_ID",
+    "permission": {
+      "approved": true,
+      "reference": "https://REPLACE_WITH_PRIVATE_PERMISSION_REFERENCE",
+      "expiresAt": 0
+    }
+  }
+]
+```
+
+Use actual existing references and a future Unix-millisecond expiry for each
+record. Missing, duplicate, foreign or expired approvals reject the entire
+operation before output. The manifest's source verification is metadata evidence,
+not an approval record. The CLI does not download audio, connect to Discord or
+activate a source. Paths and answers are omitted from its status output.
+
+Set `GUESS_YOUTUBE_CLIPS=1` and the absolute generated file path as
+`GUESS_YOUTUBE_INVENTORY_PATH` on the intended local installation. Disable other
+quiz modes and run `npm --prefix services/core run guess:check` before Core starts.
+An inactive template deliberately fails this check. Actual media/provider
+availability is determined during preparation, not by the playlist file.
+
+The bounded YouTube snapshot lasts at most thirty minutes from preparation start,
+or less if a recording approval expires. An eight-round, two-player generated
+30-second match with lobby and reveal pauses is tested across the former
+five-minute boundary. Expiry and disposal still revoke pending and future media
+reads. There is no automatic refresh or promise of uninterrupted indefinite play.
 
 ## Source choices and unresolved rights
 

@@ -566,47 +566,63 @@ export default function Afterparty() {
     return data.token;
   };
   const restoring = useRef(false);
-  const restoreEvening = async (tracks: Video[]) => {
+  const restoreEvening = async (tracks: readonly Pick<Video, "id">[]) => {
     if (restoring.current) return;
+    const ids = [...new Set(tracks.map(video => video.id))];
+    if (!ids.length || ids.length > 50 || ids.some(id => !/^[\w-]{11}$/.test(id))) return;
     restoring.current = true;
     busy.current = true;
     setPending(true);
     try {
-      for (const video of tracks) {
+      if (!roomRef.current && !(await create())) return;
+      const target = roomRef.current, generation = pollGeneration.current;
+      if (!target) return;
+      const valid = () => mounted.current && generation === pollGeneration.current &&
+        activeCode.current === target.code && roomRef.current?.code === target.code &&
+        roomRef.current?.mode === target.mode && roomRef.current?.guildId === target.guildId;
+      for (const id of ids) {
+        if (!valid()) return;
         const active = roomRef.current;
         if (
-          active?.current?.id === video.id ||
-          active?.queue.some((v) => v.id === video.id)
+          active?.current?.id === id ||
+          active?.queue.some((v) => v.id === id)
         )
           continue;
         try {
-          if (active?.mode === "discord") {
-            if (!(await botCommand("enqueue", { videoId: video.id }))) return;
+          if (target.mode === "discord") {
+            const latest = await request<{ state: DiscordState | null }>(
+              "/api/discord" + (target.guildId ? "?guildId=" + target.guildId : ""),
+            );
+            if (!valid()) return;
+            if (!latest.state?.queueRevision || latest.state.guildId !== target.guildId)
+              throw Error(t("Discord queue is unavailable. Refresh and try again."));
+            if (!(await botCommand("enqueue", { videoId: id, queueRevision: latest.state.queueRevision })) || !valid()) return;
           } else {
-            const code = active?.code ?? (await create());
-            if (!code) return;
+            const code = target.code;
             const data = await request<{ room: Room }>(`/api/rooms/${code}`, {
               method: "POST",
               headers: headers(code),
               body: JSON.stringify({
                 action: "add",
-                videoId: video.id,
+                videoId: id,
                 version: roomRef.current?.version,
                 displayName:
                   storage.get("afterparty-display-name") ?? t("Gjest"),
               }),
             });
+            if (!valid() || data.room.code !== target.code) return;
             accept({
               ...data.room,
               viewers: roomRef.current?.viewers ?? data.room.viewers,
             });
           }
         } catch (e) {
+          if (!valid()) return;
           setError("Settet er delvis lagt til. " + (e as Error).message);
           return;
         }
       }
-      announce(t("Settet er lagt i køen."));
+      if (valid()) announce(t("Settet er lagt i køen."));
     } finally {
       restoring.current = false;
       busy.current = false;
@@ -2247,6 +2263,7 @@ export default function Afterparty() {
                     history={room?.history ?? []}
                     onAdd={(v) => void add(v)}
                     onRestore={(v) => void restoreEvening(v)}
+                    onEnqueueConcerts={(ids) => void restoreEvening(ids.map(id => ({ id })))}
                     busy={adding}
                   />
                 </section>

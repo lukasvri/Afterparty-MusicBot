@@ -4,6 +4,16 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.13: Official festival concerts and a prepared EDM quiz pack
+
+2026-10-21
+
+- The evening library adds 30 curated official festival sets, including six from 2026, with event and performance-year filters, uploader attribution and direct video links. Ultra Miami, Tomorrowland Belgium, EDC Las Vegas, Creamfields and Martin Garrix at Amsterdam RAI are included. Selected sets append through existing room or Discord controls without replacing saved evenings or starting playback.
+- Playlist additions retain their original room or Discord server while metadata is resolved. Leaving or switching rooms stops the remaining additions, and late replies cannot restore the previous room. Sets are added sequentially; unavailable videos report a partial addition rather than silently changing another queue.
+- A Core-only EDM festival hits quiz pack contains eight curated official uploads with song and artist answers and 30-second clip selections. The private guess:pack command lists the pack and creates an exclusive 0600 inventory file. Existing recording approvals can be supplied locally; without them the generated template remains inactive. Answers and approval references are not added to the public concert catalog or browser assets.
+- YouTube quiz snapshots now last up to 30 minutes instead of five, allowing an eight-round game plus lobby and reveal pauses to finish. Earlier recording-permission expiry, cancellation and disposal still revoke access. Generic and Deezer inventories retain their five-minute default; no automatic refresh or production activation is included.
+- Festival links and quiz recording identities were checked against primary publication metadata. This does not establish current embedding, regional availability, sustained provider access or audible real-device quality. Runtime metadata and the existing private source checks remain authoritative.
+
 ## v2.4.0-alpha.12: Themed radio, richer search and quiz audio
 
 2026-10-21
