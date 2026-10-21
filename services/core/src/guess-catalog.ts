@@ -18,6 +18,7 @@ export interface GuessCatalog {
 const CATEGORY_EXAMPLES = Object.freeze([
   Object.freeze({ id: '2010s', name: '2010s' }),
   Object.freeze({ id: 'edm-classics', name: 'EDM classics' }),
+  Object.freeze({ id: 'edm-festival-hits', name: 'EDM festival hits' }),
 ]);
 const CONTROL = /[\p{Cc}\p{Cf}]/u;
 const KEY = /^[a-zA-Z0-9_-]{16,128}$/;

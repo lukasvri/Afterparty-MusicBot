@@ -76,7 +76,7 @@ test('private-file preflight decodes generated MP3 with real FFmpeg, reports mea
     },
   }, async (config, options) => prepared = await prepareConfiguredGuessSource(config, options));
   assert.deepEqual(result, { provider: 'deezer', status: 'ready', categories: [{ id: '2010s', count: 1, durations: [{ seconds: 16, count: 1 }] },
-    { id: 'edm-classics', count: 0, durations: [] }] });
+    { id: 'edm-classics', count: 0, durations: [] }, { id: 'edm-festival-hits', count: 0, durations: [] }] });
   assert.equal(calls.length, 2);
   const source = prepared as Awaited<ReturnType<typeof prepareConfiguredGuessSource>>;
   assert(source); assert(source.catalog.categories().every(category => !category.available));

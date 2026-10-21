@@ -13,6 +13,7 @@ test('production catalog shows unavailable example categories and contains no in
   assert.deepEqual(catalog.categories(), [
     { id: '2010s', name: '2010s', available: false, count: 0 },
     { id: 'edm-classics', name: 'EDM classics', available: false, count: 0 },
+    { id: 'edm-festival-hits', name: 'EDM festival hits', available: false, count: 0 },
   ]);
   assert.throws(() => catalog.select('2010s', { exclude: [], durationSeconds: 30 }), { status: 503 });
   assert.throws(() => catalog.media('anything'), { status: 503 });
@@ -54,7 +55,7 @@ test('operator duration histograms floor measured lengths, clamp at 90 and count
   const changed = catalog.categories(); changed[0].durations![0].count = 999; changed[0].durations!.push({ seconds: 20, count: 1 });
   inputs[0].media.durationSeconds = 90;
   assert.deepEqual(catalog.categories()[0].durations, durations, 'cached histograms are isolated from input and response mutations');
-  assert.deepEqual(new OperatorGuessCatalog([]).categories().map(c => c.durations), [[], []]);
+  assert.deepEqual(new OperatorGuessCatalog([]).categories().map(c => c.durations), [[], [], []]);
 });
 test('operator catalog rejects absent eligibility, unknown categories, duplicate IDs, URLs and malformed metadata', () => {
   const invalid: unknown[] = [

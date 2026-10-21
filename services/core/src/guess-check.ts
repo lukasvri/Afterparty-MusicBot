@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guessAbort } from './guess-audio-format.ts';
+import { UnavailableGuessCatalog } from './guess-catalog.ts';
 import { prepareConfiguredGuessSource, type GuessSourceOptions } from './guess-source.ts';
 
 type Provider = 'disabled' | 'synthetic' | 'deezer' | 'youtube';
@@ -15,7 +16,7 @@ const unavailable = (provider: Provider): GuessCheckResult => ({ provider, statu
 
 /** Copy only known public category identities and bounded capacity, never adapter names or arbitrary fields. */
 function categories(value: unknown, provider: Provider): GuessCheckCategory[] {
-  const allowed = provider === 'synthetic' ? ['synthetic-test'] : ['2010s', 'edm-classics'];
+  const allowed = provider === 'synthetic' ? ['synthetic-test'] : new UnavailableGuessCatalog().categories().map(category => category.id);
   const maximum = provider === 'synthetic' ? 5 : 8, seen = new Set<string>();
   if (!Array.isArray(value) || !value.length || value.length > allowed.length) throw Error();
   const summaries: GuessCheckCategory[] = [];
