@@ -191,10 +191,44 @@ export class DiscordBot {
         throw new UserError('Could not connect to the voice channel. Try again.');
     }
     if (this.connection !== connection) throw new UserError('The voice connection was interrupted. Try again.');
-    this.engine.store.set('voice-channel', channel.id); this.connection.subscribe(this.sink.player); this.engine.channelBitrate = channel.bitrate; this.engine.setConnection(true); let disconnectedAt:number|null=null;this.connection.on(VoiceConnectionStatus.Ready,()=>{if(disconnectedAt!==null){this.engine.diagnostics.note("voice-reconnected",performance.now()-disconnectedAt);disconnectedAt=null;}});this.connection.on(VoiceConnectionStatus.Disconnected, () => { disconnectedAt=performance.now();this.engine.diagnostics.note("voice-disconnected"); const connection = this.connection; if (!connection)
-        return; void Promise.race([entersState(connection, VoiceConnectionStatus.Signalling, 5000), entersState(connection, VoiceConnectionStatus.Connecting, 5000)]).catch(() => { if (this.connection === connection)
-        this.disconnect(); }); }); this.connection.receiver.speaking.on('start', id => { if (id === this.client.user?.id)
+    this.engine.store.set('voice-channel', channel.id); this.connection.subscribe(this.sink.player); this.engine.channelBitrate = channel.bitrate; this.engine.setConnection(true); this.watchVoiceRecovery(connection); this.connection.receiver.speaking.on('start', id => { if (id === this.client.user?.id)
         return; this.talking.add(id); this.engine.ducking = this.engine.settings.turnDownVolumeWhenPeopleSpeak && this.talking.size > 0; }); this.connection.receiver.speaking.on('end', id => { this.talking.delete(id); this.engine.ducking = this.engine.settings.turnDownVolumeWhenPeopleSpeak && this.talking.size > 0; }); }
+    watchVoiceRecovery(connection: VoiceConnection) {
+        let deadline: ReturnType<typeof setTimeout> | null = null;
+        let disconnectedAt: number | null = null;
+        const clearDeadline = () => {
+            if (deadline !== null) clearTimeout(deadline);
+            deadline = null;
+        };
+        connection.on('stateChange', (_before, after) => {
+            if (after.status === VoiceConnectionStatus.Destroyed) {
+                clearDeadline();
+                return;
+            }
+            if (this.connection !== connection) return;
+            if (after.status === VoiceConnectionStatus.Ready) {
+                clearDeadline();
+                if (disconnectedAt !== null) {
+                    this.engine.diagnostics.note('voice-reconnected', performance.now() - disconnectedAt);
+                    disconnectedAt = null;
+                }
+                return;
+            }
+            // Ordinary WebSocket reconnects go straight from Ready to Signalling.
+            // Bound the entire recovery, rather than only waiting to leave Disconnected.
+            if (deadline !== null) return;
+            disconnectedAt = performance.now();
+            this.engine.diagnostics.note('voice-disconnected');
+            deadline = setTimeout(() => {
+                deadline = null;
+                if (this.connection !== connection || connection.state.status === VoiceConnectionStatus.Ready || connection.state.status === VoiceConnectionStatus.Destroyed) return;
+                this.engine.lastError = 'Could not restore the Discord voice connection. Use /play to try again.';
+                this.engine.diagnostics.note('voice-error');
+                this.disconnect();
+            }, 20000);
+            deadline.unref();
+        });
+    }
     watchVoiceErrors(connection: VoiceConnection) {
         // The library forwards WebSocket errors here, including during startup.
         // Keep its reconnect state machine alive without an unhandled error event.
