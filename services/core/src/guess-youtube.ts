@@ -24,6 +24,7 @@ const unavailable = () => new UserError('The approved YouTube game audio invento
 const controls = /[\p{Cc}\p{Cf}]/u;
 const categories = new Set(new UnavailableGuessCatalog().categories().map(category => category.id));
 const maximumBytes = 8 * 1024 * 1024;
+export const GUESS_YOUTUBE_INVENTORY_LIFETIME_MS = 1_800_000;
 let activePreparations = 0;
 const object = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 
@@ -77,7 +78,7 @@ export async function prepareYoutubeGuessInventory(records: readonly YoutubeGues
   const extract = options.extract ?? ((args, signal) => runJson(process.env.YTDLP_PATH ?? 'yt-dlp', args, signal));
   const fetcher = options.fetcher ?? fetch, decode = options.decode ?? decodeGuessClip, externalSignal = options.signal;
   const controller = new AbortController(), deadline = Date.now() + 60_000;
-  const expiresAt = Math.min(Date.now() + 300_000, ...inputs.map(record => record.permission.expiresAt));
+  const expiresAt = Math.min(Date.now() + GUESS_YOUTUBE_INVENTORY_LIFETIME_MS, ...inputs.map(record => record.permission.expiresAt));
   let inventory: Inventory | undefined, disposed = false, ready = false, expiryTimer: ReturnType<typeof setTimeout> | undefined;
   const dispose = () => { disposed = true; controller.abort(); inventory?.dispose(); clearTimeout(expiryTimer); externalSignal.removeEventListener('abort', dispose); };
   const active = () => { if (disposed || controller.signal.aborted || externalSignal.aborted || Date.now() >= expiresAt || !ready && Date.now() >= deadline) throw unavailable(); };
@@ -120,7 +121,7 @@ export async function prepareYoutubeGuessInventory(records: readonly YoutubeGues
         prepared.push({ song: record.song, categoryIds: record.categoryIds, permission: { ...record.permission, expiresAt }, wav: new Uint8Array(decoded) });
       } finally { encoded?.fill(0); if (response?.body && !response.body.locked) void response.body.cancel().catch(() => {}); }
     }
-    active(); inventory = prepareOperatorGuessInventory(prepared); active(); ready = true;
+    active(); inventory = prepareOperatorGuessInventory(prepared, { lifetimeMs: GUESS_YOUTUBE_INVENTORY_LIFETIME_MS }); active(); ready = true;
     expiryTimer = setTimeout(dispose, Math.max(0, expiresAt - Date.now())); expiryTimer.unref();
     return { catalog: inventory.catalog, media: inventory.media, dispose };
   } catch { dispose(); throw unavailable(); }

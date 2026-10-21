@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GUESS_AUDIO_RATE, GUESS_AUDIO_MAX_BYTES, guessWave } from '../src/guess-audio-format.ts';
-import { prepareOperatorGuessInventory, type OperatorGuessInventoryRecord } from '../src/guess-operator-inventory.ts';
+import { prepareOperatorGuessInventory, type OperatorGuessInventoryOptions, type OperatorGuessInventoryRecord } from '../src/guess-operator-inventory.ts';
 
 function record(n = 1, seconds = 30): OperatorGuessInventoryRecord {
   return { song: { id: `owned-${n}`, title: `Fictional Signal ${n}`, artist: 'Fictional Performer', aliases: ['Invented Alias'] },
@@ -104,4 +104,36 @@ test('empty inventory remains unavailable and eight recordings are the bounded m
     assert.equal(inventory.catalog.categories()[0].count, records.length);
     if (!records.length) assert.throws(() => inventory.catalog.select('2010s', select), { status: 503 });
   }
+});
+
+test('trusted lifetime options are bounded integer milliseconds and cannot be changed after preparation', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 100_000 });
+  const invalid: unknown[] = [null, [], '1800000', { lifetimeMs: null },
+    ...[0, -1, 0.5, 1_800_001, Infinity, NaN, '1800000'].map(lifetimeMs => ({ lifetimeMs }))];
+  for (const options of invalid)
+    assert.throws(() => prepareOperatorGuessInventory([record()], options as OperatorGuessInventoryOptions), { status: 503 });
+  for (const lifetimeMs of [1, 1_800_000]) {
+    const input = record(); input.permission.expiresAt = Date.now() + 3_600_000;
+    const options = { lifetimeMs }, inventory = prepareOperatorGuessInventory([input], options); t.after(inventory.dispose);
+    const key = inventory.catalog.select('2010s', select).mediaKey;
+    options.lifetimeMs = 1_800_000;
+    t.mock.timers.tick(lifetimeMs - 1);
+    assert.equal((await inventory.media.read(key, new AbortController().signal)).length, GUESS_AUDIO_MAX_BYTES);
+    const pending = inventory.media.read(key, new AbortController().signal); t.mock.timers.tick(1);
+    await assert.rejects(pending, { status: 503 });
+    assert(inventory.catalog.categories().every(category => !category.available && category.durations?.length === 0));
+  }
+});
+
+test('an extended lifetime never extends the earliest recording permission', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 100_000 });
+  const records = [record(), record(2)]; records[0].permission.expiresAt = Date.now() + 3_600_000;
+  records[1].permission.expiresAt = Date.now() + 450_000;
+  const inventory = prepareOperatorGuessInventory(records, { lifetimeMs: 1_800_000 }); t.after(inventory.dispose);
+  const key = inventory.catalog.select('2010s', select).mediaKey;
+  t.mock.timers.tick(449_999);
+  assert.equal((await inventory.media.read(key, new AbortController().signal)).length, GUESS_AUDIO_MAX_BYTES);
+  t.mock.timers.tick(1);
+  await assert.rejects(inventory.media.read(key, new AbortController().signal), { status: 503 });
+  assert(inventory.catalog.categories().every(category => !category.available));
 });

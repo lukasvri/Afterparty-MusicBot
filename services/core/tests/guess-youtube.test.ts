@@ -166,13 +166,14 @@ test('permission expiry before and after each preparation step cannot publish st
   }
 });
 
-test('earliest approval expiry, five-minute TTL, lifetime cancellation and explicit disposal stop pending reads', async t => {
+test('earliest approval expiry, thirty-minute TTL, lifetime cancellation and explicit disposal stop pending reads', async t => {
   t.mock.timers.enable({ apis: ['Date'], now: 100_000 });
   for (const reason of ['expiry', 'ttl', 'abort', 'dispose']) {
     const controller = new AbortController(), first = record(), second = record('synthetic02'); if (reason === 'expiry') second.permission.expiresAt = Date.now() + 1000;
+    if (reason === 'ttl') { first.permission.expiresAt = Date.now() + 3_600_000; second.permission.expiresAt = first.permission.expiresAt; }
     const inventory = await prepareYoutubeGuessInventory([first, second], options({ signal: controller.signal })); t.after(inventory.dispose);
     const song = inventory.catalog.select('2010s', selection), pending = inventory.media.read(song.mediaKey, new AbortController().signal);
-    if (reason === 'expiry') t.mock.timers.tick(1000); if (reason === 'ttl') t.mock.timers.tick(300_000); if (reason === 'abort') controller.abort(); if (reason === 'dispose') inventory.dispose();
+    if (reason === 'expiry') t.mock.timers.tick(1000); if (reason === 'ttl') t.mock.timers.tick(1_800_000); if (reason === 'abort') controller.abort(); if (reason === 'dispose') inventory.dispose();
     await assert.rejects(pending); assert(inventory.catalog.categories().every(category => !category.available && category.count === 0)); await assert.rejects(inventory.media.read(song.mediaKey, new AbortController().signal)); inventory.dispose();
   }
 });
