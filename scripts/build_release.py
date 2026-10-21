@@ -20,6 +20,13 @@ def core(directory, commit):
     tag = 'gutta-krutt-core:git-' + commit
     subprocess.run(['docker','build','--target','final','--label',
                     'org.opencontainers.image.revision='+commit,'-t',tag,'services/core'],check=True)
+    package_core(directory, commit)
+
+
+def package_core(directory, commit):
+    """Probe and save the exact loaded image, including CI's cached Buildx output."""
+    commit = sha(commit)
+    tag = 'gutta-krutt-core:git-' + commit
     image = json.loads(run('docker','image','inspect',tag))[0]
     # Never start the bot or connect to Discord. Check only runtime readability/imports.
     smoke = """import {readdirSync,readFileSync} from 'node:fs';
@@ -133,13 +140,15 @@ def publish(directory, commit):
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('operation',choices=['core','website','prepare','publish'])
+    parser.add_argument('operation',choices=['core','core-package','website','prepare','publish'])
     parser.add_argument('--directory',type=Path,default=Path('release-assets'))
     parser.add_argument('--commit',default=os.environ.get('GITHUB_SHA'))
     args=parser.parse_args()
     args.directory.mkdir(parents=True,exist_ok=True)
     if args.operation=='core':
         core(args.directory,args.commit)
+    elif args.operation=='core-package':
+        package_core(args.directory,args.commit)
     elif args.operation=='website':
         website(args.directory)
     elif args.operation=='prepare':
