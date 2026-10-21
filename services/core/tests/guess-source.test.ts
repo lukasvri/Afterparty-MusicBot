@@ -74,3 +74,51 @@ test('invalid private files, flags and permissions fail closed before any provid
   await assert.rejects(prepareConfiguredGuessSource(env, { signal: signal(), fetcher }), unavailable);
   assert.equal(requests, 1);
 });
+
+test('YouTube quiz mode is opt-in, rejects conflicting modes and validates private files before extraction', async t => {
+  const dir = await directory(t), path = join(dir, 'youtube.local.json');
+  let extractions = 0;
+  const options = { signal: signal(), youtube: { extract: async () => { extractions++; throw Error('private extractor details'); } } };
+  for (const flag of [undefined, '0', 'true']) assert.equal(await prepareConfiguredGuessSource({
+    GUESS_YOUTUBE_CLIPS: flag, GUESS_YOUTUBE_INVENTORY_PATH: path,
+  }, options), undefined);
+  const env = { GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_INVENTORY_PATH: path };
+  for (const config of [{ ...env, GUESS_SYNTHETIC_TEST: '1' }, { ...env, GUESS_DEEZER_PREVIEWS: '1' },
+    { ...env, GUESS_YOUTUBE_INVENTORY_PATH: './relative.json' }, env]) {
+    await assert.rejects(prepareConfiguredGuessSource(config, options), unavailable);
+  }
+  for (const value of ['[]', '{}', 'not-json', ' '.repeat(32769), JSON.stringify([record()])]) {
+    await writeFile(path, value);
+    await assert.rejects(prepareConfiguredGuessSource(env, options), unavailable);
+  }
+  const link = join(dir, 'youtube-link.json'); await symlink(path, link);
+  await assert.rejects(prepareConfiguredGuessSource({ ...env, GUESS_YOUTUBE_INVENTORY_PATH: link }, options), unavailable);
+  assert.equal(extractions, 0);
+});
+
+test('private YouTube clip configuration reaches only its adapter and expires through the source lifetime', async t => {
+  const dir = await directory(t), path = join(dir, 'youtube.local.json'), lifetime = new AbortController();
+  const videoId = 'abcDEF123_-', cdn = 'https://rr1---sn-synthetic.googlevideo.com/videoplayback?expire=9999999999';
+  await writeFile(path, JSON.stringify([{ videoId, title: 'Fictional Signal', artist: 'Fictional Performer', categoryIds: ['2010s'],
+    startSeconds: 5, durationSeconds: 15, permission: record().permission }]), { mode: 0o600 });
+  let extracted = 0, fetched = 0, decoded = 0;
+  const source = await prepareConfiguredGuessSource({ GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_INVENTORY_PATH: path }, {
+    signal: lifetime.signal, fetcher: async () => { assert.fail('YouTube must not invoke the Deezer fetcher'); },
+    youtube: {
+      extract: async args => { extracted++; assert.equal(args.at(-1), 'https://www.youtube.com/watch?v=' + videoId);
+        return { id: videoId, extractor_key: 'Youtube', is_live: false, live_status: 'not_live', duration: 60, url: cdn,
+          ext: 'webm', vcodec: 'none', acodec: 'opus', protocol: 'https' }; },
+      fetcher: async (input, init) => { fetched++; assert.equal(String(input), cdn); assert.equal(init?.redirect, 'manual');
+        return new Response(new Uint8Array([1]), { headers: { 'content-type': 'audio/webm' } }); },
+      decode: async (_input, clip, clipSignal) => { decoded++; assert.deepEqual(clip, { format: 'webm', startSeconds: 5, durationSeconds: 15 });
+        assert(!clipSignal.aborted); return guessWave(new Uint8Array(GUESS_AUDIO_RATE * 2 * 15)); },
+    },
+  });
+  assert(source); t.after(source.dispose);
+  assert.deepEqual([extracted, fetched, decoded], [1, 1, 1]);
+  const selected = source.catalog.select('2010s', { exclude: [], durationSeconds: 15 });
+  assert.equal(selected.title, 'Fictional Signal'); assert.notEqual(selected.id, videoId);
+  assert.equal(source.catalog.media(selected.mediaKey).durationSeconds, 15);
+  lifetime.abort(); assert(source.catalog.categories().every(category => !category.available));
+  await assert.rejects(source.media.read(selected.mediaKey, signal()), { status: 503 });
+});

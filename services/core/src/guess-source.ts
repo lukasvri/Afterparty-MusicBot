@@ -5,21 +5,25 @@ import type { GuessCatalog } from './guess-catalog.ts';
 import type { GuessMediaSource } from './guess-media.ts';
 import { SyntheticGuessSource } from './guess-synthetic.ts';
 import { prepareDeezerGuessInventory, type DeezerGuessOptions } from './guess-deezer.ts';
+import { prepareYoutubeGuessInventory, type YoutubeGuessOptions } from './guess-youtube.ts';
 import { UserError } from './types.ts';
 
 type Source = { catalog: GuessCatalog; media: GuessMediaSource; dispose(): void };
+export type GuessSourceOptions = DeezerGuessOptions & { youtube?: Omit<YoutubeGuessOptions, 'signal'> };
 const unavailable = () => new UserError('The configured game preview source is unavailable.', 503);
 
 /** Startup-only private configuration. This is never a browser request or public upload path. */
-export async function prepareConfiguredGuessSource(env: NodeJS.ProcessEnv, options: DeezerGuessOptions): Promise<Source | undefined> {
-  if (env.GUESS_DEEZER_PREVIEWS !== '1') {
-    if (env.GUESS_SYNTHETIC_TEST !== '1') return undefined;
-    const source = new SyntheticGuessSource();
-    return { catalog: source, media: source, dispose() {} };
-  }
+export async function prepareConfiguredGuessSource(env: NodeJS.ProcessEnv, options: GuessSourceOptions): Promise<Source | undefined> {
+  const modes = [env.GUESS_DEEZER_PREVIEWS, env.GUESS_YOUTUBE_CLIPS, env.GUESS_SYNTHETIC_TEST].filter(flag => flag === '1');
+  if (!modes.length) return undefined;
   try {
-    if (env.GUESS_SYNTHETIC_TEST === '1' || options.signal.aborted) throw unavailable();
-    const path = env.GUESS_DEEZER_INVENTORY_PATH;
+    if (modes.length !== 1 || options.signal.aborted) throw unavailable();
+    if (env.GUESS_SYNTHETIC_TEST === '1') {
+      const source = new SyntheticGuessSource();
+      return { catalog: source, media: source, dispose() {} };
+    }
+    const youtube = env.GUESS_YOUTUBE_CLIPS === '1';
+    const path = youtube ? env.GUESS_YOUTUBE_INVENTORY_PATH : env.GUESS_DEEZER_INVENTORY_PATH;
     if (!path || !isAbsolute(path) || path.length > 4096 || /[\p{Cc}\p{Cf}]/u.test(path)) throw unavailable();
     // Nonblocking open avoids waiting on a FIFO; symlinks and non-regular files are rejected.
     const file = await open(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
@@ -39,6 +43,8 @@ export async function prepareConfiguredGuessSource(env: NodeJS.ProcessEnv, optio
       records = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, size)));
     } finally { await file.close(); }
     if (!Array.isArray(records) || !records.length || records.length > 8) throw unavailable();
-    return await prepareDeezerGuessInventory(records, options);
+    return youtube
+      ? await prepareYoutubeGuessInventory(records, { ...options.youtube, signal: options.signal })
+      : await prepareDeezerGuessInventory(records, options);
   } catch { throw unavailable(); }
 }

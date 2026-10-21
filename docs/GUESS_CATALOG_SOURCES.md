@@ -67,7 +67,8 @@ after establishing permission for the selected recordings and quiz use. This
 does not create a paid account. The startup factory reads an absolute private
 JSON path only when `GUESS_DEEZER_PREVIEWS=1`; it rejects symlinks, non-regular
 files, files above 32 KiB, empty inventories and malformed approvals before any
-provider access. Do not enable `GUESS_SYNTHETIC_TEST` at the same time.
+provider access. Do not enable `GUESS_SYNTHETIC_TEST` or `GUESS_YOUTUBE_CLIPS` at
+the same time.
 
 1. Keep `guess-deezer.local.json` outside the public source or in the ignored
    `.local` directory, readable only by the operator. Supply a JSON array with
@@ -127,7 +128,7 @@ To load the existing private local environment file explicitly instead:
 node --env-file=.env src/guess-check.ts
 ```
 
-With both quiz modes disabled, the check reports disabled without reading the
+With all quiz modes disabled, the check reports disabled without reading the
 inventory or contacting a provider. `GUESS_SYNTHETIC_TEST=1` checks only the
 fictional generated-tone source. The Deezer mode uses the same private-file
 validation, bounded metadata/CDN requests and FFmpeg normalization as startup;
@@ -141,6 +142,67 @@ the command never starts a Discord client, opens a Core server, changes a queue
 or installs/refreshes the snapshot in an existing process. A successful check is
 evidence for that attempt, not a guarantee of later availability or verified
 permissions.
+
+## YouTube audio-clip pilot
+
+`GUESS_YOUTUBE_CLIPS=1` selects a separate private quiz source using the bot's
+yt-dlp and FFmpeg toolchain. A fixed public video ID is resolved to an audio-only
+WebM or MP4 stream. A bounded download feeds FFmpeg through a pipe; the decoder
+uses no network/file protocols and produces only the selected 15–30-second,
+16 kHz mono WAV segment. Participants receive these answer-safe clips through
+the existing private round transport. The quiz uses its audio player without a
+YouTube iframe, and never plays through or alters the ordinary Discord queue.
+
+Keep a private inventory outside public source and point
+`GUESS_YOUTUBE_INVENTORY_PATH` at its absolute path. The regular-file, symlink and
+32 KiB limits are shared with the Deezer pilot. Supply one to eight records:
+
+```json
+[
+  {
+    "videoId": "REPLACE_WITH_11_CHARACTER_VIDEO_ID",
+    "title": "REPLACE_WITH_SONG_ANSWER",
+    "artist": "REPLACE_WITH_ARTIST_ANSWER",
+    "aliases": [],
+    "categoryIds": ["2010s"],
+    "startSeconds": 30,
+    "durationSeconds": 15,
+    "permission": {
+      "approved": true,
+      "reference": "https://REPLACE_WITH_PRIVATE_PERMISSION_REFERENCE",
+      "expiresAt": 0
+    }
+  }
+]
+```
+
+Use the actual recording, answer and existing permission record locally.
+Offsets run from zero through 3600 seconds; durations are whole seconds
+from 15 through 30. Omitted values use offset zero and duration 30. Categories
+are `2010s` and `edm-classics`. Duplicate video IDs are rejected before any
+extraction. Do not commit the filled inventory, answers, recordings or agreements.
+
+Enable only one of `GUESS_YOUTUBE_CLIPS`, `GUESS_DEEZER_PREVIEWS` and
+`GUESS_SYNTHETIC_TEST`. Run `npm run guess:check` with the intended configuration
+before starting Core; its `youtube` result reports capacity without answers or
+source URLs. yt-dlp and FFmpeg must be installed locally, as they already are in
+the Core image. The adapter ignores yt-dlp configuration and supplies no cookies,
+login or account credentials. It rejects unavailable/live/mismatched recordings,
+unsupported formats, external redirects and non-Googlevideo media endpoints.
+
+Encoded input is capped at 8 MiB per recording; I/O steps have ten-second
+deadlines and one preparation has a sixty-second deadline. At most two
+preparations run concurrently. All providers share two FFmpeg decoder slots,
+retained until each process closes. A long or large recording can fail these
+limits even when its requested segment is short. Preparation is atomic, and the
+snapshot expires at the earliest permission expiry or after five minutes.
+There is no automatic refresh of a running pilot.
+
+This separate source avoids relying on YouTube's embedded player for the quiz.
+It does not establish permission under YouTube or recording-rights terms, and
+does not bypass login, age, regional or access restrictions. Automated checks use
+generated encoded audio and controlled extractor/CDN responses. Actual YouTube
+availability, sustained operation and real-device listening remain unverified.
 
 Each private record supplies song metadata, explicit category membership,
 canonical WAV bytes and an operator approval with an HTTPS evidence reference
