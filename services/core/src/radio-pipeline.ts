@@ -1,6 +1,7 @@
 import type { CatalogSong } from "./matching.ts";
 import { normalized, scoreMatch } from "./matching.ts";
 import type { PublicTrack, Track } from "./types.ts";
+import { copyRadioDescriptor, createRecommendationRanking, type FavoriteRecording } from "./recommendation-ranking.ts";
 import {
   createRadioRanker, isRadioMusic, isRadioTitle, radioArtist, radioGenre,
   radioQuery, radioRelated, radioStyleCompatible, radioTitle,
@@ -41,6 +42,7 @@ export type RadioInput = {
   topTracks?: (seed: Track) => Promise<CatalogSong[]>;
   match?: (song: CatalogSong) => Promise<Track>;
   favorites?: string[];
+  favoriteRecordings?: FavoriteRecording[];
   diagnose?: (diagnostic: RadioDiagnostic) => void;
 };
 export type RadioSelection = { track: Track | null; source: RadioSource | null;
@@ -91,6 +93,7 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
 
   const ids = new Set([original.id, ...input.excluded, ...input.recent.map(track => track.id)]);
   const ranker = createRadioRanker(seed, input.recent, input.excluded);
+  const preferences = createRecommendationRanking(seed, input.recent, input.favorites, input.favoriteRecordings);
   const pool: { track: Track; source: RadioSource; related: boolean; index: number }[] = [];
   let lastError: unknown;
   let successfulDiscovery = 0;
@@ -123,7 +126,8 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
     if (!discover || !input.match || !artist) return;
     let songs: CatalogSong[];
     try {
-      songs = (await discover(original)).slice(0, RADIO_LIMITS.descriptors);
+      songs = (await discover(original)).slice(0, RADIO_LIMITS.descriptors)
+        .map(copyRadioDescriptor).filter((song): song is CatalogSong => song !== null);
     } catch (error) {
       lastError = error;
       diagnostic.stages[source] = "failed";
@@ -141,11 +145,9 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
       localDescriptors.add(key);
       return true;
     });
-    const favorite = (song: CatalogSong) => (input.favorites ?? []).some(name => normalized(name).includes(normalized(song.title)));
-    eligible.sort((a, b) => Number(favorite(b)) - Number(favorite(a)));
     const before = pool.length;
     const attemptsBefore = diagnostic.catalogMatches, failuresBefore = diagnostic.failedCatalogMatches;
-    for (const song of eligible) {
+    for (const song of preferences.descriptors(eligible)) {
       if (diagnostic.catalogMatches >= limit || diagnostic.catalogMatches >= RADIO_LIMITS.catalogMatches) break;
       diagnostic.catalogMatches++;
       descriptors.add(descriptorKey(song));
@@ -201,17 +203,7 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
     if (stagePriority[status] > stagePriority[diagnostic.stages[source]]) diagnostic.stages[source] = status;
   }
 
-  const recentArtists = input.recent.slice(-5).map(track => normalized(radioArtist(track)));
-  const seedArtist = normalized(artist), genre = specificRadioGenre(seed);
-  const favorite = (track: Track) => (input.favorites ?? []).some(name => normalized(name).includes(normalized(radioTitle(track))));
-  const quality = (item: typeof pool[number]) => genre && radioGenre(item.track) === genre || item.related ? 3 : 2;
-  const diversity = (track: Track) => {
-    const name = normalized(radioArtist(track));
-    return recentArtists.filter(value => value === name).length * 2 + Number(name === seedArtist);
-  };
-  const official = (track: Track) => /\b(official audio|official music video|provided to youtube)\b/i.test(track.title) || /Topic$|VEVO$/i.test(track.artist);
-  pool.sort((a, b) => quality(b) - quality(a) || diversity(a.track) - diversity(b.track) ||
-    Number(favorite(b.track)) - Number(favorite(a.track)) || Number(official(b.track)) - Number(official(a.track)) || a.index - b.index);
+  pool.sort(preferences.compare);
   const chosen = pool[0];
   if (chosen) {
     // Format preference is scoped to the already selected recording. A video

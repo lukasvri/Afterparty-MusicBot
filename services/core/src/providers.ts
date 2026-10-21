@@ -15,6 +15,7 @@ import {
 } from "./matching.ts";
 export { normalized, scoreMatch } from "./matching.ts";
 import { selectRadio } from "./radio-pipeline.ts";
+import { favoriteRecording } from "./recommendation-ranking.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
 function extractedCatalogArtist(media: ExtractedMedia) {
@@ -490,7 +491,10 @@ export class Providers {
         topTracks: (original: Track) => this.recommendations.topTracks(original),
         match: (song: CatalogSong) => this.matchSong(song),
       } : {}),
-      favorites: this.store.favorites().map(favorite => favorite.name),
+      favoriteRecordings: this.store.favorites().flatMap(favorite => {
+        const recording = favoriteRecording(favorite.query);
+        return recording ? [recording] : [];
+      }),
       diagnose: diagnostic => console.info("core-radio", JSON.stringify(diagnostic)),
     });
     this.recommendationStatus = result.source === "catalog" || result.source === "artist-catalog"
