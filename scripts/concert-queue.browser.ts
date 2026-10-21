@@ -67,10 +67,10 @@ try{
    await f.open();await settings(page);
    if(canManage){
     await page.getByRole('checkbox',{name:'Approve guest track requests'}).click();await page.waitForFunction(()=>document.querySelector<HTMLInputElement>('.approval-choice input')?.checked);
-    page.on('dialog',dialog=>dialog.accept());await page.locator('.queue-options button').filter({hasText:/^Clear$/}).click();await page.waitForFunction(()=>document.querySelectorAll('.social-track').length===0);
-    await page.locator('.queue-options button').filter({hasText:'Undo queue edit'}).click();await page.locator('.social-track').waitFor();assert.deepEqual(f.actions.map(action=>action.action),['approval','clear','undo']);
+    page.on('dialog',dialog=>dialog.accept());await page.locator('.queue-options button').filter({hasText:/^Clear$/}).click();await page.waitForFunction(()=>document.querySelectorAll('.afterparty-queue-track').length===0);
+    await page.locator('.queue-options button').filter({hasText:'Undo queue edit'}).click();await page.locator('.afterparty-queue-track').waitFor();assert.deepEqual(f.actions.map(action=>action.action),['approval','clear','undo']);
    }else{assert.equal(await page.locator('.queue-options input').count(),0);assert.equal(await page.locator('.queue-options button').count(),0);assert.equal(await page.getByRole('button',{name:/Move up/}).count(),0);}
-   assert.equal(await page.locator('.social-track img').count(),1);await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);
+   assert.equal(await page.locator('.afterparty-queue-track img').count(),1);await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);
   }finally{await page.close();}
  }
  console.log('PASS Discord queue parity, authority, clear/undo, guest controls and mobile width');
@@ -95,10 +95,10 @@ try{
    assert(await page.getByRole('button',{name:'Move up Concert queued00001',exact:true}).isDisabled());
    assert(await page.getByRole('button',{name:'Move down Concert queued00002',exact:true}).isDisabled());
    const down=page.getByRole('button',{name:'Move down Concert queued00001',exact:true});const size=await down.boundingBox();assert(size&&size.height>=44&&size.width>=44);
-   await down.focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>document.querySelector('.social-track strong')?.textContent==='Concert queued00002');
+   await down.focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>document.querySelector('.afterparty-queue-track strong')?.textContent==='Concert queued00002');
    assert.deepEqual(f.actions.map(({action,videoId,to,revision})=>({action,videoId,to,revision})),[{action:'move',videoId:'queued00001',to:1,revision:'1'}]);
    assert(await down.isDisabled());assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);
-   for(const row of await page.locator('.social-track').all()){
+   for(const row of await page.locator('.afterparty-queue-track').all()){
     const boxes=await Promise.all((await row.getByRole('button').all()).map(button=>button.boundingBox()));
     for(const box of boxes)assert(box&&box.width>=44&&box.height>=44);
     for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
@@ -113,7 +113,7 @@ try{
   const f=await fixture(),{page}=f;let failed=false;
   try{
    await f.open();f.source.get=async route=>{if(failed)return false;failed=true;await route.fulfill({status:503,json:{error:'Synthetic temporary queue failure'}});return true;};
-   await page.getByRole('alert').filter({hasText:'The concert queue is unavailable.'}).waitFor();assert.equal(await page.locator('.social-track').count(),1);
+   await page.getByRole('alert').filter({hasText:'The concert queue is unavailable.'}).waitFor();assert.equal(await page.locator('.afterparty-queue-track').count(),1);
    await page.getByRole('alert').filter({hasText:'The concert queue is unavailable.'}).waitFor({state:'detached',timeout:12000});
   }finally{await page.close();}
  }
@@ -135,11 +135,11 @@ try{
    await f.open();const old=copy(f.states.get(guildA)!);
    f.source.get=async route=>{if(held)return false;held=true;captured.resolve(route);await release.promise;await route.fulfill(staleFailure?{status:503,json:{error:'Old polling failure'}}:{json:{state:old,canManage:true}});return true;};
    await captured.promise;
-   if(staleFailure){await page.getByRole('button',{name:'Vote for Concert queued00001'}).click();await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('1'));}
-   else{await page.getByRole('button',{name:'Remove Concert queued00001'}).click();await page.locator('.social-track').waitFor({state:'detached'});}
+   if(staleFailure){await page.getByRole('button',{name:'Vote for Concert queued00001'}).click();await page.waitForFunction(()=>document.querySelector('.afterparty-queue-track > button')?.textContent?.includes('1'));}
+   else{await page.getByRole('button',{name:'Remove Concert queued00001'}).click();await page.locator('.afterparty-queue-track').waitFor({state:'detached'});}
    const response=page.waitForResponse(res=>res.url().includes('/api/discord/queue?'));release.resolve();await response;await repaint(page);
    assert.equal(await page.getByRole('alert').filter({hasText:'The concert queue is unavailable.'}).count(),0);
-   if(staleFailure)assert.match(await page.locator('.social-track > button').first().innerText(),/1/);else assert.equal(await page.locator('.social-track').count(),0);
+   if(staleFailure)assert.match(await page.locator('.afterparty-queue-track > button').first().innerText(),/1/);else assert.equal(await page.locator('.afterparty-queue-track').count(),0);
   }finally{release.resolve();await page.close();}
  }
  console.log('PASS delayed GET successes and failures cannot replace a newer mutation response');
@@ -155,7 +155,7 @@ try{
    }
    await captured.promise;await f.switchGuild();const second=page.getByRole('button',{name:'Vote for Concert second00001'});await second.waitFor();
    await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');assert(await second.isEnabled());
-   await second.click();await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('1'));
+   await second.click();await page.waitForFunction(()=>document.querySelector('.afterparty-queue-track > button')?.textContent?.includes('1'));
    release.resolve();await repaint(page);assert.equal(await page.getByRole('button',{name:'Vote for Concert queued00001'}).count(),0);assert(await second.isEnabled());
    assert.equal(await page.getByRole('alert').filter({hasText:'Old server action failed'}).count(),0);assert.equal(f.actions.at(-1)?.guildId,guildB);assert.equal(f.actions.at(-1)?.revision,'1');
   }finally{release.resolve();await page.close();}
@@ -192,7 +192,7 @@ try{
    assert(failedRead);assert.equal(attempts,1,'A timeout and failed recovery read must not automatically resend the write');assert(await vote.isEnabled());
    await vote.click();await page.locator('.queue-panel [role=alert]').filter({hasText:'Synthetic stale revision'}).waitFor();
    await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');
-   await vote.click();await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('1'));
+   await vote.click();await page.waitForFunction(()=>document.querySelector('.afterparty-queue-track > button')?.textContent?.includes('1'));
    assert.deepEqual(f.actions.map(action=>action.revision),['1','1','2']);assert.equal(f.states.get(guildA)!.revision,'3');
    assert.equal(await page.locator('.queue-panel [role=alert]').count(),0);
   }finally{release.resolve();await page.close();}
@@ -220,7 +220,7 @@ try{
    await page.getByRole('button',{name:'Vote for Concert queued00001'}).click();await oldEntered.promise;
    await f.switchGuild();const other=page.getByRole('button',{name:'Vote for Concert second00001'});await other.waitFor();
    await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');await other.click();
-   await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('1'));
+   await page.waitForFunction(()=>document.querySelector('.afterparty-queue-track > button')?.textContent?.includes('1'));
    const returned=f.states.get(guildA)!;returned.revision='7';returned.queue=[track('returned001')];returned.voteCounts={returned001:4};
    await f.switchGuild(guildA);const vote=page.getByRole('button',{name:'Vote for Concert returned001'});await vote.waitFor();
    await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');await vote.click();await newEntered.promise;
@@ -228,7 +228,7 @@ try{
    assert.equal(await page.locator('.social-queue').getAttribute('aria-busy'),'true','The old session must not unlock a new action on the same guild');
    assert.equal(await page.getByRole('button',{name:'Vote for Concert queued00001'}).count(),0);assert.equal(await page.getByRole('button',{name:'Vote for Concert second00001'}).count(),0);
    assert.equal(await page.locator('.queue-panel [role=alert]').count(),0);assert(await vote.isDisabled());
-   newRelease.resolve();await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('5'));
+   newRelease.resolve();await page.waitForFunction(()=>document.querySelector('.afterparty-queue-track > button')?.textContent?.includes('5'));
    assert.deepEqual(f.actions.map(action=>[action.guildId,action.revision]),[[guildA,'1'],[guildB,'1'],[guildA,'7']]);assert.equal(returned.revision,'8');
   }finally{oldRelease.resolve();newRelease.resolve();await page.close();}
  }

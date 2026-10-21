@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.4.0-alpha.5",
+    "date": "2026-10-21",
+    "title": "Visible queues and neutral control surfaces",
+    "items": [
+      "Upcoming songs and pending requests use an Afterparty-specific row class, avoiding the generic social-track cosmetic filter used by content blockers such as uBlock Origin. Room and Discord queue counts, ordering, permissions and concert privacy are unchanged; no blocker setting needs to be disabled.",
+      "Shared secondary surfaces, borders, text and subtle buttons use neutral dark grays instead of the late stylesheet's red-brown palette. This updates nickname fields, TV-mode controls and other panels and inputs using the shared tokens; selected controls and playback accents retain red."
+    ]
+  },
+  {
     "version": "2.4.0-alpha.4",
     "date": "2026-10-21",
     "title": "More reliable playback, queue controls and radio suggestions",

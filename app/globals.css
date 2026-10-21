@@ -266,7 +266,7 @@ input[type=range]:disabled{cursor:default;opacity:.5}
 @media(max-width:600px){.discord-strip>.button{flex-basis:calc(100% - 50px);justify-content:center}.discord-strip-copy{flex-basis:calc(100% - 60px)}}
 
 /* Afterparty studio: one video, one shared queue, one clear next action. */
-:root{--bg:#070707;--panel:#101010;--panel2:#171011;--line:#352022;--muted:#b4a9aa;--accent:#ff3048;--text:#f6f2f2}
+:root{--bg:#070707;--panel:#101010;--panel2:#1a1a1e;--line:#343438;--muted:#b6b6bd;--accent:#ff3048;--text:#f4f4f5}
 .studio-shell .sidebar{height:80px;padding:0 40px;gap:45px;background:#080808;border-bottom-color:#ffffff0d}
 .studio-shell .topbar{height:80px;padding:0 40px}
 .studio-shell .content{width:min(1600px,calc(100% - 80px));padding-top:30px}
