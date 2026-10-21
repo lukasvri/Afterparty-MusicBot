@@ -32,10 +32,10 @@ function manager(prepare: GuessSourceFactory, lifetime = new AbortController()) 
 }
 
 test('disabled manager never calls the factory or activates through caller env mutation', async t => {
-  let calls = 0; const config: NodeJS.ProcessEnv = {}, lifetime = new AbortController();
+  let calls = 0; const config: NodeJS.ProcessEnv = { GUESS_YOUTUBE_CLIPS: '0' }, lifetime = new AbortController();
   const m = new GuessSourceManager({ env: config, signal: lifetime.signal, prepare: () => { calls++; throw Error('private error'); } }); t.after(m.dispose);
   config.GUESS_YOUTUBE_CLIPS = '1';
-  assert.equal(m.configured, false); assert.equal(await m.reload(), false); assert.equal(await m.reload(), false);
+  assert.equal(m.configured, false); assert.equal(m.status, 'disabled'); assert.equal(await m.reload(), false); assert.equal(await m.reload(), false);
   assert.equal(calls, 0); assert(m.catalog.categories().every(category => !category.available));
   assert.throws(() => m.catalog.select('2010s', selection), unavailable);
   await assert.rejects(m.media.read('not-a-source-key', signal()), unavailable);
@@ -47,9 +47,11 @@ test('concurrent reloads share one preparation and publish through stable proxie
   const m = manager((_config, options) => { calls++; preparationSignal = options.signal; entered.resolve(); return gate.promise; }); t.after(m.dispose);
   const catalog = m.catalog, media = m.media;
   const a = m.reload(), b = m.reload(); assert.equal(a, b); await entered.promise;
+  assert.equal(m.status, 'loading');
   assert.equal(calls, 1); assert(m.catalog.categories().every(category => !category.available));
   const prepared = source(1); gate.resolve(prepared);
   assert.equal(await a, true); assert.equal(await b, true);
+  assert.equal(m.status, 'ready');
   assert.equal(m.catalog, catalog); assert.equal(m.media, media); assert.equal(preparationSignal?.aborted, false);
   const song = catalog.select('2010s', selection);
   assert.equal(guessWaveSeconds(await media.read(song.mediaKey, signal())), 30);
@@ -74,6 +76,7 @@ test('expired source stays unavailable without automatic work and explicit reloa
   assert.equal(game.apply(host, { action: 'read' }).game.round!.roundId, round.roundId);
   clock = 1_030_000;
   assert(catalog.categories().every(category => !category.available));
+  assert.equal(m.status, 'unavailable');
   await assert.rejects(media.read(first.mediaKey, signal()), unavailable); assert.equal(calls, 1);
   assert.equal(await m.reload(), true); assert.equal(calls, 2); assert.equal(prepared[0].releases(), 1);
   assert.equal(m.catalog, catalog); assert.equal(m.media, media);
@@ -173,8 +176,17 @@ test('sixty-second preparation timeout retains single-flight capacity until the 
   const m = manager(() => { calls++; return calls === 1 ? gate.promise : source(2); }); t.after(m.dispose);
   const pending = m.reload(); await nextTurn(); t.mock.timers.tick(60_000);
   assert.equal(await pending, false); assert.equal(await m.reload(), false); assert.equal(calls, 1);
+  assert.equal(m.status, 'unavailable', 'an ignored timed-out dependency cannot leave the UI loading forever');
   const late = source(1); gate.resolve(late); await nextTurn(); assert.equal(late.releases(), 1);
   assert.equal(await m.reload(), true); assert.equal(calls, 2);
+});
+
+test('alpha default selection configures the manager without fetching until an explicit reload', async t => {
+  let calls = 0;
+  const m = new GuessSourceManager({ env: {}, signal: signal(), prepare: () => { calls++; return source(1); } }); t.after(m.dispose);
+  assert.equal(m.configured, true); assert.equal(m.status, 'unavailable'); assert.equal(calls, 0);
+  assert.equal(await m.reload(), true); assert.equal(m.status, 'ready'); assert.equal(calls, 1);
+  m.dispose(); assert.equal(m.status, 'unavailable');
 });
 
 test('closing a published source cancels reads whose adapters ignore cancellation and clears the synthetic label', async t => {

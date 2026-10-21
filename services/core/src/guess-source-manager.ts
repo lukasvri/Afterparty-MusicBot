@@ -2,10 +2,12 @@ import { guessAbort } from './guess-audio-format.ts';
 import { UnavailableGuessCatalog, type GuessCatalog, type GuessCategorySummary } from './guess-catalog.ts';
 import type { GuessMediaSource } from './guess-media.ts';
 import { prepareConfiguredGuessSource, type GuessSourceOptions } from './guess-source.ts';
+import { selectGuessSource } from './guess-source-config.ts';
 import { UserError } from './types.ts';
 
 type Source = Exclude<Awaited<ReturnType<typeof prepareConfiguredGuessSource>>, undefined>;
 export type GuessSourceFactory = (env: NodeJS.ProcessEnv, options: GuessSourceOptions) => Source | undefined | Promise<Source | undefined>;
+export type GuessSourceState = 'disabled' | 'unavailable' | 'loading' | 'ready';
 type ActiveSource = { source: Source; lifetime: AbortController };
 const unavailable = () => new UserError('The configured game preview source is unavailable.', 503);
 
@@ -51,7 +53,9 @@ export class GuessSourceManager {
   constructor(options: { env: NodeJS.ProcessEnv; signal: AbortSignal; prepare?: GuessSourceFactory }) {
     this.env = { ...options.env }; this.prepare = options.prepare ?? prepareConfiguredGuessSource;
     this.externalSignal = options.signal;
-    this.configured = [this.env.GUESS_SYNTHETIC_TEST, this.env.GUESS_DEEZER_PREVIEWS, this.env.GUESS_YOUTUBE_CLIPS].includes('1');
+    let configured = false;
+    try { configured = selectGuessSource(this.env).provider !== 'disabled'; } catch { /* Conflicting configuration stays disabled. */ }
+    this.configured = configured;
     const syntheticTest = () => this.current?.source.catalog.syntheticTest;
     this.catalog = {
       get syntheticTest() { return syntheticTest(); },
@@ -77,6 +81,12 @@ export class GuessSourceManager {
     return this.fallback.categories();
   }
   private healthy() { return this.categories().some(category => category.available); }
+  get status(): GuessSourceState {
+    if (!this.configured) return 'disabled';
+    if (this.closed) return 'unavailable';
+    if (this.healthy()) return 'ready';
+    return this.pending && !this.pending.signal.aborted ? 'loading' : 'unavailable';
+  }
   private active(): ActiveSource {
     if (this.closed || !this.current) throw unavailable();
     return this.current;

@@ -35,9 +35,9 @@ const reloadGuess=async()=>{const available=await guessSource.reload();if(!closi
 const onGuessReload=()=>{void reloadGuess();};
 const close=async()=>{if(closing)return;closing=true;process.off('SIGHUP',onGuessReload);guessLifetime.abort();guessSource.dispose();clearInterval(presence);for(const p of publishers.values())p.close();for(const s of guilds.sessions.values()){s.engine.checkpoint();await s.bot.close();s.commands.close();s.engine.close();if(s.id!==defaultId)s.engine.store.close();}if(!guilds.sessions.has(defaultId)){commands.close();engine.close();}await client.destroy();metrics.close();await servers?.close();store.close();process.exit(0);};process.on('SIGTERM',()=>void close());process.on('SIGINT',()=>void close());
 process.on('SIGHUP',onGuessReload);
-await reloadGuess();
 if(!closing){
- servers=await createServers(engine,commands,{key,origin:new URL(site).origin,publicPort:Number(env.CORE_PORT??3990),isReady:()=>client.isReady(),guilds,oauth,guessCatalog:guessSource.catalog,guessMedia:guessSource.media,applicationId:()=>client.user?.id??'',onRequest:ms=>metrics.request(ms)});
+ servers=await createServers(engine,commands,{key,origin:new URL(site).origin,publicPort:Number(env.CORE_PORT??3990),isReady:()=>client.isReady(),guilds,oauth,guessCatalog:guessSource.catalog,guessMedia:guessSource.media,prepareSource:()=>guessSource.reload(),sourceState:()=>guessSource.status,applicationId:()=>client.user?.id??'',onRequest:ms=>metrics.request(ms)});
  presence=setInterval(()=>client.user?.setActivity(`${[...guilds.sessions.values()].filter(s=>s.engine.snapshot().playing).length} servers playing · Afterparty`,{type:ActivityType.Listening}),15000);
  console.log('Afterparty is ready for multiple servers. Manage it on the website.');
+ if(!closing&&guessSource.configured)void reloadGuess();
 }
