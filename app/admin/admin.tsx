@@ -64,6 +64,22 @@ async function api<T>(
   return d;
 }
 type SettingField = {key: string; label: string; help: string; min?: number; max?: number; toggle?: boolean};
+function safeInviteUrl(value: string, guildId?: string) {
+  if (!value) return "";
+  try {
+    const relative = value.startsWith("/") && !value.startsWith("//");
+    const url = new URL(value, "https://afterparty.invalid");
+    if (!relative && url.protocol !== "https:") return "";
+    if (guildId) {
+      if (!/^\d{14,22}$/.test(guildId)) return "";
+      url.searchParams.set("guild_id", guildId);
+      url.searchParams.set("disable_guild_select", "true");
+    }
+    return relative ? `${url.pathname}${url.search}${url.hash}` : url.toString();
+  } catch {
+    return "";
+  }
+}
 const settingGroups: {title: string; description: string; fields: SettingField[]}[] = [
   {title: "Audio playback", description: "Playback defaults for this Discord server.", fields: [
     {key: "defaultVolume", label: "Default volume", min: 0, max: 100, help: "0–100%. Current playback volume has its own control."},
@@ -118,6 +134,8 @@ export default function Admin() {
     alive = useRef(true),
     actionBusy = useRef(false);
   const selected = guilds.find((g) => g.id === guildId);
+  const inviteHref = safeInviteUrl(invite);
+  const guildInviteHref = safeInviteUrl(invite, guildId);
   const clearOwnerAccess = useCallback(() => {
     accessGeneration.current++;
     setOwnerUpdateUrl("");
@@ -401,10 +419,10 @@ export default function Admin() {
               <a className="button primary" href="/api/auth/discord">
                 {t("Logg inn med Discord")} <ArrowUpRight size={16} />
               </a>
-              {invite && (
+              {inviteHref && (
                 <a
                   className="button subtle"
-                  href={invite}
+                  href={inviteHref}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -471,7 +489,7 @@ export default function Admin() {
               {!guilds.length ? (
                 <p>
                   {t("Du har ingen servere med administrasjonstilgang.")}{" "}
-                  <a href={invite}>{t("Legg til boten")}</a>
+                  <a href={inviteHref}>{t("Legg til boten")}</a>
                 </p>
               ) : !selected?.installed ? (
                 <section className="admin-card">
@@ -480,12 +498,7 @@ export default function Admin() {
                   </h2>
                   <a
                     className="button primary"
-                    href={
-                      invite +
-                      "&guild_id=" +
-                      guildId +
-                      "&disable_guild_select=true"
-                    }
+                    href={guildInviteHref}
                     target="_blank"
                     rel="noreferrer"
                   >

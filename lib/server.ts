@@ -256,11 +256,11 @@ function duration(input: string) {
 }
 function decode(input: string) {
   return input
-    .replace(/&amp;/g, "&")
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 export async function videos(
   request: Request,
