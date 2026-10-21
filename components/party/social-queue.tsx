@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { ArrowDown, ArrowUp, Check, Heart, SkipForward, Trash2, Undo2, X } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import type { Room } from "@/lib/types";
 import { time } from "@/lib/types";
@@ -39,7 +40,7 @@ export function SocialQueue({
           <article className="afterparty-queue-track" key={v.entryId ?? v.id}>
             <span className="queue-number">{i + 1}</span>
             <Image unoptimized width={48} height={48} className="queue-art" src={v.image || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" />
-            <div>
+            <div className="queue-track-copy">
               <strong>{v.title}</strong>
               <small>{v.artist}</small>
               <small>
@@ -47,34 +48,38 @@ export function SocialQueue({
               </small>
             </div>
             <button
+              className="queue-vote"
               disabled={busy}
               onClick={() => onAction("vote", { videoId: v.entryId ?? v.id })}
               aria-label={t("Stem på ") + v.title}
             >
-              ♡ {room.voteCounts?.[v.entryId ?? v.id] ?? 0}
+              <Heart size={16} aria-hidden="true" /> <span>{room.voteCounts?.[v.entryId ?? v.id] ?? 0}</span>
             </button>
             {room.isHost && (
               <>
                 <button
+                  className="queue-move-up"
                   disabled={busy || i === 0}
                   aria-label={t("Flytt opp ") + v.title}
                   onClick={() => onAction("move", { videoId: v.entryId ?? v.id, to: i - 1 })}
                 >
-                  ↑
+                  <ArrowUp size={16} aria-hidden="true" />
                 </button>
                 <button
+                  className="queue-move-down"
                   disabled={busy || i === entries.length - 1}
                   aria-label={t("Move down {title}", { title: v.title })}
                   onClick={() => onAction("move", { videoId: v.entryId ?? v.id, to: i + 1 })}
                 >
-                  ↓
+                  <ArrowDown size={16} aria-hidden="true" />
                 </button>
                 <button
+                  className="queue-remove"
                   disabled={busy}
                   aria-label={t("Fjern ") + v.title}
                   onClick={() => onAction("remove", { videoId: v.entryId ?? v.id })}
                 >
-                  ×
+                  <Trash2 size={16} aria-hidden="true" />
                 </button>
               </>
             )}
@@ -90,32 +95,37 @@ export function SocialQueue({
           disabled={busy}
           onClick={() => onAction("skip-vote")}
         >
+          <SkipForward size={16} aria-hidden="true" />
           {t("Stem for neste låt")} · {room.skipVotes ?? 0}/3
         </button>
       )}
       {!!room.requests?.length && (
-        <div>
+        <div className="queue-requests">
           <h3>{t("Ventande låtønske")}</h3>
           {room.requests.map((v) => (
-            <article className="afterparty-queue-track" key={v.entryId ?? v.id}>
-              <div>
+            <article className="afterparty-queue-track queue-request" key={v.entryId ?? v.id}>
+              <div className="queue-track-copy">
                 <strong>{v.title}</strong>
                 <small>{t("Frå")} {v.requestedBy ?? t("Gjest")}</small>
               </div>
               {room.isHost ? (
                 <>
                   <button
+                    className="queue-approve"
                     disabled={busy}
                     aria-label={t("Approve {title}", { title: v.title })}
                     onClick={() => onAction("approve", { videoId: v.entryId ?? v.id })}
                   >
+                    <Check size={16} aria-hidden="true" />
                     {t("Godkjenn")}
                   </button>
                   <button
+                    className="queue-reject"
                     disabled={busy}
                     aria-label={t("Reject {title}", { title: v.title })}
                     onClick={() => onAction("reject", { videoId: v.entryId ?? v.id })}
                   >
+                    <X size={16} aria-hidden="true" />
                     {t("Avvis")}
                   </button>
                 </>
@@ -152,9 +162,11 @@ export function QueueSettings({room,busy,onAction}:{room:Room;busy:boolean;onAct
                   onAction("clear");
               }}
             >
+              <Trash2 size={16} aria-hidden="true" />
               {t("Tøm")}
             </button>
             <button className="button subtle" disabled={busy} onClick={() => onAction("undo")}>
+              <Undo2 size={16} aria-hidden="true" />
               {t("Angre køendring")}
             </button>
           </>

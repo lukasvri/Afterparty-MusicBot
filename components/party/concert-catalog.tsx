@@ -1,6 +1,6 @@
 "use client";
 import { useId, useState } from "react";
-import { ArrowUpRight, ListPlus, Plus } from "lucide-react";
+import { ArrowUpRight, ListPlus, Music2, Plus } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import { CONCERT_CATALOG } from "@/lib/concert-catalog";
 
@@ -20,7 +20,10 @@ export function ConcertCatalog({ busy, onEnqueue }: {
   const unavailable = busy || !onEnqueue;
   return (
     <section className="concert-catalog" aria-labelledby={`${id}-title`} aria-busy={busy}>
-      <h2 id={`${id}-title`}>{t("Festival concerts")}</h2>
+      <header className="library-section-heading">
+        <Music2 size={20} aria-hidden="true" />
+        <h2 id={`${id}-title`}>{t("Festival concerts")}</h2>
+      </header>
       <p>{t("Explore official festival uploads by event and year. Add a set or the selected year to your queue.")}</p>
       {events.size > 0 ? <>
         <div className="concert-catalog-filters">
@@ -44,7 +47,7 @@ export function ConcertCatalog({ busy, onEnqueue }: {
             <ListPlus size={16} aria-hidden="true" /> {t("Add selected year to queue")}
           </button>}
         </div>
-        <ol className="concert-catalog-list">
+        <ol className="concert-catalog-list" tabIndex={0} aria-labelledby={`${id}-title`}>
           {selected.map(entry => (
             <li key={entry.id}>
               <h3>{entry.artist}</h3>
