@@ -200,6 +200,15 @@ console.log(JSON.stringify({status:await control()}));
 """
 
 
+def validation_resources(config):
+    import importlib.util
+    path = Path(__file__).with_name('runtime_limits.py')
+    spec = importlib.util.spec_from_file_location('afterparty_resource_limits', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.RuntimeSession(config)
+
+
 class Deployer:
     def __init__(self, config):
         self.config = config
@@ -217,6 +226,9 @@ class Deployer:
 
     def command(self, args, *, capture=False, input=None, timeout=1800, cwd=None):
         # Never echo command arguments, environment or private Compose output.
+        resources = getattr(self, '_validation_resources', None)
+        if resources is not None:
+            args = resources.wrap(args)
         result = subprocess.run(args, cwd=cwd or self.repo, input=input, text=True,
                                 stdout=subprocess.PIPE if capture else self.logfile,
                                 stderr=self.logfile, timeout=timeout)
@@ -327,6 +339,12 @@ class Deployer:
             raise DeployError('Playback restarted after automatic pause. Retry the update; Core was not stopped.')
         return scopes
 
+    def quiet(self):
+        scopes = self.idle()
+        if any(s.get('connected', True) or s.get('count', 1) for s in scopes):
+            raise DeployError('Automatic update waits for no voice connections and empty queues.')
+        return scopes
+
     def preflight(self):
         for path in [self.compose_file, self.data, self.state, self.backups]:
             if path.is_relative_to(self.repo):
@@ -387,18 +405,40 @@ class Deployer:
         return source
 
     def validate(self, source):
-        self.emit('testing Core and website in isolated containers')
-        validation = 'gutta-krutt-core:validate-' + self.target[:12]
-        self.command(self.docker + ['build', '--target', 'validation', '-t', validation, str(source / 'services/core')])
-        self.command(self.docker + ['run', '--rm', '--network', 'none', '--cpus=2', '--memory=3g', '--entrypoint', 'sh', validation, '-c', 'npm run check && npm test'])
-        runner = self.docker + ['run', '--rm', '--cpus=2', '--memory=3g', '--user', str(os.getuid()) + ':' + str(os.getgid()), '-e', 'HOME=/tmp', '--mount', 'type=bind,src=' + str(source) + ',dst=/work', '-w', '/work', '--entrypoint', 'sh']
-        self.command(runner + [validation, '-c', 'npm ci --no-audit --no-fund'])
-        self.command(runner + ['--network', 'none', validation, '-c', 'npm run lint && python3 -m unittest discover -s tests -v && node node_modules/typescript/bin/tsc --noEmit --incremental false && npm run test:unit && npm run build'])
-        self.new_image = 'gutta-krutt-core:git-' + self.target[:12]
-        self.emit('building versioned production image')
-        self.command(self.docker + ['build', '--target', 'final', '--label', 'org.opencontainers.image.revision=' + self.target, '-t', self.new_image, str(source / 'services/core')])
-        self.validate_runtime_image()
+        # The same bounded validation path is used before any normal switch and by --check.
+        with validation_resources(self.config) as resources:
+            self._validation_resources = resources
+            try:
+                self._validate_candidate(source)
+            finally:
+                self._validation_resources = None
+
+    def _validate_candidate(self, source):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('afterparty_release_artifacts', Path(__file__).with_name('release_artifacts.py'))
+        artifacts = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(artifacts)
+        self.emit('checking GitHub-tested release')
+        cache = self.state / 'release-cache' / self.target
+        manifest = artifacts.Client().fetch(self.target, cache)
+        if manifest['version'] != json.loads((source / 'package.json').read_text())['version']:
+            raise DeployError('Tested build version differs from canonical source.')
+        self.new_image = manifest['image_tag']
+        self.emit('loading tested image from GitHub')
+        self.command(self.docker + ['load', '--input', str(cache / 'core-image.tar.gz')])
         self.new_image_id = self.command(self.docker + ['image', 'inspect', '--format', '{{.Id}}', self.new_image], capture=True)
+        if self.new_image_id != manifest['image_id']:
+            raise DeployError('Imported image ID differs from the tested GitHub image.')
+        self.emit('checking production image without starting Core')
+        self.validate_runtime_image()
+        proof = json.dumps({
+            'commit': self.target, 'run_id': manifest['run_id'], 'run_attempt': manifest['run_attempt'],
+            'image_id': self.new_image_id, 'manifest_sha256': artifacts.digest(cache / 'release.json'),
+            'website_sha256': manifest['files']['website.tar.gz']['sha256'],
+            'verified_at': time.time(), 'mode': 'github-tested-build'
+        }, indent=2) + '\n'
+        atomic_write(cache / 'verified.json', proof)
+        atomic_write(self.state / 'ci-build.json', proof)
 
     def validate_runtime_image(self):
         # Build-stage tests run as root. The final image must also work as its
@@ -409,7 +449,7 @@ function check(dir){for(const item of readdirSync(dir,{withFileTypes:true})){con
 check('/app/src');await import('/app/src/data-import.ts');
 console.log('Unprivileged runtime source and imports verified.');"""
         self.command(self.docker + ['run', '--rm', '--network', 'none', '--read-only',
-                     '--cpus=1', '--memory=256m', '--pids-limit=64', '--entrypoint',
+                     '--cpus=0.5', '--memory=256m', '--memory-swap=256m', '--pids-limit=64', '--entrypoint',
                      'node', self.new_image, '--input-type=module', '-e', script], timeout=30)
 
     def wait_ready(self):
@@ -441,12 +481,19 @@ console.log('Unprivileged runtime source and imports verified.');"""
     def switch(self):
         if self.compose_file.read_text() != self.old_config or self.inspect()['Image'] != self.old_image:
             raise DeployError('Production configuration or image changed during validation. Nothing was stopped.')
+        if getattr(self, 'idle_only', False):
+            self.quiet()
+            self.switch_paused()
+            self.emit('deployment succeeded')
+            return
         with self.paused_playback():
             self.switch_paused()
         self.emit('deployment succeeded')
 
     def switch_paused(self):
         # Recheck after lengthy tests, before any interruption.
+        if getattr(self, 'idle_only', False):
+            self.quiet()
         before = self.idle()
         if self.compose_file.read_text() != self.old_config or self.inspect()['Image'] != self.old_image:
             raise DeployError('Production configuration or image changed during validation. Nothing was stopped.')
@@ -457,6 +504,8 @@ console.log('Unprivileged runtime source and imports verified.');"""
         stopped, complete_backup, candidate_started = False, False, False
         try:
             self.emit('stopping Core and backing up all production data')
+            if getattr(self, 'idle_only', False):
+                self.quiet()
             stopped = True
             self.command(self.compose + ['stop', 'core'], timeout=90)
             if self.inspect()['State']['Running']:
@@ -494,9 +543,13 @@ console.log('Unprivileged runtime source and imports verified.');"""
             raise
 
     def run(self, check=False, redeploy=False):
+        if getattr(self, 'idle_only', False):
+            if self.playback_journal.exists():
+                raise DeployError('Automatic update waits for manual playback recovery.')
+            self.quiet()
         if check and self.playback_journal.exists():
             raise DeployError('Playback recovery is pending. Run a normal deployment to restore it; --check never changes playback.')
-        if not check:
+        if not check and not getattr(self, 'idle_only', False):
             self.resume_playback()
         self.preflight()
         with tempfile.TemporaryDirectory(prefix='candidate-', dir=self.state) as temporary:
@@ -519,13 +572,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True, type=Path)
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument('--check', action='store_true', help='Fetch, export, test and build without updating production.')
+    mode.add_argument('--check', action='store_true', help='Verify and import the exact tested GitHub build, run an isolated runtime probe, and never update production.')
     mode.add_argument('--status', action='store_true', help='Show local deployment records without making changes.')
     parser.add_argument('--redeploy', action='store_true', help='Also deploy if this commit is already recorded as running.')
+    parser.add_argument('--idle-only', action='store_true', help='Refuse active playback, voice connections, queues and pending recovery. Never pause or resume playback.')
     args = parser.parse_args()
     os.umask(0o077)
     config = json.loads(args.config.read_text())
     deploy = Deployer(config)
+    deploy.idle_only = args.idle_only
     for path in [deploy.state, deploy.backups]:
         path.mkdir(parents=True, exist_ok=True, mode=0o700)
     if args.status:

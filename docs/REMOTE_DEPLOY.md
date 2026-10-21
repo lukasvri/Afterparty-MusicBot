@@ -1,8 +1,8 @@
 # Deploy Core from another computer
 
 `deploy-core` runs on the bot host. Your main computer only requests an update
-over private SSH through Tailscale. Credentials, databases, test execution,
-images, logs and backups stay on the bot host.
+over private SSH through Tailscale. Credentials, databases, logs and backups stay
+on the bot host. Tests and production builds run once in GitHub Actions.
 
 ## What the command does
 
@@ -12,11 +12,16 @@ images, logs and backups stay on the bot host.
    Local edits, staged files, untracked files and ignored configuration are not
    exported or mounted in tests. The working branch and local files stay unchanged.
    If a production commit is recorded, the fetched commit must descend from it.
-3. Builds Core's validation image, reruns its tests with networking disabled,
-   then runs deployer tests, website typechecks, behavior tests and a production
-   website build. Only dependency installation has network access after the
-   validation image is built. Tests use synthetic data.
-4. Builds a production image tagged with the Git commit. Automatically pauses
+3. Requires the exact commit's successful canonical main-push workflow, including
+   the Core, website, deployer and release jobs. Downloads its commit-addressed
+   build assets and verifies GitHub's asset digests, the manifest, image ID,
+   revision label, platform and runtime user. There is no local source-build or
+   test fallback when CI or assets are missing.
+4. Imports the tested image and runs a short, unprivileged, read-only runtime
+   probe with no network, secrets or production data. The probe is limited to
+   256 MiB RAM, no swap and half a CPU. Start requires 1024 MiB available memory;
+   a guard requires a healthy existing Core and 512 MiB remaining memory.
+   Automatically pauses
    active playback on each server immediately before the switch, then stops
    Core and backs up the entire data tree,
    including `guilds/`, private Compose configuration and referenced environment files.
@@ -34,7 +39,12 @@ ones you no longer need. Check disk space before a large update. No cleanup
 command deletes production volumes automatically. The source checkout is never
 fast-forwarded or reset; `--status` records the running version.
 
-The deployment only handles Core. Website builds are validation, not publication.
+The deployment only handles Core. It also verifies and caches the matching
+compiled website for the host's separate Sites coordinator. That coordinator
+must preserve the compiled bytes and use the supported Sites source/package
+workflow with no remaining build commands. Only the project identity in the
+source and generated hosting manifests is bound locally; application code and
+storage bindings remain exactly those checked by CI.
 Automated tests and readiness checks do not replace listening in a real voice channel.
 
 ## One-time setup on the bot host
@@ -85,7 +95,11 @@ First review and merge the desired GitHub pull request. The default command
 updates only to `origin/main`. It does not merge PRs, deploy arbitrary branches,
 or need a copy of the bot's credentials on the main computer.
 
-`--check` runs tests and builds without stopping or updating production.
+`--check` verifies/downloads the GitHub build, imports the image and runs the
+isolated runtime probe without stopping or updating production. It does not
+install dependencies, run the full test suite, create a backup of live databases,
+or publish the website. A consistent backup is still taken immediately before a
+real switch, as described above.
 A normal deployment skips the restart if its recorded commit and actual running
 image already match. `--redeploy` explicitly repeats deployment of the same commit.
 An already current deployment and `--check` do not pause music. Actual updates
@@ -110,3 +124,25 @@ and keeps child output in local log files, but host shutdown or a forced process
 kill can still interrupt it. Reconnect and inspect `--status` before retrying.
 If recovery itself fails, keep the backup and inspect locally before any further
 update. Do not run `docker compose down -v`.
+
+## Build availability and first rollout
+
+The release job runs only after all three CI validation jobs succeed on a push
+to canonical main. It publishes a prerelease named `build-<full commit SHA>`
+containing `core-image.tar.gz`, `website.tar.gz` and `release.json`. These are
+public, secret-free build assets, not a production deployment or an application
+release announcement. The release is excluded from GitHub's latest-release
+selection. Published assets are never overwritten by this workflow.
+
+Pull requests run validation and upload temporary workflow artifacts, but do not
+publish build releases or deploy anything. A host needs no GitHub token to read
+the public build releases. Missing assets, failed/pending CI, wrong revisions,
+partial job results and checksum failures stop before playback or Core is touched.
+Incomplete draft build releases require review rather than automatic replacement.
+
+After merging this workflow change, wait for its first main-push run and build
+release to succeed. Older commits have no reusable build assets and are
+deliberately unavailable to the new update path. Reinstall all three pinned
+deployer files together. For development changes, `npm run setup:cloud` followed
+by `npm run check:all` remains the full validation workflow; production hosts do
+not repeat it.

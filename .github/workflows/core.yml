@@ -1,5 +1,8 @@
 name: Core validation
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 jobs:
@@ -17,8 +20,17 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Typecheck and test Core including FFmpeg
-        run: docker build --target validation -t core-validation services/core
+      - name: Test once, build the final image and check its runtime
+        run: python3 scripts/build_release.py core
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-core
+          path: |
+            release-assets/core-image.tar.gz
+            release-assets/core.json
+          if-no-files-found: error
+          retention-days: 3
+          overwrite: true
   website:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -37,3 +49,29 @@ jobs:
           node node_modules/typescript/bin/tsc --noEmit --incremental false
           npm run test:unit
           npm run build
+      - name: Package the tested website output without rebuilding
+        run: python3 scripts/build_release.py website
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-website
+          path: release-assets/website.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          overwrite: true
+  release:
+    needs: [deployer, core, website]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'lukasvri/Afterparty-MusicBot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tested-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish immutable-by-policy commit-addressed build assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/build_release.py publish

@@ -27,8 +27,10 @@ def main():
         raise SystemExit('Deployment configuration must be owned by this user with mode 600.')
     state.mkdir(parents=True,exist_ok=True,mode=0o700)
     installed=state/'deploy-core.py'
-    shutil.copyfile(Path(__file__).with_name('deploy-core.py'),installed)
-    installed.chmod(0o600)
+    for name in ['deploy-core.py','release_artifacts.py','runtime_limits.py']:
+        destination=state/name
+        shutil.copyfile(Path(__file__).with_name(name),destination)
+        destination.chmod(0o600)
     args.bin_dir.mkdir(parents=True,exist_ok=True)
     wrapper=args.bin_dir/'deploy-core'
     wrapper.write_text('#!/bin/sh\nexec '+shlex.quote(sys.executable)+' '+shlex.quote(str(installed))+' --config '+shlex.quote(str(config))+' "$@"\n')
