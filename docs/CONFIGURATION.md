@@ -25,8 +25,8 @@ File: `services/core/.env`. Docker Compose loads this file. After editing it, ru
 | `GUESS_SYNTHETIC_TEST` | Optional | Exact value `1` enables five fictional generated test tones for the game preview; default off. No real songs or external provider audio. See [test guide](GUESS_SYNTHETIC_TEST.md). |
 | `GUESS_DEEZER_PREVIEWS` | Optional | Exact value `1` enables a limited local pilot with up to eight explicitly approved Deezer track previews. Default off; mutually exclusive with YouTube and synthetic quiz modes. Requires the private inventory path below. Snapshot expires within five minutes without automatic refresh. See [pilot setup](GUESS_CATALOG_SOURCES.md#local-pilot-configuration). |
 | `GUESS_DEEZER_INVENTORY_PATH` | Optional | Absolute path to a private, regular JSON file of at most 32 KiB containing approved track IDs, categories, permission references and expiry. Never upload it to GitHub. Ignored unless preview pilot is enabled. |
-| `GUESS_YOUTUBE_CLIPS` | Optional | Exact value `1` enables a separate audio-only quiz source using yt-dlp and FFmpeg, with up to eight curated 15–30-second clips. Default off; mutually exclusive with Deezer and synthetic quiz modes. Select exactly one bundled pack or custom inventory path below. Uses the private participant audio transport. Snapshot lasts at most 30 minutes from preparation start or earlier custom recording expiry, without automatic refresh. |
-| `GUESS_YOUTUBE_PACK` | Optional | Exact value `edm-festival-hits` selects the bundled eight-song pack directly when YouTube quiz mode is enabled. No hand-built song or approval file is needed for this preset. Publication metadata does not establish a music license. Mutually exclusive with `GUESS_YOUTUBE_INVENTORY_PATH`. See [direct pack setup](GUESS_CATALOG_SOURCES.md#play-the-bundled-pack). |
+| `GUESS_YOUTUBE_CLIPS` | Optional | Alpha builds automatically prepare the bundled eight-song quiz when this is unset, empty or `auto`, unless another quiz source is explicitly selected. `0` disables it. `1` selects YouTube explicitly. Stable, beta and rc builds remain default-off. Clips use the private participant transport and expire after at most 30 minutes from preparation start or earlier custom recording expiry. |
+| `GUESS_YOUTUBE_PACK` | Optional | Alpha builds default to `edm-festival-hits` when no custom inventory is selected. No extra environment setup, song file or approval file is needed for this preset. Publication metadata does not establish a music license. Mutually exclusive with a custom YouTube inventory path. See [quiz use](GUESS_CATALOG_SOURCES.md#play-the-bundled-pack). |
 | `GUESS_YOUTUBE_INVENTORY_PATH` | Optional | Absolute path to a private regular JSON file of at most 32 KiB containing curated video IDs, answers, categories, clip offsets/durations and the existing permission records. See [YouTube clip setup](GUESS_CATALOG_SOURCES.md#youtube-audio-clip-pilot). |
 | `MAX_ACTIVE_VOICE_SESSIONS` | Optional | Simultaneous voice-session limit; default `8`, not a measured capacity guarantee |
 
@@ -38,7 +38,13 @@ readiness summary and disposes its temporary inventory. It does not install the
 inventory into a running Core or refresh its configured source. See the
 [preflight guide](GUESS_CATALOG_SOURCES.md#check-the-configuration-before-startup).
 
-On a matching updated installation, `services/core/core-control.sh guess-reload`
+In the game lobby, the host can choose **Load quiz songs** to retry an unavailable
+or expired source directly from the website. The action uses fresh room/server
+authority and game revision checks, returns promptly and reports preparation
+progress through normal polling. Players cannot select provider URLs or change
+the configured source. A healthy snapshot is kept unchanged.
+
+For a matching updated installation, `services/core/core-control.sh guess-reload`
 sends an explicit `SIGHUP` to reload an unavailable or expired configured quiz
 source without restarting Core or ordinary Discord playback. A healthy source is
 kept unchanged. This does not reload environment variables or activate a disabled

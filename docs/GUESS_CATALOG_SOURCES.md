@@ -5,9 +5,10 @@ for at most eight preapproved recordings. It returns the existing `GuessCatalog`
 and `GuessMediaSource` interfaces plus `dispose()` to release the prepared bytes.
 It does not configure the application, activate a provider, download media, read
 files, expose an upload endpoint or supply a real-song inventory. The default
-application catalog stays unavailable until a source is explicitly selected.
-The bundled [EDM pack](#play-the-bundled-pack) can now be selected directly;
-custom operator inventories retain the approval-aware path described below.
+application automatically selects the bundled [EDM pack](#play-the-bundled-pack)
+for alpha builds when no explicit override is present. Stable, beta and rc builds
+remain default-off; custom operator inventories retain the approval-aware path
+described below.
 
 The release target requires recognizable commercial hits. A freely licensed
 independent or classical catalog can support development, but does not replace
@@ -251,38 +252,42 @@ not import these answers, clip offsets or approval references into the browser.
 
 ### Play the bundled pack
 
-On the intended local installation, select the pack in Core's private environment:
+Alpha builds prepare the eight-song pack automatically when no explicit quiz
+source or disable override is configured. Matching website/Core builds are still
+required, but players do not need to set environment variables or create a song
+file. Open **Games**, enter the existing room code or follow its Discord game
+link, and join with a nickname.
 
-```dotenv
-GUESS_YOUTUBE_CLIPS=1
-GUESS_YOUTUBE_PACK=edm-festival-hits
-GUESS_YOUTUBE_INVENTORY_PATH=
-GUESS_DEEZER_PREVIEWS=0
-GUESS_SYNTHETIC_TEST=0
-```
+When audio is ready, the host chooses **EDM festival hits**, **Classic
+(30 seconds)**, and up to eight rounds, then saves settings and starts. The
+pack's default five 30-second rounds also fit without editing. Each participant
+taps **Listen to preview** and answers; the host advances after reveal. Source
+loading status is shown honestly, and Start stays disabled until enough clips
+are available.
 
-With the existing private `.env` in `services/core/`, run the isolated check:
+If preparation failed or the snapshot expired, the lobby host can choose
+**Load quiz songs** to retry from the website. Loading does not change ordinary
+music, and a healthy snapshot is never replaced. Guests cannot start preparation.
+The button uses the server's existing selected pack or custom source, not
+browser-supplied provider links, files or approval records. Loading reports
+progress through the ordinary game poll and does not hold a browser request open
+for provider preparation. End an expired active game and return to the lobby
+before retrying; its old media keys cannot be resurrected.
 
-```sh
-node --env-file=.env src/guess-check.ts
-```
+For operator overrides, `GUESS_YOUTUBE_CLIPS=0` explicitly disables the automatic
+alpha source. `GUESS_YOUTUBE_CLIPS=auto` or an unset value follows the build's
+stage: alpha uses the default pack, stable/beta/rc stays off. An explicit Deezer
+or synthetic mode is retained. Conflicting enabled modes and pack/path selectors
+fail closed. An explicit YouTube custom inventory path retains its existing
+per-record validation. Source publication is not treated as a license or an
+invented approval record.
 
-A successful result reports provider `youtube`, status `ready` and eight
-30-second recordings in each supported category. The check disposes its temporary
-audio; Core prepares its own snapshot on its next normal local startup. No
-hand-built song or approval file is needed for this preset. It selects known
-recording identities without inventing permission records or treating source
-publication as a license. Custom approval-aware inventories remain supported
-separately. Select exactly one pack or custom path; an unknown pack or both
-selectors fails before provider access.
-
-Once matching website/Core builds and this configuration are installed, open
-**Games**, enter the existing room code or follow its Discord game link, and
-join with a nickname. The host chooses **EDM festival hits**, **Classic
-(30 seconds)**, and up to eight rounds, then saves settings and starts. Each
-participant taps **Listen to preview** and answers; the host advances after
-reveal. The pack's default five 30-second rounds also fit without editing.
-The source is independent of ordinary music queues and their volume controls.
+Outside alpha, the pack can still be selected explicitly with
+`GUESS_YOUTUBE_CLIPS=1` and `GUESS_YOUTUBE_PACK=edm-festival-hits`. The isolated
+`node --env-file=.env src/guess-check.ts` command in `services/core/` follows the
+same effective selection as startup and reports readiness without starting the
+bot. Its temporary audio is disposed afterward; it does not change a running
+source.
 
 The source downloads and normalizes the selected clips using the existing
 bounded yt-dlp/FFmpeg pipeline. A provider failure leaves the source unavailable
@@ -343,8 +348,13 @@ reads. There is no automatic refresh or promise of uninterrupted indefinite play
 
 ## Reload without restarting music
 
-On a matching updated Core, an explicit local `SIGHUP` retries an unavailable or
-expired quiz source. For the supplied Compose control script, run:
+The game lobby host can retry an unavailable or expired source with
+**Load quiz songs**, without changing local environment variables or restarting
+the bot. Fresh host/participant authority, lobby phase and revision checks apply.
+Preparation is bounded, coalesced and rate-limited; guests and stale commands
+cannot trigger it. There is no arbitrary source configuration or upload route.
+
+An explicit local `SIGHUP` remains available as an operator alternative. For the supplied Compose control script, run:
 
 ```sh
 services/core/core-control.sh guess-reload
@@ -365,8 +375,9 @@ An expired match cannot resume its old media keys: end it and start a new game
 after a successful reload. The same selected configuration is retried. Private
 inventory files are reread, but environment variables remain those of the running
 process. Changing the selected mode or pack still requires a normal locally
-managed configuration update. There is no timed/background refresh and no public
-reload endpoint. `guess:check` remains an isolated check and does not reload the
+managed configuration update. There is no timed/background refresh. The scoped game preparation action
+only retries an already configured source; it cannot enable a disabled mode or
+select another provider. `guess:check` remains an isolated check and does not reload the
 running source.
 
 ## Source choices and unresolved rights
