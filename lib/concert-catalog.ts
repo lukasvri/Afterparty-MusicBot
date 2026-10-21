@@ -115,6 +115,74 @@ export const CONCERT_CATALOG: readonly ConcertRecording[] = Object.freeze(
     ]
   },
   {
+    "id": "tomorrowland-belgium-2026-fhiZ1Rj9o-A",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Alesso",
+    "title": "Alesso | Tomorrowland 2026 (Freedom Stage Weekend 2) [Full DJ Live Set]",
+    "videoId": "fhiZ1Rj9o-A",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=fhiZ1Rj9o-A",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=fhiZ1Rj9o-A",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-NpL_bT5vgmU",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Boris Brejcha",
+    "title": "Boris Brejcha WE1 | Tomorrowland 2026",
+    "videoId": "NpL_bT5vgmU",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=NpL_bT5vgmU",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=NpL_bT5vgmU",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-uMgz40hvySQ",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Charlotte de Witte",
+    "title": "Charlotte de Witte WE1 | Tomorrowland 2026",
+    "videoId": "uMgz40hvySQ",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=uMgz40hvySQ",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=uMgz40hvySQ",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-jSJEkiV3cCs",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Chase & Status",
+    "title": "Chase & Status (DJ set) WE2 | Tomorrowland 2026",
+    "videoId": "jSJEkiV3cCs",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=jSJEkiV3cCs",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=jSJEkiV3cCs",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
     "id": "tomorrowland-belgium-2026-GSnPwle4FOE",
     "eventId": "tomorrowland-belgium",
     "eventName": "Tomorrowland Belgium",
@@ -128,6 +196,55 @@ export const CONCERT_CATALOG: readonly ConcertRecording[] = Object.freeze(
     "evidenceUrls": [
       "https://www.youtube.com/watch?v=GSnPwle4FOE",
       "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ]
+  },
+  {
+    "id": "tomorrowland-belgium-2026-Tj8NbfUMS-0",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Fisher",
+    "title": "Fisher WE 1 | Tomorrowland 2026",
+    "videoId": "Tj8NbfUMS-0",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=Tj8NbfUMS-0",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=Tj8NbfUMS-0",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-Py-GG74lLU8",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Hardwell",
+    "title": "HARDWELL - Tomorrowland 2026 [FULL MAINSTAGE CLOSING SHOW]",
+    "videoId": "Py-GG74lLU8",
+    "uploaderName": "Hardwell",
+    "sourceUrl": "https://www.youtube.com/watch?v=Py-GG74lLU8",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=Py-GG74lLU8",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ]
+  },
+  {
+    "id": "tomorrowland-belgium-2026-KLyeLMJuIOY",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Lost Frequencies",
+    "title": "Lost Frequencies - Live at Tomorrowland 2026 (Mainstage) (Full Set HD)",
+    "videoId": "KLyeLMJuIOY",
+    "uploaderName": "Lost Frequencies",
+    "sourceUrl": "https://www.youtube.com/watch?v=KLyeLMJuIOY",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=KLyeLMJuIOY",
+      "https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter"
     ]
   },
   {
@@ -145,6 +262,210 @@ export const CONCERT_CATALOG: readonly ConcertRecording[] = Object.freeze(
       "https://www.youtube.com/watch?v=sqxFW3RXGdo",
       "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
     ]
+  },
+  {
+    "id": "tomorrowland-belgium-2026-JKM0Gy0lxYE",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "NERVO",
+    "title": "NERVO WE1 | Tomorrowland 2026",
+    "videoId": "JKM0Gy0lxYE",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=JKM0Gy0lxYE",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=JKM0Gy0lxYE",
+      "https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-TsyGMhx8izw",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Nicky Romero",
+    "title": "Nicky Romero WE2 | Tomorrowland 2026",
+    "videoId": "TsyGMhx8izw",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=TsyGMhx8izw",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=TsyGMhx8izw",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-2i3XOxbp54U",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Oliver Heldens",
+    "title": "Oliver Heldens WE1 | Tomorrowland 2026",
+    "videoId": "2i3XOxbp54U",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=2i3XOxbp54U",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=2i3XOxbp54U",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-EuqrehK1XFw",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Sara Landry",
+    "title": "Sara Landry WE1 | Tomorrowland 2026",
+    "videoId": "EuqrehK1XFw",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=EuqrehK1XFw",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=EuqrehK1XFw",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-aDAWctObTvI",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Sara Landry",
+    "title": "Sara Landry WE2 | Tomorrowland 2026",
+    "videoId": "aDAWctObTvI",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=aDAWctObTvI",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=aDAWctObTvI",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-jXEtB43exs0",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Sebastian Ingrosso",
+    "title": "Sebastian Ingrosso WE1 | Tomorrowland 2026",
+    "videoId": "jXEtB43exs0",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=jXEtB43exs0",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=jXEtB43exs0",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-g4vR2VlhNtk",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Sebastian Ingrosso",
+    "title": "Sebastian Ingrosso WE2 | Tomorrowland 2026",
+    "videoId": "g4vR2VlhNtk",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=g4vR2VlhNtk",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=g4vR2VlhNtk",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-eir5Sh_gHbo",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Steve Angello",
+    "title": "Steve Angello WE1 | Tomorrowland 2026",
+    "videoId": "eir5Sh_gHbo",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=eir5Sh_gHbo",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=eir5Sh_gHbo",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-5AdQy7lCbN0",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Steve Angello",
+    "title": "Steve Angello WE2 | Tomorrowland 2026",
+    "videoId": "5AdQy7lCbN0",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=5AdQy7lCbN0",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=5AdQy7lCbN0",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-8-J01-hcHfA",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Steve Aoki",
+    "title": "Steve Aoki WE2 | Tomorrowland 2026",
+    "videoId": "8-J01-hcHfA",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=8-J01-hcHfA",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=8-J01-hcHfA",
+      "https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-1lqmFLr-SkA",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "The Chainsmokers",
+    "title": "The Chainsmokers WE1 | Tomorrowland 2026",
+    "videoId": "1lqmFLr-SkA",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=1lqmFLr-SkA",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=1lqmFLr-SkA",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
+  },
+  {
+    "id": "tomorrowland-belgium-2026-QcvGuOhSVlc",
+    "eventId": "tomorrowland-belgium",
+    "eventName": "Tomorrowland Belgium",
+    "year": 2026,
+    "artist": "Timmy Trumpet",
+    "title": "Timmy Trumpet WE2 | Tomorrowland 2026",
+    "videoId": "QcvGuOhSVlc",
+    "uploaderName": "Tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=QcvGuOhSVlc",
+    "verifiedAt": "2026-10-21",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=QcvGuOhSVlc",
+      "https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/"
+    ],
+    "uploaderUrl": "https://www.youtube.com/c/tomorrowland"
   },
   {
     "id": "tomorrowland-belgium-2025-RmxWqo83MO4",

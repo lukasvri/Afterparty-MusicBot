@@ -25,6 +25,7 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 
 - [Own rooms](OWN_ROOMS.md): browser room queues, radio, permissions and scheduling.
 - [Festival concert playlists](FESTIVAL_PLAYLISTS.md): official EDM sets by event and year, independent of saved evenings.
+- [Playlist imports](PLAYLIST_IMPORT.md): paste YouTube or Spotify lists, preview all available entries and choose queue additions.
 - [Radio selection](RADIO.md): persistent original song, similarity evidence and automatic music filtering.
 - [Party experience](AFTERPARTY_EXPERIENCE.md): shared queue controls, invitations, saved evenings, moderation and TV mode.
 - [Concert stability](CONCERT_STABILITY.md): playback recovery, synchronization and video diagnostics.

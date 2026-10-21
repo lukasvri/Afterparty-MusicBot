@@ -1,14 +1,25 @@
 # Festival concert playlists
 
-The evening library includes 30 curated official uploads across five event
+The evening library includes 49 curated official uploads across five event
 families. Open **Evenings**, choose **Festival concerts**, then select an event
 and performance year. Add one set or all listed sets from that year. Existing
 saved evenings and favorites remain on the device.
 
-Six sets are from 2026: Ultra Miami (Hardwell and Martin Garrix B2B Alesso),
-Tomorrowland Belgium (David Guetta and Martin Garrix), and EDC Las Vegas
-(Tiësto and Above & Beyond). Newest available years appear first. Creamfields
-2026 is omitted where an official full-set source could not be confirmed.
+Twenty-five sets are from 2026, including 21 from Tomorrowland Belgium.
+Ultra Miami and EDC Las Vegas each contribute two more. Newest available years
+appear first. Creamfields 2026 is omitted where an official full-set source
+could not be confirmed.
+
+The supplied [Tomorrowland Belgium 2026 playlist](https://www.youtube.com/playlist?list=PLeeZgE3_zp1w)
+returns that playlist title, but its contents were not exposed during inspection.
+The 19 additional Tomorrowland sets were verified individually against official
+festival or artist uploads and the festival's full-set announcement. This is
+not a complete import of that playlist. Distinct weekend performances remain
+separate; alternate uploads of the same set are excluded.
+
+To browse the full live playlist instead, use [playlist import](PLAYLIST_IMPORT.md)
+and paste its URL. This loads the provider's available entries on demand without
+claiming that every item belongs in the curated official-source catalog.
 
 The published source and performance year were checked on 21 October 2026.
 The table is a finite selection, not a complete archive of every festival year.
@@ -44,6 +55,25 @@ The game pack is separate: see [private quiz setup](GUESS_CATALOG_SOURCES.md#pre
 | EDC Las Vegas | 2023 | [Tiësto - Live from EDC Las Vegas 2023](https://www.youtube.com/watch?v=yU4yrbUQYlU) | Tiësto | [Source 1](https://www.youtube.com/watch?v=yU4yrbUQYlU) · [Source 2](https://lasvegas.edc.com/2023-sets/) |
 | Tomorrowland Belgium | 2026 | [David Guetta live @ Tomorrowland 2026  /  MainStage WE1](https://www.youtube.com/watch?v=GSnPwle4FOE) | David Guetta | [Source 1](https://www.youtube.com/watch?v=GSnPwle4FOE) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
 | Tomorrowland Belgium | 2026 | [MARTIN GARRIX LIVE @ TOMORROWLAND 2026 (W2)](https://www.youtube.com/watch?v=sqxFW3RXGdo) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=sqxFW3RXGdo) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Alesso  /  Tomorrowland 2026 (Freedom Stage Weekend 2) [Full DJ Live Set]](https://www.youtube.com/watch?v=fhiZ1Rj9o-A) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=fhiZ1Rj9o-A) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Boris Brejcha WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=NpL_bT5vgmU) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=NpL_bT5vgmU) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Charlotte de Witte WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=uMgz40hvySQ) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=uMgz40hvySQ) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Chase & Status (DJ set) WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=jSJEkiV3cCs) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=jSJEkiV3cCs) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Fisher WE 1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=Tj8NbfUMS-0) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=Tj8NbfUMS-0) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [HARDWELL - Tomorrowland 2026 [FULL MAINSTAGE CLOSING SHOW]](https://www.youtube.com/watch?v=Py-GG74lLU8) | Hardwell | [Source 1](https://www.youtube.com/watch?v=Py-GG74lLU8) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Lost Frequencies - Live at Tomorrowland 2026 (Mainstage) (Full Set HD)](https://www.youtube.com/watch?v=KLyeLMJuIOY) | Lost Frequencies | [Source 1](https://www.youtube.com/watch?v=KLyeLMJuIOY) · [Source 2](https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter) |
+| Tomorrowland Belgium | 2026 | [NERVO WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=JKM0Gy0lxYE) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=JKM0Gy0lxYE) · [Source 2](https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter) |
+| Tomorrowland Belgium | 2026 | [Nicky Romero WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=TsyGMhx8izw) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=TsyGMhx8izw) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Oliver Heldens WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=2i3XOxbp54U) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=2i3XOxbp54U) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Sara Landry WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=EuqrehK1XFw) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=EuqrehK1XFw) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Sara Landry WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=aDAWctObTvI) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=aDAWctObTvI) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Sebastian Ingrosso WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=jXEtB43exs0) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=jXEtB43exs0) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Sebastian Ingrosso WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=g4vR2VlhNtk) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=g4vR2VlhNtk) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Steve Angello WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=eir5Sh_gHbo) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=eir5Sh_gHbo) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Steve Angello WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=5AdQy7lCbN0) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=5AdQy7lCbN0) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Steve Aoki WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=8-J01-hcHfA) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=8-J01-hcHfA) · [Source 2](https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter) |
+| Tomorrowland Belgium | 2026 | [The Chainsmokers WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=1lqmFLr-SkA) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=1lqmFLr-SkA) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
+| Tomorrowland Belgium | 2026 | [Timmy Trumpet WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=QcvGuOhSVlc) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=QcvGuOhSVlc) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
 | Tomorrowland Belgium | 2025 | [MARTIN GARRIX LIVE @ TOMORROWLAND 2025 (W2)](https://www.youtube.com/watch?v=RmxWqo83MO4) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=RmxWqo83MO4) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2025-full-sets/) |
 | Tomorrowland Belgium | 2024 | [Alesso  /  Tomorrowland 2024 (Freedom Stage Weekend 2) [Full DJ Live Set]](https://www.youtube.com/watch?v=_KWuiCtWyNA) | Alesso | [Source 1](https://www.youtube.com/watch?v=_KWuiCtWyNA) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2024-full-sets/) |
 | Tomorrowland Belgium | 2024 | [Swedish House Mafia WE2  /  Tomorrowland 2024](https://www.youtube.com/watch?v=dSK13X9oGi8) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=dSK13X9oGi8) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2024-full-sets/) |

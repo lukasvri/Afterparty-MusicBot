@@ -21,6 +21,7 @@ type Props = {
   discordConnected: boolean;
   onQuery: (query: string) => void;
   onSearch: () => void;
+  onPlaylist?: () => void;
   onSuggestion: (query: string) => void;
   onSort: (sort: "recent" | "popular") => void;
   onHistory: () => void;
@@ -42,6 +43,7 @@ export function MusicDiscovery({
   discordConnected,
   onQuery,
   onSearch,
+  onPlaylist,
   onSuggestion,
   onSort,
   onHistory,
@@ -86,7 +88,7 @@ export function MusicDiscovery({
           placeholder={t("Låt, artist eller YouTube-lenkje")}
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          maxLength={120}
+          maxLength={2000}
           minLength={2}
           required
         />
@@ -102,6 +104,7 @@ export function MusicDiscovery({
           )}
         </button>
       </form>
+      {onPlaylist && <button className="button subtle" type="button" onClick={onPlaylist}>YouTube / Spotify {t("Playlist")}</button>}
       {suggestions.length > 0 && (
         <div className="search-suggestions" role="group" aria-label={t("Suggested searches")}>
           <span>{t("Suggested searches")}</span>

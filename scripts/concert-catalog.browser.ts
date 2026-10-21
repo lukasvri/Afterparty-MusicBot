@@ -16,7 +16,7 @@ const events = [...new Set(CONCERT_CATALOG.map(entry => entry.eventId))];
 const years = (eventId: string) => [...new Set(CONCERT_CATALOG.filter(entry => entry.eventId === eventId).map(entry => entry.year))].sort((a, b) => b - a);
 const sets = (eventId: string, year: number) => CONCERT_CATALOG.filter(entry => entry.eventId === eventId && entry.year === year)
   .filter((entry, index, entries) => entries.findIndex(candidate => candidate.videoId === entry.videoId) === index);
-const multi = CONCERT_CATALOG.find(entry => sets(entry.eventId, entry.year).length >= 2);
+const multi = CONCERT_CATALOG.reduce((largest, entry) => sets(entry.eventId, entry.year).length > sets(largest.eventId, largest.year).length ? entry : largest);
 assert(multi, "a multi-set year is required to exercise sequential appends");
 const batch = sets(multi.eventId, multi.year);
 

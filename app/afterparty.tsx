@@ -66,6 +66,7 @@ import { OpenRooms } from "@/components/open-rooms";
 import { ConcertScenery } from "@/components/concert-scenery";
 import { PlayerSettings, type SettingsTab } from "@/components/player-settings";
 import releases from "@/lib/releases.json";
+import { normalizePlaylistUrl } from "@/services/core/src/playlist-url";
 
 export default function Afterparty() {
   const { t, language } = useLanguage();
@@ -119,6 +120,7 @@ export default function Afterparty() {
     }
   };
   const [room, setRoom] = useState<Room | null>(null),
+    [playlistUrl, setPlaylistUrl] = useState(""),
     [query, setQuery] = useState(""),
     [resultQuery, setResultQuery] = useState(""),
     [results, setResults] = useState<Video[]>([]),
@@ -517,7 +519,19 @@ export default function Afterparty() {
   };
   const find = async (q = query) => {
     q = q.trim();
-    if (q.length < 2 || q.length > 120) return;
+    let playlist;
+    try { playlist = normalizePlaylistUrl(q); } catch { /* Continue ordinary track search. */ }
+    if (playlist) {
+      changeQuery(q);
+      setPlaylistUrl(playlist.url);
+      setPanel("library");
+      requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".playlist-import input")?.focus());
+      return;
+    }
+    if (q.length < 2 || q.length > 120) {
+      setError(t("Skriv mellom 2 og 120 tegn."));
+      return;
+    }
     const generation = ++searchGeneration.current;
     searchRequest.current?.abort();
     const controller = new AbortController();
@@ -2264,6 +2278,8 @@ export default function Afterparty() {
                     onAdd={(v) => void add(v)}
                     onRestore={(v) => void restoreEvening(v)}
                     onEnqueueConcerts={(ids) => void restoreEvening(ids.map(id => ({ id })))}
+                    playlistUrl={playlistUrl}
+                    queueCapacity={Math.max(0, 50 - (room?.queue.length ?? 0) - (room?.requests?.length ?? 0))}
                     busy={adding}
                   />
                 </section>
@@ -2282,6 +2298,10 @@ export default function Afterparty() {
                   discordConnected={Boolean(botOnline && discord?.connected)}
                   onQuery={changeQuery}
                   onSearch={() => void find()}
+                  onPlaylist={() => {
+                    setPanel("library");
+                    requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".playlist-import input")?.focus());
+                  }}
                   onSuggestion={(q) => void find(q)}
                   onSort={setHistorySort}
                   onHistory={() => {
