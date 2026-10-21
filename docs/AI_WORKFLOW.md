@@ -25,6 +25,29 @@ The owner talks to **ChatGPT Chat** about new Afterparty ideas, problems and dec
 - A model name or subscription does not guarantee agent creation, subagents, repository write access, local computer access or a particular reasoning budget. Inspect available tools and permissions before committing to an action.
 - If Codex is unavailable, Chat should still investigate, record actionable findings in GitHub when authorized, and report the blocked delegation. Do not claim the task was coded or tested.
 
+## Codex reviews on GitHub
+
+Use Codex as an additional reviewer of PRs, including dependency updates and
+AI-generated security fixes. The root `AGENTS.md` defines the repository's
+`Code Review Rules`: server isolation, playback/recovery behavior and production
+boundaries. These rules guide reviews; existing CI and branch protection enforce
+merge requirements.
+
+Automatic review is an account/repository setting in
+[Codex code review settings](https://chatgpt.com/settings/code-review), not a
+workflow enabled by committing these instructions. Select this repository and
+review all PRs so bot-authored fixes are included. Prefer reviewing when a PR is
+ready for review; repeat after substantive fixes or before merge rather than
+starting overlapping reviewers on every intermediate draft commit.
+
+A supported one-off request is `@codex review`. A follow-up such as
+`@codex fix the CI failures` starts a separate cloud task when the connected
+environment and permissions support it. Use a focused source/PR handoff and
+preserve the owner's no-production-change constraints. These examples do not
+authorize unsolicited bot comments, automatic merges or deployments.
+
+See [official GitHub integration guidance](https://learn.chatgpt.com/docs/third-party/github).
+
 ## Chat-first investigation before Codex
 
 Chat should use its own supported tools to do the analytical work before delegating. This is the default, not a compulsory lengthy research phase for minor changes.
