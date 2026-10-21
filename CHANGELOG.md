@@ -4,6 +4,13 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.5: Visible queues and neutral control surfaces
+
+2026-10-21
+
+- Upcoming songs and pending requests use an Afterparty-specific row class, avoiding the generic social-track cosmetic filter used by content blockers such as uBlock Origin. Room and Discord queue counts, ordering, permissions and concert privacy are unchanged; no blocker setting needs to be disabled.
+- Shared secondary surfaces, borders, text and subtle buttons use neutral dark grays instead of the late stylesheet's red-brown palette. This updates nickname fields, TV-mode controls and other panels and inputs using the shared tokens; selected controls and playback accents retain red.
+
 ## v2.4.0-alpha.4: More reliable playback, queue controls and radio suggestions
 
 2026-10-21

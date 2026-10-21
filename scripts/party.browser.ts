@@ -213,7 +213,7 @@ try {
   await page.getByRole("button", { name: /Legg.*Synthetic evening song/ }).click();
   await page.locator("#queue-tab").click();
   await page.getByText("Second queued song", {exact:true}).waitFor();
-  const queued = page.locator(".social-track").filter({hasText:"Second queued song"});
+  const queued = page.locator(".afterparty-queue-track").filter({hasText:"Second queued song"});
   assert(await queued.isVisible(), "Manually queued track must be visible");
   assert.equal(await page.locator("#queue-tab .tab-count").innerText(), "1");
 

@@ -179,7 +179,7 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
         assert.match((await oldReadFailed).failure()?.errorText ?? "",/abort/i,"Switching servers must cancel the old guild read");
         releaseLateRead();
         await page.clock.runFor(100);
-        assert.equal(await page.locator(".social-track").count(),0,"An old guild's confirmed-add refresh must not populate the new guild queue");
+        assert.equal(await page.locator(".afterparty-queue-track").count(),0,"An old guild's confirmed-add refresh must not populate the new guild queue");
         assert.equal(await page.locator("#queue-tab .tab-count").innerText(),"0");
         assert.equal(await page.locator(".queue-panel [role=alert]").count(),0);
         assert.equal(writes,1);
@@ -192,7 +192,7 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
         assert.match(await page.locator(".toast").innerText(),/added.*queue/i);
         assert.equal(await page.locator(".notice.error").count(),0,"A failed read must not report the confirmed command as failed");
       } else {
-        await page.locator(".social-track").filter({hasText:added.title}).waitFor({timeout:1500});
+        await page.locator(".afterparty-queue-track").filter({hasText:added.title}).waitFor({timeout:1500});
         assert.equal(await page.locator("#queue-tab .tab-count").innerText(),"1");
         assert.equal(await page.locator(".empty-queue").count(),0);
       }

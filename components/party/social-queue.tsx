@@ -36,7 +36,7 @@ export function SocialQueue({
       </div>}
       {entries.map(({v, i, eta}) => {
         return (
-          <article className="social-track" key={v.entryId ?? v.id}>
+          <article className="afterparty-queue-track" key={v.entryId ?? v.id}>
             <span className="queue-number">{i + 1}</span>
             <Image unoptimized width={48} height={48} className="queue-art" src={v.image || `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" />
             <div>
@@ -97,7 +97,7 @@ export function SocialQueue({
         <div>
           <h3>{t("Ventande låtønske")}</h3>
           {room.requests.map((v) => (
-            <article className="social-track" key={v.entryId ?? v.id}>
+            <article className="afterparty-queue-track" key={v.entryId ?? v.id}>
               <div>
                 <strong>{v.title}</strong>
                 <small>{t("Frå")} {v.requestedBy ?? t("Gjest")}</small>

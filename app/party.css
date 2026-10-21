@@ -185,7 +185,7 @@
 .evening-library button:not(.button):hover {
   border-color: #ff596c;
 }
-.social-track {
+.afterparty-queue-track {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -193,15 +193,15 @@
   padding: 12px 0;
   border-bottom: 1px solid #ffffff15;
 }
-.social-track > div {
+.afterparty-queue-track > div {
   flex: 1;
   min-width: 120px;
 }
-.social-track strong {
+.afterparty-queue-track strong {
   font-size: 14px;
   overflow-wrap: anywhere;
 }
-.social-track small {
+.afterparty-queue-track small {
   display: block;
   color: #c8bdc3;
   margin-top: 6px;
@@ -637,8 +637,8 @@ button:disabled {
 }
 .queue-options .queue-help { margin:12px 0; }
 .queue-summary { justify-content:flex-end; }
-.social-track > div, .track-details, .queue-current > div { min-width:0; }
-.social-track strong { display:block; overflow-wrap:anywhere; }
+.afterparty-queue-track > div, .track-details, .queue-current > div { min-width:0; }
+.afterparty-queue-track strong { display:block; overflow-wrap:anywhere; }
 .concert-shell .studio-heading { align-items:center; gap:20px; }
 .concert-shell .studio-heading h1 { line-height:1.15; }
 .concert-subtitle:empty { display:none; }
@@ -671,17 +671,17 @@ button:disabled {
 }
 
 /* Queue artwork and actions stay readable inside the narrow side panel. */
-.social-track { display:grid; grid-template-columns:18px 54px 44px 44px minmax(44px,1fr); }
-.social-track .queue-art { width:54px; height:54px; object-fit:cover; border-radius:5px; }
-.social-track > div { grid-column:3/-1; }
-.social-track > div:first-child { grid-column:1/-1; }
-.social-track > button { grid-row:2; min-width:44px; min-height:44px; }
-.social-track > button:first-of-type { grid-column:2; }
-.social-track > button:nth-of-type(2) { grid-column:3; }
-.social-track > button:nth-of-type(3) { grid-column:4; }
-.social-track > button:nth-of-type(4) { grid-column:5; justify-self:end; }
-.social-track:has(> div:first-child) > button:first-of-type { grid-column:2/4; }
-.social-track:has(> div:first-child) > button:nth-of-type(2) { grid-column:4/6; }
+.afterparty-queue-track { display:grid; grid-template-columns:18px 54px 44px 44px minmax(44px,1fr); }
+.afterparty-queue-track .queue-art { width:54px; height:54px; object-fit:cover; border-radius:5px; }
+.afterparty-queue-track > div { grid-column:3/-1; }
+.afterparty-queue-track > div:first-child { grid-column:1/-1; }
+.afterparty-queue-track > button { grid-row:2; min-width:44px; min-height:44px; }
+.afterparty-queue-track > button:first-of-type { grid-column:2; }
+.afterparty-queue-track > button:nth-of-type(2) { grid-column:3; }
+.afterparty-queue-track > button:nth-of-type(3) { grid-column:4; }
+.afterparty-queue-track > button:nth-of-type(4) { grid-column:5; justify-self:end; }
+.afterparty-queue-track:has(> div:first-child) > button:first-of-type { grid-column:2/4; }
+.afterparty-queue-track:has(> div:first-child) > button:nth-of-type(2) { grid-column:4/6; }
 
 /* Afterparty identity: a compact mark and an unbroken wordmark. */
 .studio-shell .brand { letter-spacing:-.05em; font-size:23px; font-weight:900; white-space:nowrap; }
