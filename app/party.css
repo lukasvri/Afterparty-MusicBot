@@ -736,3 +736,20 @@ button:disabled {
 .discovery .search-pagination button { min-height:44px; }
 .music-copy .music-unavailable { display:block; margin-top:6px; color:#e3b8c0; white-space:normal; line-height:1.5; }
 .discovery .add-track { min-width:44px; min-height:44px; }
+.concert-catalog { padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--line); min-width:0; }
+.concert-catalog p { color:var(--muted); overflow-wrap:anywhere; }
+.concert-catalog-filters { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:12px; margin:16px 0; }
+.concert-catalog-filters>div { display:grid; gap:6px; min-width:0; }
+.concert-catalog-filters label { min-width:0; color:var(--text); font-size:12px; }
+.concert-catalog-filters select { width:100%; min-width:0; min-height:44px; border:1px solid var(--line); border-radius:8px; padding:8px; color:var(--text); background:var(--panel2); font:inherit; }
+.concert-catalog-year { display:grid; gap:8px; margin:16px 0; }
+.concert-catalog-year p { margin:0; }
+.concert-catalog .button { min-height:44px; max-width:100%; white-space:normal; text-align:left; justify-content:center; }
+.concert-catalog-list { display:grid; gap:12px; margin:16px 0; }
+.concert-catalog-list li { display:block; padding:14px; margin:0; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+.concert-catalog-list h3 { margin:0; color:var(--text); font-size:15px; overflow-wrap:anywhere; }
+.concert-catalog .concert-set-title { margin:8px 0; color:var(--text); font-size:12px; }
+.concert-catalog .concert-set-source { font-size:11px; margin:8px 0 12px; }
+.concert-set-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.concert-set-actions a { display:inline-flex; align-items:center; gap:4px; min-height:44px; color:var(--text); font-size:12px; }
+.concert-catalog .concert-catalog-note { margin:16px 0 0; font-size:11px; }
