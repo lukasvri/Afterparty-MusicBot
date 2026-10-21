@@ -92,3 +92,32 @@ test("malformed clock replies leave the last good estimate intact", async () => 
     assert.equal(clock.age(49900), 100);
   }
 });
+
+test("a Core epoch change starts a fresh sample immediately without releasing a newer in-flight sample", async () => {
+  const clock = new LiveClock(() => 1000, 10000);
+  let calls = 0, oldSignal: AbortSignal | null | undefined;
+  let releaseOld!: (response: Response) => void, releaseNew!: (response: Response) => void;
+  const old = clock.sample(new AbortController().signal, async (_url, options) => {
+    calls++; oldSignal = options?.signal;
+    return new Promise<Response>(resolve => { releaseOld = resolve; });
+  });
+  clock.reset();
+  const current = clock.sample(new AbortController().signal, async () => {
+    calls++; return new Promise<Response>(resolve => { releaseNew = resolve; });
+  });
+  try {
+    assert.equal(calls, 2, 'the previous epoch cannot block the new lease clock');
+    assert.equal(oldSignal?.aborted, true, 'release the retired network request');
+    releaseOld(Response.json({ serverTime: 90000 })); assert.equal(await old, null);
+    assert.equal(await clock.sample(new AbortController().signal, async () => {
+      calls++; return Response.json({ serverTime: 70000 });
+    }), null, 'retired cleanup cannot unlock an active replacement sample');
+    assert.equal(calls, 2);
+    releaseNew(Response.json({ serverTime: 50000 })); assert.equal(await current, 0);
+    assert.equal(clock.age(49900), 100);
+  } finally {
+    releaseOld(Response.json({ serverTime: 90000 }));
+    releaseNew?.(Response.json({ serverTime: 50000 }));
+    await Promise.all([old, current]);
+  }
+});

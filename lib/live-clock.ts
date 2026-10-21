@@ -5,7 +5,7 @@ export class LiveClock {
   private bestRtt = Infinity;
   private estimateAt = -Infinity;
   private generation = 0;
-  private sampling = false;
+  private sampling: AbortController | null = null;
   readonly now: () => number;
   constructor(monotonic = () => performance.now(), wallTime = Date.now()) {
     this.origin = wallTime - monotonic();
@@ -36,6 +36,8 @@ export class LiveClock {
     this.bestRtt = Infinity;
     this.estimateAt = -Infinity;
     this.generation++;
+    this.sampling?.abort();
+    this.sampling = null;
   }
   age(serverTime: number, maximum = 1500) {
     return this.offset === null || !Number.isFinite(serverTime)
@@ -44,22 +46,24 @@ export class LiveClock {
   }
   async sample(signal: AbortSignal, request: typeof fetch = fetch) {
     if (this.sampling || signal.aborted) return null;
-    this.sampling = true;
+    const sampling = new AbortController();
+    this.sampling = sampling;
     const sent = this.now(), generation = this.generation;
+    const requestSignal = AbortSignal.any([signal, sampling.signal, AbortSignal.timeout(5000)]);
     try {
       const response = await request("/api/realtime/clock", {
         cache: "no-store",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+        signal: requestSignal,
       });
-      if (!response.ok || signal.aborted) return null;
+      if (!response.ok || requestSignal.aborted) return null;
       const data: unknown = await response.json();
-      return signal.aborted || generation !== this.generation || !data || typeof data !== "object" || !("serverTime" in data) || typeof data.serverTime !== "number"
+      return requestSignal.aborted || generation !== this.generation || !data || typeof data !== "object" || !("serverTime" in data) || typeof data.serverTime !== "number"
         ? null
         : this.record(sent, data.serverTime);
     } catch {
       return null;
     } finally {
-      this.sampling = false;
+      if (this.sampling === sampling) this.sampling = null;
     }
   }
 }

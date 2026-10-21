@@ -54,7 +54,7 @@ function gate(): Gate {
   return { started, wait, seen, release };
 }
 
-async function fixture(kind: "room" | "discord", failDiscovery = false, manager = false) {
+async function fixture(kind: "room" | "discord", failDiscovery = false, manager = false, delayClock = false) {
   const browser = await chromium.launch({
     headless: true,
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
@@ -126,8 +126,12 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
   });
   const commands: string[] = [], errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  let discoveryCalls = 0, roomCalls = 0, closed = false, discoveryUnavailable = failDiscovery;
+  let discoveryCalls = 0, roomCalls = 0, clockCalls = 0, closed = false, discoveryUnavailable = failDiscovery;
   const roomGates = new Map<string, Gate>(), discordGates = new Map<string, Gate>(), allGates: Gate[] = [];
+  const initialClock = delayClock ? gate() : undefined;
+  const scopedClock = delayClock ? gate() : undefined;
+  let holdClockSamples = delayClock;
+  if (initialClock) allGates.push(initialClock);
   const hold = (map: Map<string, Gate>, key: string) => {
     const value = gate();
     map.set(key, value);
@@ -174,7 +178,16 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
         : deliver(route, { url: "wss://core.invalid/live" });
     }
     const now = await page.evaluate(() => Date.now());
-    if (url.pathname === "/api/realtime/clock") return deliver(route, { serverTime: now });
+    if (url.pathname === "/api/realtime/clock") {
+      clockCalls++;
+      if (holdClockSamples && initialClock) {
+        initialClock.seen();
+        // Startup first opens the global hook, then the selected room/guild hook.
+        if (clockCalls >= 2) scopedClock!.seen();
+        await initialClock.wait;
+      }
+      return deliver(route, { serverTime: now });
+    }
     if (url.pathname.startsWith("/api/rooms/")) {
       const code = url.pathname.split("/").at(-1)!;
       roomCalls++;
@@ -219,6 +232,10 @@ async function fixture(kind: "room" | "discord", failDiscovery = false, manager 
     discoveryCalls: () => discoveryCalls,
     allowDiscovery: () => { discoveryUnavailable = false; },
     roomCalls: () => roomCalls,
+    clockCalls: () => clockCalls,
+    initialClock,
+    scopedClock,
+    allowClockSamples: () => { holdClockSamples = false; },
     holdRoom: (code: string, snapshot?: Room) => {
       const pending = hold(roomGates, code);
       pending.snapshot = snapshot;
@@ -268,6 +285,33 @@ test("room hooks reject delayed fallback, stale revisions and duplicate lease re
     await f.page.waitForSelector('[data-live-state="connecting:room"]');
     assert(f.roomCalls() >= 3, "Expired live state must resume room polling");
     assert.deepEqual(f.commands, [], "Transport failures must never pause or seek playback");
+    assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
+for (const kind of ["room", "discord"] as const) test(`${kind} epoch recovery replaces an outstanding clock request immediately`, async () => {
+  const f = await fixture(kind, false, false, true);
+  try {
+    await f.scopedClock!.started;
+    const index = await sourceIndex(f.page, kind === "room" ? "room=TESTROOM" : "guildId=" + guildA);
+    const time = await f.page.evaluate(() => Date.now());
+    const initial = kind === "room"
+      ? { type: "room", room: { ...browserRoom(time), syncSource: "live", syncEpoch: "old-core", syncValidForMs: 5000, version: 8, current: video("Before restart") } }
+      : { type: "state", state: { ...discordState(guildA, "Before restart", time), epoch: "old-core", sequence: 8 } };
+    await send(f.page, index, initial); await titleVisible(f.page, "Before restart");
+    const callsBeforeRestart = f.clockCalls();
+    f.allowClockSamples();
+    const sampled = f.page.waitForResponse(response => new URL(response.url()).pathname === "/api/realtime/clock" && response.ok(), { timeout: 3000 });
+    const restarted = kind === "room"
+      ? { type: "room", room: { ...browserRoom(time), syncSource: "live", syncEpoch: "new-core", syncValidForMs: 5000, version: 1, current: video("After restart") } }
+      : { type: "state", state: { ...discordState(guildA, "After restart", time), epoch: "new-core", sequence: 1 } };
+    await send(f.page, index, restarted);
+    await sampled; await titleVisible(f.page, "After restart");
+    assert.equal(f.clockCalls(), callsBeforeRestart + 1, "the new Core lease must not wait for the retired clock request");
+    f.initialClock!.release();
+    await f.page.clock.runFor(150);
+    await titleVisible(f.page, "After restart");
+    assert.deepEqual(f.commands, [], "clock recovery never sends playback commands");
     assert.deepEqual(f.errors, []);
   } finally { await f.close(); }
 });
