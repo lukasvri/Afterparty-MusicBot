@@ -392,21 +392,91 @@ class CIProducer(unittest.TestCase):
                     api.assert_called_once_with('/releases/tags/build-'+COMMIT,'synthetic-ci-token')
                     upload.assert_not_called()
 
-    def test_core_is_built_once_and_that_exact_final_image_is_saved(self):
+    def test_failed_signature_and_changed_manifest_never_reach_github(self):
+        with self.prepared_main_release() as root:
+            self.fixture.verify_code=1
+            with patch.object(self.producer,'api') as api:
+                with self.assertRaisesRegex(artifacts.ReleaseError,'provenance verification failed'):
+                    self.producer.publish(root,COMMIT)
+                api.assert_not_called()
+            self.fixture.verify_code=0
+            manifest=json.loads((root/'release.json').read_text())
+            manifest['version']='unsigned-change'
+            (root/'release.json').write_text(json.dumps(manifest))
+            with patch.object(self.producer,'verify_provenance') as verify,patch.object(self.producer,'api') as api:
+                with self.assertRaisesRegex(RuntimeError,'manifest changed after signing'):
+                    self.producer.publish(root,COMMIT)
+                verify.assert_not_called()
+                api.assert_not_called()
+
+    def save_fixture_image(self,args,**kwargs):
         import gzip
+        if args[:2]==['docker','save']:
+            with gzip.open(self.fixture.root/'core-image.tar.gz','rb') as stream:
+                Path(args[args.index('-o')+1]).write_bytes(stream.read())
+
+    def test_core_is_built_once_and_that_exact_final_image_is_saved(self):
         output=self.fixture.root/'producer'
         output.mkdir()
-        def command(args,**kwargs):
-            if args[:2]==['docker','save']:
-                with gzip.open(self.fixture.root/'core-image.tar.gz','rb') as stream:
-                    Path(args[args.index('-o')+1]).write_bytes(stream.read())
-        with patch.object(self.producer.subprocess,'run',side_effect=command) as calls,patch.object(self.producer,'run',return_value=json.dumps([{'Id':self.fixture.manifest['image_id']}])):
+        with patch.object(self.producer.subprocess,'run',side_effect=self.save_fixture_image) as calls,patch.object(self.producer,'run',return_value=json.dumps([{'Id':self.fixture.manifest['image_id']}])):
             self.producer.core(output,COMMIT)
         builds=[call.args[0] for call in calls.call_args_list if call.args[0][:2]==['docker','build']]
-        self.assertEqual(len(builds),1)
-        self.assertIn('final',builds[0])
+        self.assertEqual(builds,[['docker','build','--target','final','--label',
+                                 'org.opencontainers.image.revision='+COMMIT,'-t',TAG,'services/core']])
         metadata=json.loads((output/'core.json').read_text())
         artifacts.validate_image(output/'core-image.tar.gz',metadata)
+
+    def test_existing_image_is_probed_and_saved_without_any_build(self):
+        output=self.fixture.root/'producer'
+        output.mkdir()
+        with patch.object(self.producer.subprocess,'run',side_effect=self.save_fixture_image) as calls, \
+                patch.object(self.producer,'run',return_value=json.dumps([{'Id':self.fixture.manifest['image_id']}])) as inspect:
+            self.producer.package_core(output,COMMIT)
+        inspect.assert_called_once_with('docker','image','inspect',TAG)
+        commands=[call.args[0] for call in calls.call_args_list]
+        self.assertEqual([command[:2] for command in commands],[['docker','run'],['docker','save']])
+        probe=commands[0]
+        self.assertEqual(probe[probe.index('--network')+1],'none')
+        self.assertIn('--read-only',probe)
+        self.assertEqual(probe[probe.index('--entrypoint')+1:probe.index('--entrypoint')+3],['node',TAG])
+        self.assertIn('Runtime must be unprivileged',probe[-1])
+        self.assertIn("await import('/app/src/data-import.ts')",probe[-1])
+        self.assertEqual(commands[1],['docker','save','-o',str(output/'core-image.tar'),TAG])
+        metadata=json.loads((output/'core.json').read_text())
+        self.assertEqual(metadata,{key:self.fixture.manifest[key] for key in ('commit','image_tag','image_id','platform')})
+        self.assertEqual(artifacts.validate_image(output/'core-image.tar.gz',metadata),{metadata['image_id']})
+        self.assertFalse((output/'core-image.tar').exists())
+
+    def test_existing_image_failure_never_falls_back_to_a_build(self):
+        output=self.fixture.root/'producer'
+        output.mkdir()
+        failure=self.producer.subprocess.CalledProcessError(1,['docker','image','inspect',TAG])
+        with patch.object(self.producer,'run',side_effect=failure),patch.object(self.producer.subprocess,'run') as calls:
+            with self.assertRaises(self.producer.subprocess.CalledProcessError):
+                self.producer.package_core(output,COMMIT)
+            calls.assert_not_called()
+        self.assertFalse((output/'core.json').exists())
+
+    def test_existing_image_must_pass_the_runtime_probe_before_archiving(self):
+        output=self.fixture.root/'producer'
+        output.mkdir()
+        failure=self.producer.subprocess.CalledProcessError(1,['docker','run'])
+        with patch.object(self.producer,'run',return_value=json.dumps([{'Id':self.fixture.manifest['image_id']}])), \
+                patch.object(self.producer.subprocess,'run',side_effect=failure) as calls:
+            with self.assertRaises(self.producer.subprocess.CalledProcessError):
+                self.producer.package_core(output,COMMIT)
+            self.assertEqual([call.args[0][:2] for call in calls.call_args_list],[['docker','run']])
+        self.assertFalse((output/'core-image.tar.gz').exists())
+        self.assertFalse((output/'core.json').exists())
+
+    def test_existing_image_archive_identity_is_validated_before_metadata(self):
+        output=self.fixture.root/'producer'
+        output.mkdir()
+        with patch.object(self.producer.subprocess,'run',side_effect=self.save_fixture_image), \
+                patch.object(self.producer,'run',return_value=json.dumps([{'Id':'sha256:'+'0'*64}])):
+            with self.assertRaises(artifacts.ReleaseError):
+                self.producer.package_core(output,COMMIT)
+        self.assertFalse((output/'core.json').exists())
 
 
 if __name__=='__main__':

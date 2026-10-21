@@ -4,6 +4,16 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.8: Bounded, cached and reviewable GitHub workflows
+
+2026-10-21
+
+- CI uses immutable commit pins for official Node 24 Actions and an explicit Ubuntu 24.04 runner. Core builds reuse GitHub Actions Buildx layers, then probe and package the same loaded final image without a second build; commit and signed-release verification remain required.
+- Superseded pull-request checks are canceled while each main push retains its own release run. Jobs have bounded timeouts, intermediate artifacts expire after three days, and already compressed archives are uploaded without another compression pass.
+- Validation jobs retain read-only repository access and do not persist checkout credentials. Only the canonical main release job receives the write and OIDC permissions needed to attest and publish the verified artifacts; pull requests do not publish releases or deploy production.
+- Dependabot proposes one grouped Actions update each week and groups npm security updates while routine npm version proposals are disabled. Changes remain review proposals with no automatic merge; the pull-request template requests validation, canonical release notes and explicit operational scope.
+- This preparation alpha describes workflow source readiness, not a production deployment or accepted v3 release. Existing server resource limits and manual production approval remain in place; this change does not restart the bot or enable automatic updates.
+
 ## v2.4.0-alpha.7: Docker image identity compatibility for verified updates
 
 2026-10-21
