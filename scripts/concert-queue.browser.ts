@@ -55,7 +55,7 @@ async function fixture(canManage=true){
   await route.fulfill({json:data});
  });
  return {...fixture,room,open:async()=>{await page.goto(base+'/?room=DISCORD1');await page.getByRole('button',{name:'Vote for Concert queued00001'}).waitFor();},
-  async switchGuild(){fixture.activeGuild=guildB;await page.evaluate(()=>{history.pushState(null,'','/?room=DISCORD2');dispatchEvent(new PopStateEvent('popstate'));});},
+  async switchGuild(guild=guildB){fixture.activeGuild=guild;await page.evaluate(code=>{history.pushState(null,'','/?room='+code);dispatchEvent(new PopStateEvent('popstate'));},guild===guildA?'DISCORD1':'DISCORD2');},
   source:fixture,
  };
 }
@@ -161,6 +161,78 @@ try{
   }finally{release.resolve();await page.close();}
  }
  console.log('PASS switching servers cancels delayed reads/actions and releases controls for the new server');
+ {
+  const f=await fixture(),{page}=f,entered=deferred<void>(),release=deferred<void>();let attempts=0,failedRead=false;
+  try{
+   await page.clock.install();
+   await page.addInitScript(()=>{
+    const original=window.fetch.bind(window);let first=true;
+    window.fetch=(input,init)=>{
+     if(first&&String(input)==='/api/discord/queue'&&init?.method==='POST'){
+      first=false;const timeout=new AbortController();
+      (window as unknown as {expireQueuePost:()=>void}).expireQueuePost=()=>timeout.abort(new DOMException('Synthetic queue timeout','TimeoutError'));
+      return original(input,{...init,signal:AbortSignal.any([init.signal!,timeout.signal])});
+     }
+     return original(input,init);
+    };
+   });
+   await f.open();await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+100));
+   f.source.post=async(route,input)=>{
+    attempts++;
+    if(attempts===1){entered.resolve();await release.promise;await route.fulfill({json:{state:f.states.get(guildA),canManage:true}}).catch(()=>{});return true;}
+    if(attempts===2){assert.equal(input.revision,'1');await route.fulfill({status:409,json:{error:'Synthetic stale revision'}});return true;}
+    assert.equal(input.revision,'2');return false;
+   };
+   f.source.get=async route=>{if(!attempts||failedRead)return false;failedRead=true;await route.fulfill({status:503,json:{error:'Synthetic recovery read failed'}});return true;};
+   const vote=page.getByRole('button',{name:'Vote for Concert queued00001'});await vote.click();await entered.promise;
+   f.states.get(guildA)!.revision='2';
+   await page.evaluate(()=>(window as unknown as {expireQueuePost:()=>void}).expireQueuePost());
+   await page.locator('.queue-panel [role=alert]').filter({hasText:'Synthetic queue timeout'}).waitFor();
+   await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');
+   assert(failedRead);assert.equal(attempts,1,'A timeout and failed recovery read must not automatically resend the write');assert(await vote.isEnabled());
+   await vote.click();await page.locator('.queue-panel [role=alert]').filter({hasText:'Synthetic stale revision'}).waitFor();
+   await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');
+   await vote.click();await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('1'));
+   assert.deepEqual(f.actions.map(action=>action.revision),['1','1','2']);assert.equal(f.states.get(guildA)!.revision,'3');
+   assert.equal(await page.locator('.queue-panel [role=alert]').count(),0);
+  }finally{release.resolve();await page.close();}
+ }
+ console.log('PASS timeout plus failed recovery read releases controls without resending and retries retain strict CAS');
+ for(const oldFailure of [false,true]){
+  const f=await fixture(),{page}=f,oldEntered=deferred<void>(),oldRelease=deferred<void>(),oldSettled=deferred<void>(),newEntered=deferred<void>(),newRelease=deferred<void>();let first=true;
+  try{
+   // Keep the first transport alive despite AbortSignal to exercise generation checks independently.
+   await page.addInitScript(()=>{
+    const original=window.fetch.bind(window);let first=true;
+    window.fetch=(input,init)=>{
+     if(first&&String(input)==='/api/discord/queue'&&init?.method==='POST'){
+      first=false;const copied={...init};delete copied.signal;return original(input,copied);
+     }
+     return original(input,init);
+    };
+   });
+   await f.open();const old=copy(f.states.get(guildA)!);old.revision='2';
+   f.source.post=async(route,input)=>{
+    if(input.guildId!==guildA)return false;
+    if(first){first=false;oldEntered.resolve();await oldRelease.promise;await route.fulfill(oldFailure?{status:409,json:{error:'Old session moderation failed'}}:{json:{state:old,canManage:true}});oldSettled.resolve();return true;}
+    newEntered.resolve();await newRelease.promise;return false;
+   };
+   await page.getByRole('button',{name:'Vote for Concert queued00001'}).click();await oldEntered.promise;
+   await f.switchGuild();const other=page.getByRole('button',{name:'Vote for Concert second00001'});await other.waitFor();
+   await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');await other.click();
+   await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('1'));
+   const returned=f.states.get(guildA)!;returned.revision='7';returned.queue=[track('returned001')];returned.voteCounts={returned001:4};
+   await f.switchGuild(guildA);const vote=page.getByRole('button',{name:'Vote for Concert returned001'});await vote.waitFor();
+   await page.waitForFunction(()=>document.querySelector('.social-queue')?.getAttribute('aria-busy')==='false');await vote.click();await newEntered.promise;
+   oldRelease.resolve();await oldSettled.promise;await repaint(page);
+   assert.equal(await page.locator('.social-queue').getAttribute('aria-busy'),'true','The old session must not unlock a new action on the same guild');
+   assert.equal(await page.getByRole('button',{name:'Vote for Concert queued00001'}).count(),0);assert.equal(await page.getByRole('button',{name:'Vote for Concert second00001'}).count(),0);
+   assert.equal(await page.locator('.queue-panel [role=alert]').count(),0);assert(await vote.isDisabled());
+   newRelease.resolve();await page.waitForFunction(()=>document.querySelector('.social-track > button')?.textContent?.includes('5'));
+   assert.deepEqual(f.actions.map(action=>[action.guildId,action.revision]),[[guildA,'1'],[guildB,'1'],[guildA,'7']]);assert.equal(returned.revision,'8');
+  }finally{oldRelease.resolve();newRelease.resolve();await page.close();}
+ }
+ console.log('PASS A to B to A isolates late successful and failed POSTs even when the transport ignores cancellation');
  {
   const f=await fixture(),{page}=f;f.source.current=null;
   try{await f.open();assert.equal(await page.locator('.social-queue .radio-retry').count(),0);}finally{await page.close();}

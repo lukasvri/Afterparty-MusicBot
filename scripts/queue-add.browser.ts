@@ -13,11 +13,12 @@ const track = (id: string, title: string): Video => ({
   live: false, embeddable: true, concert: true,
 });
 
-for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-refresh-failure", "discord-switch", "discord-action-race", "discord-management-first", "discord-management-first-failure"] as const) {
-  test(`${mode}: confirmed additions refresh the visible queue or report a read failure without retrying the command`, async () => {
+for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-refresh-failure", "discord-switch", "discord-action-race", "discord-management-first", "discord-management-first-failure", "discord-offline"] as const) {
+  test(mode === "discord-offline" ? "discord-offline: disconnected queue controls do not send commands" : `${mode}: confirmed additions refresh the visible queue or report a read failure without retrying the command`, async () => {
     const browser = await chromium.launch({headless:true, executablePath:process.env.CHROMIUM_PATH, args:["--no-sandbox"]});
     let releaseLateRead = () => {};
     let releaseManagement = () => {};
+    let releaseRapid = () => {};
     try {
       const page = await browser.newPage({viewport:{width:1440,height:1000}});
       await page.clock.install();
@@ -34,15 +35,18 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
       let startedManagement = () => {};
       const managementStarted = new Promise<void>(resolve => { startedManagement = resolve; });
       const managementGate = new Promise<void>(resolve => { releaseManagement = resolve; });
+      let startedRapid = () => {};
+      const rapidStarted = new Promise<void>(resolve => { startedRapid = resolve; });
+      const rapidGate = new Promise<void>(resolve => { releaseRapid = resolve; });
       const queueState = () => ({revision:String(1+writes),queue,requests:[],approvalRequired,voteCounts:{},skipVotes:0});
       const room = (): Room => ({
         code:"TESTROOM", name:"Synthetic queue", current:track("current0001", "Current song"),
         queue, playing:false, position:0, version:1+writes, serverTime:Date.now(),
         isHost:!discord, viewers:1, expiresAt:Date.now()+60000,
-        ...(discord ? {mode:"discord",guildId,discordOnline:true,playbackKey:"core:current"} : {}),
+        ...(discord ? {mode:"discord",guildId,discordOnline:mode!=="discord-offline",playbackKey:"core:current"} : {}),
       });
       const otherRoom = (): Room => ({...room(),code:"OTHERROOM",name:"Another guild",guildId:"222222222222222222",current:track("other000001","Other guild current"),queue:[],isHost:false});
-      const state = () => ({...room(),guildId,ready:true,connected:true,online:true,volume:60,queueRevision:String(1+writes),lastSeen:Date.now()});
+      const state = () => ({...room(),guildId,ready:true,connected:mode!=="discord-offline",online:mode!=="discord-offline",volume:60,queueRevision:String(1+writes),lastSeen:Date.now()});
       await page.route("**/*", async route => {
         const url = new URL(route.request().url());
         if(url.origin !== base) return route.abort();
@@ -80,6 +84,7 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
           if(input) {
             assert.equal(input.action,"enqueue"); assert.equal(input.videoId,added.id); assert.equal(input.guildId,guildId);
             queue=[added]; writes++;
+            if(mode === "discord-immediate") { startedRapid(); await rapidGate; }
             data={id:"synthetic-command",status:mode === "discord-polled" ? "processing" : "done"};
           } else if(url.searchParams.has("command")) { commandReads++; data={state:state(),command:{status:"done",result:""}}; }
           else data={state:discord ? (url.searchParams.get("guildId") === "222222222222222222" ? {...state(),...otherRoom()} : state()) : null};
@@ -104,6 +109,13 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
       assert.equal(await page.locator(".discovery-summary[role=status]").innerText(),"1 track");
       const addSize=await add.boundingBox(); assert(addSize&&addSize.width>=44&&addSize.height>=44,"Search add controls retain accessible touch targets");
       if(discord) assert.equal(queueReads,1);
+      if(mode === "discord-offline") {
+        assert(await add.isDisabled(),"Disconnected Discord must not expose an enabled queue-add control");
+        await add.dispatchEvent("click"); await page.clock.runFor(100);
+        assert.equal(writes,0,"Click events on an unavailable Discord control must not send a command");
+        assert.equal(commandReads,0); assert.equal(queueReads,1);
+        return;
+      }
       if(mode === "discord-management-first" || mode === "discord-management-first-failure") {
         await page.locator(".video-settings > summary").click();
         await page.locator(".settings-tabs").getByRole("tab",{name:"Queue",exact:true}).click();
@@ -129,7 +141,13 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
         assert.equal(queueReads,mode === "discord-management-first-failure" ? 3 : 2);
         return;
       }
-      await add.click();
+      if(mode === "discord-immediate") {
+        await add.evaluate(button=>{for(let n=0;n<3;n++)button.dispatchEvent(new MouseEvent("click",{bubbles:true}));});
+        await rapidStarted; await page.clock.runFor(100);
+        assert.equal(writes,1,"Rapid repeated clicks while the command is pending must send one write");
+        assert(await add.isDisabled()); assert.equal(await page.locator(".discovery-summary[role=status]").innerText(),"Updating queue…");
+        releaseRapid();
+      } else await add.click();
       if(mode === "discord-action-race") {
         await lateReadStarted;
         await page.locator(".video-settings > summary").click();
@@ -181,6 +199,6 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
       assert.equal(writes,1,"One click must issue exactly one command");
       if(discord) assert.equal(queueReads,2,"Command confirmation refreshes the authoritative social queue once");
       assert.equal(commandReads,mode === "discord-polled" ? 1 : 0);
-    } finally { releaseLateRead(); releaseManagement(); await browser.close(); }
+    } finally { releaseLateRead(); releaseManagement(); releaseRapid(); await browser.close(); }
   });
 }
