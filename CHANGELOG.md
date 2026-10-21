@@ -4,6 +4,18 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v2.4.0-alpha.3: More quiz modes, source matching and copyright requests
+
+2026-10-21
+
+- Guess the Song hosts can choose song-title or artist answers. Artist mode matches the full normalized artist, uses artist-specific prompts and late hints, and keeps title aliases separate. Existing clients that omit the mode retain title guessing; settings stay frozen during play.
+- Joined players can vote once per active round to skip. A strict majority of the current joined roster reveals the answer without changing scores or advancing the game. Counts and the requesting player’s vote status synchronize between clients; disconnected tabs remain in the roster and the host can still reveal.
+- Quick 15-second and classic 30-second presets fit the selected category’s distinct recording capacity and require saving before Start. Catalogs advertise bounded duration summaries without answers or media keys, invalid combinations cannot start, and expired inventories clear their capacity. Older catalogs remain compatible.
+- Optional DEEZER_METADATA=1 on Core adds canonical Deezer track, album and playlist metadata lookup for ordinary playback, followed by the existing recording matcher. Default is off. Matching preserves explicit recording versions and distinguishes repeated version words from title or artist words, preventing studio/live mixups. Requests, pages, bytes and time are bounded. This does not stream Deezer audio or populate the quiz catalog.
+- A separate default-off Deezer quiz pilot prepares up to eight explicitly approved track previews from a private local inventory file. Bounded metadata/CDN requests and MP3 decoding produce canonical WAV without answer tags for the existing private round transport. The snapshot expires within five minutes or earlier approval expiry, without automatic refresh. Real FFmpeg and two-player HTTP checks use generated audio only; live availability and permissions remain unverified. DEEZER_METADATA does not enable quiz audio.
+- A copyright/removal page prepares an editable private notice and email draft for the operator’s public contact address, with copying and clearing controls. Reporters send the notice themselves. The form does not submit or store notices or remove material automatically; support, terms and privacy pages explain the flow.
+- The remote quiz still needs a playable recognizable-hit inventory. The source investigation separates Jockie’s documented features from unknown backend details and examines a separately documented metadata/playback architecture. No real recordings, provider credentials, paid accounts or production changes are included.
+
 ## v2.4.0-alpha.2: Fair concurrent answers and authorized game inventory
 
 2026-10-21

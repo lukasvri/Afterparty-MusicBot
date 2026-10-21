@@ -33,6 +33,29 @@ test('trusted operator assignments drive summaries and eligible selection withou
   const summaries = JSON.stringify(catalog.categories());
   for (const secret of ['Fictional', 'Sample Artist', 'synthetic_media', 'Invented Alias', 'durationSeconds']) assert.equal(summaries.includes(secret), false);
 });
+test('operator duration histograms floor measured lengths, clamp at 90 and count category membership once', () => {
+  const lengths = [15, 15.99996875, 29.99996875, 30, 120, 90.5];
+  const inputs = lengths.map((durationSeconds, n) => {
+    const value = record(n); value.media.durationSeconds = durationSeconds;
+    if (n === 3) value.categoryIds = ['2010s', 'edm-classics'];
+    return value;
+  });
+  const catalog = new OperatorGuessCatalog(inputs, () => 0);
+  const durations = [{ seconds: 15, count: 2 }, { seconds: 29, count: 1 }, { seconds: 30, count: 1 }, { seconds: 90, count: 2 }];
+  assert.deepEqual(catalog.categories()[0].durations, durations);
+  assert.deepEqual(catalog.categories()[1].durations, [{ seconds: 30, count: 1 }]);
+  const eligibleCount = (seconds: number) => catalog.categories()[0].durations!.filter(bin => bin.seconds >= seconds).reduce((sum, bin) => sum + bin.count, 0);
+  for (const seconds of [15, 16, 29, 30, 31, 90]) {
+    const selected: string[] = [];
+    while (selected.length < eligibleCount(seconds)) selected.push(catalog.select('2010s', { exclude: selected, durationSeconds: seconds }).id);
+    assert.equal(selected.length, lengths.filter(length => length >= seconds).length);
+    assert.throws(() => catalog.select('2010s', { exclude: selected, durationSeconds: seconds }), { status: 503 });
+  }
+  const changed = catalog.categories(); changed[0].durations![0].count = 999; changed[0].durations!.push({ seconds: 20, count: 1 });
+  inputs[0].media.durationSeconds = 90;
+  assert.deepEqual(catalog.categories()[0].durations, durations, 'cached histograms are isolated from input and response mutations');
+  assert.deepEqual(new OperatorGuessCatalog([]).categories().map(c => c.durations), [[], []]);
+});
 test('operator catalog rejects absent eligibility, unknown categories, duplicate IDs, URLs and malformed metadata', () => {
   const invalid: unknown[] = [
     { ...record(1), rightsCleared: false }, { ...record(1), rightsCleared: undefined },

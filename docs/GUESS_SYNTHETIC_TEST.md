@@ -1,8 +1,9 @@
 # Synthetic Guess the Song test
 
-This focused preview adds a separate game authority and dedicated `/games` page
-to the stable bot and website. It does not include concert reactions, highlights,
-bingo or Discord Activities. Source and patch notes do not prove deployment.
+This preview uses a separate game authority and dedicated `/games` page on the
+ordinary bot/web source line. Its audio and scores stay independent of concert
+reactions, highlights and bingo. It does not run a Discord Activity. Source and
+patch notes do not prove deployment.
 
 ## Operator boundary
 
@@ -32,6 +33,12 @@ fictional state. Restarting Core discards game sessions and scores.
    550 and 660 Hz respectively. This tests game flow, not recognizing real music.
 4. Submit a matching title, check synchronized scores, reveal and continue.
    Early answers earn more points. Earlier round scores never change.
+   In the lobby, also try **Answer mode: Artist** and save before starting.
+   The synthetic artist answer is **Synthetic Test Generator**, rather than
+   a tone title. Quick/classic presets change the draft settings and still need
+   to be saved. Guests can vote to skip after a round starts; more than half of
+   the joined roster is required, including disconnected tabs. A successful
+   vote reveals without changing scores, and the host advances the game.
 5. Stop/cancel preview, hide the tab, disconnect, reconnect and leave the game.
    Audio must stop, returning must not autoplay, and reconnect must not replay
    writes or award points twice. The music queue must remain unchanged.

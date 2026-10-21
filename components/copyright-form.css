@@ -1,0 +1,25 @@
+.copyright-form { margin-top: 34px; border-top: 1px solid #ffffff1f; padding-top: 12px; }
+.copyright-form form, .copyright-form fieldset { min-width: 0; margin: 0; }
+.copyright-form fieldset { border: 0; padding: 0; }
+.copyright-form legend { padding: 0; font-size: 1.05rem; font-weight: 650; margin-bottom: 10px; }
+.copyright-form .copyright-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
+.copyright-form .copyright-wide { grid-column: 1 / -1; }
+.copyright-form label { display: grid; gap: 8px; margin: 0 0 20px; font-size: .9rem; color: #e8e8ea; line-height: 1.6; }
+.copyright-form input:not([type=checkbox]), .copyright-form textarea { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; border: 1px solid #ffffff29; border-radius: 9px; background: #09090b; color: #f4f4f5; padding: 12px; font: inherit; line-height: 1.6; }
+.copyright-form textarea { resize: vertical; min-height: 90px; }
+.copyright-form input:focus-visible, .copyright-form textarea:focus-visible, .copyright-form button:focus-visible, .copyright-form a:focus-visible { outline: 2px solid #ff5267; outline-offset: 3px; }
+.copyright-form .copyright-statements { border-top: 1px solid #ffffff1a; margin-top: 24px; padding-top: 22px; }
+.copyright-form .copyright-statements label { display: flex; gap: 12px; align-items: flex-start; }
+.copyright-form input[type=checkbox] { accent-color: #ff263e; flex: 0 0 auto; width: 18px; height: 18px; margin-top: 4px; }
+.copyright-form .copyright-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.copyright-form .copyright-actions .button { margin: 0; min-height: 44px; white-space: normal; text-align: center; }
+.copyright-form .copyright-help { color: #a1a1aa; font-size: .83rem; }
+.copyright-form .copyright-contact { padding: 16px; border: 1px solid #ffffff21; background: #ffffff04; border-radius: 10px; overflow-wrap: anywhere; }
+.copyright-form .copyright-preview { border-top: 1px solid #ffffff21; padding-top: 18px; margin-top: 28px; }
+.copyright-form .copyright-preview label { margin-bottom: 8px; }
+.copyright-form .copyright-preview textarea { min-height: 320px; }
+@media (max-width: 600px) {
+  .copyright-form .copyright-fields { grid-template-columns: minmax(0, 1fr); }
+  .copyright-form .copyright-actions { flex-direction: column; }
+  .copyright-form .copyright-actions .button { width: 100%; box-sizing: border-box; }
+}

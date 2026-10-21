@@ -93,11 +93,28 @@ test('configure whitelists setting keys without coercing illegal values, and cat
   const invalid = await f.call({ action: 'configure', settings: { ...settings, durationSeconds: '30', hints: 'true' } });
   assert.equal((invalid.settings as Record<string, unknown>).durationSeconds, '30');
   assert.equal((invalid.settings as Record<string, unknown>).hints, 'true', 'model must receive and reject the illegal type');
+  const artist = await f.call({ action: 'configure', settings: { ...settings, answerMode: 'artist' } }, 'synthetic-owner');
+  assert.equal((artist.settings as Record<string, unknown>).answerMode, 'artist');
+  const badMode = await f.call({ action: 'configure', settings: { ...settings, answerMode: 1 } });
+  assert.equal((badMode.settings as Record<string, unknown>).answerMode, 1, 'Core must validate the mode without browser coercion');
   assert.equal((await f.call({ action: 'configure', settings: 'invalid' })).settings, null);
   const reads = f.reads;
   const catalog = await f.call({ action: 'catalog', host: true, categories: ['forged'], mediaUrl: 'forged' });
   assert.deepEqual(JSON.parse(JSON.stringify(catalog)), { action: 'catalog' });
   assert.equal(f.reads, reads); assert.deepEqual(f.calls, []);
+});
+
+test('skip votes retain fresh room authority and strip forged vote totals, participant identity and host claims', async () => {
+  const f = await fixture();
+  const input = await f.call({ action: 'skip', host: true, actor: 'other-player', participantId: 'other-player',
+    skipVotes: 64, skipRequired: 1, skipVoted: false, awarded: 2000, answer: 'forged', mediaUrl: 'https://example.test/secret.wav' });
+  assert.equal(input.action, 'skip'); assert.equal(input.host, false);
+  for (const key of ['actor', 'participantId', 'skipVotes', 'skipRequired', 'skipVoted', 'awarded', 'answer', 'mediaUrl']) assert.equal(key in input, false);
+  assert.deepEqual(f.calls, []);
+  f.room.owner_hash = await hash('new-owner');
+  assert.equal((await f.call({ action: 'skip', host: true }, 'synthetic-owner')).host, false);
+  f.room.expires_at = Date.now() - 1;
+  await assert.rejects(f.call({ action: 'skip', roomExpiresAt: Date.now() + 60_000 }), { status: 404 });
 });
 
 async function audioProxy(fetcher: typeof fetch) {

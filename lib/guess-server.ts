@@ -11,7 +11,7 @@ export async function guessInput(request: Request) {
   await limit(request, 'guess-visitor', 600, 60000);
   if (action === 'catalog') return { action };
   if (!['room', 'guild'].includes(String(scope)) || typeof scopeId !== 'string' || !(scope === 'room' ? /^[A-Z0-9]{8}$/ : /^\d{14,22}$/).test(scopeId)) fail(400, 'Invalid game scope.');
-  if (!['join', 'read', 'media', 'configure', 'start', 'guess', 'reveal', 'next', 'end', 'reset'].includes(String(action))) fail(400, 'Unknown game action.');
+  if (!['join', 'read', 'media', 'configure', 'start', 'guess', 'skip', 'reveal', 'next', 'end', 'reset'].includes(String(action))) fail(400, 'Unknown game action.');
   if (action === 'join') await limit(request, 'guess-join', 30, 60000);
   let authority: Record<string, unknown>;
   if (scope === 'guild') { const session = await discordSession(request); if (!session) fail(401, 'Sign in with Discord to join this game.'); authority = { tokenCipher: session.token_cipher }; }
@@ -24,5 +24,5 @@ export async function guessInput(request: Request) {
     authority = { roomExpiresAt: value.expires_at, host: actorHash === value.owner_hash || Boolean(actorHash && state.cohostHashes?.includes(actorHash)) };
   }
   return { scope, scopeId, action, ...authority, token: input.token, eventId: input.eventId, sessionId: input.sessionId, revision: input.revision, roundId: input.roundId, categoryId: input.categoryId, text: input.text, nickname: input.nickname,
-    ...(action === 'configure' ? { settings: input.settings && typeof input.settings === 'object' ? Object.fromEntries(['durationSeconds', 'roundCount', 'maxPoints', 'minPoints', 'hints'].map(key => [key, (input.settings as Record<string, unknown>)[key]])) : null } : {}) };
+    ...(action === 'configure' ? { settings: input.settings && typeof input.settings === 'object' ? Object.fromEntries(['durationSeconds', 'roundCount', 'maxPoints', 'minPoints', 'hints', 'answerMode'].map(key => [key, (input.settings as Record<string, unknown>)[key]])) : null } : {}) };
 }

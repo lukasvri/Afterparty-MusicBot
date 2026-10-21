@@ -1,6 +1,10 @@
 import { UserError } from './types.ts';
 
-export type GuessCategorySummary = { id: string; name: string; available: boolean; count: number };
+/** Optional histogram of available whole-second clip lengths, ascending and clamped to 90 seconds. */
+export type GuessCategorySummary = {
+  id: string; name: string; available: boolean; count: number;
+  durations?: { seconds: number; count: number }[];
+};
 /** Private catalog metadata. Never serialize this into a live public round. */
 export type GuessSong = { id: string; title: string; artist: string; aliases: readonly string[]; mediaKey: string };
 /** Internal descriptor, not a browser URL or authorization to expose media. */
@@ -61,6 +65,7 @@ export type OperatorGuessRecord = {
  */
 export class OperatorGuessCatalog implements GuessCatalog {
   private records: readonly OperatorGuessRecord[];
+  private summaries: readonly GuessCategorySummary[];
   private random: () => number;
   constructor(records: readonly OperatorGuessRecord[], random = Math.random) {
     if (!Array.isArray(records) || records.length > 1000) throw new UserError('Invalid operator catalog.', 503);
@@ -77,13 +82,20 @@ export class OperatorGuessCatalog implements GuessCatalog {
       ids.add(song.id); keys.add(song.mediaKey);
       return Object.freeze({ rightsCleared: true as const, categoryIds: Object.freeze([...record.categoryIds]), song, media: Object.freeze(media) });
     });
+    this.summaries = CATEGORY_EXAMPLES.map(category => {
+      const histogram = new Map<number, number>();
+      let count = 0;
+      for (const record of this.records) if (record.categoryIds.includes(category.id)) {
+        const seconds = Math.min(90, Math.floor(record.media.durationSeconds));
+        histogram.set(seconds, (histogram.get(seconds) ?? 0) + 1); count++;
+      }
+      const durations = [...histogram].sort(([a], [b]) => a - b).map(([seconds, count]) => ({ seconds, count }));
+      return { ...category, count, available: count > 0, durations };
+    });
     this.random = random;
   }
   categories(): GuessCategorySummary[] {
-    return CATEGORY_EXAMPLES.map(category => {
-      const count = this.records.filter(record => record.categoryIds.includes(category.id)).length;
-      return { ...category, count, available: count > 0 };
-    });
+    return this.summaries.map(category => ({ ...category, durations: category.durations!.map(bin => ({ ...bin })) }));
   }
   select(categoryId: string, options: { exclude: readonly string[]; durationSeconds: number }): GuessSong {
     if (!options || !Array.isArray(options.exclude) || options.exclude.length > 20 ||

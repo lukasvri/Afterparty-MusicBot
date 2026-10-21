@@ -8,9 +8,12 @@ import { GUESS_AUDIO_MAX_BYTES, GUESS_AUDIO_RATE, guessWaveSeconds } from '../sr
 test('synthetic catalog explicitly identifies five fictional recordings and rejects unsupported selections', () => {
   const source = new SyntheticGuessSource(), ids: string[] = [], titles: string[] = [];
   assert.equal(source.syntheticTest, true);
-  assert.deepEqual(source.categories(), [{ id: 'synthetic-test', name: 'Synthetic test tones', available: true, count: 5 }]);
+  assert.deepEqual(source.categories(), [{ id: 'synthetic-test', name: 'Synthetic test tones', available: true, count: 5,
+    durations: [{ seconds: 30, count: 5 }] }]);
   source.categories()[0].name = 'Changed output';
+  source.categories()[0].durations![0].count = 100;
   assert.equal(source.categories()[0].name, 'Synthetic test tones');
+  assert.deepEqual(source.categories()[0].durations, [{ seconds: 30, count: 5 }]);
   for (let index = 0; index < 5; index++) {
     const song = source.select('synthetic-test', { exclude: ids, durationSeconds: 30 });
     ids.push(song.id); titles.push(song.title);

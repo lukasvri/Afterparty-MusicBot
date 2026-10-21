@@ -16,7 +16,9 @@ const unavailable = () => new UserError('Synthetic test tone is unavailable.', 5
 export class SyntheticGuessSource implements GuessCatalog, GuessMediaSource {
   readonly syntheticTest = true;
 
-  categories(): GuessCategorySummary[] { return [{ ...CATEGORY }]; }
+  categories(): GuessCategorySummary[] {
+    return [{ ...CATEGORY, durations: [{ seconds: GUESS_AUDIO_MAX_SECONDS, count: CATEGORY.count }] }];
+  }
 
   select(categoryId: string, options: { exclude: readonly string[]; durationSeconds: number }): GuessSong {
     if (!options || !Array.isArray(options.exclude) || options.exclude.length > 20 ||
