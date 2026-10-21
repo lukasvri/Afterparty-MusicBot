@@ -63,6 +63,30 @@ use em dashes. Keep global personal preferences out of repository instructions.
   Request decisions only for genuinely ambiguous goals or protected actions.
   Delegation does not grant merge, publishing, deployment or production access.
 
+## Code Review Rules
+
+### Server isolation and authorization
+
+- Flag changes that let a selected Discord server read or change another server's
+  queues, settings, databases or private membership data. Authorization must be
+  checked for the selected server; the owner's fallback access is limited to the
+  owner's server. Public concert responses must exclude ordinary Discord music.
+
+### Playback and recovery
+
+- Flag changes that bypass queue revisions, stale-command checks or the shared
+  playback clock, or resume audio after a user deliberately paused or changed it.
+  Recovery must reconcile current user intent and preserve per-server state;
+  synthetic tests alone are not evidence of audible Discord behavior.
+
+### Production and release boundaries
+
+- Flag new production deployment or restart side effects in PR validation,
+  exposure of local secrets/data, or updates that bypass signed artifact checks,
+  resource limits or recovery paths. Review code and fix proposals remain
+  separate from owner-approved production operations. Do not request duplicate
+  formatting, lint or type checks already enforced by CI.
+
 ## Release notes and pull requests
 
 - Every code or user-facing change must include written release/patch notes in
