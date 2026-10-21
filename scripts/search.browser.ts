@@ -86,6 +86,14 @@ for (const [width, language] of [[1440, "en"], [390, "en"], [390, "nb"]] as cons
       assert.equal(await page.locator(".search-suggestions").getByText("Unverified Uploader", { exact: true }).count(), 0, "bare uploaders are not guessed to be artists");
       assert.equal(await page.locator(".search-suggestions").getByText("Machine Artist", { exact: true }).count(), 0, "explicitly marked AI history is not suggested");
       assert.equal(await page.locator(".search-suggestions").getByText("Generator Artist", { exact: true }).count(), 0, "explicit AI title labels are respected without a flag");
+      for (const hover of [false, true]) {
+        if (hover) await suggestion.hover();
+        const colors = await suggestion.evaluate(button => ({ surface: getComputedStyle(button).backgroundColor, border: getComputedStyle(button).borderTopColor }));
+        for (const color of Object.values(colors)) {
+          const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+          assert(Math.max(...channels) - Math.min(...channels) <= 10, `suggestions retain a neutral surface and border: ${color}`);
+        }
+      }
       await page.screenshot({ path: `/tmp/afterparty-search-suggestions-${width}-${language}.png`, fullPage: true });
       await suggestion.focus(); await page.keyboard.press("Enter");
       await page.locator(".search-result-query").getByText(language === "en" ? "Results for Current Artist" : "Resultater for Current Artist", { exact: true }).waitFor();
@@ -145,5 +153,21 @@ test("editing a pending query and returning to history retire old responses and 
     await page.locator(".music-row").filter({ hasText: "History Artist - Earlier Song" }).waitFor();
     assert.equal(await page.getByText("Retired search failed", { exact: true }).count(), 0);
     assert.deepEqual(f.searches, ["Slow first", "Fresh query", "Slow history"]); assert.deepEqual(f.writes, []); assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
+test("a cold search can finish after thirteen real seconds without being cut off by the old browser deadline", async () => {
+  const f = await fixture(390);
+  try {
+    const cold = f.hold("Cold artist"), started = performance.now();
+    await f.page.locator(".search-form input").fill("Cold artist");
+    await f.page.locator(".search-form button").click(); await cold.started;
+    // Native AbortSignal.timeout is intentionally not mocked or advanced by page.clock.
+    await new Promise<void>(resolve => setTimeout(() => { cold.release(); resolve(); }, 13250));
+    await f.page.locator(".music-row").filter({ hasText: "Search Result 10" }).waitFor({ timeout: 3000 });
+    assert(performance.now() - started >= 13000, "the response really arrives beyond the previous twelve-second cutoff");
+    assert.equal(await f.page.locator(".music-row").count(), 10);
+    assert.equal(await f.page.locator(".search-result-query").innerText(), "Results for Cold artist");
+    assert.deepEqual(f.searches, ["Cold artist"]); assert.deepEqual(f.writes, []); assert.deepEqual(f.errors, []);
   } finally { await f.close(); }
 });

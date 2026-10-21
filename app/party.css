@@ -725,14 +725,14 @@ button:disabled {
   display:block;
   -webkit-line-clamp:unset;
 }
-.discovery-summary { min-height:1.4em; margin:8px 0; color:#c8b4c2; font-size:12px; }
+.discovery-summary { min-height:1.4em; margin:8px 0; color:var(--muted); font-size:12px; }
 .discovery .search-suggestions { margin:14px 0; min-width:0; }
-.discovery .search-suggestions>span { display:block; margin-bottom:8px; color:#c8b4c2; font-size:12px; }
+.discovery .search-suggestions>span { display:block; margin-bottom:8px; color:var(--muted); font-size:12px; }
 .discovery .search-suggestions>div { display:flex; flex-wrap:wrap; gap:8px; }
-.discovery .search-suggestions button { min-height:44px; max-width:100%; padding:9px 12px; border:1px solid #53303b; border-radius:12px; background:#20171c; color:#f4e6ee; text-align:left; overflow-wrap:anywhere; font-size:12px; }
-.discovery .search-suggestions button:hover { background:#35212b; border-color:#b35a79; }
-.discovery .search-result-query { margin:12px 0 4px; overflow-wrap:anywhere; color:#f4e6ee; font-size:13px; }
-.discovery .search-pagination { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:14px 0; color:#c8b4c2; font-size:12px; }
+.discovery .search-suggestions button { min-height:44px; max-width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); color:var(--text); text-align:left; overflow-wrap:anywhere; font-size:12px; }
+.discovery .search-suggestions button:hover { filter:brightness(1.12); border-color:var(--muted); }
+.discovery .search-result-query { margin:12px 0 4px; overflow-wrap:anywhere; color:var(--text); font-size:13px; }
+.discovery .search-pagination { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:14px 0; color:var(--muted); font-size:12px; }
 .discovery .search-pagination button { min-height:44px; }
 .music-copy .music-unavailable { display:block; margin-top:6px; color:#e3b8c0; white-space:normal; line-height:1.5; }
 .discovery .add-track { min-width:44px; min-height:44px; }

@@ -531,7 +531,7 @@ export default function Afterparty() {
     try {
       const data = await request<{ videos: Video[] }>(
         `/api/search?q=${encodeURIComponent(q)}`,
-        { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]) },
+        { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35000)]) },
       );
       if (generation === searchGeneration.current) setResults(data.videos);
     } catch (e) {
