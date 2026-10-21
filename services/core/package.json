@@ -1,6 +1,6 @@
 {
   "name": "gutta-krutt-core",
-  "version": "2.4.0-alpha.9",
+  "version": "2.4.0-alpha.10",
   "private": true,
   "type": "module",
   "engines": {
@@ -22,5 +22,8 @@
     "@types/node": "24.10.0",
     "@types/ws": "8.18.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "undici": "6.29.1"
+  }
 }

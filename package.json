@@ -1,6 +1,6 @@
 {
   "name": "site-creator-vinext-starter",
-  "version": "2.4.0-alpha.9",
+  "version": "2.4.0-alpha.10",
   "private": true,
   "engines": {
     "node": ">=24.17.0"
@@ -21,7 +21,7 @@
     "release:changelog": "node scripts/releases.ts --write",
     "test:party": "node scripts/party.browser.ts",
     "test:sync": "node --test --test-concurrency=1 --test-timeout=45000 scripts/sync.browser.ts",
-    "test:unit": "node --test scripts/fullscreen.test.ts scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/live-command.test.ts scripts/native-seek.test.ts scripts/rooms.test.ts scripts/bridge.test.ts scripts/admin-auth.test.ts scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts scripts/radio-catalog-probe.test.ts scripts/queue-order.test.ts scripts/player-readiness.test.ts scripts/guess-authority.test.ts scripts/guess-worker.test.ts scripts/social-authority.test.ts scripts/guess-availability.test.ts",
+    "test:unit": "node --test scripts/fullscreen.test.ts scripts/audio-preferences.test.ts scripts/playback-sync.test.ts scripts/live-clock.test.ts scripts/live-command.test.ts scripts/native-seek.test.ts scripts/rooms.test.ts scripts/bridge.test.ts scripts/admin-auth.test.ts scripts/hosting-output.test.ts scripts/afterparty-compatibility.test.ts scripts/releases.test.ts scripts/radio-catalog-probe.test.ts scripts/queue-order.test.ts scripts/player-readiness.test.ts scripts/guess-authority.test.ts scripts/guess-worker.test.ts scripts/social-authority.test.ts scripts/guess-availability.test.ts scripts/toolchain.test.mjs",
     "test:admin-channels": "node scripts/admin-channels.browser.ts",
     "test:guess": "node --test --test-concurrency=1 --test-timeout=90000 scripts/guess.browser.ts scripts/guess-synthetic.browser.ts",
     "test:copyright": "node scripts/copyright.browser.ts",
@@ -32,8 +32,8 @@
     "lucide-react": "^1.31.0",
     "next": "16.3.8",
     "qrcode": "^1.5.4",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -49,7 +49,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.8",
     "playwright": "1.62.1",
-    "react-server-dom-webpack": "19.2.6",
+    "react-server-dom-webpack": "19.2.8",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.5",
@@ -60,7 +60,13 @@
   "overrides": {
     "miniflare": {
       "sharp": "0.35.5"
-    }
+    },
+    "esbuild": "0.28.2",
+    "undici": "7.30.1",
+    "ws": "8.22.0",
+    "fast-uri": "3.1.8",
+    "fflate": "0.7.5",
+    "image-size": "2.0.3"
   },
   "license": "MIT"
 }
