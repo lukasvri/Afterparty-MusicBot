@@ -85,7 +85,7 @@ test('Deezer metadata is opt-in and uses strict existing source matching without
  const f=setup();try{
   let fetches=0,enrichments=0;const queries:string[]=[];
   t.mock.method(globalThis,'fetch',async()=>{fetches++;return Response.json({id:123,title:'Example Song',duration:200,readable:true,artist:{name:'Artist'},isrc:source.isrc,preview:'https://untrusted.example/secret.mp3'});});
-  for(const value of [undefined,'0','true','yes'])await assert.rejects(new Providers(f.store,{DEEZER_METADATA:value}).resolve('https://www.deezer.com/track/123'),/not enabled/);
+  for(const value of [undefined,'0','true','yes'])for(const query of ['https://www.deezer.com/track/123','https://www.deezer.com/track/123?utm_source=user_sharing','https://link.deezer.com/s/synthetic?utm_medium=desktop'])await assert.rejects(new Providers(f.store,{DEEZER_METADATA:value}).resolve(query),/not enabled/);
   assert.equal(fetches,0,'disabled imports never contact the provider');
   const p=new Providers(f.store,{DEEZER_METADATA:'1'});
   t.mock.method(p.spotifyCatalog,'enrich',async()=>{enrichments++;throw Error('must not enrich Deezer as Spotify');});
@@ -99,6 +99,42 @@ test('Deezer metadata is opt-in and uses strict existing source matching without
   await assert.rejects(p.resolve('https://www.deezer.com/track/123'),/reliable audio match/);
   const before=fetches;await assert.rejects(p.resolve('https://www.deezer.com.evil.test/track/123'),/Use a/);assert.equal(fetches,before);
  }finally{f.close();}
+});
+test('enabled Deezer sharing links discard tracking and retain strict source matching after bounded expansion',async t=>{
+ const f=setup();try{
+  const requests:string[]=[],queries:string[]=[];
+  t.mock.method(globalThis,'fetch',async(url:Parameters<typeof fetch>[0])=>{
+   requests.push(String(url));
+   if(String(url)==='https://link.deezer.com/s/synthetic')return new Response(null,{status:302,headers:{location:'https://www.deezer.com/en/track/123?utm_source=user_sharing'}});
+   assert.equal(String(url),'https://api.deezer.com/track/123');
+   return Response.json({id:123,title:'Example Song',duration:200,readable:true,artist:{name:'Artist'},isrc:source.isrc,preview:'https://untrusted.example/secret.mp3'});
+  });
+  const p=new Providers(f.store,{DEEZER_METADATA:'1'});
+  t.mock.method(p.spotifyCatalog,'enrich',async()=>{throw Error('Deezer must not use Spotify identifiers');});
+  p.search=async query=>{queries.push(query);return [track('Artist - Example Song Live'),track()];};p.video=async()=>[track()];
+  const [matched]=await p.resolve('https://link.deezer.com/s/synthetic?utm_campaign=clipboard-generic');
+  assert.deepEqual(requests,['https://link.deezer.com/s/synthetic','https://api.deezer.com/track/123']);
+  assert.deepEqual(queries,['"'+source.isrc+'"']);assert.equal(matched.id,'abcdefghijk');assert.equal(matched.catalog?.id,undefined);assert(!JSON.stringify(matched).includes('secret.mp3'));
+  requests.length=0;await p.resolve('https://www.deezer.com/track/123?utm_source=deezer&utm_content=track-123');assert.deepEqual(requests,['https://api.deezer.com/track/123']);
+  const before=requests.length;await assert.rejects(p.resolve('https://link.deezer.com.evil.test/s/synthetic'),/Use a/);assert.equal(requests.length,before);
+ }finally{f.close();}
+});
+test('Deezer playlist imports preserve order and keep at most three recording matches active',async t=>{
+ const f=setup(),gates=Array.from({length:4},()=>deferred<void>()),firstThree=deferred<void>(),fourth=deferred<void>();
+ try{
+  t.mock.method(globalThis,'fetch',async()=>Response.json({data:Array.from({length:4},(_,i)=>({id:i+1,title:'Song '+i,artist:{name:'Artist'},duration:200})),total:4}));
+  const p=new Providers(f.store,{DEEZER_METADATA:'1'}),started:number[]=[];let active=0,maxActive=0;
+  p.matchSong=async song=>{
+   const index=Number(song.title.slice(5));started.push(index);active++;maxActive=Math.max(maxActive,active);
+   if(started.length===3)firstThree.resolve();if(index===3)fourth.resolve();
+   try{await gates[index].promise;return track('Artist - '+song.title);}finally{active--;}
+  };
+  const pending=p.resolve('https://www.deezer.com/playlist/123?utm_source=user_sharing');
+  await firstThree.promise;assert.deepEqual(started,[0,1,2]);assert.equal(active,3);
+  gates[2].resolve();await fourth.promise;assert.deepEqual(started,[0,1,2,3]);
+  gates[3].resolve();gates[1].resolve();gates[0].resolve();
+  assert.deepEqual((await pending).map(song=>song.title),['Artist - Song 0','Artist - Song 1','Artist - Song 2','Artist - Song 3']);assert.equal(maxActive,3);
+ }finally{gates.forEach(gate=>gate.resolve());f.close();}
 });
 test('bounded matching preserves playlist order despite out-of-order completion',async()=>{const out=await mapLimited([20,0,5],2,async n=>{await new Promise(r=>setTimeout(r,n));return n;});assert.deepEqual(out,[20,0,5]);});
 const sc=(id:string)=>({id,title:'Sound '+id,uploader:'Artist',duration:180,webpage_url:'https://soundcloud.com/artist/'+id,thumbnail:'https://example.test/image'});

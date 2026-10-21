@@ -4,7 +4,7 @@ import { runJson } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
-import { deezerRef, loadDeezer } from "./deezer.ts";
+import { deezerRef, deezerShareUrl, expandDeezerLink, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
 import {
@@ -341,10 +341,11 @@ export class Providers {
       const items = await this.spotify(spotify.kind, spotify.id);
       return mapLimited(items, 3, (item) => this.matchSong(item));
     }
-    const deezer = deezerRef(query);
-    if (deezer) {
+    const deezer = deezerRef(query), deezerSharing = deezerShareUrl(query);
+    if (deezer || deezerSharing) {
       if (!this.deezerMetadata) throw new UserError("Deezer link matching is not enabled for this installation.");
-      const items = await loadDeezer(deezer, Math.min(500, this.store.settings().playlistLimit));
+      const ref = deezer ?? await expandDeezerLink(deezerSharing!);
+      const items = await loadDeezer(ref, Math.min(500, this.store.settings().playlistLimit));
       return mapLimited(items, 3, (item) => this.matchSong(item));
     }
     if (soundcloudUrl(query) || /^sc(?:search)?:/i.test(query))

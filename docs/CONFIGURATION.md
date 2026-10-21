@@ -20,12 +20,20 @@ File: `services/core/.env`. Docker Compose loads this file. After editing it, ru
 | `YOUTUBE_API_KEY` | Optional for Core | YouTube Data API key; Core has a search fallback |
 | `SPOTIFY_CLIENT_ID` | Optional | Your Spotify application client ID |
 | `SPOTIFY_CLIENT_SECRET` | Optional | Matching Spotify client secret |
-| `DEEZER_METADATA` | Optional | Exact value `1` enables canonical Deezer track/album/playlist metadata lookup for normal playback and matching through existing sources. Default off; at most 500 entries within the configured playlist limit. No Deezer preview/full-audio streaming or Guess the Song inventory is enabled. |
+| `DEEZER_METADATA` | Optional | Exact value `1` enables Deezer track/album/playlist metadata lookup and matching through existing sources, including supported `link.deezer.com/s/…` shares and bounded `utm_*` tracking on canonical links. Default off; at most 500 entries within the configured playlist limit. No Deezer preview/full-audio streaming or Guess the Song inventory is enabled. |
 | `LASTFM_API_KEY` | Optional | Enables Last.fm-backed radio recommendations |
 | `GUESS_SYNTHETIC_TEST` | Optional | Exact value `1` enables five fictional generated test tones for the game preview; default off. No real songs or external provider audio. See [test guide](GUESS_SYNTHETIC_TEST.md). |
 | `GUESS_DEEZER_PREVIEWS` | Optional | Exact value `1` enables a limited local pilot with up to eight explicitly approved Deezer track previews. Default off; conflicts with synthetic test mode. Requires the private inventory path below. Snapshot expires within five minutes without automatic refresh. See [pilot setup](GUESS_CATALOG_SOURCES.md#local-pilot-configuration). |
 | `GUESS_DEEZER_INVENTORY_PATH` | Optional | Absolute path to a private, regular JSON file of at most 32 KiB containing approved track IDs, categories, permission references and expiry. Never upload it to GitHub. Ignored unless preview pilot is enabled. |
 | `MAX_ACTIVE_VOICE_SESSIONS` | Optional | Simultaneous voice-session limit; default `8`, not a measured capacity guarantee |
+
+Run `npm run guess:check` from `services/core/` with the intended quiz variables
+already loaded to check the configured source without starting the bot or web
+server. For a private local environment file, use
+`node --env-file=.env src/guess-check.ts`. The command returns a bounded JSON
+readiness summary and disposes its temporary inventory. It does not install the
+inventory into a running Core or refresh its five-minute pilot. See the
+[preflight guide](GUESS_CATALOG_SOURCES.md#check-the-configuration-before-startup).
 
 Compose sets `DATA_DIR=/data` and `CORE_PORT=3990`. Keep these consistent with its volume and port configuration. The Docker image supplies Node, FFmpeg and yt-dlp.
 

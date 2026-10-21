@@ -71,6 +71,15 @@ preview URLs and Deezer IDs from the Spotify-specific enrichment contract. This
 does not stream from Deezer or populate the game catalog. Provider reachability,
 availability and live matching have not been established by synthetic fixtures.
 
+Ordinary link matching also recognizes bounded `link.deezer.com/s/…` shares and
+the five standard `utm_*` tracking fields on canonical Deezer links. Share
+resolution follows at most three manual redirects within the supported Deezer
+share/canonical paths, with per-request and total deadlines, fixed concurrency
+and response-body cancellation. It never follows an external redirect or reads
+a share page's HTML. Tracking is discarded before requests, and a track lookup
+must return the requested recording ID. These additions remain separate from
+quiz previews and do not add provider credentials or audio extraction.
+
 The separate `prepareDeezerGuessInventory` function can prepare approved short
 previews without making each player select local files. Startup requires the
 separate `GUESS_DEEZER_PREVIEWS=1` opt-in and an absolute private inventory path;
