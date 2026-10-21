@@ -91,16 +91,18 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
       });
       await page.goto(base+"/?room=TESTROOM");
       await page.locator("#music-tab").waitFor();
-      if(discord) await page.waitForFunction(() => !document.querySelector(".queue-panel [role=alert]"));
+      if(discord) await page.waitForFunction(() => document.querySelector(".social-queue")?.getAttribute("aria-busy") === "false");
+      // Stop periodic reads before search/render timing can schedule a second initial poll.
+      // Confirmed commands must update the queue without assistance from polling.
+      await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now())+100));
       await page.locator("#music-tab").click();
       const search=page.locator(".search-form input");
       await search.fill("Synthetic song");
       await page.locator(".search-form button").click();
       const add=page.locator(".add-track");
       await add.waitFor();
-      // Freeze periodic timers only after initial room, queue and search have loaded.
-      // A successful command must refresh its rendered queue without a later poll.
-      await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now())+100));
+      assert.equal(await page.locator(".discovery-summary[role=status]").innerText(),"1 track");
+      const addSize=await add.boundingBox(); assert(addSize&&addSize.width>=44&&addSize.height>=44,"Search add controls retain accessible touch targets");
       if(discord) assert.equal(queueReads,1);
       if(mode === "discord-management-first" || mode === "discord-management-first-failure") {
         await page.locator(".video-settings > summary").click();
@@ -149,15 +151,15 @@ for (const mode of ["browser", "discord-immediate", "discord-polled", "discord-r
       }
       if(mode === "discord-switch") {
         await lateReadStarted;
+        const oldReadFailed=page.waitForEvent("requestfailed",request => new URL(request.url()).pathname === "/api/discord/queue" && new URL(request.url()).searchParams.get("guildId") === guildId);
         await page.evaluate(() => {
           history.pushState(null,"","/?room=OTHERROOM");
           dispatchEvent(new PopStateEvent("popstate"));
         });
         await page.locator("#queue-tab").click();
         await page.locator(".queue-current strong").filter({hasText:"Other guild current"}).waitFor();
-        const lateResponse=page.waitForResponse(response => new URL(response.url()).pathname === "/api/discord/queue" && new URL(response.url()).searchParams.get("guildId") === guildId);
+        assert.match((await oldReadFailed).failure()?.errorText ?? "",/abort/i,"Switching servers must cancel the old guild read");
         releaseLateRead();
-        await (await lateResponse).finished();
         await page.clock.runFor(100);
         assert.equal(await page.locator(".social-track").count(),0,"An old guild's confirmed-add refresh must not populate the new guild queue");
         assert.equal(await page.locator("#queue-tab .tab-count").innerText(),"0");
