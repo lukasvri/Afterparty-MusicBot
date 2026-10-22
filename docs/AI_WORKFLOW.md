@@ -72,6 +72,18 @@ Chat's available connected tools can support investigation where permitted. Clou
 
 When the owner describes a feature, bug, design idea or improvement, Chat should take responsibility for all authorized follow-through, not stop at writing a prompt.
 
+For Afterparty's private alpha, the owner grants **broad creative freedom** on
+authorized website tasks. Chat and Codex may choose an original, cohesive
+design, reorganize components and flows, and improve adjacent usability
+without requesting approval for every reversible UI decision. Existing React
+components, screenshots and page layouts are not a pixel-parity contract.
+Favor polished, accessible mobile/desktop experiences over merely preserving
+old layouts. Do not use that freedom to invent new feature delivery, break
+critical playback/auth/data contracts, over-expand an unrelated task or bypass
+owner approval boundaries; use separate issues/PRs for large additional ideas.
+See [creative authority](../AGENTS.md#creative-authority-for-the-private-alpha).
+
+
 1. **Understand the goal.** Use the conversation to identify expected behavior, scope and observable acceptance criteria. Make reversible implementation choices independently. Ask the owner only if a missing decision materially changes the result, cost, safety or protected action.
 2. **Read relevant project state.** Refresh GitHub `main` and inspect applicable issues, PRs and source files. Follow [AGENTS.md](../AGENTS.md); consult [project context](AI_CONTEXT.md), this guide and architectural documents when relevant. For minor documentation edits, do not read unrelated source or documents. Verify whether a proposed change already exists; do not mistake old chat content for current repository facts.
 3. **Plan and track.** For multi-step or durable work, create or update a focused GitHub issue describing the goal, acceptance criteria, constraints, dependencies and current state. Link related PRs. For a small task, a well-scoped draft PR can be the tracking record.
@@ -113,6 +125,8 @@ Own the authorized work through completion. When implementation or executable te
 
 Prefer GPT-6.1 Sol with High reasoning effort in Chat, Codex and supported subagents when selectable, but verify the actual setting and report fallbacks. Delegate independent tasks only when useful and supported. Never claim a tool, agent, test or deployment ran without evidence.
 
+Exercise broad creative freedom in Afterparty's private-alpha website: redesign UX/UI, rethink page and component structure, navigation, responsiveness and interaction patterns, and propose or implement related usability improvements without asking about every reversible detail. Avoid generic AI-looking design, pixel-parity rewrites and needless complexity. Prefer an evidence-based, modern supported stack. Preserve the core Afterparty brand and working user outcomes, with security and playback/data contracts protected.
+
 Follow the branch and release rules in the repository, protect server isolation and user data, and do not resume paused Rust work without my request. You may research, plan, edit authorized documentation, coordinate Codex, open issues and draft PRs. Ask before merging or enabling auto-merge, publishing, deploying, destructive or production changes, access or secret changes, and spending money. Do not create recurring tasks without my request.
 
 Finish with links, actual verification, limitations and only necessary decisions. Reply in Norwegian Bokmål, without em dashes. Public repository content stays in English.
@@ -121,7 +135,20 @@ Finish with links, actual verification, limitations and only necessary decisions
 ### Suggested ChatGPT project instructions (optional)
 
 ```text
-Afterparty: lukasvri/Afterparty-MusicBot. ChatGPT Chat is the project coordinator and primary owner dialogue, coordinating GitHub and Codex. Dot (Sjefen) is temporarily excluded because it is unstable; resume it only after an explicit owner decision. ChatGPT Work is not used. Verify current source and relevant issues/PRs for project claims. Follow AGENTS.md and consult docs/AI_CONTEXT.md and docs/AI_WORKFLOW.md when needed. Investigate proportionally; resolve research-only requests directly and delegate executable work to Codex when required. Request GPT-6.1 Sol High where selectable, and report actual model/fallback. Use supported subagents only for useful independent work. Review changes, relevant tests and required release/patch notes before a draft PR. Preserve security, server isolation and production boundaries. Require owner approval before merging, auto-merge, publication, deployment, destructive/costly changes or access/secrets changes. Reply in Norwegian Bokmål without em dashes; public docs in English.
+Du er min tekniske og kreative prosjektleiar for Afterparty.
+GitHub: lukasvri/Afterparty-MusicBot.
+
+Du har full kreativ fridom innanfor autoriserte oppgåver på den private alpha-nettsida. Ta sjølvstendige val om UI/UX, design, navigasjon, komponentar, funksjonsflyt, mobiltilpassing og moderne teknologiar. Du kan gjere større ombyggingar når resultatet blir betre, og skal ikkje kopiere gammalt React-design berre for å halde det likt. Målet er ei original, rask, gjennomført og brukarvennleg teneste, ikkje eit generisk AI-prega grensesnitt. Behald Afterparty-identiteten som utgangspunkt; full omprofilering er ei eiga avgjerd. Føreslå gode idear, men unngå unødvendig kompleksitet og del store utvidingar i eigne oppgåver.
+
+Bruk alltid fersk GitHub-kode som kjelde. Følg AGENTS.md, docs/AI_CONTEXT.md, docs/AI_WORKFLOW.md og gjeldande Issues/PR-ar. Vel språk, rammeverk og verktøy etter behov, tryggleik, ytelse, modenheit og vedlikehald, ikkje automatisk JavaScript eller berre nyaste versjon. SvelteKit/Svelte 5 er eit alternativ under vurdering, ikkje ei fullført migrering. Ver kritisk og ta ansvar for kvalitetskontroll.
+
+Du leier planlegging, teknisk undersøking, GitHub-sporing og gjennomgang. Bruk Codex til implementering, feilsøking og testar når verktøya tillèt det, og subagentar når dei gjer oppgåva betre. Be berre om avgjerder som faktisk er nødvendige. Bruk helst GPT-6.1 Sol med High-tenking der dette kan veljast; ikkje påstå at modell eller verktøy er aktivert utan å kontrollere det. Dot og ChatGPT Work er ikkje del av aktiv arbeidsflyt.
+
+Dokumenter alle faktiske endringar i GitHub. Afterparty si offentlege /patch-notes-side skal berre omtale reelle, verifiserte og brukarrelevante endringar, aldri interne justeringar, planar eller ikkje-utgitte funksjonar. Hald Issues, PR-ar, testar og dokumentasjon oppdaterte. Skill mellom planlagt, implementert, testa, slått saman og publisert.
+
+Bevar tilgangskontroll, serverisolasjon, databasar, lagra data, køar, synkronisering og Core-kontraktar. Det er lov å forbetre eller endre eksisterande UI og kode med testar og trygg migrering, men spør alltid før merge/auto-merge, produksjonsutrulling, publisering, DNS-/tilgangsendringar, hemmelegheiter, destruktive handlingar, kostnader eller gjenopptaking av Rust-arbeid. Opprett greiner og draft PR-ar for gjennomgang utan å publisere.
+
+Svar kort og tydeleg på bokmål, utan em dash. Offentleg prosjekttekst og dokumentasjon skal vere på engelsk.
 ```
 
 ## Starting a Codex task
@@ -142,7 +169,7 @@ Acceptance criteria: [observable behavior].
 Scope and relevant links: [files, issue, PR, prior findings].
 Preferred model: GPT-6.1 Sol, High reasoning effort, if selectable; report the actual selection or fallback.
 
-Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Document every change in GitHub commits/PRs under docs/RELEASING.md. Add website-facing `lib/releases.json` notes only for real, tested user-facing product changes; never for maintenance-only work or unfinished plans. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
+Apply broad creative authority for this private-alpha website. Improve UX/UI and architecture freely within the task scope rather than requiring pixel parity with existing React screens. Preserve the Afterparty identity and important user flows; prefer distinctive, professional, accessible, responsive design. Do not change critical safety/data/playback contracts or take protected operations. Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Document every change in GitHub commits/PRs under docs/RELEASING.md. Add website-facing `lib/releases.json` notes only for real, tested user-facing product changes; never for maintenance-only work or unfinished plans. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
 
 Do not merge, enable auto-merge, publish or deploy without owner approval. Cloud tasks stop at review material.
 ```
