@@ -8,6 +8,13 @@ The owner talks to **ChatGPT Chat** about new Afterparty ideas, problems and dec
 
 **Current GitHub source, issues and reviewed pull requests are the source of truth.** Memories, task conversations and local checkouts may be stale. A source commit is not proof of deployment.
 
+**Release communication rule:** Every actual change belongs in GitHub commits
+and its PR. The website `/patch-notes` is a narrower, user-facing summary
+of real implemented improvements in a product release. Never promote internal
+maintenance, hypothetical features, unfinished work or unverified deployment
+claims into the website UI. Follow
+[the canonical release policy](RELEASING.md#notes-for-every-change).
+
 ## Responsibilities
 
 | Tool | Responsibility | Expected output |
@@ -122,7 +129,7 @@ Afterparty: lukasvri/Afterparty-MusicBot. ChatGPT Chat is the project coordinato
 1. Check GitHub `main`, relevant PRs and the local checkout's uncommitted work. Fetch upstream before reviewing or editing and preserve existing local changes.
 2. For TypeScript fixes and features, create a distinct branch from the latest remote `main` targeting `main`. For isolated Rust experiments, use a focused `experiment/rust-*` branch from `dev`, incorporate latest `main` and target `dev`, as described in [branch strategy](../CONTRIBUTING.md#branch-strategy). Rust evaluation was paused by the owner on 18 October 2026; do not restart it without a new request.
 3. Read repository rules and affected source/contracts, including [architecture](ARCHITECTURE.md), [branding](BRANDING.md) and [cloud workflow](CLOUD_DEVELOPMENT.md) where relevant.
-4. Identify release-note impact before making changes. For code or user-facing changes update the canonical `lib/releases.json`, generated changelog and shared versions as required by [release policy](RELEASING.md#notes-for-every-change). Internal documentation-only changes instead record their impact in the PR.
+4. Identify release-note impact before making changes. Every code, dependency and documentation change must be recorded in GitHub commits/PRs. For genuine user-facing product releases only, update the canonical `lib/releases.json`, generated changelog and shared versions under [release policy](RELEASING.md#notes-for-every-change); internal-only work stays in GitHub change records rather than website patch notes.
 5. Refresh upstream again before PR submission, reconcile newer source and competing releases, and rerun checks affected by integration. Do not reset away existing work.
 
 ### Reusable Chat to Codex handoff
@@ -135,7 +142,7 @@ Acceptance criteria: [observable behavior].
 Scope and relevant links: [files, issue, PR, prior findings].
 Preferred model: GPT-6.1 Sol, High reasoning effort, if selectable; report the actual selection or fallback.
 
-Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Update release notes under docs/RELEASING.md for all code and user-facing changes, including website patch notes where relevant. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
+Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Document every change in GitHub commits/PRs under docs/RELEASING.md. Add website-facing `lib/releases.json` notes only for real, tested user-facing product changes; never for maintenance-only work or unfinished plans. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
 
 Do not merge, enable auto-merge, publish or deploy without owner approval. Cloud tasks stop at review material.
 ```
@@ -156,8 +163,8 @@ No claims about production deployment without separate live evidence.
 ## Completion and reporting
 
 - In the draft PR, describe scope, acceptance criteria, changed behavior, target branch, relevant checks, failures, remaining limitations and follow-up. Link the GitHub issue where applicable.
-- For **internal documentation-only changes**, record the outcome and release-note impact in the PR. No product version bump or website patch-note entry is needed unless user-facing behavior or instructions change.
-- For **code and user-facing changes**, follow [release policy](RELEASING.md#notes-for-every-change). Check the canonical notes, shared versions and relevant `/patch-notes` rendering, and state any missing preview or tests honestly.
+- For **all changes**, record a truthful GitHub commit/PR description with validation and limitations; this includes internal-only code, dependencies, CI and documentation. Do not manufacture a product release to advertise routine maintenance.
+- For **actual user-facing product releases**, follow [release policy](RELEASING.md#notes-for-every-change), update the canonical product notes and shared versions, inspect `/patch-notes` and state any missing preview or tests honestly. Technical-only work stays in GitHub. Never imply that a reviewed commit has been deployed.
 - Inspect current source, diff, links and CI for the exact PR head. CI and FFmpeg tests do not prove what users hear in live Discord playback.
 - All merging, auto-merge, publication and production deployment require owner approval and the separate host-side checks in [operations](../services/core/PUBLIC_RELEASE.md). A reviewed PR is not a production update.
 - Report actual work and links to the owner. Do not claim Chat is monitoring, executing work in the background or following up on a schedule unless those capabilities were configured and invoked.
