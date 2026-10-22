@@ -2,7 +2,7 @@
 
 Effective: 21 October 2026
 
-This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://afterparty.lukasvri.chatgpt.site/support). Independently hosted copies are operated separately.
+This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://ap.openworks.no/support). Independently hosted copies are operated separately.
 
 
 ## Information processed and why
@@ -13,7 +13,7 @@ This policy describes the hosted Afterparty Discord bot and Afterparty website. 
 - **Optional admin login:** Discord sign-in requests the `identify` and `guilds` scopes. We process your Discord ID, display name, server list and permissions to check which servers you may manage. The Discord access token and identity are stored in an encrypted grant for the session. The application does not request your Discord password or email through these scopes.
 - **Website security and preferences:** session cookies, random visitor identifiers, hashes derived from IP addresses, request counters and operational errors support authentication, viewer counts, rate limits and troubleshooting. Hosting providers process connection information such as IP addresses and request metadata.
 - **Device storage:** your browser can retain language, volume, display name, visitor ID, room host credentials and saved evening settings in local storage. These remain until you clear the site’s browser data or remove them through the interface.
-- **Copyright requests:** the [notice preparation form](https://afterparty.lukasvri.chatgpt.site/copyright) keeps entered details in the current page without submitting or saving them to Afterparty. If you copy a notice or open an email draft, your clipboard or email application receives that text. When you send a notice to the maintainer, the contact details and claim are used to investigate, respond and handle disputes; information necessary to address the claim may be shared with the affected content provider.
+- **Copyright requests:** the [notice preparation form](https://ap.openworks.no/copyright) keeps entered details in the current page without submitting or saving them to Afterparty. If you copy a notice or open an email draft, your clipboard or email application receives that text. When you send a notice to the maintainer, the contact details and claim are used to investigate, respond and handle disputes; information necessary to address the claim may be shared with the affected content provider.
 
 The bot uses server and voice-state events. It does not request Discord’s Message Content, Server Members or Presence privileged intents. Its audio engine sends music to voice channels; it does not record participants’ conversations.
 
@@ -40,7 +40,7 @@ The copyright form does not create a server-side notice archive. Notices you sen
 
 You can remove your favorites and room content using the available controls, sign out of admin, clear site data in your browser, and revoke Discord authorization in Discord’s Authorized Apps settings. Server administrators can uninstall the bot. These steps do not by themselves erase every stored record.
 
-To request access, correction, export or deletion of information associated with you or your server, contact **lukasvri** through [Support](https://afterparty.lukasvri.chatgpt.site/support). Specify the affected feature and provide identifiers privately only when needed to locate the records. We may ask you to demonstrate control of the relevant account or server before disclosing or deleting data. Do not send passwords, bot tokens or identity documents. We will respond as required by applicable data protection law. Depending on your location, you may also have rights to object, restrict processing and complain to a data protection authority.
+To request access, correction, export or deletion of information associated with you or your server, contact **lukasvri** through [Support](https://ap.openworks.no/support). Specify the affected feature and provide identifiers privately only when needed to locate the records. We may ask you to demonstrate control of the relevant account or server before disclosing or deleting data. Do not send passwords, bot tokens or identity documents. We will respond as required by applicable data protection law. Depending on your location, you may also have rights to object, restrict processing and complain to a data protection authority.
 
 We process information needed to provide features you request and use operational information to protect and maintain the service. Where applicable, these purposes rely on performance of the service agreement and legitimate interests in security and reliability. Where a third-party feature requires consent, its provider handles that choice. You can contact us with questions or objections.
 
