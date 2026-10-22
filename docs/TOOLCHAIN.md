@@ -13,7 +13,7 @@ official compatibility documentation before implementing each change.
 | Website language | TypeScript 5.9 | TypeScript 6 where framework/build/plugin support is verified | Do not force a toolchain upgrade that breaks CI or Cloudflare |
 | Website styling | Tailwind CSS 4 | Keep Tailwind 4 only when it improves design-system consistency | Preserve Afterparty black/red identity and accessibility; avoid duplicate styling systems |
 | Database/API | Drizzle ORM, Cloudflare tooling | Retain Drizzle for applicable database access, Workers and D1 for website hosting | Validate bindings, schema changes and authorization without touching production |
-| Core/audio | Node.js 24, TypeScript, discord.js, FFmpeg | Keep the working Core while the website changes | Protect guild/room isolation, persistence, queue revisions, playback clock and recovery; no speculative rewrite |
+| Core/audio | Node.js 24, TypeScript, discord.js, FFmpeg | Evaluate Node.js 26 for the next LTS baseline while keeping the working Core stable | Test build, dependencies, native audio paths and recovery before any Node/Docker production change; protect guild/room isolation, persistence, queue revisions and playback clock |
 | Other service languages | Existing Core is TypeScript | Consider Go for independent APIs, Rust for measured low-level work, Python for automation/AI | Choose per workload, interoperability, hosting and test evidence; paused Rust work is not resumed by this decision |
 
 SvelteKit 3 was released on 1 October 2026. Its selection is an **approved
@@ -39,7 +39,7 @@ reason to add Astro to this application's runtime.
 | Prettier | Add only if format tooling is useful, compatible and does not conflict with existing scripts. | **Not yet adopted** |
 | Wrangler and Cloudflare | Validate the actual target Workers/D1 build locally in isolation; do not enable deployment or modify secrets/DNS. | Cloudflare tooling already present; production cutover not established |
 | Drizzle ORM | Retain typed schema/data access where already suitable. Test migrations against synthetic data only. | Already present |
-| Node.js runtime | Prefer supported **Node 24 LTS** for current setup; consider Node 26 after LTS and compatibility checks. | Existing supported baseline |
+| Node.js runtime | **Node 26** is the preferred next LTS target; **Node 24** stays the proven production fallback. Node 26 enters LTS on 28 October 2026, subject to schedule changes. | Use Node 26 in the existing **website CI validation job** for early compatibility feedback. The Core Dockerfile and host runtime stay on Node 24 until tested and separately approved. |
 
 Practical standards:
 
@@ -62,6 +62,30 @@ Practical standards:
    under `docs/RELEASING.md`.
 7. Require explicit approval for merge, auto-merge, publication, production
    deployments, access/secrets/DNS changes, destructive work or costs.
+
+## Official website addresses
+
+- OpenWorks project portal: **https://openworks.no**
+- Afterparty website: **https://ap.openworks.no** (owner-confirmed canonical
+  address on 22 October 2026). Update website links and documentation; the
+  actual live host, DNS, SSL certificate, OAuth callback registration and
+  deployed commit are not independently verified here. Domain configuration,
+  redirects and secret/origin changes still need separate approval and safe
+  testing.
+
+## Node 26 compatibility rollout
+
+1. **Now:** Run existing website GitHub CI on Node 26 in a review branch,
+   without adding an extra job. Preserve the Node 24 baseline for Core and
+   local/production operation. This only tests the website source and tools.
+2. **Before switching Core:** Test a Node 26 Core build and the required
+   synthetic FFmpeg, transport, recovery, queue and audio suites. Validate
+   the exact Node 26 Docker base image digest and dependencies.
+3. **When LTS is available:** Reconfirm supported Cloudflare tooling and
+   production host availability. Switch any real deployment only after
+   owner approval, compatible CI/host validation and a rollback plan.
+4. A successful Node 26 CI workflow is not evidence that a website has
+   been published or that audible Discord playback was tested.
 
 ## Technology choices for other projects
 
