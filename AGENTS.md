@@ -88,6 +88,36 @@ use em dashes. Keep global personal preferences out of repository instructions.
   from migration targets and optional tools. Do not claim a migration or
   tool installation was completed just because it was approved.
 
+## Codex allowance and efficient execution
+
+- Chat handles requirements, focused source inspection, research, issue triage,
+  design decisions and PR review with its own available tools before consuming
+  Codex capacity. Do not start Codex merely to plan, summarize, repeat earlier
+  analysis, generate a prompt or perform a simple GitHub/documentation action
+  that an existing authorized tool can do.
+- Send one short, executable handoff: repository/ref, observed issue, desired
+  outcome, constraints, relevant paths, acceptance criteria and targeted checks.
+  Refer to these repository instructions by path; do not paste the entire
+  instruction set, repository history or broad feature wishlist on every task.
+  Reuse an existing issue or working thread rather than restarting discovery.
+- Work in bounded, useful slices with a clear stop condition. Implement related
+  changes together and report a concrete diff. For major alpha rewrites, advance
+  one testable vertical slice at a time instead of requesting a complete
+  redesign plus unrelated features in one Codex run.
+- Subagents are opt-in for substantial independent work with a clear net
+  benefit. Avoid default fan-out, duplicate exploration, overlapping agents
+  and repeated reviews. Use one focused reviewer after meaningful changes
+  when warranted; reuse existing CI and review results.
+- During coding, run fast tests relevant to modified behavior and reuse their
+  output. Before a review-ready code PR, run the required full validation and
+  affected browser/security suites. Documentation-only edits need diff/link
+  checks, not full application tests. Never reduce security, playback or data
+  verification just to save allowance.
+- Check remaining usage in Settings > Usage or Codex CLI `/status` when
+  available. If running low, finish the smallest useful verified slice, record
+  remaining work in the issue/PR and stop nonessential reruns. Never assume
+  an exact quota, promise a saving percentage or spend API credits automatically.
+
 ## Delegation and review
 
 - ChatGPT Chat is the project coordinator and primary owner dialogue. Dot
@@ -100,9 +130,10 @@ use em dashes. Keep global personal preferences out of repository instructions.
   discovery for small, obvious changes. Chat resolves research-only requests
   directly; delegate code edits, executable tests or environment-specific
   debugging to Codex when needed, with a focused technical handoff.
-- Prefer GPT-6.1 Sol with High reasoning effort in Chat, Codex and supported
-  subagents when selectable. Verify the actual model and effort, and report any
-  fallback or setting that cannot be verified.
+- Conserve Codex allowance: use an available lightweight model for trivial edits,
+  GPT-6.1 Sol at Medium effort for ordinary coding, and Sol High for difficult
+  debugging, architecture or migrations. Escalate to the heaviest model only
+  with a concrete reason. Verify actual model/effort and report fallbacks.
 - Use subagents or delegation when the active tool supports it and independent
   work benefits from parallel execution, such as source inspection and review.
   Give each agent a bounded task, source ref and acceptance criteria. Assign

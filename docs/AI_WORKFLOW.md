@@ -27,10 +27,37 @@ claims into the website UI. Follow
 
 ## Model preference and tool availability
 
-- Prefer **GPT-6.1 Sol with High reasoning effort** in Chat and Codex when model and effort selection are supported. Whenever Chat delegates a task to **Codex**, include this preference in the handoff. Apply the same preference to supported Codex subagents.
+- Choose the smallest capable model/effort for each Codex task: an available lightweight model for small mechanical edits, **GPT-6.1 Sol Medium** for ordinary implementation, and **Sol High** for difficult reasoning, debugging, architecture and migrations. Use the heaviest model only when the task warrants it. Model availability and actual usage must be verified.
 - Confirm what the session or task actually used. When the preferred model or effort cannot be selected or verified, say so and identify the available fallback. Never silently claim a requested model was enforced.
 - A model name or subscription does not guarantee agent creation, subagents, repository write access, local computer access or a particular reasoning budget. Inspect available tools and permissions before committing to an action.
 - If Codex is unavailable, Chat should still investigate, record actionable findings in GitHub when authorized, and report the blocked delegation. Do not claim the task was coded or tested.
+
+## Codex allowance management
+
+1. **Spend Chat effort first.** Chat gathers requirements, inspects only relevant
+   GitHub files/issues, evaluates approaches and creates a concise implementation
+   handoff; do not launch Codex for research-only requests or boilerplate plans.
+2. **Bound the work.** Give Codex one executable outcome with success criteria,
+   relevant paths and focused tests. Reference AGENTS.md and the issue rather
+   than pasting long instructions. Reuse the current task/thread and its findings,
+   avoid restarting unchanged discovery or asking for repeated status-only turns.
+3. **Limit parallelism.** Use a single agent by default. Add subagents only for
+   independent, substantial work whose expected benefit outweighs extra usage;
+   prevent overlapping exploration and writes.
+4. **Tier validation without compromising safety.** Run targeted checks as code
+   changes, then the required full CI-equivalent and relevant browser/permission/
+   playback suites before submitting a code PR. For documentation-only changes,
+   inspect the diff, links and references without installing dependencies or
+   running full application suites.
+5. **Avoid duplicate reviews and retries.** Use existing CI results; request
+   additional Codex review after substantive changes or for high-risk work, not
+   every intermediate commit. On failures, send the exact error and affected
+   file or test back to the current thread rather than a fresh full-repo prompt.
+6. **Respect the allowance.** Check Settings > Usage or Codex CLI `/status`
+   when available. When near a limit, prioritize a small verified change,
+   document unfinished work in GitHub and skip optional exploration. Never buy
+   API credits, enable paid tools or claim a fixed percentage saving without
+   owner approval or evidence.
 
 ## Codex reviews on GitHub
 
@@ -63,7 +90,7 @@ Chat should use its own supported tools to do the analytical work before delegat
 2. **Form a technical diagnosis.** Separate verified facts, plausible hypotheses and unknowns. Check for duplicate or in-progress fixes and relevant architectural or security constraints, including queue order, per-server isolation, playback revisions, compatibility and data safety.
 3. **Choose the approach.** Compare practical solutions and tradeoffs; select a focused default that preserves existing behavior. Define desired user experience, exact affected areas, edge cases, acceptance criteria, regression tests and likely release-note impact.
 4. **Decide the execution route.** If the request is answered by research, explanation, planning, design review or a GitHub issue update, Chat should complete it directly and not start Codex. Use Codex when a repository edit, build, automated test, programmatic reproduction or execution in the developer environment is actually required. If Chat has a suitable authorized tool for a small non-code change, it may use it directly.
-5. **Prepare one useful handoff.** Where Codex is needed, provide source branch/commit, issue or PR links, observed evidence, hypotheses with uncertainty, proposed solution, exact acceptance criteria, tests and release-note requirements. Request GPT-6.1 Sol High where selectable. Avoid wasting Codex tasks on basic research that Chat has already completed, but do not substitute theoretical review for executable verification.
+5. **Prepare one useful handoff.** Where Codex is needed, provide source branch/commit, issue or PR links, observed evidence, hypotheses with uncertainty, proposed solution, exact acceptance criteria, tests and release-note requirements. Request an effort level appropriate to the task; reserve Sol High for difficult work. Avoid wasting Codex tasks on basic research that Chat has already completed, but do not substitute theoretical review for executable verification.
 6. **Own post-implementation review.** Chat inspects the actual diff and CI, checks against the plan and regression risks, and requests narrowly scoped fixes if required. It distinguishes checks performed by Codex from independent checks by Chat. Escalate only essential design decisions and protected actions to the owner.
 
 Chat's available connected tools can support investigation where permitted. Cloud access does not authorize opening production secrets, manipulating live Discord playback, deploying or running tests against real user data. Do not claim that static code reading or a successful CI job proves the real production audio experience.
@@ -123,7 +150,7 @@ I discuss ideas and bugs with you. Inspect the latest relevant GitHub source, is
 
 Own the authorized work through completion. When implementation or executable testing is needed, hand Codex a focused task with source refs, expected behavior, tests and constraints. Review the resulting code, checks and release notes; request fixes and prepare a draft PR. Track ongoing work in GitHub so I do not have to relay updates between assistants. Dot (Sjefen) is temporarily out of the entire active workflow because it is unstable; do not route work through Dot or resume it without my explicit decision. Do not include ChatGPT Work in this workflow.
 
-Prefer GPT-6.1 Sol with High reasoning effort in Chat, Codex and supported subagents when selectable, but verify the actual setting and report fallbacks. Delegate independent tasks only when useful and supported. Never claim a tool, agent, test or deployment ran without evidence.
+Use task-sized Codex settings: lightweight for trivial edits, Sol Medium for ordinary code and Sol High for difficult work when selectable; verify actual settings and fallbacks. Delegate independent tasks only when useful and supported. Never claim a tool, agent, test or deployment ran without evidence.
 
 Exercise broad creative freedom in Afterparty's private-alpha website: redesign UX/UI, rethink page and component structure, navigation, responsiveness and interaction patterns, and propose or implement related usability improvements without asking about every reversible detail. Avoid generic AI-looking design, pixel-parity rewrites and needless complexity. Prefer an evidence-based, modern supported stack. Preserve the core Afterparty brand and working user outcomes, with security and playback/data contracts protected.
 
@@ -157,7 +184,7 @@ a verified completed migration.
 Coordinate investigation, design, GitHub tracking and reviews. Delegate coding,
 debugging and executable validation to Codex when supported, and use subagents
 where useful. Make ordinary reversible design decisions without asking for
-approval at every step. Prefer GPT-6.1 Sol with High effort where available;
+approval at every step. Prefer Sol Medium for normal implementation and High for difficult tasks when selectable;
 verify tools and model selection rather than claiming they were configured.
 Dot and ChatGPT Work remain excluded from the active workflow.
 
@@ -193,7 +220,7 @@ Repository: lukasvri/Afterparty-MusicBot. Refresh upstream main and follow AGENT
 Goal: [observable outcome].
 Acceptance criteria: [observable behavior].
 Scope and relevant links: [files, issue, PR, prior findings].
-Preferred model: GPT-6.1 Sol, High reasoning effort, if selectable; report the actual selection or fallback.
+Preferred model: GPT-6.1 Sol at Medium for routine coding, High for difficult work, if selectable; report the actual selection or fallback.
 
 Apply broad creative authority for this private-alpha website. Improve UX/UI and architecture freely within the task scope rather than requiring pixel parity with existing React screens. Preserve the Afterparty identity and important user flows; prefer distinctive, professional, accessible, responsive design. Do not change critical safety/data/playback contracts or take protected operations. Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Document every change in GitHub commits/PRs under docs/RELEASING.md. Add website-facing `lib/releases.json` notes only for real, tested user-facing product changes; never for maintenance-only work or unfinished plans. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
 
