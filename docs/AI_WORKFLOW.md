@@ -8,6 +8,13 @@ The owner talks to **ChatGPT Chat** about new Afterparty ideas, problems and dec
 
 **Current GitHub source, issues and reviewed pull requests are the source of truth.** Memories, task conversations and local checkouts may be stale. A source commit is not proof of deployment.
 
+**Release-note audience rule:** Every actual change belongs in GitHub's complete
+commit/PR and product changelog record. Only delivered, verified, user-relevant
+changes belong in the Afterparty website's public `/patch-notes` UI. Do not
+copy technical CI, infrastructure, dependency or draft-only notes into public
+UI. See [release policy](RELEASING.md#notes-for-every-change) for the current
+unimplemented UI filtering requirement; documentation alone does not hide items.
+
 ## Responsibilities
 
 | Tool | Responsibility | Expected output |
@@ -135,7 +142,7 @@ Acceptance criteria: [observable behavior].
 Scope and relevant links: [files, issue, PR, prior findings].
 Preferred model: GPT-6.1 Sol, High reasoning effort, if selectable; report the actual selection or fallback.
 
-Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Update release notes under docs/RELEASING.md for all code and user-facing changes, including website patch notes where relevant. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
+Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Update the complete GitHub release notes under docs/RELEASING.md for all code and user-facing changes. Website /patch-notes must show only real, verified, user-facing changes in the displayed build; never show internal work or unreleased claims. Document and test the separation where relevant. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
 
 Do not merge, enable auto-merge, publish or deploy without owner approval. Cloud tasks stop at review material.
 ```
@@ -157,7 +164,7 @@ No claims about production deployment without separate live evidence.
 
 - In the draft PR, describe scope, acceptance criteria, changed behavior, target branch, relevant checks, failures, remaining limitations and follow-up. Link the GitHub issue where applicable.
 - For **internal documentation-only changes**, record the outcome and release-note impact in the PR. No product version bump or website patch-note entry is needed unless user-facing behavior or instructions change.
-- For **code and user-facing changes**, follow [release policy](RELEASING.md#notes-for-every-change). Check the canonical notes, shared versions and relevant `/patch-notes` rendering, and state any missing preview or tests honestly.
+- For **code and user-facing changes**, follow [release policy](RELEASING.md#notes-for-every-change). Check the complete GitHub release notes and shared versions; public `/patch-notes` must contain only relevant, verified user changes, not internal-only updates. Report missing UI filtering, previews or tests rather than claiming separation exists.
 - Inspect current source, diff, links and CI for the exact PR head. CI and FFmpeg tests do not prove what users hear in live Discord playback.
 - All merging, auto-merge, publication and production deployment require owner approval and the separate host-side checks in [operations](../services/core/PUBLIC_RELEASE.md). A reviewed PR is not a production update.
 - Report actual work and links to the owner. Do not claim Chat is monitoring, executing work in the background or following up on a schedule unless those capabilities were configured and invoked.
