@@ -59,7 +59,7 @@ const hooks = registerHooks({
       return {
         format: "module",
         source: stripTypeScriptTypes(readFileSync(new URL(url), "utf8"), {
-          mode: "transform",
+          mode: "strip",
         }),
         shortCircuit: true,
       };
