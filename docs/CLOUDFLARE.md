@@ -143,3 +143,23 @@ creating that Custom Domain. Do not delete or replace the live record during
 source preparation. Domain attachment, certificate checks, runtime origin changes
 and any Discord callback update belong to the approved cutover window. Retain the
 old deployment until post-cutover checks and data consistency are confirmed.
+
+### Retiring the Sites writer
+
+The Worker entry point supports an optional runtime setting,
+`AFTERPARTY_HOST_TRANSITION`. Leave it absent or empty on the active Cloudflare
+Worker. Normal application handling is unchanged in that state.
+
+On the retiring Sites deployment, set `hold` before the final database copy.
+Every request returns HTTP 503 with `Cache-Control: no-store` and
+`Retry-After: 30`, before the application can access D1 or Core. Verify that the
+hold is active before taking the final copy; a setting change may require the
+host's deployment flow to become effective.
+
+After the approved cutover and new-host checks, change the retired host to
+`redirect`. It returns a temporary HTTP 307 to `https://ap.openworks.no`, preserving
+the request path, query and method. The destination is fixed in source. Requests
+already using that origin return maintenance HTTP 503 instead, preventing a loop
+while old DNS answers remain cached. Unknown nonempty settings also fail closed
+with HTTP 503. Do not remove the hold on a retired database without first
+reconciling writes accepted by the new host.
