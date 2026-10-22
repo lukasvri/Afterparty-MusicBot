@@ -50,47 +50,69 @@ and the owner-approved release scope without promoting Activity experiments.
 
 ## Notes for every change
 
-Every code or user-facing change must carry written release/patch notes in the
-same PR. Write them during implementation and update them when the scope changes,
-including after review fixes. Describe actual behavior, affected users and any
-compatibility or operator action; distinguish verified results from limitations.
+**GitHub is the complete change record.** Every code, dependency, security,
+configuration, test, infrastructure and documentation change must be described
+truthfully in its commit(s) and PR. Keep the PR description current with actual
+behavior, affected components, checks run, compatibility/operator actions and
+limitations. Proposed or unverified work is not an implemented change.
 
-- Product code changes, including internal fixes, use `lib/releases.json`, the
-  existing shared source for website patch notes and generated GitHub notes.
-  Follow the release preparation steps below, synchronize the shared version
-  and generate `CHANGELOG.md`. Do not edit generated or historical notes by hand
-  or introduce a second release log.
-- Check related open PRs for proposed versions. Before submission and again
-  before merge, refresh the target branch and reconcile competing version entries
-  against the combined changes. Preserve other work and rerun release validation.
-- For user-facing website or Core changes, verify `/patch-notes` renders the
-  relevant entry and the welcome page links to it using the current release data
-  (`app/patch-notes/page.tsx` and the versioned footer link in `app/afterparty.tsx`). Check the
-  displayed title, version and bullets in a local preview, including mobile when
-  layout changes. A data/import check alone is not a visual check. Report any
-  preview limitation; do not deploy to validate notes.
-- Isolated Rust experiment code targeting `dev` still needs scoped patch notes
-  in the PR, explicitly marked offline/experimental with checks and limitations.
-  It does not change the product version or advertise unadopted experiments on
-  the production website. Adoption into `main` requires a separate owner decision,
-  reviewed PR and product release notes.
-- Internal documentation-only changes record their outcome in the PR with a
-  release-note impact statement. They do not require a product version bump,
-  website patch-note entry or GitHub Release draft. Documentation that changes
-  user-facing instructions, terms or expected behavior needs relevant product
-  notes. A missing note is not excused by calling a code change maintenance.
+**The public website has a deliberately narrower audience.** Currently
+`app/patch-notes/page.tsx` renders every `lib/releases.json` entry, and
+`CHANGELOG.md` and GitHub Release bodies are generated from that same product
+source. There is no separate per-item website visibility filter. Therefore:
 
-The PR must identify its notes source, website relevance, version decision and
-checks actually run. If GitHub Release draft creation is unavailable, include the
-generated body in the PR and report the blocker. Never publish as a workaround.
-Owner approval is required before merge, auto-merge, release publication or
-deployment. Cloud tasks stop at review material.
+- Add a product entry to `lib/releases.json` **only when preparing a real,
+  test-backed, user-facing product release**. Include concrete changes that
+  affect the user, for example fixed searches, improved player behavior,
+  visible interface refinements or usable new features. Describe the actual
+  implementation and limitations in understandable English.
+- Do **not** put internal refactors, dependency version changes, build work,
+  CI/testing, infrastructure, hypothetical features, unfinished experiments,
+  migration preparation or housekeeping into website-facing notes simply
+  because work occurred. Record all that work in GitHub commits and PRs.
+  Technical implementation details can accompany the related PR rather than
+  being repeated in the product changelog.
+- An internal-only change does not by itself require a new product version,
+  `lib/releases.json` entry, website note or GitHub Release draft. When it
+  later contributes to a user-facing product release, summarize only its
+  observable benefit in that release, if any. GitHub retains the full audit
+  trail even when a change never needs a public patch note.
+- For actual product releases, update the canonical `lib/releases.json`,
+  synchronize the version and regenerate `CHANGELOG.md` with the existing
+  script. Preserve historical entries and do not maintain a competing release
+  source or edit generated changelog content by hand.
+- Before submission and again before merge, inspect concurrent PRs, refresh
+  the target branch and reconcile competing version candidates without
+  discarding other work. Validate the resulting release history.
+- Verify that `/patch-notes` shows exactly the relevant product entries and
+  the homepage points to the right version (`app/patch-notes/page.tsx` and
+  `app/afterparty.tsx`). Review a local desktop/mobile preview for layout or
+  public note changes. A data/import check alone is not a visual check.
+  The website displays source-build notes only after that build is deployed.
+  Neither a branch, passing CI nor a release draft proves a production rollout;
+  for Core-dependent claims verify the installed compatible Core separately.
+- Isolated Rust experiment code targeting `dev` needs accurate scoped notes
+  in its GitHub PR with test and feasibility limits, not website product notes
+  or an implied release. Owner approval is still required to resume Rust
+  testing or adopt it into `main`.
+- Internal documentation-only changes record outcome and release-note impact
+  in the PR, without a product version bump or website note. User-facing
+  instruction changes can be described in product notes when they are
+  genuinely relevant to users.
+
+Each PR identifies GitHub change notes, whether a website product note applies,
+the version decision, checks actually run and limitations. When a user-facing
+GitHub Release draft cannot be created, include the generated release body in
+its PR rather than publishing as a workaround. Merging, auto-merge, release
+publication and deployment need explicit owner approval. Cloud tasks stop
+at review material.
 
 ## Prepare a release in a pull request
 
-1. Prepend an entry to `lib/releases.json`, newest first. Use an ISO date,
-   an English title and concrete release-note bullets. This is the shared source
-   for the website and GitHub notes. Preserve existing entries.
+1. For a genuine user-facing product release, prepend an entry to
+   `lib/releases.json`, newest first. Use an ISO date, a truthful English title
+   and concrete user-relevant bullets. This is the shared product-note source
+   for the website and generated GitHub notes. Preserve existing entries.
 2. Set the same version in both `package.json` files and both `package-lock.json`
    files, including each lockfile's `packages[""].version`. Do not change dependency
    versions as part of a product version bump.
@@ -120,4 +142,4 @@ alone is not deployment evidence. Cloud tasks do not merge, publish or deploy.
 
 ## Reading release history
 
-Website and Core use semantic versioning. Historical release entries retain their original numbering. Patch notes describe the source build; a build is not proof of a production deployment. Published release artifacts are listed in [GitHub Releases](https://github.com/lukasvri/Afterparty-MusicBot/releases).
+Website and Core use semantic versioning. Historical release entries retain their original numbering. Public patch notes summarize real, relevant product changes in the source build, not every internal change recorded in GitHub. A build is not proof of production deployment. Published release artifacts are listed in [GitHub Releases](https://github.com/lukasvri/Afterparty-MusicBot/releases).
