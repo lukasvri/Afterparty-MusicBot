@@ -19,6 +19,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - `main` remains the stable bot/web line. `beta` retains the v3 and Discord Activity experiments; extract independently tested shared fixes without promoting the Activity SDK, routes, session model or test configuration. See [release channels](RELEASE_CHANNELS.md).
 - `dev` is reserved for isolated Rust testing, initially based on the latest `main`. It is not the staging branch for normal features. Existing `nightly` and Rust branches remain separate from `main`; future Rust adoption requires a separate owner decision and review. Follow the [branch strategy](../CONTRIBUTING.md#branch-strategy).
 - Rust evaluation is paused at the owner's request on 18 October 2026; [research task #51](https://github.com/lukasvri/Afterparty-MusicBot/issues/51) and [PR #66](https://github.com/lukasvri/Afterparty-MusicBot/pull/66) are closed. Prioritize TypeScript/Node.js and FFmpeg performance and stability. Preserve Rust source, measurements and branch history, and resume Rust work only on an explicit owner request.
+- On 21 October 2026, the owner authorized substantial alpha-stage UI improvements and evaluation of SvelteKit/Svelte 5 under [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114). The proposed stack is not evidence of implementation, merge or deployment. Evaluate stable, compatible language/framework options for actual requirements rather than choosing JavaScript or the newest tool by default; protect Core and data contracts.
 - Website: `app/`, `components/`, `hooks/`, `lib/`; hosted separately from Core.
 - Discord audio and room Core: `services/core/src/`. Core drives Discord playback and owns the shared playback clock.
 - The site and Core communicate across authenticated HTTPS and do not share a database file. Browser rooms and Discord servers have separate queue, permission and persistence boundaries.
@@ -44,7 +45,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - [Cloud development](CLOUD_DEVELOPMENT.md): fresh checkout, setup, checks and safe local release process.
 - [Contributing](../CONTRIBUTING.md): module map and review standards.
 - [Changelog](../CHANGELOG.md): generated release notes, **not** proof of deployment.
-- [Release policy](RELEASING.md#notes-for-every-change): notes required in each code or user-facing PR, the shared release source, website checks and documentation/experiment handling.
+- [Release policy](RELEASING.md#notes-for-every-change): GitHub tracks every change; website product patch notes include only verified user-relevant changes in a release, with no invented deployment claims.
 - [AI collaboration](AI_WORKFLOW.md): using Chat, Codex and GitHub without losing the handoff.
 
 ## AI coordination
@@ -53,7 +54,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - **Dot (Sjefen) is temporarily excluded from the entire active workflow because it is unstable.** Do not use Dot for owner dialogue, research, task routing, handoffs, reviews or follow-up. Resume Dot only after an explicit owner decision. ChatGPT Work remains excluded. Codex implements, debugs and tests repository changes.
 - Prefer **GPT-6.1 Sol with High reasoning effort** wherever model and effort selection are supported, including Chat and Codex tasks. Verify the actual available model and effort in the target environment; if unavailable, disclose the fallback and do not claim the preference was enforced. Model requests do not create delegation capabilities.
 - Use supported subagents/delegation for independent work when parallel execution helps. Tool availability and permissions, not a Chat model name or Pro selection, determine whether delegation is possible. The lead reviews the combined result; see [delegation controls](AI_WORKFLOW.md#delegation-controls).
-- GitHub holds canonical source, issues, PRs, checks and release records. Chat follows each owner request through the available steps and records status in GitHub rather than relying on shared chat history. Keep code, user-facing notes and validation together in the PR, following the [release policy](RELEASING.md#notes-for-every-change). Merging, auto-merge, publication and deployment require owner approval; cloud work stops at review material.
+- GitHub holds canonical source, issues, PRs, checks and the complete record of technical changes. Chat follows each owner request through the available steps and records status in GitHub rather than relying on shared chat history. Keep code, truthful user-facing product notes when applicable, and validation together in the PR; do not advertise internal-only or planned work in `/patch-notes`. Follow the [release policy](RELEASING.md#notes-for-every-change). Merging, auto-merge, publication and deployment require owner approval; cloud work stops at review material.
 - All tools should verify current source and PRs before claiming a feature exists or that a production change has gone live. See [AI collaboration](AI_WORKFLOW.md) for Chat setup, permissions and delegated tasks.
 
 ## Active work and uncertainties
