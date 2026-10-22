@@ -8,6 +8,13 @@ The owner talks to **ChatGPT Chat** about new Afterparty ideas, problems and dec
 
 **Current GitHub source, issues and reviewed pull requests are the source of truth.** Memories, task conversations and local checkouts may be stale. A source commit is not proof of deployment.
 
+**Release communication rule:** Every actual change belongs in GitHub commits
+and its PR. The website `/patch-notes` is a narrower, user-facing summary
+of real implemented improvements in a product release. Never promote internal
+maintenance, hypothetical features, unfinished work or unverified deployment
+claims into the website UI. Follow
+[the canonical release policy](RELEASING.md#notes-for-every-change).
+
 ## Responsibilities
 
 | Tool | Responsibility | Expected output |
@@ -65,6 +72,18 @@ Chat's available connected tools can support investigation where permitted. Clou
 
 When the owner describes a feature, bug, design idea or improvement, Chat should take responsibility for all authorized follow-through, not stop at writing a prompt.
 
+For Afterparty's private alpha, the owner grants **broad creative freedom** on
+authorized website tasks. Chat and Codex may choose an original, cohesive
+design, reorganize components and flows, and improve adjacent usability
+without requesting approval for every reversible UI decision. Existing React
+components, screenshots and page layouts are not a pixel-parity contract.
+Favor polished, accessible mobile/desktop experiences over merely preserving
+old layouts. Do not use that freedom to invent new feature delivery, break
+critical playback/auth/data contracts, over-expand an unrelated task or bypass
+owner approval boundaries; use separate issues/PRs for large additional ideas.
+See [creative authority](../AGENTS.md#creative-authority-for-the-private-alpha).
+
+
 1. **Understand the goal.** Use the conversation to identify expected behavior, scope and observable acceptance criteria. Make reversible implementation choices independently. Ask the owner only if a missing decision materially changes the result, cost, safety or protected action.
 2. **Read relevant project state.** Refresh GitHub `main` and inspect applicable issues, PRs and source files. Follow [AGENTS.md](../AGENTS.md); consult [project context](AI_CONTEXT.md), this guide and architectural documents when relevant. For minor documentation edits, do not read unrelated source or documents. Verify whether a proposed change already exists; do not mistake old chat content for current repository facts.
 3. **Plan and track.** For multi-step or durable work, create or update a focused GitHub issue describing the goal, acceptance criteria, constraints, dependencies and current state. Link related PRs. For a small task, a well-scoped draft PR can be the tracking record.
@@ -106,6 +125,8 @@ Own the authorized work through completion. When implementation or executable te
 
 Prefer GPT-6.1 Sol with High reasoning effort in Chat, Codex and supported subagents when selectable, but verify the actual setting and report fallbacks. Delegate independent tasks only when useful and supported. Never claim a tool, agent, test or deployment ran without evidence.
 
+Exercise broad creative freedom in Afterparty's private-alpha website: redesign UX/UI, rethink page and component structure, navigation, responsiveness and interaction patterns, and propose or implement related usability improvements without asking about every reversible detail. Avoid generic AI-looking design, pixel-parity rewrites and needless complexity. Prefer an evidence-based, modern supported stack. Preserve the core Afterparty brand and working user outcomes, with security and playback/data contracts protected.
+
 Follow the branch and release rules in the repository, protect server isolation and user data, and do not resume paused Rust work without my request. You may research, plan, edit authorized documentation, coordinate Codex, open issues and draft PRs. Ask before merging or enabling auto-merge, publishing, deploying, destructive or production changes, access or secret changes, and spending money. Do not create recurring tasks without my request.
 
 Finish with links, actual verification, limitations and only necessary decisions. Reply in Norwegian Bokmål, without em dashes. Public repository content stays in English.
@@ -114,7 +135,46 @@ Finish with links, actual verification, limitations and only necessary decisions
 ### Suggested ChatGPT project instructions (optional)
 
 ```text
-Afterparty: lukasvri/Afterparty-MusicBot. ChatGPT Chat is the project coordinator and primary owner dialogue, coordinating GitHub and Codex. Dot (Sjefen) is temporarily excluded because it is unstable; resume it only after an explicit owner decision. ChatGPT Work is not used. Verify current source and relevant issues/PRs for project claims. Follow AGENTS.md and consult docs/AI_CONTEXT.md and docs/AI_WORKFLOW.md when needed. Investigate proportionally; resolve research-only requests directly and delegate executable work to Codex when required. Request GPT-6.1 Sol High where selectable, and report actual model/fallback. Use supported subagents only for useful independent work. Review changes, relevant tests and required release/patch notes before a draft PR. Preserve security, server isolation and production boundaries. Require owner approval before merging, auto-merge, publication, deployment, destructive/costly changes or access/secrets changes. Reply in Norwegian Bokmål without em dashes; public docs in English.
+You are the technical and creative project lead for Afterparty.
+Repository: lukasvri/Afterparty-MusicBot.
+
+You have broad creative authority for authorized private-alpha website work. Choose
+the UI/UX, design, navigation, component structure, user flows, mobile layout,
+and suitable modern technology independently. Substantial redesigns are welcome
+when they improve the product; do not insist on pixel parity with the old React
+UI. Deliver a distinctive, fast, cohesive, accessible experience rather than a
+generic, AI-looking template. Preserve the core Afterparty identity; a complete
+rebrand needs a separate decision. Propose useful improvements, but avoid feature
+bloat and split large unrelated ideas into separate reviewable tasks.
+
+Always use fresh GitHub source as the source of truth. Follow AGENTS.md,
+docs/AI_CONTEXT.md, docs/AI_WORKFLOW.md and current issues/PRs. Evaluate
+languages, frameworks and tooling based on actual requirements, maintenance,
+compatibility, performance and security rather than automatically choosing
+JavaScript or the newest release. SvelteKit/Svelte 5 is under evaluation, not
+a verified completed migration.
+
+Coordinate investigation, design, GitHub tracking and reviews. Delegate coding,
+debugging and executable validation to Codex when supported, and use subagents
+where useful. Make ordinary reversible design decisions without asking for
+approval at every step. Prefer GPT-6.1 Sol with High effort where available;
+verify tools and model selection rather than claiming they were configured.
+Dot and ChatGPT Work remain excluded from the active workflow.
+
+Record every actual technical change in GitHub. Public website /patch-notes
+must show only real, verified, user-relevant product changes, not internal
+maintenance, plans or unshipped features. Keep issues, PRs, validation and docs
+accurate. Distinguish proposed, implemented, tested, merged and deployed work.
+
+Preserve authorization, server isolation, databases, persistence, queues,
+synchronization and Core contracts. UI and source architecture can change
+with proper tests, compatibility planning and safe migrations. Explicitly ask
+before merging/auto-merging, publishing, deploying, changing DNS or access and
+secrets, destructive actions, spending money or restarting paused Rust work.
+Work on separate branches and draft PRs for review.
+
+Reply to the owner in Norwegian Bokmål without em dashes. Public product copy
+and repository documentation remain in English.
 ```
 
 ## Starting a Codex task
@@ -122,7 +182,7 @@ Afterparty: lukasvri/Afterparty-MusicBot. ChatGPT Chat is the project coordinato
 1. Check GitHub `main`, relevant PRs and the local checkout's uncommitted work. Fetch upstream before reviewing or editing and preserve existing local changes.
 2. For TypeScript fixes and features, create a distinct branch from the latest remote `main` targeting `main`. For isolated Rust experiments, use a focused `experiment/rust-*` branch from `dev`, incorporate latest `main` and target `dev`, as described in [branch strategy](../CONTRIBUTING.md#branch-strategy). Rust evaluation was paused by the owner on 18 October 2026; do not restart it without a new request.
 3. Read repository rules and affected source/contracts, including [architecture](ARCHITECTURE.md), [branding](BRANDING.md) and [cloud workflow](CLOUD_DEVELOPMENT.md) where relevant.
-4. Identify release-note impact before making changes. For code or user-facing changes update the canonical `lib/releases.json`, generated changelog and shared versions as required by [release policy](RELEASING.md#notes-for-every-change). Internal documentation-only changes instead record their impact in the PR.
+4. Identify release-note impact before making changes. Every code, dependency and documentation change must be recorded in GitHub commits/PRs. For genuine user-facing product releases only, update the canonical `lib/releases.json`, generated changelog and shared versions under [release policy](RELEASING.md#notes-for-every-change); internal-only work stays in GitHub change records rather than website patch notes.
 5. Refresh upstream again before PR submission, reconcile newer source and competing releases, and rerun checks affected by integration. Do not reset away existing work.
 
 ### Reusable Chat to Codex handoff
@@ -135,7 +195,7 @@ Acceptance criteria: [observable behavior].
 Scope and relevant links: [files, issue, PR, prior findings].
 Preferred model: GPT-6.1 Sol, High reasoning effort, if selectable; report the actual selection or fallback.
 
-Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Update release notes under docs/RELEASING.md for all code and user-facing changes, including website patch notes where relevant. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
+Apply broad creative authority for this private-alpha website. Improve UX/UI and architecture freely within the task scope rather than requiring pixel parity with existing React screens. Preserve the Afterparty identity and important user flows; prefer distinctive, professional, accessible, responsive design. Do not change critical safety/data/playback contracts or take protected operations. Follow CONTRIBUTING.md branch strategy. Preserve current local work; refresh upstream before edits and before PR submission. Use supported subagents for independent work where helpful, with bounded responsibilities. Preserve privacy, queues, per-server permissions, compatibility and production boundaries. Document every change in GitHub commits/PRs under docs/RELEASING.md. Add website-facing `lib/releases.json` notes only for real, tested user-facing product changes; never for maintenance-only work or unfinished plans. Implement on a dedicated branch, validate, and open a draft PR with tested commit, notes source, version decision, checks, limitations and next steps.
 
 Do not merge, enable auto-merge, publish or deploy without owner approval. Cloud tasks stop at review material.
 ```
@@ -156,8 +216,8 @@ No claims about production deployment without separate live evidence.
 ## Completion and reporting
 
 - In the draft PR, describe scope, acceptance criteria, changed behavior, target branch, relevant checks, failures, remaining limitations and follow-up. Link the GitHub issue where applicable.
-- For **internal documentation-only changes**, record the outcome and release-note impact in the PR. No product version bump or website patch-note entry is needed unless user-facing behavior or instructions change.
-- For **code and user-facing changes**, follow [release policy](RELEASING.md#notes-for-every-change). Check the canonical notes, shared versions and relevant `/patch-notes` rendering, and state any missing preview or tests honestly.
+- For **all changes**, record a truthful GitHub commit/PR description with validation and limitations; this includes internal-only code, dependencies, CI and documentation. Do not manufacture a product release to advertise routine maintenance.
+- For **actual user-facing product releases**, follow [release policy](RELEASING.md#notes-for-every-change), update the canonical product notes and shared versions, inspect `/patch-notes` and state any missing preview or tests honestly. Technical-only work stays in GitHub. Never imply that a reviewed commit has been deployed.
 - Inspect current source, diff, links and CI for the exact PR head. CI and FFmpeg tests do not prove what users hear in live Discord playback.
 - All merging, auto-merge, publication and production deployment require owner approval and the separate host-side checks in [operations](../services/core/PUBLIC_RELEASE.md). A reviewed PR is not a production update.
 - Report actual work and links to the owner. Do not claim Chat is monitoring, executing work in the background or following up on a schedule unless those capabilities were configured and invoked.

@@ -34,6 +34,55 @@ use em dashes. Keep global personal preferences out of repository instructions.
 - Use synthetic credentials and isolated temporary data in tests. Automated
   audio tests do not establish what a person hears in a Discord voice channel.
 
+## Creative authority for the private alpha
+
+- The owner grants broad creative and technical discretion for the Afterparty
+  alpha website. Treat the existing UI as a starting point, not a fixed design,
+  feature layout or component specification. Proactively choose distinctive,
+  professional design, information architecture, navigation, responsive
+  layouts, interactions, accessible motion and supporting tools that produce a
+  better, coherent experience. Avoid generic template-like or "AI-looking" UI.
+- For an authorized website goal, independently make routine, reversible
+  design and implementation decisions. Rework, merge or replace screens and
+  components, propose and build relevant usability improvements, and improve
+  related flows without asking for approval on each detail. Significant
+  redesigns are welcome while the site is alpha; do not require pixel-perfect
+  parity with React or screenshots. Preserve the Afterparty identity as the
+  starting brand, including its name, canonical logo and black/red direction.
+  A full rebrand remains a distinct owner decision.
+- Creative freedom is not a license for feature bloat or unbounded unrelated
+  scope. Prioritize real usability, memorable polish, accessibility, readable
+  mobile UI, maintainable architecture and demonstrable performance. Record
+  substantial new independent feature ideas in GitHub issues, and split risky
+  changes into reviewable draft PRs. Explain major tradeoffs, not every minor
+  styling choice. Validate relevant user journeys with tests and visual review.
+- Preserve functional user outcomes and critical authorization, persistence,
+  privacy, queue, music and shared playback contracts, or document/test a safe,
+  intentional migration with rollback. Do not change production systems or
+  use live data during cloud development.
+- This authority covers investigation, source edits, refactoring, tests,
+  documentation, commits, branches, issues and draft PRs only. Never infer
+  permission to merge/auto-merge, publish, deploy, change production/DNS/access
+  or secrets, spend money, destroy important data or restart paused Rust work.
+  Explicit owner approval is still required for those protected actions.
+
+## Technology decisions
+
+- Choose technologies for measured product needs, operational reliability,
+  security support and long-term maintenance rather than defaulting to
+  JavaScript/TypeScript or always selecting the newest release. The existing
+  TypeScript/Core stack remains supported while it is the sound choice.
+- The alpha website may evaluate a substantial SvelteKit/Svelte 5 redesign
+  under [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114).
+  Compare supported versions, Cloudflare/D1 compatibility, developer experience,
+  testability and actual performance before adopting anything. Preserve critical
+  authorization, persistence and playback contracts; do not restart paused Rust
+  experiments or replace Core without a separate, justified decision.
+- Independent new projects choose their own fit-for-purpose stack, which could
+  include Rust, Go, Python, TypeScript or other actively maintained technologies.
+  Do not copy Afterparty's stack merely by habit, or introduce trendy tooling
+  without a useful, supportable reason. Document substantive architecture choices.
+
 ## Delegation and review
 
 - ChatGPT Chat is the project coordinator and primary owner dialogue. Dot
@@ -89,13 +138,23 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Release notes and pull requests
 
-- Every code or user-facing change must include written release/patch notes in
-  the same PR and keep them current as scope changes. Follow the canonical
-  [release policy](docs/RELEASING.md#notes-for-every-change), including its rules
-  for internal documentation and isolated Rust experiments.
-- Use `lib/releases.json` for product notes and generate `CHANGELOG.md`; preserve
-  historical entries. Verify relevant notes reach the website's `/patch-notes`
-  and latest-release link. Do not create a competing changelog.
+- Record **every actual change** in GitHub through descriptive commits and
+  reviewable PRs, including internal fixes, refactors, dependency/security
+  updates, tests, infrastructure and documentation. State what changed, what was
+  verified and what remains uncertain. Do not invent implementation, tests or
+  deployment claims.
+- The website `/patch-notes` must contain **only truthful, user-relevant
+  improvements or fixes actually implemented in the release candidate**, not
+  development plans, housekeeping, dependency pins, CI changes, internal
+  experiments or unshipped features. The page currently renders every entry
+  from `lib/releases.json`, so audit every public bullet before adding it.
+  A candidate or merged commit is not evidence of production deployment.
+- Follow the canonical [release policy](docs/RELEASING.md#notes-for-every-change):
+  record internal-only changes in the GitHub PR/commits, and reserve
+  `lib/releases.json` and generated `CHANGELOG.md` for genuine product-release
+  notes. Preserve existing history; never fabricate a version or change solely
+  to populate the website. Confirm `/patch-notes` and latest-release links
+  when preparing a user-facing release.
 - Follow [branch strategy](CONTRIBUTING.md#branch-strategy): focused branches
   from refreshed `main` target `main`; isolated Rust branches target `dev`.
   Open a draft PR with actual checks, notes and limitations. Owner approval is
