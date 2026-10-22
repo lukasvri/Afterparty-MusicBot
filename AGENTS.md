@@ -83,6 +83,11 @@ use em dashes. Keep global personal preferences out of repository instructions.
   Do not copy Afterparty's stack merely by habit, or introduce trendy tooling
   without a useful, supportable reason. Document substantive architecture choices.
 
+- Use the [approved toolchain guide](docs/TOOLCHAIN.md) as the starting
+  configuration for Afterparty work. It distinguishes tools already present
+  from migration targets and optional tools. Do not claim a migration or
+  tool installation was completed just because it was approved.
+
 ## Delegation and review
 
 - ChatGPT Chat is the project coordinator and primary owner dialogue. Dot
