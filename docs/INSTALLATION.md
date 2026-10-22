@@ -260,11 +260,16 @@ git remote -v
 Keep existing deployment configuration paths, data volumes and backups unchanged.
 The example `/srv/Afterparty-MusicBot` path is for new installations only.
 
-The hosted website is now `https://afterparty.lukasvri.chatgpt.site`.
-For that installation, update Core's `PUBLIC_SITE_URL` and the website's
-`GUTTA_CORE_SITE_ORIGIN` to this origin. Register
-`https://afterparty.lukasvri.chatgpt.site/api/auth/discord/callback` under
-Discord Developer Portal's OAuth2 redirects. Keep existing redirects until the
-new login flow is verified. Self-hosted copies should continue using their own
-origins. These source changes do not update production environment settings or
-Discord Developer Portal automatically.
+The owner identifies the hosted Afterparty website as
+`https://ap.openworks.no` (22 October 2026). This documentation update does
+not verify the live hosting, sign-in configuration or domain transition.
+Self-hosted copies should continue using their own origins.
+
+For an **approved** host migration, validate DNS/HTTPS, configure Core's
+`PUBLIC_SITE_URL` and the website's `GUTTA_CORE_SITE_ORIGIN` for the actual
+website origin, and register
+`https://ap.openworks.no/api/auth/discord/callback` in the Discord Developer
+Portal. Keep existing redirects and previous configuration until the new login
+flow is verified, with rollback prepared. Never automatically change live
+environment variables, Discord OAuth redirects or deployments from source
+documentation alone.
