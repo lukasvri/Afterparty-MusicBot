@@ -41,6 +41,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 
 - [AGENTS.md](../AGENTS.md): repository-wide instructions, safe cloud tasks, test commands and production boundary.
 - [Architecture](ARCHITECTURE.md): service/data boundary, transport and playback responsibilities.
+- [Approved toolchain](TOOLCHAIN.md): the owner's chosen current tools, proposed SvelteKit frontend stack, validation gates and alternatives for new projects.
 - [Branding](BRANDING.md): logo, design direction, compatibility rules and Discord application settings.
 - [Cloud development](CLOUD_DEVELOPMENT.md): fresh checkout, setup, checks and safe local release process.
 - [Contributing](../CONTRIBUTING.md): module map and review standards.
