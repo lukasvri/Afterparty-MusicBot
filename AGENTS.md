@@ -34,6 +34,23 @@ use em dashes. Keep global personal preferences out of repository instructions.
 - Use synthetic credentials and isolated temporary data in tests. Automated
   audio tests do not establish what a person hears in a Discord voice channel.
 
+## Technology decisions
+
+- Choose technologies for measured product needs, operational reliability,
+  security support and long-term maintenance rather than defaulting to
+  JavaScript/TypeScript or always selecting the newest release. The existing
+  TypeScript/Core stack remains supported while it is the sound choice.
+- The alpha website may evaluate a substantial SvelteKit/Svelte 5 redesign
+  under [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114).
+  Compare supported versions, Cloudflare/D1 compatibility, developer experience,
+  testability and actual performance before adopting anything. Preserve critical
+  authorization, persistence and playback contracts; do not restart paused Rust
+  experiments or replace Core without a separate, justified decision.
+- Independent new projects choose their own fit-for-purpose stack, which could
+  include Rust, Go, Python, TypeScript or other actively maintained technologies.
+  Do not copy Afterparty's stack merely by habit, or introduce trendy tooling
+  without a useful, supportable reason. Document substantive architecture choices.
+
 ## Delegation and review
 
 - ChatGPT Chat is the project coordinator and primary owner dialogue. Dot
@@ -89,13 +106,23 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Release notes and pull requests
 
-- Every code or user-facing change must include written release/patch notes in
-  the same PR and keep them current as scope changes. Follow the canonical
-  [release policy](docs/RELEASING.md#notes-for-every-change), including its rules
-  for internal documentation and isolated Rust experiments.
-- Use `lib/releases.json` for product notes and generate `CHANGELOG.md`; preserve
-  historical entries. Verify relevant notes reach the website's `/patch-notes`
-  and latest-release link. Do not create a competing changelog.
+- Record **every actual change** in GitHub through descriptive commits and
+  reviewable PRs, including internal fixes, refactors, dependency/security
+  updates, tests, infrastructure and documentation. State what changed, what was
+  verified and what remains uncertain. Do not invent implementation, tests or
+  deployment claims.
+- The website `/patch-notes` must contain **only truthful, user-relevant
+  improvements or fixes actually implemented in the release candidate**, not
+  development plans, housekeeping, dependency pins, CI changes, internal
+  experiments or unshipped features. The page currently renders every entry
+  from `lib/releases.json`, so audit every public bullet before adding it.
+  A candidate or merged commit is not evidence of production deployment.
+- Follow the canonical [release policy](docs/RELEASING.md#notes-for-every-change):
+  record internal-only changes in the GitHub PR/commits, and reserve
+  `lib/releases.json` and generated `CHANGELOG.md` for genuine product-release
+  notes. Preserve existing history; never fabricate a version or change solely
+  to populate the website. Confirm `/patch-notes` and latest-release links
+  when preparing a user-facing release.
 - Follow [branch strategy](CONTRIBUTING.md#branch-strategy): focused branches
   from refreshed `main` target `main`; isolated Rust branches target `dev`.
   Open a draft PR with actual checks, notes and limitations. Owner approval is
