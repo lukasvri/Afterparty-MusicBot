@@ -34,6 +34,38 @@ use em dashes. Keep global personal preferences out of repository instructions.
 - Use synthetic credentials and isolated temporary data in tests. Automated
   audio tests do not establish what a person hears in a Discord voice channel.
 
+## Creative authority for the private alpha
+
+- The owner grants broad creative and technical discretion for the Afterparty
+  alpha website. Treat the existing UI as a starting point, not a fixed design,
+  feature layout or component specification. Proactively choose distinctive,
+  professional design, information architecture, navigation, responsive
+  layouts, interactions, accessible motion and supporting tools that produce a
+  better, coherent experience. Avoid generic template-like or "AI-looking" UI.
+- For an authorized website goal, independently make routine, reversible
+  design and implementation decisions. Rework, merge or replace screens and
+  components, propose and build relevant usability improvements, and improve
+  related flows without asking for approval on each detail. Significant
+  redesigns are welcome while the site is alpha; do not require pixel-perfect
+  parity with React or screenshots. Preserve the Afterparty identity as the
+  starting brand, including its name, canonical logo and black/red direction.
+  A full rebrand remains a distinct owner decision.
+- Creative freedom is not a license for feature bloat or unbounded unrelated
+  scope. Prioritize real usability, memorable polish, accessibility, readable
+  mobile UI, maintainable architecture and demonstrable performance. Record
+  substantial new independent feature ideas in GitHub issues, and split risky
+  changes into reviewable draft PRs. Explain major tradeoffs, not every minor
+  styling choice. Validate relevant user journeys with tests and visual review.
+- Preserve functional user outcomes and critical authorization, persistence,
+  privacy, queue, music and shared playback contracts, or document/test a safe,
+  intentional migration with rollback. Do not change production systems or
+  use live data during cloud development.
+- This authority covers investigation, source edits, refactoring, tests,
+  documentation, commits, branches, issues and draft PRs only. Never infer
+  permission to merge/auto-merge, publish, deploy, change production/DNS/access
+  or secrets, spend money, destroy important data or restart paused Rust work.
+  Explicit owner approval is still required for those protected actions.
+
 ## Technology decisions
 
 - Choose technologies for measured product needs, operational reliability,
