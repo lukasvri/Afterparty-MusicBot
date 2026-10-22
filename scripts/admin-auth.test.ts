@@ -73,7 +73,7 @@ const hooks = registerHooks({
   },
   load(url, options, next) {
     if (url.startsWith(root.href) && url.endsWith(".ts")) return {
-      format: "module", source: stripTypeScriptTypes(readFileSync(new URL(url), "utf8"), { mode: "transform" }), shortCircuit: true,
+      format: "module", source: stripTypeScriptTypes(readFileSync(new URL(url), "utf8"), { mode: "strip" }), shortCircuit: true,
     };
     return next(url, options);
   },
