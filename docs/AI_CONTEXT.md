@@ -26,6 +26,23 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - Retain persisted and integration identifiers even when display branding changes. Read [branding compatibility](BRANDING.md#compatibility) before renaming keys, API identifiers, paths or environment variables.
 - Live Core settings, secrets, databases, backups and hosting-specific IDs remain outside GitHub and cloud work.
 
+## Changelog and technology decisions
+
+- **GitHub tracks every real change**, including technical fixes, build/security
+  maintenance, tests, user-facing features and resolved problems, via commits,
+  PRs and the existing generated product changelog. Keep the complete history.
+- **Afterparty's website patch notes are for users**, not a mirror of engineering
+  logs. Show only confirmed improvements included in the build being viewed.
+  The current page still imports the full canonical release entries; see the
+  [release policy](RELEASING.md#notes-for-every-change) for the required
+  filtering implementation. Do not claim the UI has already been separated.
+- The current React/Next.js/TypeScript website may be substantially redesigned
+  during private alpha; [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114)
+  evaluates SvelteKit/Svelte 5. No migration has been verified as shipped.
+  Evaluate maintained tools on actual requirements rather than always defaulting
+  to JavaScript/TypeScript or choosing the newest version blindly. OpenWorks is
+  a separate Astro/Svelte project with its own rules.
+
 ## What counts as verified?
 
 | Claim | Evidence |
