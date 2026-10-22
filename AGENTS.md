@@ -15,6 +15,22 @@ use em dashes. Keep global personal preferences out of repository instructions.
 - Recheck upstream before submitting a pull request. If `main` moved during the
   task, incorporate it and rerun checks affected by the new changes.
 
+## Technical choices
+
+- Afterparty's current application stack is TypeScript/Node.js, React/Next.js and
+  FFmpeg, with SvelteKit/Svelte 5 being evaluated for the unfinished alpha website
+  in [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114).
+  Do not claim that migration has shipped. A significant alpha redesign is allowed
+  when it materially improves maintainability, performance or the user experience,
+  provided the security, data, playback and compatibility contracts are tested.
+- Do not choose languages or frameworks merely because the existing code is
+  JavaScript/TypeScript, nor adopt the newest tool solely for novelty. Evaluate
+  maintained modern options against requirements, hosting/runtime support,
+  measurable performance, accessibility, security, maturity and testability.
+  Keep current working contracts during migration; document any deliberate change.
+- These rules apply to Afterparty. Other projects, including OpenWorks, have
+  independent repositories and should select their own fit-for-purpose stack.
+
 ## Development and validation
 
 - Use Node.js 24.17+, Python 3.11+ and FFmpeg. `npm run setup:cloud` installs both
@@ -89,13 +105,25 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Release notes and pull requests
 
-- Every code or user-facing change must include written release/patch notes in
-  the same PR and keep them current as scope changes. Follow the canonical
-  [release policy](docs/RELEASING.md#notes-for-every-change), including its rules
-  for internal documentation and isolated Rust experiments.
-- Use `lib/releases.json` for product notes and generate `CHANGELOG.md`; preserve
-  historical entries. Verify relevant notes reach the website's `/patch-notes`
-  and latest-release link. Do not create a competing changelog.
+- Record **every actual change** in GitHub, including internal engineering work,
+  dependency/security updates, tests, documentation and user-facing changes.
+  Use commits and reviewable PR descriptions; for product code follow the
+  canonical [release policy](docs/RELEASING.md#notes-for-every-change), keep
+  `lib/releases.json` complete and generate `CHANGELOG.md`. Preserve history
+  and never introduce a competing changelog. Internal documentation-only edits
+  need the PR record, not a product version bump.
+- The Afterparty **website UI** at `/patch-notes` is for a short, truthful,
+  user-relevant account of changes actually available in the build being viewed:
+  delivered features, visible improvements and resolved user-impacting bugs.
+  Exclude internal refactors, tooling, CI, dependency pins, future plans, draft
+  PRs and unverified claims. Only mention an alpha feature with an accurate
+  availability/limitations label. A commit, merge, test or GitHub Release does
+  not establish production deployment.
+- GitHub's complete notes and the website's curated notes must be kept distinct
+  **without losing either**. The current page imports the complete release data;
+  the release policy requires a reviewed implementation of audience filtering
+  before claiming internal-only entries are hidden from the UI. Verify the
+  actual website preview, version and patch-note links for user-visible updates.
 - Follow [branch strategy](CONTRIBUTING.md#branch-strategy): focused branches
   from refreshed `main` target `main`; isolated Rust branches target `dev`.
   Open a draft PR with actual checks, notes and limitations. Owner approval is
