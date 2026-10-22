@@ -1,7 +1,8 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
-import { registerHooks, stripTypeScriptTypes } from "node:module";
+import { registerHooks } from "node:module";
+import { transpileFixtureModule } from "./fixture-transpile.mjs";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { pbkdf2Sync } from "node:crypto";
 
@@ -73,7 +74,7 @@ const hooks = registerHooks({
   },
   load(url, options, next) {
     if (url.startsWith(root.href) && url.endsWith(".ts")) return {
-      format: "module", source: stripTypeScriptTypes(readFileSync(new URL(url), "utf8"), { mode: "strip" }), shortCircuit: true,
+      format: "module", source: transpileFixtureModule(url), shortCircuit: true,
     };
     return next(url, options);
   },
