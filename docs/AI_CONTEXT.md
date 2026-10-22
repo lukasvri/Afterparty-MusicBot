@@ -7,6 +7,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 ## Product and identity
 
 - Public product name: **Afterparty**. The website and Discord music bot share this display identity.
+- Canonical website address from the owner on 22 October 2026: **https://ap.openworks.no**. The separate OpenWorks portfolio uses **https://openworks.no**. These are owner-reported domains, not independently verified deployed commits; changing OAuth/host origins or DNS needs separate validation and approval.
 - Product direction: a self-hosted Discord music bot, a shared concert/video experience and private browser rooms.
 - Visual direction: dark/black background, white lowercase `ap` lettering and a restrained red accent (`#ff263e`). Keep interfaces clean, readable, consistent and professional.
 - Preserve the canonical vector logo and core Afterparty identity; existing UI components and old screenshots are references, **not requirements**. The owner grants broad creative control to redesign and replace the private-alpha website UI for a materially better outcome. Prefer a distinctive, coherent design over generic template/AI-looking artwork. A complete rebrand requires a separate owner decision.
@@ -41,6 +42,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 
 - [AGENTS.md](../AGENTS.md): repository-wide instructions, safe cloud tasks, test commands and production boundary.
 - [Architecture](ARCHITECTURE.md): service/data boundary, transport and playback responsibilities.
+- [Approved toolchain](TOOLCHAIN.md): the owner's chosen current tools, proposed SvelteKit frontend stack, validation gates and alternatives for new projects.
 - [Branding](BRANDING.md): logo, design direction, compatibility rules and Discord application settings.
 - [Cloud development](CLOUD_DEVELOPMENT.md): fresh checkout, setup, checks and safe local release process.
 - [Contributing](../CONTRIBUTING.md): module map and review standards.

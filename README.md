@@ -10,7 +10,7 @@
 [![MIT](https://img.shields.io/badge/license-MIT-ff263e?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/Node.js-24.17%2B-171717?style=flat-square)](https://nodejs.org/)
 
-[**Open Afterparty**](https://afterparty.lukasvri.chatgpt.site) · [**Install your own**](docs/INSTALLATION.md) · [**Documentation**](docs/README.md) · [**Changelog**](CHANGELOG.md)
+[**Open Afterparty**](https://ap.openworks.no) · [**Install your own**](docs/INSTALLATION.md) · [**Documentation**](docs/README.md) · [**Changelog**](CHANGELOG.md)
 
 </div>
 

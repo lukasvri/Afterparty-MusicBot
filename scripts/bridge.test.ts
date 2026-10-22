@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
-import { registerHooks, stripTypeScriptTypes } from "node:module";
+import { registerHooks } from "node:module";
+import { transpileFixtureModule } from "./fixture-transpile.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 
 // Exercise the actual Worker bridge with migrated, isolated in-memory databases.
@@ -65,9 +66,7 @@ const hooks = registerHooks({
     if (url.endsWith("/lib/party.ts"))
       return {
         format: "module",
-        source: stripTypeScriptTypes(readFileSync(new URL(url), "utf8"), {
-          mode: "transform",
-        }),
+        source: transpileFixtureModule(url),
         shortCircuit: true,
       };
     return next(url, options);

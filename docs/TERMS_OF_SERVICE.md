@@ -20,7 +20,7 @@ Do not use the service for unlawful content, harassment, spam, unauthorized acce
 
 ## Copyright complaints
 
-Copyright owners and authorized representatives can use the [copyright and removal request form](https://afterparty.lukasvri.chatgpt.site/copyright) to prepare a notice. Send it privately through the listed contact channel so the maintainer can review it and remove or disable access where appropriate. For disputed removals, request a private review through [Support](https://afterparty.lukasvri.chatgpt.site/support). A reporting process does not grant permission to use third-party material.
+Copyright owners and authorized representatives can use the [copyright and removal request form](https://ap.openworks.no/copyright) to prepare a notice. Send it privately through the listed contact channel so the maintainer can review it and remove or disable access where appropriate. For disputed removals, request a private review through [Support](https://ap.openworks.no/support). A reporting process does not grant permission to use third-party material.
 
 
 ## Availability and changes
@@ -32,7 +32,7 @@ To the extent permitted by applicable law, the service is provided as available 
 
 ## Leaving, privacy and support
 
-You can stop using the website or remove the bot through Discord’s server settings. Removing the bot does not automatically erase its stored server data. See the [Privacy Policy](https://afterparty.lukasvri.chatgpt.site/privacy) for data handling and deletion requests, and [Support](https://afterparty.lukasvri.chatgpt.site/support) to contact the maintainer.
+You can stop using the website or remove the bot through Discord’s server settings. Removing the bot does not automatically erase its stored server data. See the [Privacy Policy](https://ap.openworks.no/privacy) for data handling and deletion requests, and [Support](https://ap.openworks.no/support) to contact the maintainer.
 
 
 ## Updates to these terms
