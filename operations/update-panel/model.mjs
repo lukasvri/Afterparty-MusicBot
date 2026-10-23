@@ -23,7 +23,7 @@ export function viewState(value = {}) {
     ready,
     error: failed ? value.error || value.message || '' : '',
     headline: checking ? 'Kontrollerer betaversjonen' : running ? 'Betaoppdatering pågår' : checkFailed ? 'Statuskontrollen ble ikke fullført' : failed ? 'Betaoppdateringen trenger oppfølging' : updated ? 'Beta er oppdatert' : ready ? 'Ny betaversjon er klar' : 'Sjekk betaversjonen',
-    message: updated ? 'Siste kontrollerte betaversjon er allerede på nett. Ingen oppdatering er nødvendig.' : value.message || 'Kontroller GitHub-versjonen før du oppdaterer.',
+    message: checkFailed && typeof value.retry_after === 'number' ? (retrySeconds > 0 ? `GitHub begrenser statuskontroller akkurat nå. Prøv igjen om omtrent ${Math.ceil(retrySeconds/60)} minutter. Ingen oppdatering er startet.` : 'Ventetiden fra GitHub er over. Trykk «Sjekk status» for en ny kontroll. Ingen oppdatering er startet.') : updated ? 'Siste kontrollerte betaversjon er allerede på nett. Ingen oppdatering er nødvendig.' : value.message || 'Kontroller GitHub-versjonen før du oppdaterer.',
     progressLabel: running ? 'Oppdatering pågår' : value.progress_kind === 'last' ? 'Siste fullførte oppdatering' : failed ? 'Ikke fullført' : value.stage === 'done' ? 'Fullført' : 'Ingen oppdatering pågår',
     actionTitle: updated ? 'Beta er oppdatert' : ready ? 'Publiser ny betaversjon' : checking ? 'Kontrollerer betaversjonen' : checkFailed ? 'Prøv statuskontrollen igjen' : failed ? 'Kontroller feilen før nytt forsøk' : 'Sjekk før du oppdaterer'
   };
