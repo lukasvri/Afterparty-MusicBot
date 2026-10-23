@@ -7,6 +7,9 @@
 | `afterparty-banner.png` | AI-generated brand artwork made for this repository: black DJ platter, white lowercase lettering and red accents. It illustrates the Afterparty identity. |
 | `afterparty-desktop.png` | Screenshot of the local website preview at 1440 × 1000, in English. |
 | `afterparty-mobile.png` | Screenshot of the same preview at a 390 px viewport, in English. |
+| `v3-classic-desktop-20261023.png`, `v3-classic-mobile-20261023.png` | Existing website baseline from `e69a2c1`, with a synthetic room and the search tab open, at 1440x1000 and 390x1000. External artwork/media is blocked. |
+| `v3-svelte-desktop-20261023.png`, `v3-svelte-mobile-20261023.png` | Opt-in SvelteKit `/v3` candidate with synthetic room/queue/search data at the same viewport sizes. Audio is not activated in these images. These show a partial migration, not full feature parity or deployment. |
+| `svelte-room-measurements-20261023.json` | Successful local production-Worker script response sizes, uncompressed and individually gzipped. Fresh Chromium contexts, synthetic data and blocked external requests. Includes method and scope limitations; this is not a Lighthouse/Web Vitals or audible-media benchmark. |
 | `dj-console-before-20261018.png`, `dj-console-after-20261018.png` | Matching 1440 px local-preview crops of the decorative stage before/after the TypeScript interface pass, using Norwegian UI preferences and reduced motion. |
 | `admin-mobile-before-20261018.png`, `admin-mobile-after-20261018.png` | Matching 390 px synthetic admin-login previews showing navigation and shared-interface changes. |
 | `stage-pa-lighting-after-20261018.png` | Follow-up 1440 px English welcome-stage crop: opaque concert PA arrays, subwoofers, red/white lighting and a halo contained inside the LED screen, with motion switched off. Compare with the earlier `dj-console-after-20261018.png` scene above. |

@@ -14,6 +14,7 @@ case "${1:-check}" in
   setup)
     npm ci --no-audit --no-fund
     npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
+    npm --prefix apps/web ci --no-audit --no-fund
     ;;
   check)
     npm run lint
@@ -23,6 +24,10 @@ case "${1:-check}" in
     npm --prefix services/core run check
     npm --prefix services/core test
     npm run build
+    npm --prefix apps/web run format:check
+    npm --prefix apps/web run check
+    npm --prefix apps/web test
+    npm --prefix apps/web run build
     ;;
   *) printf 'Usage: %s setup|check\n' "$0" >&2; exit 2 ;;
 esac

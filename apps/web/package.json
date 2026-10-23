@@ -1,0 +1,41 @@
+{
+  "name": "afterparty-web",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
+  "engines": {
+    "node": ">=24.17.0"
+  },
+  "scripts": {
+    "dev": "node --import ./scripts/runtime.ts node_modules/vite/bin/vite.js dev --host 127.0.0.1 --port 5174",
+    "build": "node --import ./scripts/runtime.ts node_modules/vite/bin/vite.js build",
+    "preview": "node --import ./scripts/runtime.ts node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --local --ip 127.0.0.1 --port 5174 --inspector-port 0",
+    "check": "node --import ./scripts/runtime.ts node_modules/@sveltejs/kit/svelte-kit.js sync && node --import ./scripts/runtime.ts node_modules/svelte-check/bin/svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "test": "node --test tests/*.test.ts",
+    "test:browser": "node --test --test-concurrency=1 tests/player.browser.ts",
+    "test:stack": "node --test tests/local-stack.browser.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "overrides": {
+    "miniflare": {
+      "sharp": "0.35.5"
+    },
+    "undici": "7.30.1"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-cloudflare": "8.0.1",
+    "@sveltejs/kit": "3.1.0",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@types/node": "22.19.19",
+    "prettier": "3.9.10",
+    "prettier-plugin-svelte": "4.1.1",
+    "svelte": "5.57.2",
+    "svelte-check": "4.7.7",
+    "typescript": "6.0.3",
+    "vite": "8.3.5",
+    "wrangler": "4.118.0"
+  }
+}
