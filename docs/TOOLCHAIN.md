@@ -1,6 +1,6 @@
 # Approved development toolchain
 
-Owner decision: 22 October 2026. This document selects **preferred tools and
+Owner decisions: 22 and 23 October 2026. This document selects **preferred tools and
 architecture**, not a claim that a migration, installation or deployment has
 already happened. Check current GitHub code, supported tool versions, CI and
 official compatibility documentation before implementing each change.
@@ -9,15 +9,16 @@ official compatibility documentation before implementing each change.
 
 | Area | Verified existing source | Preferred direction | Implementation gate |
 | --- | --- | --- | --- |
-| Website framework | React 19, Next.js 16, Vinext/Vite | **SvelteKit 3 + Svelte 5** for an alpha redesign | Prove Cloudflare Workers/D1, OAuth/session, API and real-time contracts before switching; compare measured baseline |
+| Website framework | React 19, Next.js 16, Vinext/Vite, with an optional Svelte candidate | Improve the existing **Classic frontend** for beta, following the owner's 23 October decision | Preserve complete Classic journeys, responsive usability and existing API/authentication contracts; retain Svelte at `/v3` for optional evaluation |
 | Website language | TypeScript 5.9 | TypeScript 6 where framework/build/plugin support is verified | Do not force a toolchain upgrade that breaks CI or Cloudflare |
 | Website styling | Tailwind CSS 4 | Keep Tailwind 4 only when it improves design-system consistency | Preserve Afterparty black/red identity and accessibility; avoid duplicate styling systems |
 | Database/API | Drizzle ORM, Cloudflare tooling | Retain Drizzle for applicable database access, Workers and D1 for website hosting | Validate bindings, schema changes and authorization without touching production |
 | Core/audio | Node.js 24, TypeScript, discord.js, FFmpeg | Evaluate Node.js 26 for the next LTS baseline while keeping the working Core stable | Test build, dependencies, native audio paths and recovery before any Node/Docker production change; protect guild/room isolation, persistence, queue revisions and playback clock |
 | Other service languages | Existing Core is TypeScript | Consider Go for independent APIs, Rust for measured low-level work, Python for automation/AI | Choose per workload, interoperability, hosting and test evidence; paused Rust work is not resumed by this decision |
 
-SvelteKit 3 was released on 1 October 2026. Its selection is an **approved
-preferred direction for evaluation and implementation**, not a completed port.
+SvelteKit 3 was released on 1 October 2026. Its earlier selection led to an
+isolated candidate, not a completed port. The owner's 23 October decision makes
+Classic the basis for beta development and supersedes the Svelte default UI.
 The detailed alpha scope and acceptance criteria remain in
 [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114).
 A large rewrite is allowed but must not silently remove important capabilities.
@@ -52,8 +53,8 @@ Practical standards:
 2. Diagnose and measure first; prefer stable, supported dependency versions over
    speculative upgrades. Avoid adding a framework or test runner without a
    specific benefit.
-3. Design, implement and test a vertical slice of the SvelteKit frontend before
-   attempting a wholesale cutover. Validate D1, authorization, public/private
+3. Improve and test the Classic frontend in bounded slices. Keep the Svelte
+   candidate optional. Validate D1, authorization, public/private
    server data boundaries, shared playback state, mobile accessibility and the
    Cloudflare target build.
 4. Keep operational Core stable. Use `npm run setup:cloud` and
@@ -109,5 +110,5 @@ currently deployed source commit.
   project guidance.
 - [SvelteKit 3 official release](https://svelte.dev/blog/sveltekit-3-is-here).
 - [Node.js release status](https://nodejs.org/en/about/previous-releases).
-- This file is **documentation only**. It does not install dependencies,
+- This file records toolchain decisions. It does not install dependencies,
   update lockfiles, run tests, migrate the website or alter production.
