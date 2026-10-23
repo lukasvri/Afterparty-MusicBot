@@ -145,6 +145,10 @@ async function fixture(width: number, host = true, initial = false) {
       return route.abort();
     }
     if (!url.pathname.startsWith('/api/')) return route.continue();
+    if (url.pathname === '/api/realtime/stream')
+      return route.fulfill({ status: 503, json: { error: 'Synthetic polling-only room' } });
+    if (url.pathname === '/api/realtime/clock')
+      return route.fulfill({ json: { serverTime: Date.now() } });
     const headers = request.headers();
     assert.equal(headers['x-afterparty-visitor'], visitor);
     const input = request.method() === 'POST' ? request.postDataJSON() : null;

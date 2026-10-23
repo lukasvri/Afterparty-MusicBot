@@ -10,6 +10,7 @@
   let view = $state<RoomClientState>({
     room: null,
     connection: 'idle',
+    live: false,
     busy: false,
     error: '',
     searching: false,
@@ -31,6 +32,7 @@
   const classic = $derived(
     room ? `/?classic=1&room=${encodeURIComponent(room.code)}` : '/?classic=1',
   );
+  const connected = $derived(view.connection === 'connected' && !target.stale);
   onMount(() => {
     client = createRoomClient();
     const unsubscribe = client.subscribe((value) => {
@@ -120,10 +122,11 @@
     <header class="topbar">
       <span class="eyebrow">THE LISTENING ROOM</span>
       <div class="top-status">
-        <span class="status-dot" class:online={view.connection === 'connected'}
-        ></span>{view.connection === 'connected'
-          ? 'Connected'
-          : view.connection === 'reconnecting'
+        <span class="status-dot" class:online={connected}></span>{connected
+          ? view.live
+            ? 'Live'
+            : 'Connected'
+          : view.connection === 'reconnecting' || target.stale
             ? 'Reconnecting…'
             : view.connection === 'connecting'
               ? 'Connecting…'
@@ -232,14 +235,14 @@
                 <button
                   class="play-control"
                   aria-label={room.playing ? 'Pause playback' : 'Resume playback'}
-                  disabled={!room.isHost || view.busy || view.connection !== 'connected'}
+                  disabled={!room.isHost || view.busy || !connected}
                   onclick={() => {
                     void client?.control(room.playing ? 'pause' : 'play');
                   }}><Icon name={room.playing ? 'pause' : 'play'} size={24} /></button
                 ><button
                   class="icon-button"
                   aria-label="Next track"
-                  disabled={!room.isHost || view.busy || view.connection !== 'connected'}
+                  disabled={!room.isHost || view.busy || !connected}
                   onclick={() => {
                     void client?.control('next');
                   }}><Icon name="next" /></button
@@ -252,10 +255,7 @@
                     max={Math.max(1, room.current.duration)}
                     step="1"
                     value={seekValue ?? Math.min(target.position, room.current.duration)}
-                    disabled={!room.isHost ||
-                      room.current.live ||
-                      view.busy ||
-                      view.connection !== 'connected'}
+                    disabled={!room.isHost || room.current.live || view.busy || !connected}
                     oninput={(event) => {
                       seekValue = Number(event.currentTarget.value);
                     }}
@@ -356,9 +356,7 @@
                   <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span><button
                     class="icon-button add-track"
                     aria-label={`Add ${video.title} to queue`}
-                    disabled={view.busy ||
-                      view.connection !== 'connected' ||
-                      video.embeddable === false}
+                    disabled={view.busy || !connected || video.embeddable === false}
                     onclick={() => {
                       void client?.add(video.id);
                     }}><Icon name="add" /></button

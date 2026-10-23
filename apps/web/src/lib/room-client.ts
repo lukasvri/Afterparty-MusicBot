@@ -2,14 +2,18 @@ import { request as browserRequest } from '../../../../lib/browser-api.ts';
 import { browserStorage } from '../../../../lib/browser-storage.ts';
 import {
   compensateDelivery,
+  isDuplicateSnapshot,
+  isOlderSnapshot,
   playbackTarget,
   roomPollUpdate,
 } from '../../../../lib/playback-sync.ts';
 import type { Room, Video } from '../../../../lib/types.ts';
+import { createRoomLive } from './room-live.ts';
 
 export type RoomClientState = {
   room: Room | null;
   connection: 'idle' | 'connecting' | 'connected' | 'reconnecting';
+  live: boolean;
   busy: boolean;
   error: string;
   searching: boolean;
@@ -23,10 +27,22 @@ export type RoomClientOptions = {
   storage?: Storage;
   now?: () => number;
   pollMs?: number;
+  livePollMs?: number;
+  live?: typeof createRoomLive;
   setTimeout?: typeof globalThis.setTimeout;
   clearTimeout?: typeof globalThis.clearTimeout;
 };
-type Session = { code: string; generation: number; controller: AbortController; serial: number };
+type Session = {
+  code: string;
+  generation: number;
+  controller: AbortController;
+  serial: number;
+  reading?: AbortController;
+  readAt: number;
+  epoch?: string;
+  retiredEpochs: Set<string>;
+  live?: ReturnType<typeof createRoomLive>;
+};
 
 /** Browser rooms only. The existing website owns authorization, persistence and progression. */
 export function createRoomClient(options: RoomClientOptions = {}) {
@@ -39,6 +55,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
   let state: RoomClientState = {
     room: null,
     connection: 'idle',
+    live: false,
     busy: false,
     error: '',
     searching: false,
@@ -78,6 +95,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
   };
   const retire = () => {
     session?.controller.abort();
+    session?.live?.destroy();
     session = null;
     generation++;
     if (timer !== undefined) {
@@ -90,11 +108,19 @@ export function createRoomClient(options: RoomClientOptions = {}) {
   };
   const begin = (code: string) => {
     retire();
-    const target: Session = { code, generation, controller: new AbortController(), serial: 0 };
+    const target: Session = {
+      code,
+      generation,
+      controller: new AbortController(),
+      serial: 0,
+      readAt: now(),
+      retiredEpochs: new Set(),
+    };
     session = target;
     publish({
       room: null,
       connection: 'connecting',
+      live: false,
       busy: false,
       error: '',
       searching: false,
@@ -103,6 +129,18 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       receivedAt: 0,
     });
     return target;
+  };
+  const retiredTimeline = (target: Session, room: Room) =>
+    room.syncSource === 'live' &&
+    Boolean(room.syncEpoch && target.retiredEpochs.has(room.syncEpoch));
+  const rememberEpoch = (target: Session, room: Room) => {
+    if (room.syncSource !== 'live' || !room.syncEpoch) return;
+    if (target.epoch && target.epoch !== room.syncEpoch) {
+      target.retiredEpochs.add(target.epoch);
+      if (target.retiredEpochs.size > 16)
+        target.retiredEpochs.delete(target.retiredEpochs.values().next().value!);
+    }
+    target.epoch = room.syncEpoch;
   };
   const accept = (target: Session, room: Room, sent: number) => {
     if (!current(target)) return;
@@ -117,15 +155,70 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     )
       throw new Error('This view supports browser rooms only.');
     const next = compensateDelivery(room, now() - sent);
-    const update = roomPollUpdate(state.room, next, false);
+    const update =
+      retiredTimeline(target, next) && state.room
+        ? {
+            snapshot: {
+              ...state.room,
+              isHost: next.isHost,
+              isOwner: next.isOwner,
+              isPublic: next.isPublic,
+              viewers: next.viewers,
+            },
+            timeline: false,
+          }
+        : roomPollUpdate(state.room, next, target.live?.isFresh() ?? false);
+    if (update.timeline) rememberEpoch(target, next);
     publish({
       room: update.snapshot,
       connection: 'connected',
       ...(update.timeline ? { receivedAt: now() } : {}),
     });
   };
-  const read = async (target: Session, clearError = false) => {
-    if (!current(target) || state.busy) return;
+  const connectLive = (target: Session) => {
+    if (!current(target) || !state.room || target.live) return;
+    target.live = (options.live ?? createRoomLive)({
+      code: target.code,
+      signal: target.controller.signal,
+      now,
+      setTimeout: schedule,
+      clearTimeout: cancel,
+      onSnapshot(room) {
+        if (
+          !current(target) ||
+          !state.room ||
+          room.code !== target.code ||
+          retiredTimeline(target, room) ||
+          isOlderSnapshot(state.room, room) ||
+          isDuplicateSnapshot(state.room, room)
+        )
+          return false;
+        rememberEpoch(target, room);
+        // The public timeline cannot grant or revoke authenticated room rights.
+        publish({
+          room: {
+            ...room,
+            isHost: state.room.isHost,
+            isOwner: state.room.isOwner,
+            isPublic: state.room.isPublic,
+            viewers: state.room.viewers,
+          },
+          receivedAt: now(),
+        });
+        return true;
+      },
+      onFresh(live) {
+        if (!current(target)) return;
+        publish({ live });
+        poll(target);
+      },
+    });
+  };
+  const read = async (target: Session, clearError = false, replacePending = false) => {
+    if (!current(target) || state.busy || (target.reading && !replacePending)) return;
+    target.reading?.abort();
+    const reading = new AbortController();
+    target.reading = reading;
     const recovering = state.connection === 'reconnecting';
     const serial = ++target.serial,
       sent = now();
@@ -133,27 +226,46 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       const room = await request<Room>(`/api/rooms/${target.code}`, {
         headers: headers(target.code),
         cache: 'no-store',
-        signal: signal(target.controller),
+        signal: AbortSignal.any([signal(target.controller), reading.signal]),
       });
       if (!current(target) || target.serial !== serial) return;
       accept(target, room, sent);
+      target.readAt = now();
+      connectLive(target);
       if (clearError || recovering) publish({ error: '' });
     } catch (error) {
       if (current(target) && target.serial === serial)
         publish({ connection: 'reconnecting', error: message(error) });
+    } finally {
+      if (target.reading === reading) target.reading = undefined;
     }
   };
   const poll = (target: Session) => {
     if (!current(target)) return;
+    if (timer !== undefined) cancel(timer);
+    const fallback = options.pollMs ?? 1000,
+      interval = options.livePollMs ?? 10000;
+    const delay =
+      state.busy || target.reading || state.connection !== 'connected'
+        ? fallback
+        : Math.min(
+            target.live?.isFresh() ? interval : fallback,
+            Math.max(0, target.readAt + interval - now()),
+          );
     timer = schedule(() => {
+      timer = undefined;
       void read(target).finally(() => poll(target));
-    }, options.pollMs ?? 1000);
+    }, delay);
   };
   const mutate = async (action: string, fields: Record<string, unknown> = {}) => {
     const target = session,
       room = state.room;
     if (!target || !room || !current(target) || state.busy || state.connection !== 'connected')
       return false;
+    if (playbackTarget(room, state.receivedAt, now()).stale) {
+      publish({ error: 'The room connection is stale. Reconnect before changing playback.' });
+      return false;
+    }
     if (action !== 'add' && !room.isHost) {
       publish({ error: 'Only the room host can control playback.' });
       return false;
@@ -181,7 +293,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     } finally {
       if (current(target)) {
         publish({ busy: false });
-        if (refreshAfterConflict) await read(target);
+        if (refreshAfterConflict) await read(target, false, true);
       }
     }
   };
@@ -238,7 +350,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       return current(target) && state.room !== null;
     },
     async refresh() {
-      if (session) await read(session, true);
+      if (session) await read(session, true, true);
     },
     async search(value: string) {
       if (destroyed) return;
@@ -291,6 +403,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       publish({
         room: null,
         connection: 'idle',
+        live: false,
         busy: false,
         error: '',
         searching: false,
