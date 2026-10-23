@@ -1,11 +1,16 @@
 // UI integration uses isolated browser contexts, synthetic API state and no real media.
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chromium, type Page } from 'playwright';
+import { afterEach, test } from 'node:test';
+import { chromium, type Browser, type Page } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
 
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5174').origin;
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname));
+const browsers = new Set<Browser>();
+// Also clean up when setup fails or a test deadline interrupts pending work.
+afterEach(async () => {
+  await Promise.all([...browsers].map((browser) => browser.close()));
+});
 const code = 'TESTROOM',
   token = 'b'.repeat(64),
   visitor = 'a'.repeat(32);
@@ -36,6 +41,8 @@ async function fixture(width: number, host = true, initial = false) {
     executablePath: process.env.CHROMIUM_PATH,
     args: ['--no-sandbox'],
   });
+  browsers.add(browser);
+  browser.once('disconnected', () => browsers.delete(browser));
   const page = await browser.newPage({
     viewport: { width, height: 1000 },
     reducedMotion: 'reduce',
