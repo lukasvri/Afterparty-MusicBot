@@ -1,6 +1,6 @@
 {
   "sourceBase": "e69a2c1",
-  "candidate": "feat/afterparty-3-svelte-player (working tree)",
+  "candidate": "768e6747e8ffc8a557624400207ed6b1e4f32151 (before beta landing configuration)",
   "date": "2026-10-23",
   "node": "v24.19.0",
   "chromium": "system /usr/bin/chromium",

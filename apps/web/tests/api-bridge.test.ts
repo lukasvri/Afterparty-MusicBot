@@ -1,6 +1,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bridge } from '../src/lib/api-bridge.ts';
+import { betaEntry, bridge } from '../src/lib/api-bridge.ts';
+
+test('the beta landing preserves room links and keeps Classic and API callbacks reachable', () => {
+  const room = new Request('https://ap.beta.openworks.no/?room=TESTROOM');
+  assert.equal(betaEntry(room, false), null);
+  const response = betaEntry(room, true);
+  assert.equal(response?.status, 307);
+  assert.equal(response?.headers.get('Location'), 'https://ap.beta.openworks.no/v3?room=TESTROOM');
+  assert.equal(
+    betaEntry(new Request('https://ap.beta.openworks.no/?classic=1&room=TESTROOM'), true),
+    null,
+  );
+  assert.equal(
+    betaEntry(new Request('https://ap.beta.openworks.no/', { method: 'POST' }), true),
+    null,
+  );
+  assert.equal(
+    betaEntry(
+      new Request('https://ap.beta.openworks.no/api/auth/discord/callback?code=synthetic'),
+      true,
+    ),
+    null,
+  );
+});
 
 test('forwarding preserves origin, cookies, bearer, revisions and response cookies', async () => {
   const request = new Request('https://synthetic.invalid/api/rooms/TESTROOM', {

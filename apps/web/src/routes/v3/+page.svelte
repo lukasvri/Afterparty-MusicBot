@@ -28,7 +28,9 @@
     void tick;
     return client?.playback() ?? { position: 0, playing: false, stale: false };
   });
-  const classic = $derived(room ? `/?room=${encodeURIComponent(room.code)}` : '/');
+  const classic = $derived(
+    room ? `/?classic=1&room=${encodeURIComponent(room.code)}` : '/?classic=1',
+  );
   onMount(() => {
     client = createRoomClient();
     const unsubscribe = client.subscribe((value) => {

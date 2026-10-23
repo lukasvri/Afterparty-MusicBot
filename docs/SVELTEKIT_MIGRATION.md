@@ -103,8 +103,9 @@ CHROMIUM_PATH=/usr/bin/chromium npm --prefix apps/web run test:stack
 ```
 
 `test:stack` requires both production builds but starts its own local Workers on
-port 5175. It applies existing migrations and seeds fictional metadata into a
-fresh temporary D1 directory for every run, then exercises the actual API and
+port 5175. It also verifies the beta root redirect and Classic bypass. It applies
+existing migrations and seeds fictional metadata into a fresh temporary D1
+directory for every run, then exercises the actual API and
 mobile UI without routing API responses in Playwright. It tests persistence,
 wrong-room host tokens, guest restrictions, cross-origin rejection, stale revisions,
 search and transport, and shuts down its own Workers and removes temporary data.
@@ -122,7 +123,8 @@ smaller in feature scope than Classic; payload observations must not be presente
 as full-application performance parity. No audible Discord, live provider,
 production OAuth, Lighthouse or field performance verification is claimed.
 
-The recorded room/search payload observation is identical at 1440px and 390px:
+The recorded room/search payload observation from `768e6747` (before beta landing
+configuration) is identical at 1440px and 390px:
 
 | Successful local script responses | Classic | Svelte candidate |
 | --- | ---: | ---: |
@@ -152,14 +154,20 @@ on Node 24 and its runtime configuration was not changed.
   owner-approved acceptance outside cloud tests. Tests use a deterministic player
   boundary; they do not establish audible provider playback.
 
-An approved future rollout would bind the candidate to the existing API service
+The owner-requested isolated beta has a dedicated
+[deployment runbook](SVELTEKIT_BETA.md) and `apps/web/wrangler.beta.jsonc` template
+for `ap.beta.openworks.no`, using the existing laptop beta and Afterparty test bot.
+The beta-only entry flag selects `/v3` at the root; `/?classic=1` retains Classic.
+These files prepare deployment and do not establish live availability.
+
+A production rollout would bind the candidate to the existing API service
 under the same public origin and validate the real OAuth callback, session cookies,
 bindings, host state and legacy route/asset behavior. Keep `/` on the existing
 application until feature and acceptance gates pass. A frontend rollback removes
 candidate routing and serves the previous website artifact; D1 and Core require
 no rollback migration because this slice changes neither schema nor protocol.
-Do not delete databases or ownership storage. Merge, deployment, DNS, secrets,
-automatic release changes and publication still require owner approval.
+Do not delete databases or ownership storage. The beta request does not authorize
+a production deployment, merge or automatic release changes.
 
 No public release bullet or product version bump is appropriate for this opt-in
 migration candidate. Its complete change and validation record belongs in the

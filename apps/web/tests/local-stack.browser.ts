@@ -89,6 +89,7 @@ test(
         compatibility_flags: ['nodejs_compat'],
         assets: { directory: `${root}apps/web/.svelte-kit/cloudflare`, binding: 'ASSETS' },
         services: [{ binding: 'AFTERPARTY_API', service: 'afterparty-api-test' }],
+        vars: { AFTERPARTY_BETA_ENTRY: '1' },
       }),
     );
     let output = '';
@@ -168,6 +169,14 @@ test(
       Number(new URL(origin).port),
     );
     await waitForWorker(`${origin}/api/me`, webWorker);
+
+    const landing = await fetch(`${origin}/?room=TESTROOM`, { redirect: 'manual' });
+    assert.equal(landing.status, 307);
+    assert.equal(landing.headers.get('Location'), `${origin}/v3?room=TESTROOM`);
+    const classic = await fetch(`${origin}/?classic=1`, { redirect: 'manual' });
+    assert.equal(classic.status, 200);
+    assert.match(classic.headers.get('Content-Type') ?? '', /text\/html/);
+    await classic.text();
 
     async function api<T>(path: string, token?: string, input?: unknown, sourceOrigin = origin) {
       const response = await fetch(origin + path, {
@@ -281,7 +290,8 @@ test(
         }
         return route.continue();
       });
-      await page.goto(`${origin}/v3?room=${room.code}`);
+      await page.goto(`${origin}/?room=${room.code}`);
+      assert.equal(page.url(), `${origin}/v3?room=${room.code}`);
       await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Resume playback' }).isEnabled(), true);
       await page
