@@ -96,9 +96,12 @@ jobs:
           npm --prefix apps/web run check
           npm --prefix apps/web test
           npm --prefix apps/web run build
+      - name: Install Chromium for browser checks
+        # The Ubuntu 24.04 image already has Chromium's runtime libraries.
+        # Avoid upgrading them and downloading optional system font stacks.
+        run: npx playwright install chromium
       - name: Check Classic and experimental desktop/mobile journeys with synthetic data
         run: |
-          npx playwright install --with-deps chromium
           XDG_CONFIG_HOME="$PWD/.sites-runtime/config" npm run start -- --name afterparty-api-local > /tmp/afterparty-api-preview.log 2>&1 &
           api_preview_pid=$!
           npm --prefix apps/web run preview > /tmp/afterparty-web-preview.log 2>&1 &
