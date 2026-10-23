@@ -5,6 +5,12 @@ under `apps/web/`. It is an opt-in development candidate at `/v3`, not a product
 cutover or a completed Afterparty 3.0 release. The existing website, Core, product
 version and public patch notes remain the release baseline.
 
+On 23 October 2026, the owner chose Classic as the basis for continued beta
+development, with design improvements. The beta template now uses
+`AFTERPARTY_BETA_ENTRY=0`: `/` serves Classic through the API service binding,
+while `/v3` remains an optional prototype. This source change does not establish
+the currently deployed beta version.
+
 ## Implemented journey
 
 Create an unlisted private browser room, or join using its existing eight-character
@@ -111,10 +117,13 @@ npm run check:all
 npm --prefix apps/web run format:check
 CHROMIUM_PATH=/usr/bin/chromium npm --prefix apps/web run test:browser
 CHROMIUM_PATH=/usr/bin/chromium npm --prefix apps/web run test:stack
+CHROMIUM_PATH=/usr/bin/chromium PREVIEW_URL=http://127.0.0.1:5174 npm run test:search
+CHROMIUM_PATH=/usr/bin/chromium PREVIEW_URL=http://127.0.0.1:5174 npm run test:sync
 ```
 
 `test:stack` requires both production builds but starts its own local Workers on
-port 5175. It also verifies the beta root redirect and Classic bypass. It applies
+port 5175. It verifies Classic at the root without a redirect, the Classic bypass
+and the optional `/v3` route. It applies
 existing migrations and seeds fictional metadata into a fresh temporary D1
 directory for every run, then exercises the actual API and
 mobile UI without routing API responses in Playwright. It tests persistence,
@@ -125,7 +134,8 @@ Chromium; CI installs the matching browser and runs the synthetic UI suite.
 
 The normal full check now includes candidate type/a11y checks, Node contract tests
 and the Cloudflare build. The existing Node 26 website CI job additionally checks
-formatting, desktop/mobile journeys and the isolated D1 stack test. Each application
+formatting, Classic search/synchronization, experimental desktop/mobile journeys
+and the isolated D1 stack test. Each application
 retains its own locked Wrangler version during local integration. The signed release packaging remains
 unchanged and contains the existing website only. No deployment steps were added.
 
@@ -175,7 +185,8 @@ on Node 24 and its runtime configuration was not changed.
 The owner-requested isolated beta has a dedicated
 [deployment runbook](SVELTEKIT_BETA.md) and `apps/web/wrangler.beta.jsonc` template
 for `ap.beta.openworks.no`, using the existing laptop beta and Afterparty test bot.
-The beta-only entry flag selects `/v3` at the root; `/?classic=1` retains Classic.
+The beta entry flag is disabled in the template, keeping Classic at the root;
+`/?classic=1` also bypasses older beta configurations that still select `/v3`.
 These files prepare deployment and do not establish live availability.
 
 A production rollout would bind the candidate to the existing API service

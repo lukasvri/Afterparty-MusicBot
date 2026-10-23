@@ -37,7 +37,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { Room, Video, type DiscordState, type HistoryVideo } from "@/lib/types";
+import { Room, Video, time, type DiscordState, type HistoryVideo } from "@/lib/types";
 import { useBrowserValue, useClientReady } from "@/hooks/use-browser-value";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useAudioPreferences } from "@/hooks/use-audio-preferences";
@@ -813,6 +813,10 @@ export default function Afterparty() {
           ...extra,
         })
       : void action(name, extra);
+  const queued = queueRoom?.queue ?? [];
+  const queueDuration = queued.length && queued.every(video => !video.live && Number.isFinite(video.duration) && video.duration > 0)
+    ? queued.reduce((duration, video) => duration + video.duration, 0)
+    : null;
   const botCommand = async (
     action: "skip" | "enqueue" | "pause" | "resume",
     extras: Record<string, unknown> = {},
@@ -1463,10 +1467,32 @@ export default function Afterparty() {
     fullscreenElement,
   );
   const hideChrome = fullscreenActive && !controls.visible;
+  const openMusicSearch = () => {
+    if (!roomRef.current || modal || fullscreenActive || tv) return false;
+    if (panel === "music" && !directoryOpen) {
+      requestAnimationFrame(() => {
+        const input = document.querySelector<HTMLInputElement>(".search-form input");
+        input?.focus({ preventScroll: true });
+        input?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      });
+    } else {
+      searchFocusRequested.current = true;
+      setPanel("music");
+      if (directoryOpen) navigate("music");
+    }
+    return true;
+  };
   const fullscreenShortcut = useEffectEvent(fullscreenToggle);
   const muteShortcut = useEffectEvent(audio.toggleMute);
+  const searchShortcut = useEffectEvent(openMusicSearch);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
+      const editing = event.target instanceof HTMLElement && Boolean(event.target.closest('input,textarea,select,[contenteditable="true"],dialog'));
+      const searchKey = event.key === "/" && !event.ctrlKey && !event.metaKey || event.key.toLowerCase() === "k" && !event.shiftKey && (event.ctrlKey || event.metaKey);
+      if (!event.defaultPrevented && !event.repeat && !event.altKey && !editing && searchKey && searchShortcut()) {
+        event.preventDefault();
+        return;
+      }
       if (
         event.defaultPrevented ||
         event.repeat ||
@@ -1695,6 +1721,10 @@ export default function Afterparty() {
                 </span>
                 <span className={`status-dot ${botOnline ? "live" : ""}`} />
               </span>
+              <button className="button primary room-search" onClick={openMusicSearch}
+                aria-label={t("Finn musikk")} aria-keyshortcuts="/ Control+k Meta+k">
+                <Search size={17} aria-hidden="true" /><span>{t("Finn musikk")}</span><kbd aria-hidden="true">/</kbd>
+              </button>
               <button
                 className="button subtle share-button"
                 disabled={!room}
@@ -2200,6 +2230,10 @@ export default function Afterparty() {
                           : t("Klar")}
                     </small>
                   </div>
+                  {queued.length > 0 && <div className="queue-overview" aria-label={t("Queue overview")}>
+                    <span><ListMusic size={14} aria-hidden="true" />{t(queued.length === 1 ? "1 track" : "{count} tracks", { count: queued.length })}</span>
+                    {queueDuration !== null && <span title={t("Queue duration")}>{time(queueDuration)}</span>}
+                  </div>}
                   <div className="queue-content">
                     {room?.current && (
                       <article className="queue-current">
@@ -2394,21 +2428,16 @@ export default function Afterparty() {
                 ?.scrollIntoView({ block: "start", behavior: "smooth" })
             }
           >
-            {t("Spelar")}
+            <Music2 size={18} aria-hidden="true" /><span>{t("Spelar")}</span>
           </button>
           <button
-            onClick={() => {
-              setPanel("music");
-              requestAnimationFrame(() =>
-                document
-                  .querySelector<HTMLInputElement>(".search-form input")
-                  ?.focus(),
-              );
-            }}
+            aria-pressed={panel === "music"}
+            onClick={openMusicSearch}
           >
-            {t("Søk")}
+            <Search size={18} aria-hidden="true" /><span>{t("Søk")}</span>
           </button>
           <button
+            aria-pressed={panel === "queue"}
             onClick={() => {
               setPanel("queue");
               requestAnimationFrame(() =>
@@ -2418,9 +2447,10 @@ export default function Afterparty() {
               );
             }}
           >
-            {t("Kø")} {queueRoom?.queue.length ?? 0}
+            <ListMusic size={18} aria-hidden="true" /><span>{t("Kø")} <span className="mobile-queue-count">{queueRoom?.queue.length ?? 0}</span></span>
           </button>
           <button
+            aria-pressed={panel === "library"}
             onClick={() => {
               setPanel("library");
               requestAnimationFrame(() =>
@@ -2430,7 +2460,7 @@ export default function Afterparty() {
               );
             }}
           >
-            {t("Kveldar")}
+            <Sparkles size={18} aria-hidden="true" /><span>{t("Kveldar")}</span>
           </button>
         </nav>
       )}

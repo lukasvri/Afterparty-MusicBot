@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
-import { useId, useState } from "react";
-import { ListMusic, LoaderCircle, Plus, Search, X } from "lucide-react";
+import { useId, useRef, useState } from "react";
+import { ArrowLeft, History, ListMusic, LoaderCircle, Plus, Search } from "lucide-react";
 import { useLanguage } from "@/components/language";
 import { time, type Video, type HistoryVideo } from "@/lib/types";
 import { radioArtist } from "@/services/core/src/radio";
@@ -51,6 +51,7 @@ export function MusicDiscovery({
 }: Props) {
   const { t } = useLanguage();
   const descriptionId = useId();
+  const searchInput = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState({ key: "", count: 10 });
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const resultKey = resultQuery + ":" + shown.map(video => video.id).join(",");
@@ -68,6 +69,16 @@ export function MusicDiscovery({
       normalized !== needle && (!needle || normalized.includes(needle)) &&
       values.findIndex(candidate => normalize(candidate) === normalized) === index;
   }).slice(0, 4);
+  const search = () => {
+    setExpanded({ key: "", count: 10 });
+    setSuggestionsOpen(false);
+    onSearch();
+  };
+  const returnToHistory = () => {
+    onHistory();
+    searchInput.current?.focus();
+    setSuggestionsOpen(false);
+  };
   return (
     <section
       id="music-content"
@@ -79,18 +90,21 @@ export function MusicDiscovery({
       <div className="discovery-search-area"
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setSuggestionsOpen(false); }}
         onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.querySelector<HTMLInputElement>("input")?.focus(); setSuggestionsOpen(false); } }}>
+      <label className="discovery-search-heading" htmlFor={`${descriptionId}-query`}>{t("Finn musikk")}</label>
       <div className="discovery-search-tools">
         <form
           className="search-form"
           onSubmit={(e) => {
             e.preventDefault();
-            setExpanded({ key: "", count: 10 });
-            setSuggestionsOpen(false);
-            onSearch();
+            search();
           }}
         >
           <input
-            aria-label={t("Søk etter låt, artist eller YouTube-lenkje")}
+            ref={searchInput}
+            id={`${descriptionId}-query`}
+            type="search"
+            autoComplete="off"
+            enterKeyHint="search"
             placeholder={t("Låt, artist eller YouTube-lenkje")}
             value={query}
             onFocus={() => setSuggestionsOpen(true)}
@@ -102,21 +116,23 @@ export function MusicDiscovery({
           />
           <button
             className="button primary"
+            type="submit"
             aria-label={t("Søk etter musikk")}
             disabled={searching}
           >
             {searching ? (
-              <LoaderCircle className="spin" size={17} />
+              <LoaderCircle className="spin" size={17} aria-hidden="true" />
             ) : (
-              <Search size={17} />
+              <Search size={17} aria-hidden="true" />
             )}
+            <span>{t("Søk")}</span>
           </button>
         </form>
         {onPlaylist && (
           <button className="button subtle discovery-playlist" type="button" onClick={onPlaylist}
             aria-label={t("Import playlist")} title={`YouTube / Spotify ${t("Playlist")}`}>
             <ListMusic size={18} aria-hidden="true" />
-            <span>{t("Playlist")}</span>
+            <span>{t("Import playlist")}</span>
           </button>
         )}
       </div>
@@ -136,7 +152,9 @@ export function MusicDiscovery({
       )}
       </div>
       <div className="discovery-results-header">
-        {searched && <p className="search-result-query" title={resultQuery}>{t("Results for {query}", { query: resultQuery })}</p>}
+        {searched
+          ? <p className="search-result-query" title={resultQuery}>{t("Results for {query}", { query: resultQuery })}</p>
+          : <h3 className="discovery-history-heading"><History size={14} aria-hidden="true" />{t("Historikk")}</h3>}
         <div className="discovery-results-controls">
           <div className="search-chips" role={!searched ? "group" : undefined} aria-label={!searched ? t("Historikk") : undefined}>
             {!searched ? (
@@ -156,11 +174,11 @@ export function MusicDiscovery({
                   {t("Mest spelt")}
                 </button>
               </>
-            ) : (
-              <button onClick={onHistory}>
-                {t("Historikk")} <X size={12} />
+            ) : (searching || shown.length > 0) ? (
+              <button type="button" onClick={returnToHistory}>
+                <ArrowLeft size={13} aria-hidden="true" /> {t("Historikk")}
               </button>
-            )}
+            ) : null}
           </div>
           <p className="discovery-summary" role="status" aria-live="polite" aria-atomic="true">
             {adding ? t("Updating queue…") : !searching && shown.length > 0
@@ -218,10 +236,24 @@ export function MusicDiscovery({
           ); })}
         </div>
       ) : (
-        <div className="search-status">
-          {searched
-            ? t("Ingen treff. Prøv eit anna søk.")
-            : t("Ingen låtar i historikken enno.")}
+        <div className="search-status discovery-empty">
+          {searched ? <Search size={24} aria-hidden="true" /> : <History size={24} aria-hidden="true" />}
+          <div className="discovery-empty-copy">
+            <p>{searched ? t("Ingen treff. Prøv eit anna søk.") : t("Ingen låtar i historikken enno.")}</p>
+            {!searched && <p>{t("Søk etter ei låt eller lim inn ei YouTube-lenkje.")}</p>}
+          </div>
+          <div className="discovery-empty-actions">
+            {searched ? <>
+              <button type="button" className="button subtle" onClick={returnToHistory}>
+                <ArrowLeft size={14} aria-hidden="true" />{t("Historikk")}
+              </button>
+              <button type="button" className="button subtle" onClick={search}>
+                <Search size={14} aria-hidden="true" />{t("Prøv igjen")}
+              </button>
+            </> : <button type="button" className="button subtle" onClick={() => searchInput.current?.focus()}>
+              <Search size={14} aria-hidden="true" />{t("Finn musikk")}
+            </button>}
+          </div>
         </div>
       )}
       {searched && !searching && shown.length > 10 && (
