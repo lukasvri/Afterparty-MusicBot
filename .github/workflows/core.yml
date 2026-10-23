@@ -75,11 +75,14 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             services/core/package-lock.json
+            apps/web/package-lock.json
       - name: Report Node.js runtime (Node 26 compatibility trial)
         run: node --version
       - run: npm ci --no-audit --no-fund
       - name: Install locked Core dependencies for typed integration fixtures
         run: npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Install locked SvelteKit candidate dependencies
+        run: npm --prefix apps/web ci --no-audit --no-fund
       - name: Lint, typecheck, browser behavior tests and production build
         run: |
           npm run lint
@@ -87,6 +90,21 @@ jobs:
           npm run test:unit
           CF_WORKER_NAME=afterparty-ci CF_D1_DATABASE_NAME=afterparty-ci-db CF_D1_DATABASE_ID=12345678-1234-4123-8123-123456789abc npm run build:cloudflare
           npm run build
+      - name: Validate the SvelteKit candidate without changing the release artifact
+        run: |
+          npm --prefix apps/web run format:check
+          npm --prefix apps/web run check
+          npm --prefix apps/web test
+          npm --prefix apps/web run build
+      - name: Check SvelteKit desktop and mobile journeys with synthetic data
+        run: |
+          npx playwright install --with-deps chromium
+          npm --prefix apps/web run preview > /tmp/afterparty-web-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
+          npm --prefix apps/web run test:browser
+          npm --prefix apps/web run test:stack
       - name: Package the tested website output without rebuilding
         run: python3 scripts/build_release.py website
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

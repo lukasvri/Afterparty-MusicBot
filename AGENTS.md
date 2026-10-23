@@ -17,15 +17,19 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Development and validation
 
-- Use Node.js 24.17+, Python 3.11+ and FFmpeg. `npm run setup:cloud` installs both
-  locked dependency trees. `npm run check:all` runs lint with zero warnings,
+- Use Node.js 24.17+, Python 3.11+ and FFmpeg. `npm run setup:cloud` installs the
+  locked website, Core and isolated `apps/web` candidate dependency trees.
+  `npm run check:all` runs lint with zero warnings,
   recovery and application tests, both typechecks, Core audio tests with real
-  FFmpeg, and the website production build. Separate Playwright browser suites
+  FFmpeg, and the website production build. It also checks formatting/types,
+  tests and builds the SvelteKit candidate; see `docs/SVELTEKIT_MIGRATION.md`.
+  Separate Playwright browser suites
   are not included; run relevant browser suites for UI/playback changes. Docker
   is not required for these checks. For internal documentation-only edits,
   verify links and the diff without running the full application suite.
 - Core lives in `services/core/src/`; the website is in `app/`, `components/`,
-  `hooks/` and `lib/`. Preserve third-party license notices.
+  `hooks/` and `lib/`; the opt-in SvelteKit candidate is in `apps/web/`.
+  Preserve third-party license notices.
 - Keep changes focused and report the checks actually run and any limitations.
 - Preserve per-server queues, settings, permissions and databases. Owner access
   must not grant access to another server.

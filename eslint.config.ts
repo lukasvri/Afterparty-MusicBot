@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "apps/web/.svelte-kit/**",
+    "apps/web/.wrangler/**",
+    ".sites-runtime/**",
   ]),
 ]);
 

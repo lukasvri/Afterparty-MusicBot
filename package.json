@@ -8,6 +8,9 @@
   "scripts": {
     "install:ci": "node scripts/install-ci.ts",
     "dev": "node scripts/run-framework.ts dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build:web": "npm --prefix apps/web run build",
+    "test:web": "npm --prefix apps/web test",
     "build": "node scripts/run-framework.ts build",
     "start": "node --import ./scripts/sites-env.ts ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --max-warnings 0",

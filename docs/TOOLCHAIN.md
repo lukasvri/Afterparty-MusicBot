@@ -27,6 +27,11 @@ reason to add Astro to this application's runtime.
 
 ## Developer workflow and testing
 
+The repository includes an isolated SvelteKit 3/Svelte 5/TypeScript 6 listening-room
+candidate in `apps/web/`. See [the migration guide](SVELTEKIT_MIGRATION.md) for its
+locked versions, service-binding/D1 boundary, local verification and limitations.
+The existing website and Core remain the release baseline.
+
 | Tool | Project rule | Adoption state |
 | --- | --- | --- |
 | GitHub, pull requests, GitHub Actions | All changes live in GitHub; CI checks every review candidate. Use separate branches and draft PRs. | Already part of workflow |
@@ -34,9 +39,9 @@ reason to add Astro to this application's runtime.
 | Playwright | Use targeted desktop/mobile browser suites for user journeys, room synchronization, playback controls, search, admin and permissions. | Already in website dependencies and test scripts |
 | Node.js built-in tests | Retain current unit/integration suites until the migration justifies changing them. | Already used |
 | Vitest | Preferred for new Svelte component/unit tests when it gives useful framework integration. Do not replace all existing tests or add it before needed. | **Not yet adopted** |
-| Vite | Use the toolchain integrated with the chosen framework. | Already used with Vinext; SvelteKit integration pending |
+| Vite | Use the toolchain integrated with the chosen framework. | Used by the Vinext baseline and the isolated SvelteKit candidate; no production cutover |
 | ESLint | Retain existing checks and zero-warning discipline. | Already configured |
-| Prettier | Add only if format tooling is useful, compatible and does not conflict with existing scripts. | **Not yet adopted** |
+| Prettier | Scope formatting to the new Svelte candidate with the Svelte plugin. | Adopted in `apps/web/` only; legacy formatting remains unchanged |
 | Wrangler and Cloudflare | Validate the actual target Workers/D1 build locally in isolation; do not enable deployment or modify secrets/DNS. | Cloudflare tooling already present; production cutover not established |
 | Drizzle ORM | Retain typed schema/data access where already suitable. Test migrations against synthetic data only. | Already present |
 | Node.js runtime | **Node 26** is the preferred next LTS target; **Node 24** stays the proven production fallback. Node 26 enters LTS on 28 October 2026, subject to schedule changes. | Use Node 26 in the existing **website CI validation job** for early compatibility feedback. The Core Dockerfile and host runtime stay on Node 24 until tested and separately approved. |

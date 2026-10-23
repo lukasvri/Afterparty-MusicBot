@@ -1,0 +1,396 @@
+{
+  "sourceBase": "e69a2c1",
+  "candidate": "feat/afterparty-3-svelte-player (working tree)",
+  "date": "2026-10-23",
+  "node": "v24.19.0",
+  "chromium": "system /usr/bin/chromium",
+  "method": "Production Workers, fresh browser contexts, synthetic room/queue, no network or CPU throttle. Classic search tab open; Svelte search is inline. Measured successful same-origin script response bodies and gzipSync per file, not wire bytes, Lighthouse, Web Vitals or media latency. Feature coverage differs; this is a scoped payload observation, not a full-application performance comparison.",
+  "measurements": [
+    {
+      "label": "classic",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scriptCount": 23,
+      "scriptBytes": 773392,
+      "individuallyGzippedScriptBytes": 235630,
+      "externalOriginsBlocked": [
+        "https://i.ytimg.com"
+      ],
+      "scripts": [
+        {
+          "path": "/_next/static/chunks/record-BGze3w87.js",
+          "bytes": 79,
+          "gzipBytes": 94
+        },
+        {
+          "path": "/_next/static/chunks/rolldown-runtime-XKyaHtl9.js",
+          "bytes": 726,
+          "gzipBytes": 429
+        },
+        {
+          "path": "/_next/static/chunks/headers-0sAfgUrU.js",
+          "bytes": 3286,
+          "gzipBytes": 1286
+        },
+        {
+          "path": "/_next/static/chunks/framework-CoEnCyl2.js",
+          "bytes": 190038,
+          "gzipBytes": 59053
+        },
+        {
+          "path": "/_next/static/chunks/protocol-headers-De2985Ry.js",
+          "bytes": 327,
+          "gzipBytes": 177
+        },
+        {
+          "path": "/_next/static/chunks/index-D0QUGqq8.js",
+          "bytes": 204146,
+          "gzipBytes": 56249
+        },
+        {
+          "path": "/_next/static/chunks/app-elements-DivoMNzK.js",
+          "bytes": 12817,
+          "gzipBytes": 4223
+        },
+        {
+          "path": "/_next/static/chunks/app-rsc-render-mode-CAt0a5Fk.js",
+          "bytes": 668,
+          "gzipBytes": 344
+        },
+        {
+          "path": "/_next/static/chunks/hash-B9TVtkv9.js",
+          "bytes": 256,
+          "gzipBytes": 181
+        },
+        {
+          "path": "/_next/static/chunks/navigation-errors-q6nRL7l1.js",
+          "bytes": 3991,
+          "gzipBytes": 1618
+        },
+        {
+          "path": "/_next/static/chunks/app-rsc-cache-busting-BXjSzIE_.js",
+          "bytes": 4962,
+          "gzipBytes": 2046
+        },
+        {
+          "path": "/_next/static/chunks/deployment-id-omnKpZ2w.js",
+          "bytes": 84,
+          "gzipBytes": 96
+        },
+        {
+          "path": "/_next/static/chunks/layout-segment-context-Bq_IFaMc.js",
+          "bytes": 534,
+          "gzipBytes": 366
+        },
+        {
+          "path": "/_next/static/chunks/trash-2-BkczgzB9.js",
+          "bytes": 1466,
+          "gzipBytes": 689
+        },
+        {
+          "path": "/_next/static/chunks/language-BtnhWYFB.js",
+          "bytes": 67652,
+          "gzipBytes": 20557
+        },
+        {
+          "path": "/_next/static/chunks/afterparty-navigation-YTNTh39h.js",
+          "bytes": 49488,
+          "gzipBytes": 16169
+        },
+        {
+          "path": "/_next/static/chunks/afterparty-gKu0P3fQ.js",
+          "bytes": 166261,
+          "gzipBytes": 47728
+        },
+        {
+          "path": "/_next/static/chunks/link-D3ZMTxm9.js",
+          "bytes": 13678,
+          "gzipBytes": 5142
+        },
+        {
+          "path": "/_next/static/chunks/query-D5qkXgcY.js",
+          "bytes": 978,
+          "gzipBytes": 481
+        },
+        {
+          "path": "/_next/static/chunks/browser-api-8pJjQ2gp.js",
+          "bytes": 714,
+          "gzipBytes": 462
+        },
+        {
+          "path": "/_next/static/chunks/arrow-up-right-_svsVKKQ.js",
+          "bytes": 172,
+          "gzipBytes": 160
+        },
+        {
+          "path": "/_next/static/chunks/app-route-prefetch-policy-DlAPBwE2.js",
+          "bytes": 1104,
+          "gzipBytes": 559
+        },
+        {
+          "path": "/_next/static/chunks/releases-b3TV7QJ0.js",
+          "bytes": 49965,
+          "gzipBytes": 17521
+        }
+      ]
+    },
+    {
+      "label": "svelte",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scriptCount": 10,
+      "scriptBytes": 111763,
+      "individuallyGzippedScriptBytes": 43586,
+      "externalOriginsBlocked": [],
+      "scripts": [
+        {
+          "path": "/afterparty-app/immutable/entry/start.CZbLu1k2.js",
+          "bytes": 522,
+          "gzipBytes": 310
+        },
+        {
+          "path": "/afterparty-app/immutable/entry/payload.DSmR2FwN.js",
+          "bytes": 65,
+          "gzipBytes": 77
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/C8XtHrnI.js",
+          "bytes": 39714,
+          "gzipBytes": 14533
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/DaEaCWi9.js",
+          "bytes": 40741,
+          "gzipBytes": 15610
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/CRzLMJPS.js",
+          "bytes": 1534,
+          "gzipBytes": 798
+        },
+        {
+          "path": "/afterparty-app/immutable/entry/app.DtevvDwP.js",
+          "bytes": 1094,
+          "gzipBytes": 561
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/j961aMVC.js",
+          "bytes": 4301,
+          "gzipBytes": 1938
+        },
+        {
+          "path": "/afterparty-app/immutable/nodes/0.CTO4zlVE.js",
+          "bytes": 146,
+          "gzipBytes": 141
+        },
+        {
+          "path": "/afterparty-app/immutable/nodes/2.CnJwTP_e.js",
+          "bytes": 23324,
+          "gzipBytes": 9372
+        },
+        {
+          "path": "/afterparty-app/immutable/nodes/1.D6KRQHqR.js",
+          "bytes": 322,
+          "gzipBytes": 246
+        }
+      ]
+    },
+    {
+      "label": "classic",
+      "viewport": {
+        "width": 390,
+        "height": 1000
+      },
+      "scriptCount": 23,
+      "scriptBytes": 773392,
+      "individuallyGzippedScriptBytes": 235630,
+      "externalOriginsBlocked": [
+        "https://i.ytimg.com"
+      ],
+      "scripts": [
+        {
+          "path": "/_next/static/chunks/index-D0QUGqq8.js",
+          "bytes": 204146,
+          "gzipBytes": 56249
+        },
+        {
+          "path": "/_next/static/chunks/record-BGze3w87.js",
+          "bytes": 79,
+          "gzipBytes": 94
+        },
+        {
+          "path": "/_next/static/chunks/headers-0sAfgUrU.js",
+          "bytes": 3286,
+          "gzipBytes": 1286
+        },
+        {
+          "path": "/_next/static/chunks/rolldown-runtime-XKyaHtl9.js",
+          "bytes": 726,
+          "gzipBytes": 429
+        },
+        {
+          "path": "/_next/static/chunks/framework-CoEnCyl2.js",
+          "bytes": 190038,
+          "gzipBytes": 59053
+        },
+        {
+          "path": "/_next/static/chunks/protocol-headers-De2985Ry.js",
+          "bytes": 327,
+          "gzipBytes": 177
+        },
+        {
+          "path": "/_next/static/chunks/app-elements-DivoMNzK.js",
+          "bytes": 12817,
+          "gzipBytes": 4223
+        },
+        {
+          "path": "/_next/static/chunks/hash-B9TVtkv9.js",
+          "bytes": 256,
+          "gzipBytes": 181
+        },
+        {
+          "path": "/_next/static/chunks/app-rsc-render-mode-CAt0a5Fk.js",
+          "bytes": 668,
+          "gzipBytes": 344
+        },
+        {
+          "path": "/_next/static/chunks/app-rsc-cache-busting-BXjSzIE_.js",
+          "bytes": 4962,
+          "gzipBytes": 2046
+        },
+        {
+          "path": "/_next/static/chunks/navigation-errors-q6nRL7l1.js",
+          "bytes": 3991,
+          "gzipBytes": 1618
+        },
+        {
+          "path": "/_next/static/chunks/deployment-id-omnKpZ2w.js",
+          "bytes": 84,
+          "gzipBytes": 96
+        },
+        {
+          "path": "/_next/static/chunks/layout-segment-context-Bq_IFaMc.js",
+          "bytes": 534,
+          "gzipBytes": 366
+        },
+        {
+          "path": "/_next/static/chunks/trash-2-BkczgzB9.js",
+          "bytes": 1466,
+          "gzipBytes": 689
+        },
+        {
+          "path": "/_next/static/chunks/afterparty-gKu0P3fQ.js",
+          "bytes": 166261,
+          "gzipBytes": 47728
+        },
+        {
+          "path": "/_next/static/chunks/link-D3ZMTxm9.js",
+          "bytes": 13678,
+          "gzipBytes": 5142
+        },
+        {
+          "path": "/_next/static/chunks/language-BtnhWYFB.js",
+          "bytes": 67652,
+          "gzipBytes": 20557
+        },
+        {
+          "path": "/_next/static/chunks/afterparty-navigation-YTNTh39h.js",
+          "bytes": 49488,
+          "gzipBytes": 16169
+        },
+        {
+          "path": "/_next/static/chunks/app-route-prefetch-policy-DlAPBwE2.js",
+          "bytes": 1104,
+          "gzipBytes": 559
+        },
+        {
+          "path": "/_next/static/chunks/releases-b3TV7QJ0.js",
+          "bytes": 49965,
+          "gzipBytes": 17521
+        },
+        {
+          "path": "/_next/static/chunks/query-D5qkXgcY.js",
+          "bytes": 978,
+          "gzipBytes": 481
+        },
+        {
+          "path": "/_next/static/chunks/browser-api-8pJjQ2gp.js",
+          "bytes": 714,
+          "gzipBytes": 462
+        },
+        {
+          "path": "/_next/static/chunks/arrow-up-right-_svsVKKQ.js",
+          "bytes": 172,
+          "gzipBytes": 160
+        }
+      ]
+    },
+    {
+      "label": "svelte",
+      "viewport": {
+        "width": 390,
+        "height": 1000
+      },
+      "scriptCount": 10,
+      "scriptBytes": 111763,
+      "individuallyGzippedScriptBytes": 43586,
+      "externalOriginsBlocked": [],
+      "scripts": [
+        {
+          "path": "/afterparty-app/immutable/entry/start.CZbLu1k2.js",
+          "bytes": 522,
+          "gzipBytes": 310
+        },
+        {
+          "path": "/afterparty-app/immutable/entry/payload.DSmR2FwN.js",
+          "bytes": 65,
+          "gzipBytes": 77
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/DaEaCWi9.js",
+          "bytes": 40741,
+          "gzipBytes": 15610
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/CRzLMJPS.js",
+          "bytes": 1534,
+          "gzipBytes": 798
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/C8XtHrnI.js",
+          "bytes": 39714,
+          "gzipBytes": 14533
+        },
+        {
+          "path": "/afterparty-app/immutable/chunks/j961aMVC.js",
+          "bytes": 4301,
+          "gzipBytes": 1938
+        },
+        {
+          "path": "/afterparty-app/immutable/nodes/0.CTO4zlVE.js",
+          "bytes": 146,
+          "gzipBytes": 141
+        },
+        {
+          "path": "/afterparty-app/immutable/nodes/2.CnJwTP_e.js",
+          "bytes": 23324,
+          "gzipBytes": 9372
+        },
+        {
+          "path": "/afterparty-app/immutable/entry/app.DtevvDwP.js",
+          "bytes": 1094,
+          "gzipBytes": 561
+        },
+        {
+          "path": "/afterparty-app/immutable/nodes/1.D6KRQHqR.js",
+          "bytes": 322,
+          "gzipBytes": 246
+        }
+      ]
+    }
+  ]
+}
