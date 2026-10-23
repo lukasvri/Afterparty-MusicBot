@@ -10,19 +10,22 @@ export function viewState(value = {}) {
   const running = value.running === true;
   const checking = value.checking === true;
   const failed = ['blocked', 'failed'].includes(value.stage);
-  const current = typeof value.current_commit === 'string' ? value.current_commit : value.deployed_commit;
+  const checkFailed = failed && value.operation === 'check';
+  const current = typeof value.current_commit === 'string' ? value.current_commit : value.deployed_commit || value.last_deployment_commit;
   const sameVersion = value.available === false && current && current === value.commit;
   const updated = !running && !checking && !failed && (value.stage === 'done' || sameVersion);
   const ready = value.ready === true && value.available !== false && !running && !checking && !failed;
+  const retrySeconds = typeof value.retry_after === 'number' ? Math.max(0, Math.ceil(value.retry_after - Date.now()/1000)) : 0;
   return {
+    retrySeconds,
     current,
     updated,
     ready,
     error: failed ? value.error || value.message || '' : '',
-    headline: checking ? 'Kontrollerer betaversjonen' : running ? 'Betaoppdatering pågår' : failed ? 'Betaoppdateringen trenger oppfølging' : updated ? 'Beta er oppdatert' : ready ? 'Ny betaversjon er klar' : 'Sjekk betaversjonen',
+    headline: checking ? 'Kontrollerer betaversjonen' : running ? 'Betaoppdatering pågår' : checkFailed ? 'Statuskontrollen ble ikke fullført' : failed ? 'Betaoppdateringen trenger oppfølging' : updated ? 'Beta er oppdatert' : ready ? 'Ny betaversjon er klar' : 'Sjekk betaversjonen',
     message: updated ? 'Siste kontrollerte betaversjon er allerede på nett. Ingen oppdatering er nødvendig.' : value.message || 'Kontroller GitHub-versjonen før du oppdaterer.',
     progressLabel: running ? 'Oppdatering pågår' : value.progress_kind === 'last' ? 'Siste fullførte oppdatering' : failed ? 'Ikke fullført' : value.stage === 'done' ? 'Fullført' : 'Ingen oppdatering pågår',
-    actionTitle: updated ? 'Beta er oppdatert' : ready ? 'Publiser ny betaversjon' : checking ? 'Kontrollerer betaversjonen' : failed ? 'Kontroller feilen før nytt forsøk' : 'Sjekk før du oppdaterer'
+    actionTitle: updated ? 'Beta er oppdatert' : ready ? 'Publiser ny betaversjon' : checking ? 'Kontrollerer betaversjonen' : checkFailed ? 'Prøv statuskontrollen igjen' : failed ? 'Kontroller feilen før nytt forsøk' : 'Sjekk før du oppdaterer'
   };
 }
 export function frozenRequest(state) {

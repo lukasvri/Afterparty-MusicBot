@@ -92,8 +92,8 @@ if (panel && workspace && workspace.querySelector('.project-switcher')) {
       li.append(icon,document.createTextNode(step.label || step.name || 'Kontroll'));list.append(li);
     }
     find('error').textContent = view.error; find('error').hidden = !view.error;
-    check.disabled = busy || value.running || value.checking;
-    check.textContent = value.checking ? 'Sjekker beta…' : 'Sjekk status';
+    check.disabled = busy || value.running || value.checking || view.retrySeconds > 0;
+    check.textContent = value.checking ? 'Sjekker beta…' : view.retrySeconds > 0 ? `Prøv igjen om ${Math.ceil(view.retrySeconds / 60)} min` : 'Sjekk status';
     open.disabled = busy || !view.ready;
     open.textContent = value.running ? 'Oppdaterer beta…' : 'Oppdater beta';
   };

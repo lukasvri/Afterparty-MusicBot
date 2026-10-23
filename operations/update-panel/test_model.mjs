@@ -24,3 +24,7 @@ test('old errors are not shown after a successful check',()=>{
 test('a check preserves the label of the last completed job',()=>{
  assert.equal(viewState({stage:'ready',progress_kind:'last'}).progressLabel,'Siste fullførte oppdatering');
 });
+test('quota failures remain check failures and retain recorded deployment and progress',()=>{
+ const v=viewState({stage:'failed',operation:'check',error:'Quota',last_deployment_commit:commit,progress_kind:'last',retry_after:Date.now()/1000+300});
+ assert.equal(v.headline,'Statuskontrollen ble ikke fullført');assert.equal(v.current,commit);assert.equal(v.ready,false);assert.ok(v.retrySeconds>0);assert.equal(v.progressLabel,'Siste fullførte oppdatering');
+});

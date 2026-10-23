@@ -75,7 +75,7 @@ class BetaUpdater:
         # Only a small public schema crosses the HTTP boundary.
         fields = ('checked_at', 'commit', 'confirmation_id', 'ready', 'running', 'message',
                   'steps', 'deployed_commit', 'health', 'stage', 'updated_at', 'error', 'version',
-                  'available', 'current_commit')
+                  'available', 'current_commit', 'operation', 'retry_after')
         result = {key: state[key] for key in fields if key in state}
         result.update(environment='Beta', site_url='https://ap.beta.openworks.no',
                       branch='beta-svelte-3', checking=self.checking)
@@ -92,6 +92,11 @@ class BetaUpdater:
         recorded = (current.get('status') == 'succeeded'
                     and isinstance(current.get('commit'), str)
                     and re.fullmatch('[a-f0-9]{40}', current['commit']))
+        if recorded:
+            result['last_deployment_commit'] = current['commit']
+            if isinstance(current.get('time'), (float, int)):
+                result['last_deployment_at'] = current['time']
+        check_failure = failed and state.get('operation') == 'check'
         live = result['running']
         phase = state.get('stage')
         worker = previous.get('active_worker')
@@ -101,11 +106,11 @@ class BetaUpdater:
                   ('frontend', 'Bygg og publiser betaens frontend'),
                   ('verify', 'Kontroller betasiden og forbindelsen'),
                   ('done', 'Lagre kontrollert resultat')]
-        result['progress_kind'] = 'current' if live or failed else 'last' if recorded else 'none'
+        result['progress_kind'] = 'current' if live or (failed and not check_failure) else 'last' if recorded else 'none'
         steps = []
         for name, label in labels:
             status = 'pending'
-            if not live and not failed and recorded:
+            if not live and (not failed or check_failure) and recorded:
                 status = 'done'
             elif name == 'validate':
                 status = 'running' if live and phase == 'validate' else 'done' if phase in ('cloudflare', 'verify', 'done') else 'failed' if failed else 'pending'
@@ -127,6 +132,9 @@ class BetaUpdater:
 
     def request_check(self):
         with self.mutex, self._locks():
+            retry = self._read('state.json').get('retry_after')
+            if isinstance(retry, (int, float)) and time.time() < retry:
+                return False
             if self.checking or self.status()['running']:
                 return False
             self.checking = True

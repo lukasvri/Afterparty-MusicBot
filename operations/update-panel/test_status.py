@@ -56,6 +56,22 @@ class StatusTests(unittest.TestCase):
         self.save('rollback.json', {'completed_builds':{'afterparty-staging':{'status':'succeeded'}}})
         self.assertEqual([s['status'] for s in self.adapter.status()['steps']], ['running','pending','pending','pending','pending'])
 
+    def test_rate_limit_prevents_another_background_check(self):
+        self.state['retry_after'] = time.time() + 300
+        self.save('state.json', self.state)
+        with patch('beta_adapter.subprocess.run') as run:
+            self.assertFalse(self.adapter.request_check())
+        run.assert_not_called()
+
+    def test_failed_check_keeps_last_deployment_and_completed_progress(self):
+        self.state.update(stage='failed', operation='check', current_commit=None, commit=None)
+        self.save('state.json', self.state)
+        self.save('current.json', {'status':'succeeded', 'commit':COMMIT, 'time':1000})
+        status = self.adapter.status()
+        self.assertEqual(status['last_deployment_commit'], COMMIT)
+        self.assertEqual(status['progress_kind'], 'last')
+        self.assertTrue(all(s['status']=='done' for s in status['steps']))
+
     def test_stale_error_is_removed_after_successful_check(self):
         self.state['error'] = 'old error'
         self.save('state.json', self.state)

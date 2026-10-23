@@ -46,6 +46,11 @@ An already deployed version cannot be started again through this adapter.
 - The route for `_astro/*.js` and `_astro/*.css` must serve authenticated static
   assets. The installer does not change the gateway or authentication policy.
 
+GitHub rate limits are reported with a retry countdown and prevent repeated
+background checks until the provider permits them. The last deployed source
+and completed job remain visible if a new check fails. No token or extra
+GitHub permissions are introduced.
+
 The adapter reports safe progress derived from the current transaction and the
 last successful job. A status check does not erase completed progress. Private
 hosting identifiers, log contents and credentials are never returned to the UI.
@@ -66,6 +71,7 @@ layout against the authenticated panel. Do not publish merely to test the UI.
 ## Recovery
 
 Restore the prior index, server, adapter and `update_panel.py` from the installer
-backup. Restore its `channel-ui-source` directory when present, or remove the
+backup. If the beta runner was patched, restore its backed-up `beta_update.py`
+and prior `github_checks.py` alongside it. Restore its `channel-ui-source` directory when present, or remove the
 index-rendering hook when reverting to a version without it. Restart only the
 panel web service. Old hashed assets are retained for already open clients.
