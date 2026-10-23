@@ -170,3 +170,30 @@
   .concert-shell .library-panel .discovery .search-form input,
   .discovery .search-form input { font-size:16px; }
 }
+
+/* Give search and playlist import their own clear actions, including on narrow panels. */
+.discovery .discovery-search-area { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px 12px; }
+.discovery .discovery-search-heading { min-width:0; font-size:15px; font-weight:650; line-height:1.35; color:var(--text); }
+.discovery .discovery-search-tools { display:contents; }
+.concert-shell .library-panel .discovery .search-form,
+.discovery .search-form { grid-column:1/-1; grid-row:2; }
+.concert-shell .library-panel .discovery .search-form .button,
+.discovery .search-form .button { width:auto; min-width:80px; padding:0 12px; gap:7px; font-size:12px; }
+.concert-shell .discovery .discovery-playlist,
+.discovery .discovery-playlist { grid-column:2; grid-row:1; width:auto; min-height:44px; height:44px; padding:0 10px; gap:7px; font-size:11px; }
+.concert-shell .discovery .discovery-playlist>span,
+.discovery .discovery-playlist>span { display:inline; }
+.discovery .search-suggestions { grid-column:1/-1; margin:4px 0 0; }
+.discovery .discovery-history-heading { display:flex; align-items:center; gap:7px; margin-bottom:8px; color:var(--muted); font-size:12px; font-weight:500; }
+.concert-shell .discovery .discovery-empty,
+.discovery .discovery-empty { flex-direction:column; min-height:240px; padding:32px 12px; gap:16px; }
+.discovery .discovery-empty>svg { color:var(--muted); }
+.discovery .discovery-empty-copy { max-width:260px; }
+.discovery .discovery-empty-copy>p:first-child { color:var(--text); font-weight:550; }
+.discovery .discovery-empty-copy>p+p { margin-top:7px; font-size:12px; }
+.discovery .discovery-empty-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.discovery .discovery-empty-actions .button { min-height:44px; gap:7px; padding:9px 12px; font-size:12px; }
+@container(max-width:280px) {
+  .discovery .discovery-search-heading { grid-column:1/-1; }
+  .concert-shell .discovery .discovery-playlist { grid-column:1/-1; grid-row:3; justify-self:start; }
+}

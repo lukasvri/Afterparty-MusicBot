@@ -17,7 +17,7 @@ const track: Video = {
   title: 'Local D1 soundtrack',
   artist: 'Synthetic Artist',
   duration: 240,
-  image: '',
+  image: '/afterparty-mark.svg',
   live: false,
   embeddable: true,
 };
@@ -89,7 +89,7 @@ test(
         compatibility_flags: ['nodejs_compat'],
         assets: { directory: `${root}apps/web/.svelte-kit/cloudflare`, binding: 'ASSETS' },
         services: [{ binding: 'AFTERPARTY_API', service: 'afterparty-api-test' }],
-        vars: { AFTERPARTY_BETA_ENTRY: '1' },
+        vars: { AFTERPARTY_BETA_ENTRY: '0' },
       }),
     );
     let output = '';
@@ -171,12 +171,17 @@ test(
     await waitForWorker(`${origin}/api/me`, webWorker);
 
     const landing = await fetch(`${origin}/?room=TESTROOM`, { redirect: 'manual' });
-    assert.equal(landing.status, 307);
-    assert.equal(landing.headers.get('Location'), `${origin}/v3?room=TESTROOM`);
+    assert.equal(landing.status, 200);
+    assert.equal(landing.headers.get('Location'), null);
+    assert.match(landing.headers.get('Content-Type') ?? '', /text\/html/);
+    await landing.text();
     const classic = await fetch(`${origin}/?classic=1`, { redirect: 'manual' });
     assert.equal(classic.status, 200);
     assert.match(classic.headers.get('Content-Type') ?? '', /text\/html/);
     await classic.text();
+    const prototype = await fetch(`${origin}/v3`, { redirect: 'manual' });
+    assert.equal(prototype.status, 200);
+    await prototype.text();
 
     async function api<T>(path: string, token?: string, input?: unknown, sourceOrigin = origin) {
       const response = await fetch(origin + path, {
@@ -291,14 +296,17 @@ test(
         return route.continue();
       });
       await page.goto(`${origin}/?room=${room.code}`);
-      assert.equal(page.url(), `${origin}/v3?room=${room.code}`);
-      await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Resume playback' }).isEnabled(), true);
+      assert.equal(page.url(), `${origin}/?room=${room.code}`);
+      await page.locator('.track-details h2').getByText(track.title, { exact: true }).waitFor();
+      assert.equal(await page.locator('.now-playing .shared-play').isEnabled(), true);
+      await page.locator('.room-search').click();
+      await page.locator('.search-form input').fill('synthetic afterparty');
+      await page.locator('.search-form button[type=submit]').click();
       await page
-        .getByRole('textbox', { name: 'Search songs or artists' })
-        .fill('synthetic afterparty');
-      await page.getByRole('button', { name: 'Find music' }).click();
-      await page.getByRole('button', { name: `Add ${track.title} to queue` }).waitFor();
+        .locator('.music-row')
+        .filter({ hasText: track.title })
+        .locator('.add-track')
+        .waitFor();
       assert.deepEqual(external, []);
     } finally {
       await browser.close();

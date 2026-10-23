@@ -96,13 +96,17 @@ jobs:
           npm --prefix apps/web run check
           npm --prefix apps/web test
           npm --prefix apps/web run build
-      - name: Check SvelteKit desktop and mobile journeys with synthetic data
+      - name: Check Classic and experimental desktop/mobile journeys with synthetic data
         run: |
           npx playwright install --with-deps chromium
+          XDG_CONFIG_HOME="$PWD/.sites-runtime/config" npm run start -- --name afterparty-api-local > /tmp/afterparty-api-preview.log 2>&1 &
+          api_preview_pid=$!
           npm --prefix apps/web run preview > /tmp/afterparty-web-preview.log 2>&1 &
           preview_pid=$!
-          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
-          node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
+          trap 'kill "$preview_pid" "$api_preview_pid" 2>/dev/null || true' EXIT
+          node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
+          PREVIEW_URL=http://127.0.0.1:5174 npm run test:search
+          PREVIEW_URL=http://127.0.0.1:5174 npm run test:sync
           npm --prefix apps/web run test:browser
           npm --prefix apps/web run test:stack
       - name: Package the tested website output without rebuilding

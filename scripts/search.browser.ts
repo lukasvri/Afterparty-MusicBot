@@ -50,7 +50,7 @@ async function fixture(width: number, language = "en") {
       const query = url.searchParams.get("q")!; searches.push(query);
       const held = holds.get(query);
       if (held) { held.entered(); await held.wait; }
-      return query.startsWith("Slow") ? deliver(route, { error: "Retired search failed" }, 503) : deliver(route, { videos: results });
+      return query.startsWith("Slow") ? deliver(route, { error: "Retired search failed" }, 503) : deliver(route, { videos: query === "No matches" ? [] : results });
     }
     if (url.pathname === "/api/history") return deliver(route, { videos: [
       { ...track("history0000", "Machine Artist - Fabricated Song", "Machine Artist - Topic"), aiGenerated: true },
@@ -193,3 +193,68 @@ test("a cold search can finish after thirteen real seconds without being cut off
     assert.deepEqual(f.searches, ["Cold artist"]); assert.deepEqual(f.writes, []); assert.deepEqual(f.errors, []);
   } finally { await f.close(); }
 });
+
+for (const width of [1440, 390]) {
+  test(`${width}px: Classic room search shortcuts, queue overview and empty-result recovery`, async () => {
+    const f = await fixture(width);
+    try {
+      const { page } = f;
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.locator('#queue-tab').click();
+      await page.keyboard.press('/');
+      const input = page.getByRole('searchbox', { name: 'Find music', exact: true });
+      await input.waitFor();
+      await page.waitForFunction(() => document.activeElement?.matches('.search-form input'));
+      assert(await input.evaluate(element => element === document.activeElement));
+      assert.deepEqual(f.searches, [], 'opening search does not contact a provider');
+      await input.fill('Literal ');
+      await page.keyboard.press('/');
+      assert.equal(await input.inputValue(), 'Literal /', 'typing in a field does not trigger a shortcut');
+      await page.locator('#queue-tab').click();
+      await page.keyboard.press('Control+k');
+      await input.waitFor();
+      await page.waitForFunction(() => document.activeElement?.matches('.search-form input'));
+      assert(await input.evaluate(element => element === document.activeElement));
+      await input.fill('No matches');
+      await page.locator('.search-form button[type=submit]').click();
+      await page.locator('.discovery-empty').getByText('No results. Try another search.', { exact: true }).waitFor();
+      await page.locator('.discovery-empty').getByRole('button', { name: 'Try again', exact: true }).click();
+      await page.locator('.discovery-empty').getByText('No results. Try another search.', { exact: true }).waitFor();
+      assert.deepEqual(f.searches, ['No matches', 'No matches']);
+      await page.locator('.discovery-empty').getByRole('button', { name: 'History', exact: true }).click();
+      assert.equal(await input.inputValue(), '');
+      assert(await input.evaluate(element => element === document.activeElement));
+      await page.locator('.music-row').filter({ hasText: 'History Artist - Earlier Song' }).waitFor();
+      await input.fill('Queue picks');
+      await page.locator('.search-form button[type=submit]').click();
+      await page.locator('.music-row').filter({ hasText: 'Search Result 10' }).waitFor();
+      for (const index of [0, 1]) {
+        const changed = page.waitForResponse(response => response.request().method() === 'POST');
+        await page.locator('.music-row').nth(index).locator('.add-track').click();
+        await changed;
+      }
+      await page.locator('#queue-tab').click();
+      await page.locator('.queue-overview').getByText('2 tracks', { exact: true }).waitFor();
+      assert.equal(await page.locator('.queue-overview').getByText('6:00', { exact: true }).count(), 1);
+      await page.locator('.room-search').click();
+      await input.waitFor();
+      await page.waitForFunction(() => document.activeElement?.matches('.search-form input'));
+      assert(await input.evaluate(element => element === document.activeElement));
+      assert.deepEqual(f.writes, [f.results[0].id, f.results[1].id]);
+      assert.deepEqual(f.searches, ['No matches', 'No matches', 'Queue picks']);
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (width === 390) {
+        assert.equal(await page.locator('.mobile-party-nav button[aria-pressed=true]').textContent(), 'Search');
+        const box = await page.locator('.room-search').boundingBox();
+        assert(box && box.width >= 44 && box.height >= 44);
+      }
+      await page.clock.runFor(5000);
+      if (width === 390) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.locator('.library-panel').evaluate(element => element.scrollIntoView({ block: 'start', behavior: 'instant' }));
+      }
+      await page.screenshot({ path: `/tmp/afterparty-classic-improved-${width}.png`, fullPage: width > 390 });
+      assert.deepEqual(f.errors, []);
+    } finally { await f.close(); }
+  });
+}
