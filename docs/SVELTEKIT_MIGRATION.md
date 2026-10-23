@@ -20,6 +20,12 @@ official YouTube iframe API after an explicit local activation. A guest can add
 music but cannot control the host's timeline. Leaving destroys local playback and
 cancels polling and in-flight work while preserving saved ownership.
 
+Rooms backed by Core receive live timeline updates through the existing event
+stream. Each validated timeline has a maximum five-second lease. The interface
+falls back to one-second authenticated polling when the stream is unavailable;
+healthy streams retain ten-second reads for permissions and presence. Restoring
+a connection reads current intent and never replays play, seek or next commands.
+
 The interface uses the canonical vector logo and self-hosted Inter font directly
 from `public/`, black surfaces, red controls, keyboard focus, touch targets and
 reduced-motion support. Desktop and mobile use the same component tree. Styling
@@ -59,7 +65,12 @@ Room mutations include the latest version and existing visitor/host headers.
 Commands are serialized; a conflict refreshes state without replaying the command.
 Late responses cannot cross a room switch or overwrite a newer timeline.
 Read failures stop local audio; reconnecting only reads current intent and cannot
-send recovery play/skip commands. Polling uses the existing shared playback helpers.
+send recovery play/skip commands. Live updates use the existing protocol validator,
+monotonic clock calibration and shared playback helpers. Stale/duplicate frames
+cannot extend a lease, and retired Core epochs are fenced across both stream and
+HTTP responses. Public stream payloads cannot grant permissions or overwrite
+authenticated room presence. Expired timelines disable playback writes. Leaving
+or changing rooms closes streams, clock samples, retry/watchdog timers and reads.
 Search and radio-dependent next retain the existing 35-second catalog budget;
 editing a query immediately cancels and retires its previous request.
 Server/Core progression owns automatic next; delayed browser end events never
@@ -128,6 +139,13 @@ and the isolated D1 stack test. Each application
 retains its own locked Wrangler version during local integration. The signed release packaging remains
 unchanged and contains the existing website only. No deployment steps were added.
 
+The browser suite also opens two isolated clients, desktop and mobile, against a
+loopback HTTP fixture using native `EventSource`. It verifies immediate host/guest
+updates, reduced room reads while the stream is fresh, Core epoch rollover,
+polling fallback, failure recovery without unpausing and stream/poll cleanup.
+This fixture supplies fictional API and event data; it is separate from the real
+local Workers/D1 test and does not establish live provider or Discord audio.
+
 See [screenshots and measurement provenance](assets/README.md). The candidate is
 smaller in feature scope than Classic; payload observations must not be presented
 as full-application performance parity. No audible Discord, live provider,
@@ -151,9 +169,9 @@ on Node 24 and its runtime configuration was not changed.
 
 ## Remaining work and rollout boundary
 
-- Browser rooms currently use authoritative one-second polling, not SSE. Forwarding
-  supports streaming, but a Svelte subscription/lease/recovery implementation and
-  two-client transport tests remain future slices.
+- Live subscriptions cover private browser-room timelines. Discord/concert stream
+  consumption and their controls remain separate migration slices. D1-only rooms
+  continue to work through polling when Core streaming is unavailable.
 - Discord control, concerts, playlists/library, games, advanced room moderation,
   saved language choices and the three administration settings groups remain in
   Classic through existing links. These capabilities are not removed or ported.

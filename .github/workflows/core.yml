@@ -21,7 +21,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Deployment failure and recovery tests with synthetic data
-        run: python3 -m unittest discover -s tests -v
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 -m unittest discover -s operations/update-panel -p 'test_*.py' -v
   core:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
