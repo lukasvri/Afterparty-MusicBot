@@ -35,6 +35,8 @@ The locked candidate uses SvelteKit 3.1.0, Svelte 5.57.2, TypeScript 6.0.3,
 Vite 8.3.5, adapter-cloudflare 8.0.1 and Wrangler 4.118.0. Their declared peer
 ranges are compatible. TypeScript 7 is available but outside Kit's TypeScript 6
 peer range. The existing website/Core TypeScript and Node 24 runtime are retained.
+The candidate also retains the root project's patched Sharp and Undici overrides
+for Wrangler/Miniflare's local development dependencies.
 Kit 3 configuration lives in the Vite plugin, uses `#lib` package imports and
 `$app/tsconfig`, and accesses bindings through `cloudflare:workers`.
 
