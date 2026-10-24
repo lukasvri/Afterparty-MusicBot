@@ -19,9 +19,11 @@ interface FixtureDatabase {
   batch(statements: FixtureStatement[]): Promise<unknown[]>;
 }
 const context: {
-  env: { ADMIN_BRIDGE_KEY: string };
+  env: { ADMIN_BRIDGE_KEY: string; GUTTA_CORE_BRIDGE_MODE?: string };
+  core: Record<string,unknown> | null;
+  coreRequest: ((...args: unknown[])=>Promise<unknown>) | null;
   db: FixtureDatabase | null;
-} = { env: { ADMIN_BRIDGE_KEY: "synthetic-key" }, db: null };
+} = { env: { ADMIN_BRIDGE_KEY: "synthetic-key" }, db: null, core: null, coreRequest: null };
 const globals = globalThis as typeof globalThis & {
   __bridgeTestContext: typeof context;
 };
@@ -51,9 +53,11 @@ const hooks = registerHooks({
       if (specifier === "./core-server" || specifier === "./discord-auth")
         return {
           url: moduleUrl(`
-          export const coreUrl=()=>null;
+          export const coreUrl=()=>globalThis.__bridgeTestContext.core?'https://synthetic.invalid':null;
+          export const corePresence=async(guild,room)=>{const state=globalThis.__bridgeTestContext.core;if(!state||guild&&state.guildId!==guild||room&&state.roomCode!==room)throw Error('Core unavailable');return state;};
+          export const legacyBridgeOverride=()=>globalThis.__bridgeTestContext.env.GUTTA_CORE_BRIDGE_MODE==='legacy';
           export const commandTicket=async()=>({});
-          export const coreRequest=async()=>{throw Error('Unexpected Core request');};
+          export const coreRequest=async(...args)=>{if(globalThis.__bridgeTestContext.coreRequest)return globalThis.__bridgeTestContext.coreRequest(...args);throw Error('Unexpected Core request');};
           export const adminState=async()=>{throw Error('Unexpected admin request');};
         `),
           shortCircuit: true,
@@ -76,6 +80,9 @@ const { bridge, discord, publicCommand } = await import("../lib/party.ts");
 hooks.deregister();
 
 function fixture() {
+  context.core=null;
+  context.coreRequest=null;
+  delete context.env.GUTTA_CORE_BRIDGE_MODE;
   const sqlite = new DatabaseSync(":memory:");
   for (const file of readdirSync(new URL("../drizzle/", import.meta.url))
     .filter((f) => f.endsWith(".sql"))
@@ -514,4 +521,127 @@ test("equal publication counters with altered checkpoint or payload cannot updat
       'an exact duplicate may reconstruct only its previously accepted checkpoint');
     assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state').all(), presence, 'exact retries never extend liveness');
   } finally { sqlite.close(); }
+});
+
+const authorityCapability = 'core-authority-v1';
+function authorityPublication(bridgeRevision: number, checkpointRevision: number, extra: Record<string, unknown> = {}) {
+ const live = { ...state, epoch:'epoch-current', sequence:1, buffering:false, guildId:guild, roomCode:'DISCORD1', online:true, ...extra };
+ context.core=live;
+ return {guildId:guild,roomCode:'DISCORD1',presenceCapability:authorityCapability,bridgeRevision,checkpointRevision,state:live};
+}
+test('Core authority eliminates idle presence writes and bounds active writes to durable checkpoints',async(t)=>{
+ let now=1800000000000;t.mock.method(Date,'now',()=>now);
+ const measured:Record<string,number>={};
+ for(const active of [false,true]){
+  const sqlite=fixture();
+  try{
+   let baseline=0;
+   for(let sample=0;sample<=60;sample++){
+    const publication=authorityPublication(sample+1,active?1+Math.floor(sample/12)*12:1,{playing:active,position:sample*5,current:active?{id:'abcdefghijk',title:'Concert',artist:'Test',duration:900,concert:true}:null});
+    now+=5000;
+    await bridge(request(),publication);
+    if(sample===0)baseline=Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n);
+   }
+   measured[active?'active':'idle']=Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n)-baseline;
+   assert.equal(measured[active?'active':'idle'],active?10:0);
+   assert.equal((await discord(false,guild)).state?.online,true);
+   context.core=null;
+   const offline=(await discord(false,guild)).state!;
+   assert.equal(offline.online,false);assert.equal(offline.playing,false);
+  }finally{sqlite.close();}
+ }
+ t.diagnostic('Negotiated five-minute table-row writes excluding seed: '+JSON.stringify(measured));
+});
+test('negotiated state rejects stale intent and other guilds, cannot silently downgrade, and requires verified fresh checkpoint to roll back',async()=>{
+ const sqlite=fixture();
+ try{
+  await bridge(request(),authorityPublication(10,10));
+  const saved=()=>sqlite.prepare('SELECT * FROM bot_state').all();
+  const initial=saved();
+  const stale=authorityPublication(11,11);context.core={...context.core!,sequence:2};
+  await assert.rejects(bridge(request(),stale),{status:409});assert.deepEqual(saved(),initial);
+  context.core={...context.core!,guildId:otherGuild};
+  await bridge(request(),stale);assert.deepEqual(saved(),initial);
+  context.core=null;
+  await bridge(request(),stale);assert.deepEqual(saved(),initial);
+  // A rolling old binary cannot remove persisted mode even with a stale payload
+  // whose publication counter appears newer.
+  for(const override of [undefined,'legacy']){
+   context.env.GUTTA_CORE_BRIDGE_MODE=override;
+   await bridge(request(),{guildId:guild,roomCode:'DISCORD1',state:{...state,volume:20},bridgeRevision:100,checkpointRevision:100});
+   await bridge(request(),{guildId:guild,roomCode:'DISCORD1',state:{...state,volume:20}});
+   assert.deepEqual(saved(),initial);
+  }
+  await bridge(request(),authorityPublication(11,10));assert.deepEqual(saved(),initial,'rollback also waits for a newer verified checkpoint');
+  await bridge(request(),authorityPublication(12,12,{sequence:2,playing:false,position:42}));
+  const rolled=JSON.parse(String(saved()[0].state));
+  assert.equal(rolled.presenceCapability,undefined);assert.equal(rolled.position,0);
+  const room=sqlite.prepare("SELECT state FROM rooms WHERE code='DISCORD1'").get()!;
+  assert.equal(JSON.parse(String(room.state)).checkpointRevision,12);
+ }finally{context.core=null;sqlite.close();}
+});
+test('authoritative pause seek replacement and restart checkpoints retain guild-scoped idempotent receipts',async()=>{
+ const sqlite=fixture();
+ const concert={id:'abcdefghijk',title:'Concert',artist:'Test',duration:900,concert:true};
+ try{
+  await bridge(request(),authorityPublication(10,10,{current:concert,playing:true,position:10}));
+  const publish=async(revision:number,extra:Record<string,unknown>)=>bridge(request(),authorityPublication(revision,revision,{current:concert,...extra}));
+  await publish(11,{sequence:2,playing:false,position:10});
+  await publish(12,{sequence:3,playing:false,position:42});
+  await publish(13,{sequence:4,playing:false,position:0,current:{...concert,id:'bcdefghijkl'}});
+  const read=()=>JSON.parse(String(sqlite.prepare("SELECT state FROM rooms WHERE code='DISCORD1'").get()!.state));
+  assert.equal(read().current.id,'bcdefghijkl');assert.equal(read().playing,false);
+  await publish(14,{epoch:'normal-restart',sequence:0,playing:false,position:0});
+  const restored=authorityPublication(2,2,{epoch:'restored-backup',sequence:0});
+  await assert.rejects(bridge(request(),restored),{status:409,code:'bridge_reconciliation_required'});
+  assert.equal(JSON.parse(String(sqlite.prepare('SELECT state FROM bot_state').get()!.state)).epoch,'normal-restart');
+  sqlite.prepare("INSERT INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES('mine','{}','processing',?,?,?),('other','{}','processing',?,?,?)").run(Date.now(),Date.now()+30000,guild,Date.now(),Date.now()+30000,otherGuild);
+  for(let i=0;i<2;i++)await bridge(request(),{...authorityPublication(15+i,14,{epoch:'normal-restart',sequence:0}),events:[{id:'authority-event',at:Date.now(),video:concert}],results:[{id:'mine',ok:true,message:'Done'},{id:'other',ok:true,message:'Forbidden'}]});
+  sqlite.prepare("INSERT INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES('pending','{}','pending',?,?,?)").run(Date.now(),Date.now()+30000,guild);
+  context.core=null;const outage=await bridge(request(),{...restored,bridgeRevision:30,checkpointRevision:14,state:{...restored.state,epoch:'normal-restart'},events:[{id:'outage-event',at:Date.now(),video:concert}]});
+  assert.deepEqual(outage.commands,[]);assert.equal(sqlite.prepare("SELECT status FROM bot_commands WHERE id='pending'").get()!.status,'pending');
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM playback_history').get()!.n,2);
+  assert.equal(sqlite.prepare("SELECT status FROM bot_commands WHERE id='mine'").get()!.status,'done');
+  assert.equal(sqlite.prepare("SELECT status FROM bot_commands WHERE id='other'").get()!.status,'processing');
+ }finally{context.core=null;sqlite.close();}
+});
+
+test('missing canonical heartbeat cannot downgrade authority, restore lower intent, or divert jobs to a legacy publisher',async()=>{
+ for(const missing of [false,true])for(const ordered of [false,true])for(const differentRoom of [false,true])for(const scoped of [false,true]){
+  const sqlite=fixture();
+  try{
+   await bridge(request(),authorityPublication(10,10));
+   const room=sqlite.prepare("SELECT * FROM rooms WHERE code='DISCORD1'").get();
+   if(missing)sqlite.prepare('DELETE FROM bot_state').run();
+   const bot=sqlite.prepare('SELECT * FROM bot_state').all();
+   sqlite.prepare("INSERT INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES('pending','{}','pending',?,?,?)").run(Date.now(),Date.now()+30000,scoped?guild:null);
+   const reply=await bridge(request(),{...scoped?{guildId:guild}:{},roomCode:differentRoom?'D0C0FFEE':'DISCORD1',state,...ordered?{bridgeRevision:100,checkpointRevision:100}:{}});
+   assert.deepEqual(reply.commands,[]);assert.equal(sqlite.prepare("SELECT status FROM bot_commands WHERE id='pending'").get()!.status,'pending');
+   assert.deepEqual(sqlite.prepare("SELECT * FROM rooms WHERE code='DISCORD1'").get(),room);
+   assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state').all(),bot);
+   await assert.rejects(bridge(request(),{...authorityPublication(2,2,{epoch:'restored-lower',sequence:0}),roomCode:differentRoom?'D0C0FFEE':'DISCORD1'}),{status:409,code:'bridge_reconciliation_required'});
+   assert.deepEqual(sqlite.prepare("SELECT * FROM rooms WHERE code='DISCORD1'").get(),room);
+  }finally{context.core=null;sqlite.close();}
+ }
+});
+
+test('pending public receipt fallback uses the short Core deadline and caller cancellation',async()=>{
+ const sqlite=fixture();
+ try{
+  context.core={};
+  let forwarded:AbortSignal|undefined;
+  context.coreRequest=async(...args)=>{
+   forwarded=args[4] as AbortSignal;
+   if(forwarded.aborted)throw forwarded.reason;
+   return await new Promise((_resolve,reject)=>forwarded!.addEventListener('abort',()=>reject(forwarded!.reason),{once:true}));
+  };
+  const id='public:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  sqlite.prepare("INSERT INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES(?,'{}','pending',?,?,?)").run(id,Date.now(),Date.now()+30000,guild);
+  const start=performance.now();
+  assert.equal((await publicCommand(id,guild))?.status,'pending');
+  assert(performance.now()-start<2500);assert.equal(forwarded!.aborted,true);
+  const controller=new AbortController();controller.abort();
+  assert.equal((await publicCommand(id,guild,controller.signal))?.status,'pending');
+  assert.equal(forwarded!.aborted,true);
+ }finally{context.core=null;context.coreRequest=null;sqlite.close();}
 });

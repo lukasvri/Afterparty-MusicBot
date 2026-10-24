@@ -15,6 +15,7 @@ See [release policy](docs/RELEASING.md).
 - Room playback adds local volume, mute and fullscreen controls, and follows the shared timeline with stream leases and read-only reconnection. This is an alpha review build; live provider playback, Discord listening and production login still require acceptance testing.
 - The listening room loads library, playlist and festival tools when you open them, reducing the initial JavaScript payload while keeping those tools available. Game hosting code also loads on demand.
 - Core saves pause and resume choices immediately for restart recovery, closing the gap before the next playback clock tick.
+- Optional Core-authoritative concert rooms show a saved checkpoint as offline when Core cannot be reached, keeping stale playback paused until fresh state is available.
 
 ## v2.4.0-alpha.15: Prepare an opt-in Cloudflare website build
 

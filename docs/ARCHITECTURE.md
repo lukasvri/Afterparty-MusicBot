@@ -45,7 +45,7 @@ Start with the responsibility below rather than reading every file. There are tw
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
 | Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core, Classic and v3 |
-| Shared bridge checkpoint wire contract | `services/core/src/bridge-checkpoint.ts` | Core publisher and Worker validation; no runtime services or credentials |
+| Shared bridge checkpoint wire contract | `services/core/src/bridge-checkpoint.ts` | Core publisher and Worker checkpoint/presence negotiation, intent validation and bounded authority reads; no runtime services or credentials |
 | Shared social messages and validation | `services/core/src/social-protocol.ts` | Browser-safe; no database, token signing or Node imports |
 | Device-local reaction expiry | `lib/social-reactions.ts` | Shared by both website implementations |
 | Discord/Core startup | `services/core/src/` | `main.ts`, `guilds.ts`, `server.ts` |

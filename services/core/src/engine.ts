@@ -210,12 +210,15 @@ export class Engine extends EventEmitter {
   }
   websiteSnapshot(): PublicState {
     const state = this.snapshot(),
+      blocked = this.store.get('bridge-reconciliation-block', false),
       current = state.current?.concert ? state.current : null;
     return {
       ...state,
+      ready: !blocked && state.ready,
+      online: !blocked && state.online,
       current,
       queue: state.queue.filter((t) => t.concert),
-      playing: Boolean(current) && state.playing,
+      playing: !blocked && Boolean(current) && state.playing,
       position: current ? state.position : 0,
       playbackKey: current ? state.playbackKey : null,
     };

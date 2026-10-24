@@ -274,3 +274,41 @@ test("a command that finishes after publisher closure does not write to a closed
   await setImmediate();
   assert.equal(finish.mock.callCount(), 0);
 });
+
+test('terminal reconciliation persists across publishers and restart without allocating, acknowledging or changing audio',async(t)=>{
+ const directory=mkdtempSync(join(tmpdir(),'afterparty-reconciliation-'));
+ const file=join(directory,'core.sqlite');
+ const f=fixture();
+ f.store.close();
+ f.engine.store=new Store(file);
+ let calls=0;
+ t.mock.method(console,'warn',()=>{});
+ t.mock.method(globalThis,'fetch',async()=>{calls++;return Response.json({code:'bridge_reconciliation_required',error:'Reconcile first'},{status:409});});
+ const checkpoint=t.mock.method(f.engine,'checkpoint');
+ const stop=t.mock.method(f.engine,'stop');
+ f.engine.store.record('pending',video);
+ let publisher=new Publisher(f.engine,f.commands,'https://synthetic.invalid','synthetic-key',{presenceCapability:'core-authority-v1'});
+ try{
+  await setImmediate();
+  assert.equal(f.engine.store.get('bridge-reconciliation-block',false),true);
+  assert.equal(f.engine.store.get('bridge-publication-revision',0),1);
+  assert.equal(f.engine.store.events().length,1);
+  for(let i=0;i<10;i++){publisher.changed();await publisher.sync();}
+  publisher.close();f.engine.store.close();f.engine.store=new Store(file);
+  publisher=new Publisher(f.engine,f.commands,'https://synthetic.invalid','synthetic-key',{presenceCapability:'core-authority-v1'});
+  await setImmediate();await publisher.sync();
+  assert.equal(calls,1);assert.equal(f.engine.store.get('bridge-publication-revision',0),1);
+  assert.equal(stop.mock.callCount(),0);assert.equal(checkpoint.mock.callCount(),0);
+ }finally{publisher.close();f.commands.close();f.engine.close();f.engine.store.close();rmSync(directory,{recursive:true,force:true});}
+});
+
+test('closing during terminal reply parsing cannot write a reconciliation block to a closed database',async(t)=>{
+ const f=fixture();const parsed=deferred<{code:string}>();
+ const response=Response.json({},{status:409});
+ t.mock.method(response,'json',()=>parsed.promise);
+ t.mock.method(globalThis,'fetch',async()=>response);
+ const publisher=new Publisher(f.engine,f.commands,'https://synthetic.invalid','synthetic-key');
+ await setImmediate();publisher.close();f.close();
+ parsed.resolve({code:'bridge_reconciliation_required'});await setImmediate();
+ assert.equal(publisher.running,false);
+});

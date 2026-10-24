@@ -17,6 +17,8 @@ type FixtureEnvironment = {
     };
   };
   YOUTUBE_API_KEY?: string;
+  GUTTA_CORE_PUBLIC_URL?: string;
+  ADMIN_BRIDGE_KEY?: string;
 };
 const syntheticEnv: FixtureEnvironment = {};
 const globals = globalThis as typeof globalThis & { __roomTestEnv: FixtureEnvironment };
@@ -1021,4 +1023,46 @@ for (const example of [
     assert.equal(f.roomState().radioSeed?.id, original.id);
     assert(!JSON.stringify(room).includes('radioRelatedTo'));
   } finally { f.close(); }
+});
+
+test('negotiated room reads require bounded authenticated Core and immediately stop on outage or configuration loss',async(t)=>{
+ const f=fixture();
+ const guildId='111111111111111',code='D0123456';
+ const concert={...seed,concert:true};
+ const checkpoint={current:concert,queue:[],playing:true,position:12,presenceCapability:'core-authority-v1'};
+ try{
+  await f.save(code,checkpoint);
+  f.sqlite.prepare('UPDATE rooms SET guild_id=? WHERE code=?').run(guildId,code);
+  f.sqlite.prepare('INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?)').run('discord:'+guildId,JSON.stringify({...checkpoint,guildId,roomCode:code,bridgeRevision:20,checkpointRevision:20,presenceCapability:'core-authority-v1'}),Date.now());
+  const original=f.roomRow(code);
+  syntheticEnv.GUTTA_CORE_PUBLIC_URL='https://synthetic-core.invalid';syntheticEnv.ADMIN_BRIDGE_KEY='synthetic-key';
+  let mode='live';
+  const calls:Array<{url:string,signal:AbortSignal|null|undefined}>=[];
+  t.mock.method(globalThis,'fetch',async(url:unknown,init:RequestInit)=>{
+   calls.push({url:String(url),signal:init.signal});
+   assert.equal(init.headers&&new Headers(init.headers).get('Authorization'),'Bearer synthetic-key');
+   assert.equal(init.redirect,'manual');
+   if(mode==='outage')throw Error('Offline');
+   if(mode==='timeout')return await new Promise<Response>((_resolve,reject)=>init.signal!.addEventListener('abort',()=>reject(init.signal!.reason),{once:true}));
+   return Response.json({state:{...checkpoint,queue:[concert,{...next,concert:false}],current:concert,position:77,ready:true,connected:true,playing:mode!=='paused',volume:100,queueRevision:'queue',buffering:false,playbackKey:'core:test',epoch:'epoch-current',sequence:5,engine:'gutta-krutt-core',serverTime:Date.now(),online:true,guildId:mode==='wrong-guild'?'222222222222222':guildId,roomCode:code}});
+  });
+  const live=await publicRoom(f.request,original,false);
+  assert.equal(live.position,77);assert.equal(live.playing,true);assert.equal(live.discordOnline,true);
+  assert.equal(live.syncSource,'live');assert.equal(live.isHost,false);assert.equal(live.queue.length,1);
+  assert.equal(new URL(calls[0].url).searchParams.get('authority'),'1');
+  mode='paused';assert.equal((await publicRoom(f.request,original,false)).playing,false);
+  for(const failure of ['outage','wrong-guild','timeout']){
+   mode=failure;
+   const start=performance.now();
+   const offline=await publicRoom(f.request,original,false);
+   assert(performance.now()-start<2500,'Core fallback is bounded to its short presence deadline');
+   assert.equal(offline.discordOnline,false);assert.equal(offline.playing,false);assert.equal(offline.position,12);assert.equal(offline.syncValidForMs,0);
+  }
+  delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;
+  const offline=await publicRoom(f.request,original,false);
+  assert.equal(offline.discordOnline,false);assert.equal(offline.position,12);assert.equal(offline.playing,false);
+  f.sqlite.prepare('DELETE FROM bot_state').run();
+  assert.equal((await publicRoom(f.request,original,false)).discordOnline,false,'the room also persists authority mode if its heartbeat is missing');
+  assert.deepEqual(f.roomRow(code),original,'presence reads do not update the checkpoint');
+ }finally{delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
 });

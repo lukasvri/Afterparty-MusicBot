@@ -170,21 +170,95 @@ older one; legacy payloads deliberately retain their old acceptance behavior.
 Reverting the website and Core restores the prior bridge cadence without deleting
 rooms, queues, history or receipts.
 
-Restoring an older local database whose publication counter trails D1 is a
-separate recovery operation. Individual publications below the stored watermark
-are rejected, but retries keep allocating numbers and can eventually overtake it.
-Monotonic ordering is not persistent publisher fencing. Keep a restored publisher
-stopped until an operator has reconciled its queue, explicit playback intent and
-publication continuity against validated current state. Do not automatically
-reset either counter, delete the D1 watermark or resume old backup intent. A
-reviewed recovery handshake for backup rollback and concurrent publisher fencing
-remains future work.
+### Opt-in Core authority without a D1 presence heartbeat
 
-Issue #132 remains open. Removing the five-second D1 presence/position lease still
-requires an explicit bounded offline fallback contract and its outage/restart,
-direct/fallback, concurrent-guild and browser-reconnect acceptance. This slice
-does not move all transient state out of D1 or claim full migration, live Discord
-listening, deployment or provider verification.
+The next slice is explicitly negotiated. Set `CORE_BRIDGE_PRESENCE=authority` in
+Core only when the website has its authenticated `GUTTA_CORE_PUBLIC_URL` configured.
+The default remains the revisioned heartbeat above. The browser-safe protocol,
+intent checks, capability and deadline live in `services/core/src/bridge-checkpoint.ts`.
+
+For `core-authority-v1` publications, the Worker checks fixed-origin authenticated
+Core `/v1/state?authority=1` using a **1,500 ms deadline**, the caller's abort signal,
+no redirects, and exact guild, room, Engine epoch, intent sequence and buffering
+matches. Only a newer durable checkpoint updates `bot_state` and `rooms`, together;
+unchanged five-second presence and advancing positions produce no D1 state writes.
+The checkpoint is sampled from freshly verified Core state, not the delayed
+publisher position. Each record retains the negotiated mode. Explicit pause,
+seek, queue replacement and process restart still create immediate checkpoints;
+unchanged active playback checkpoints every minute, idle daily.
+
+Room and Discord reads obtain fresh Core state with the same bounded deadline.
+**This intentionally changes the legacy 15-second offline grace in negotiated
+mode:** after a direct request fails or times out, return the durable checkpoint
+immediately with `online=false` / `discordOnline=false`, `playing=false` and zero
+playback lease. Do not extrapolate its position or enable controls. A missing Core
+URL, missing heartbeat or explicit rollback flag alone cannot relabel that saved
+checkpoint online. Reachable Core remains authoritative; a browser reconnect
+only reads state and cannot resume a paused song.
+
+Five-second bridge requests continue handling idempotent history and result ACKs.
+If Core verification is unavailable, those safe receipts may still finish, but
+no state is written and **no pending commands are claimed or returned**. Existing
+pending commands can expire normally. A mismatched/superseded Engine intent is
+rejected and cannot renew state. Guild-scoped receipts, queue revisions and stale
+command guards are unchanged. No Worker-local presence cache is introduced.
+
+Comparable migrated-SQLite five-minute windows, again excluding the initial seed,
+user/receipt/maintenance/index writes and local SQLite counters:
+
+| Five-minute window | Original bridge | Revisioned heartbeat | Opt-in Core authority |
+| --- | ---: | ---: | ---: |
+| Unchanged idle | 60 | 60 | 0 |
+| Advancing active playback | 120 | 65 | 10 |
+| Active room rows within that total | 60 | 5 | 5 |
+
+The negotiated active window saves 110/120 table-row changes (91.67%); the idle
+window removes its 60 heartbeat changes. Daily idle renewal, real intent changes,
+receipts, rate limits, cleanup, indexes and concurrent servers remain additional
+costs. These are synthetic comparable counts, not production account savings.
+
+### Rollback, restored backups and remaining acceptance
+
+`GUTTA_CORE_BRIDGE_MODE=legacy` is an explicit **website** rollback override. Keep
+the opt-in publisher and authenticated Core available until a **newer, verified
+checkpoint** replaces the saved authority record with legacy heartbeat mode.
+Unverified, delayed or old-binary legacy frames cannot perform that downgrade,
+even when the override is set. Only then stop the newer publisher before rolling
+back to an old binary. Removing the URL or capability first leaves saved authority
+checkpoints offline, rather than reviving stale state. Do not delete watermarks,
+rooms, queue data or receipts to force a rollback. A full coordinated binary
+rollback remains a separate operator-approved operation.
+
+For opt-in publishers, a new Engine epoch whose publication counter is at or below
+the durable D1 watermark receives structured HTTP 409
+`bridge_reconciliation_required`. The publisher stores a durable local block and
+stops allocating counters or retrying, including after process/database reopen.
+It does not acknowledge retained data, reset counters, alter playback or restart
+audio. Its public Core snapshots and streams become offline, not ready and paused;
+authenticated authority reads return 409, and previously issued public control
+tickets cannot create or execute jobs. Private operator reads and other servers
+retain their existing behavior. A normal restart with the intact counter can establish its new epoch.
+Legacy heartbeat publishers retain their previous ordering behavior and do not
+have this terminal handshake. Same-epoch delayed frames do not stop the publisher.
+
+This is not a complete backup-restore or concurrent-publisher fencing protocol.
+Authority/public reads can appear before the first bridge acknowledgement: the
+terminal 409 block quarantines public state after detection, not before a startup
+handshake. The manual stopped-audio/publisher precondition below remains necessary.
+Skipped transient publications have no D1 watermark; a restored counter already
+above the last durable checkpoint cannot be detected by that counter alone.
+A copied live epoch and later superseding publisher require manual reconciliation.
+Keep restored publishers **and audio stopped** until an operator reconciles the
+whole per-guild database, queue, explicit playback intent and publication continuity
+against validated current state. Do not automatically raise/reset either counter,
+clear a reconciliation block, delete the D1 watermark or resume old backup intent.
+The publisher block only stops website publishing and does not stop existing
+Discord audio or make old-backup audio recovery safe by itself.
+
+Issue #132 remains open for reviewed manual recovery/fencing acceptance, production
+write telemetry and owner-run outage/restart/concurrent-guild listening evidence.
+The source implements the opt-in bounded offline contract; synthetic tests do not
+establish live Discord audio, provider correctness or deployment readiness.
 
 References: [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/),
 [metrics and query insights](https://developers.cloudflare.com/d1/observability/metrics-analytics/),
