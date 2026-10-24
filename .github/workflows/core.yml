@@ -105,10 +105,19 @@ jobs:
           npx playwright install --with-deps chromium
           npm --prefix apps/web run preview > /tmp/afterparty-web-preview.log 2>&1 &
           preview_pid=$!
-          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          trap 'result=$?; if [ "$result" -ne 0 ]; then tail -200 /tmp/afterparty-web-preview.log; fi; kill "$preview_pid" 2>/dev/null || true; exit "$result"' EXIT
           node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
           npm --prefix apps/web run test:browser
           npm --prefix apps/web run test:stack
+      - name: Preserve preview diagnostics when browser validation fails
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: v3-browser-diagnostics
+          path: /tmp/afterparty-web-preview.log
+          if-no-files-found: ignore
+          retention-days: 3
+          archive: true
       - name: Preserve the v3 review bundle separately from operational releases
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
