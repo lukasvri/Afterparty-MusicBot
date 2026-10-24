@@ -162,8 +162,8 @@ The official [Node distribution index](https://nodejs.org/dist/index.json)
 reported v26.12.1 dated 21 October 2026, `security: true` and `lts: false` at this
 check. LTS qualification cannot be marked complete before the actual transition.
 Remaining gates: reconfirm LTS/security support after the scheduled 28 October
-transition, prepare host staging/backup/rollback and separately authorize live
-listening and any runtime switch. No real Discord account, provider recording,
+transition, execute the prepared [host staging/backup/rollback plan](HOST_READINESS.md#qualifying-a-core-runtime-change)
+and separately authorize live listening and any runtime switch. No real Discord account, provider recording,
 production data, deployment or restart was used. Node 24 remains the operational
 Core runtime baseline.
 

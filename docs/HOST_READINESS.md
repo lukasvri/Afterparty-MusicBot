@@ -108,6 +108,55 @@ multi-server Discord capacity guarantee. Before increasing the live voice limit,
 test actual concurrent Discord sessions, crossfades, network recovery and the
 host's latency while its normal desktop workloads are running.
 
+## Qualifying a Core runtime change
+
+Use this sequence for [Node 26 qualification](TOOLCHAIN.md#core-qualification-evidence-24-october-2026)
+and later runtime changes. This is a preparation and review plan, not an
+instruction to update a live host without its owner's approval.
+
+1. Record the running source commit, immutable image ID, Node version, health,
+   active voice sessions and backup verification result in private host records.
+   Use the existing online backup and read-only health commands above. Preserve
+   the complete per-guild data tree, private Compose/environment configuration
+   and exact previous image. Verify the archive before proceeding.
+2. Keep experimental qualification images separate from production. The local
+   Node 26 image recorded in the toolchain guide is unsigned qualification
+   evidence. Do not supply it to the production deployer or bypass the required
+   canonical main-push checks and signed build assets. Node 24 remains the
+   production baseline until the runtime promotion is separately approved.
+3. First probe the candidate offline as its unprivileged user, with a read-only
+   root filesystem, resource limits and no production mounts, credentials or
+   network. Check its actual Node version, source/package readability, required
+   imports, worker execution, FFmpeg and synthetic audio. Use the existing
+   offline audio probe above; record image-specific results rather than assuming
+   that a root build-stage test establishes runtime behavior.
+4. For an authorized real staging window, use a separate existing staging
+   container, test application and data. Preserve restart policy `no` and run a
+   bounded [staging session](D1_WRITE_BUDGET.md#staging-only-during-tests).
+   Verify health and source/image identity, SQLite integrity, selected-server
+   authorization, queue/recovery behavior, pause/seek intent and reconnects.
+   Never reuse production configuration to make an experimental image start.
+   Stop staging at the end and confirm that production's image, start time,
+   mounts and playback are unchanged. Real listening remains a separate check.
+5. Reconfirm the runtime's actual LTS/security support, not just its scheduled
+   transition date. After approval of the pinned runtime source change and a
+   successful canonical main build, use the installed signed-artifact deployer's
+   `--check` workflow in [remote deployment](REMOTE_DEPLOY.md#everyday-use-from-your-main-computer).
+   It verifies/imports the exact tested image without stopping production.
+   A later live switch still needs an approved window and a fresh verified backup.
+6. Use that deployer's existing failure/recovery transaction for the live switch:
+   stop the failed candidate, preserve its data for investigation, restore the
+   matching pre-switch data and exact previous image, then verify recovery.
+   Preserve deliberate pauses and newer user intent. Never reset publication
+   counters, delete bridge watermarks or combine an old database with a newer
+   live session to force an update through. Reconcile restored state while the
+   affected publisher is stopped, following the current
+   [bridge rollback contract](D1_WRITE_BUDGET.md).
+
+The plan is prepared; host execution, actual listening and runtime promotion
+are not established by this document. Keep private evidence off GitHub and
+report sanitized pass/fail/not-run results in the tracking issue.
+
 ## Before the release
 
 - Verify a recent backup on a separate device and an isolated restore.
