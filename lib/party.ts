@@ -17,7 +17,9 @@ export async function history(sort='recent'){
 }
 export async function discord(all=false,guildId?:string){
  if(coreUrl()){try{return await coreRequest<{state:DiscordState}>('/v1/state?'+new URLSearchParams({...all?{all:'1'}:{},...guildId?{guildId}:{}}));}catch{/* retain the bridge when the upstream cannot be reached */}}
- const row=await db().prepare("SELECT state,updated_at FROM bot_state WHERE key=?").bind(guildId?'discord:'+guildId:'discord').first<{state:string;updated_at:number}>();
+ // The default room points at its guild's canonical heartbeat. Legacy unscoped
+ // bridges retain their original key; a missing guild row never uses that alias.
+ const row=await db().prepare("SELECT state,updated_at FROM bot_state WHERE key=COALESCE(?,(SELECT 'discord:'||guild_id FROM rooms WHERE code='DISCORD1'),'discord')").bind(guildId?'discord:'+guildId:null).first<{state:string;updated_at:number}>();
  if(!row)return {state:null};const state=JSON.parse(row.state) as DiscordState;return {state:{...state,lastSeen:row.updated_at,online:Date.now()-row.updated_at<15000}};
 }
 export async function bridge(request:Request,input:Record<string,unknown>){
@@ -33,7 +35,6 @@ export async function bridge(request:Request,input:Record<string,unknown>){
  // bot_state owns the live heartbeat. Persist unchanged room snapshots only
  // when their 48-hour lease needs renewal, keeping polls free of room writes.
  const statements=[db().prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at").bind(botKey,serialized,now),db().prepare("INSERT INTO rooms(code,name,owner_hash,state,version,updated_at,expires_at,guild_id) VALUES(?,?, 'private-discord',?,1,?,?,?) ON CONFLICT(code) DO UPDATE SET state=excluded.state,version=version+1,updated_at=excluded.updated_at,expires_at=excluded.expires_at,guild_id=excluded.guild_id WHERE rooms.state IS NOT excluded.state OR rooms.guild_id IS NOT excluded.guild_id OR rooms.expires_at<=excluded.updated_at+86400000").bind(roomCode,'Discord · '+String(input.guildName??'Afterparty').slice(0,80),JSON.stringify({current:state.current,queue:state.queue,playing:state.playing,buffering:state.buffering,position,playbackKey}),now,now+172800000,guildId)];
- if(guildId&&roomCode==='DISCORD1')statements.push(db().prepare("INSERT INTO bot_state(key,state,updated_at) VALUES('discord',?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at").bind(serialized,now));
  if(input.events!==undefined&&!Array.isArray(input.events))fail(400,'Ugyldig historikk.');
  for(const event of (input.events as Record<string,unknown>[]??[]).slice(0,20)){
   if(!event||typeof event.id!=='string'||event.id.length>160||typeof event.at!=='number'||!Number.isFinite(event.at)||event.at>now+60000||event.at<now-7776000000)fail(400,'Ugyldig spillehendelse.');const video=cleanVideo(event.video);if(video?.concert)statements.push(db().prepare('INSERT OR IGNORE INTO playback_history(event_id,video_id,video,source,played_at) VALUES(?,?,?,?,?)').bind(`discord:${event.id}`,video.id,JSON.stringify(video),'discord',event.at));
