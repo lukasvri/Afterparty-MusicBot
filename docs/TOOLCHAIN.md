@@ -96,30 +96,53 @@ Practical standards:
 ### Core qualification evidence, 24 October 2026
 
 Tracking: [issue #117](https://github.com/lukasvri/Afterparty-MusicBot/issues/117).
-Tested source: main `7cd059c5ae921287629eaaf7a18d976f49eda7e7`, product
-`3.0.0-alpha.1`. A clean archive of tracked `services/core` files was extracted
-into a temporary directory, excluding local credentials, databases and installed
-dependencies. Node 26 installed the existing lockfile with the same flags as the
-Core Docker dependency stage: `npm ci --omit=peer --ignore-scripts --no-audit
---no-fund`. No lockfile or dependency versions changed.
+The Core application source in main `d9d38ee51530cd577d5d8279aab00f38f3ebd31c`
+is unchanged from the earlier tested `7cd059c` baseline, product `3.0.0-alpha.1`.
+Qualification uses a clean archive of tracked Core files, excluding local
+credentials, databases and installed dependencies. Dependencies are installed
+from the existing lockfile with the Docker stage's flags:
+`npm ci --omit=peer --ignore-scripts --no-audit --no-fund`.
 
 | Check | Node 24.19.0 baseline | Node 26.12.1 qualification |
 | --- | --- | --- |
-| Platform | Linux x64 | Linux x64 |
+| Platform | Linux x64 | Linux x64, container `linux/amd64` |
 | Node module ABI / OpenSSL | 137 / 3.5.7 | 147 / 3.5.9 |
-| Core strict typecheck | Passed | Passed after clean install |
-| Core unit, HTTP, isolation, recovery and audio tests | 741 passed | 741 passed; none failed or skipped |
-| FFmpeg | 7.1.5, real local synthetic audio | Same FFmpeg; real local synthetic audio |
+| Clean locked dependency install and strict typecheck | Passed | Passed |
+| Core unit, HTTP, isolation, recovery and audio tests | 741 passed | 741 passed locally and 741 in the actual image validation stage; none failed or skipped |
+| FFmpeg | Real local synthetic audio | Local FFmpeg 7.1.5 and image FFmpeg 5.1.9 |
+| Final image probes | Existing Node 24 CI | UID 1000, readable source/package, Discord voice imports, ESM worker and FFmpeg pass with read-only filesystem and no network |
 
-The Node 24 baseline is the full local validation of code head `6b8c9ee`,
-whose `services/core` tree is unchanged in this main commit. Its subsequent
-documentation-only follow-up and merge passed Core Docker validation on Node 24
-in [GitHub run 40129899214](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40129899214).
-Core executes TypeScript directly; it has no separate application compilation
-step. Successful local tests do not qualify a Node 26 container image.
+The Node 24 source baseline is full local validation of code head `6b8c9ee`,
+whose Core source tree matches the commits above. Its documentation follow-up
+passed Node 24 Docker validation in
+[GitHub run 40129899214](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40129899214).
+Core executes TypeScript directly and has no separate application compilation step.
 
-To reproduce, select Node 26.12.1 in an isolated source checkout, verify
-`node --version`, then run:
+The verified Node 26 `linux/amd64` base is
+`node:26.12.1-bookworm-slim@sha256:1884ec272c7c06aba7696262fb822dc602f8fa5eb978d03617d6bfe487d7ebac`.
+The qualification image follows the canonical multi-stage Dockerfile with that
+base substituted in a temporary copy. Cloud proxy trust is supplied through
+BuildKit secret mounts, never copied into image layers. The production Dockerfile
+retains its pinned Node 24 base. This local experimental image is not a signed
+production release and is not published or deployed.
+
+The final local image also passed the existing read-only runtime probe and
+saved-archive validation in `scripts/build_release.py core-package`. Its image ID
+was `sha256:361389159ecc7830f10f1f6f4a1826a354afd869b698fc77a10eebbc98d78e05`.
+The temporary qualification Dockerfile SHA-256 was
+`dbbac4c7261b2564ae3c1206585256e402f820ea3e2d7ce13f1b876d51ee10b9`. The variant is
+identified separately from the canonical Node 24 release image.
+
+The restrictive-umask reproduction used 0600 source files and 0700 directories.
+The first image passed all 741 tests as root but failed its final unprivileged
+`guess-pack --list` check because package.json was unreadable. The Dockerfile now
+normalizes public `/app` read/traverse permissions while keeping root ownership
+and the existing unprivileged runtime user. The same reproduction then passes
+both that CLI check and the final runtime probes. No stored data permissions or
+host configuration are changed.
+
+To reproduce the source suite, select Node 26.12.1 in an isolated checkout,
+verify `node --version`, then run:
 
 ```sh
 npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
@@ -127,14 +150,22 @@ npm --prefix services/core run check
 npm --prefix services/core test
 ```
 
-Remaining gates: confirm actual LTS/security status after the scheduled
-28 October transition; verify an immutable `linux/amd64` Node 26 image digest;
-run the actual candidate image and its recovery/package checks; prepare host
-staging, backup and rollback; separately authorize live listening and any runtime
-switch. The cloud Docker daemon socket was inaccessible, so no Node 26 image
-build or image probe is claimed. No real Discord account, provider recording,
-production data, deployment, restart or Dockerfile change was used. Node 24
-remains the Core image/runtime baseline.
+For image qualification, use only tracked Core files, substitute the immutable
+base above in a temporary Dockerfile, and build `--platform linux/amd64
+--target final`. Retain the validation stage and final unprivileged CLI check.
+Run the existing `scripts/build_release.py core-package` locally against the
+tested image to probe its runtime and validate the saved archive; do not run its
+publication operations. Labels and local qualification metadata must identify
+the tested source and record the temporary base/Dockerfile variant.
+
+The official [Node distribution index](https://nodejs.org/dist/index.json)
+reported v26.12.1 dated 21 October 2026, `security: true` and `lts: false` at this
+check. LTS qualification cannot be marked complete before the actual transition.
+Remaining gates: reconfirm LTS/security support after the scheduled 28 October
+transition, prepare host staging/backup/rollback and separately authorize live
+listening and any runtime switch. No real Discord account, provider recording,
+production data, deployment or restart was used. Node 24 remains the operational
+Core runtime baseline.
 
 ## Technology choices for other projects
 

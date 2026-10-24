@@ -26,7 +26,9 @@ COPY --from=validation /app/validation.ok /app/validation.ok
 COPY --from=validation /app/quiz-playlists.json ./
 COPY package.json ./
 COPY licenses licenses
-RUN mkdir -p /data && chown node:node /data
+# Source checkouts may use a restrictive umask. Keep public runtime files
+# root-owned but readable/traversable by the unprivileged runtime user.
+RUN chmod -R a+rX /app && mkdir -p /data && chown node:node /data
 USER node
 RUN node src/guess-pack.ts --list
 ENV DATA_DIR=/data CORE_PORT=3990
