@@ -72,7 +72,7 @@ const hooks = registerHooks({
     return next(url, options);
   },
 });
-const { bridge, publicCommand } = await import("../lib/party.ts");
+const { bridge, discord, publicCommand } = await import("../lib/party.ts");
 hooks.deregister();
 
 function fixture() {
@@ -137,12 +137,82 @@ test("idle bridge heartbeats update presence without rewriting unchanged room sn
       const before = changes();
       now += 5000;
       await publish();
-      assert.equal(changes() - before, 2, "Only the guild heartbeat and default alias are written");
+      assert.equal(changes() - before, 1, "Only the canonical guild heartbeat is written");
       assert.deepEqual(readRoom(), initial);
       const heartbeats = sqlite.prepare("SELECT updated_at FROM bot_state").all();
-      assert.equal(heartbeats.length, 2);
+      assert.equal(heartbeats.length, 1);
       assert(heartbeats.every(row => row.updated_at === now));
     }
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("default Discord reads use the canonical guild heartbeat and retain its 15-second lease", async (t) => {
+  const sqlite = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    await bridge(request(), { guildId: guild, roomCode: "DISCORD1", state });
+    await bridge(request(), { guildId: otherGuild, roomCode: "D0123456", state: { ...state, volume: 20 } });
+    assert.equal(sqlite.prepare("SELECT count(*) AS n FROM bot_state").get()!.n, 2,
+      "Multiple guilds each keep one heartbeat, including the default guild");
+    assert.equal((await discord()).state?.guildId, guild);
+    assert.equal((await discord()).state?.volume, 100);
+    assert.equal((await discord(false, otherGuild)).state?.volume, 20);
+    const heartbeat = now;
+    now += 14999;
+    assert.equal((await discord()).state?.online, true);
+    now += 1;
+    const expired = (await discord()).state;
+    assert.equal(expired?.online, false);
+    assert.equal(expired?.lastSeen, heartbeat);
+    await bridge(request(), { guildId: guild, roomCode: "DISCORD1", state });
+    assert.equal((await discord()).state?.online, true);
+    assert.equal((await discord(false, otherGuild)).state?.online, false,
+      "Refreshing the default guild cannot renew another guild's lease");
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("legacy unscoped Discord bridges retain their single heartbeat and default lookup", async () => {
+  const sqlite = fixture();
+  try {
+    await bridge(request(), { state: { ...state, volume: 35 } });
+    assert.equal(sqlite.prepare("SELECT count(*) AS n FROM bot_state").get()!.n, 1);
+    assert.equal(sqlite.prepare("SELECT key FROM bot_state").get()!.key, "discord");
+    assert.equal((await discord()).state?.volume, 35);
+    assert.equal((await discord()).state?.online, true);
+    assert.equal((await discord(false, guild)).state, null,
+      "An explicit guild cannot inherit a legacy unscoped snapshot");
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("rebound default rooms ignore obsolete aliases and never fall back to another guild", async (t) => {
+  const sqlite = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    await bridge(request(), { state: { ...state, volume: 10 } });
+    const legacy = sqlite.prepare("SELECT * FROM bot_state WHERE key='discord'").get();
+    now += 5000;
+    await bridge(request(), { guildId: guild, roomCode: "DISCORD1", state: { ...state, volume: 45 } });
+    assert.equal((await discord()).state?.guildId, guild);
+    assert.equal((await discord()).state?.volume, 45);
+    assert.deepEqual(sqlite.prepare("SELECT * FROM bot_state WHERE key='discord'").get(), legacy,
+      "Upgrading a legacy bridge leaves the old alias untouched rather than writing it again");
+    now += 5000;
+    await bridge(request(), { guildId: otherGuild, roomCode: "DISCORD1", state: { ...state, volume: 65 } });
+    assert.equal((await discord()).state?.guildId, otherGuild);
+    assert.equal((await discord()).state?.volume, 65);
+    assert.equal((await discord(false, guild)).state?.volume, 45);
+    sqlite.prepare("DELETE FROM bot_state WHERE key=?").run("discord:" + otherGuild);
+    assert.equal((await discord()).state, null,
+      "A missing canonical default snapshot cannot reuse an old alias or another guild");
+    assert.equal((await discord(false, otherGuild)).state, null);
   } finally {
     sqlite.close();
   }
