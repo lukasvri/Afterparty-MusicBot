@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { cpus } from "node:os";
 import { execFileSync } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
-import { playableRoomQueue } from "../src/room-radio.ts";
+import { hasPlayableRoomQueue, playableRoomQueue } from "../src/room-radio.ts";
 import { rankRadio } from "../src/radio.ts";
 import { repeatedHistoryQueue, syntheticRoom } from "../tests/radio-queue-fixture.ts";
 
@@ -29,6 +29,7 @@ const cases = [
   { name: "stress: twenty automatic suggestions, full history", automatic: 20, manual: 0, history: 100 },
 ];
 const results = [];
+const presenceResults = [];
 for (const scenario of cases) {
   const state = syntheticRoom(scenario.automatic, scenario.manual, scenario.history);
   const operations = { repeatedHistory: () => repeatedHistoryQueue(state, baselineRank), sharedHistory: () => playableRoomQueue(state) };
@@ -54,9 +55,31 @@ for (const scenario of cases) {
   results.push({ ...scenario, selected: expected.length, checksum, measurements: Object.entries(samples).map(([name, values]) => ({
     name, medianMs: values.toSorted((a, b) => a - b)[Math.floor(rounds / 2)], samplesMs: values,
   })) });
+  const presenceOperations = {
+    fullEnumeration: () => playableRoomQueue(state).length > 0,
+    firstPlayable: () => hasPlayableRoomQueue(state),
+  };
+  const expectedPresence = expected.length > 0;
+  const presenceSamples = Object.fromEntries(Object.keys(presenceOperations).map(name => [name, [] as number[]]));
+  for (const run of Object.values(presenceOperations)) for (let n = 0; n < warmup; n++) run();
+  for (let round = 0; round < rounds; round++) {
+    const entries = Object.entries(presenceOperations);
+    if (round % 2) entries.reverse();
+    for (const [name, run] of entries) {
+      assert.equal(run(), expectedPresence);
+      const started = performance.now();
+      for (let n = 0; n < iterations; n++) run();
+      presenceSamples[name].push(performance.now() - started);
+    }
+  }
+  presenceResults.push({ ...scenario, exists: expectedPresence,
+    measurements: Object.entries(presenceSamples).map(([name, values]) => ({
+      name, medianMs: values.toSorted((a, b) => a - b)[Math.floor(rounds / 2)], samplesMs: values,
+    })),
+  });
 }
 console.log(JSON.stringify({ scope: "Synthetic queue selection only; no network, audio or production data.",
   baseline: baselineRef ?? "Previous per-entry queue selection using current radio helpers",
   environment: { node: process.version, platform: process.platform, cpu: cpus()[0]?.model },
-  workload: { iterations, rounds, warmup }, results,
+  workload: { iterations, rounds, warmup }, results, presenceResults,
 }, null, 2));

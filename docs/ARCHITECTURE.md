@@ -49,6 +49,7 @@ Start with the responsibility below rather than reading every file. There are tw
 | Device-local reaction expiry | `lib/social-reactions.ts` | Shared by both website implementations |
 | Discord/Core startup | `services/core/src/` | `main.ts`, `guilds.ts`, `server.ts` |
 | Playback and source extraction | `services/core/src/` | `engine.ts`, `audio.ts`, `providers.ts`, `extractor.ts` |
+| Shared room-radio queue selection and existence checks | `services/core/src/room-radio.ts` | One lazy selection policy for Core and website fallback; `room-state.ts` owns command/prefetch eligibility |
 | Core rooms, games and social authority | `services/core/src/` | `rooms.ts`, `guess-game.ts`, `social.ts` |
 | Website schema and migrations | `db/`, `drizzle/` | Existing D1 migration sequence |
 | Core schema and data | `services/core/src/` | `store.ts`, `migrate.ts`; private data stays outside Git |

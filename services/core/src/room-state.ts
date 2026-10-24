@@ -1,6 +1,6 @@
 import { UserError } from "./types.ts";
 import type { RoomVideo } from "./protocol.ts";
-import { roomRadioSeed, playableRoomQueue, roomRadioHistory } from "./room-radio.ts";
+import { roomRadioSeed, playableRoomQueue, hasPlayableRoomQueue, roomRadioHistory } from "./room-radio.ts";
 import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
 
 /** Durable room state, shared by Core and the Worker fallback. Never publish vote identities. */
@@ -66,7 +66,7 @@ export function finished(state: RoomPlayback, updatedAt: number, now: number) {
 }
 export function prefetchDue(state:RoomPlayback,updatedAt:number,now:number){
  const remaining=(state.current?.duration??0)-state.position-Math.max(0,now-Math.max(updatedAt,state.startsAt??updatedAt))/1000;
- return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && !playableRoomQueue(state).length && remaining>0 && now>=(state.radioRetryAt??0));
+ return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && remaining>0 && now>=(state.radioRetryAt??0) && !hasPlayableRoomQueue(state));
 }
 export function needsRecommendation(
   state: RoomPlayback,
@@ -75,9 +75,9 @@ export function needsRecommendation(
   // A queued track already wins over radio. Avoid allocating a shared lookup
   // and yielding the revision to concurrent commands when no search is needed.
   const enabling = input.action === "radio" && input.enabled === true;
-  if (playableRoomQueue(state).length || (state.radio === false && !enabling)) return false;
+  if (state.radio === false && !enabling) return false;
   const actor = String(input.participantHash ?? "");
-  return (
+  const eligible = (
     input.action === "next" || input.action === "radio-prefetch" ||
     (input.action === "radio" && input.enabled === true) ||
     Boolean(
@@ -88,6 +88,7 @@ export function needsRecommendation(
       !state.skipVoters.includes(actor),
     )
   );
+  return eligible && !hasPlayableRoomQueue(state);
 }
 export function changeRoom(
   previous: RoomPlayback,
