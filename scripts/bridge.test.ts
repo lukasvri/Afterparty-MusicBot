@@ -645,3 +645,67 @@ test('pending public receipt fallback uses the short Core deadline and caller ca
   assert.equal(forwarded!.aborted,true);
  }finally{context.core=null;context.coreRequest=null;sqlite.close();}
 });
+
+test('an incoming guild or unscoped legacy publisher cannot overwrite another authority room or claim either guild jobs',async()=>{
+ for(const code of ['DISCORD1','D0C0FFEE'])for(const scoped of [false,true])for(const ordered of [false,true])for(const previous of [false,true])for(const missingOwner of [false,true])for(const missingRoom of [false,true]){
+  if(missingOwner&&missingRoom)continue;
+  const sqlite=fixture();
+  try{
+   const payload={...scoped?{guildId:guild}:{},roomCode:code,state,...ordered?{bridgeRevision:100,checkpointRevision:100}:{}};
+   if(previous){
+    await bridge(request(),payload);
+    // Preserve the obsolete publisher's exact canonical payload while the room
+    // subsequently belongs to another authoritative guild.
+    sqlite.prepare('DELETE FROM rooms').run();
+   }
+   const publication=authorityPublication(10,10,{guildId:otherGuild,roomCode:code});
+   await bridge(request(),{...publication,guildId:otherGuild,roomCode:code});
+   if(missingOwner)sqlite.prepare('DELETE FROM bot_state WHERE key=?').run('discord:'+otherGuild);
+   if(missingRoom)sqlite.prepare('DELETE FROM rooms WHERE code=?').run(code);
+   const rooms=sqlite.prepare('SELECT * FROM rooms').all();
+   const bots=sqlite.prepare('SELECT * FROM bot_state ORDER BY key').all();
+   sqlite.prepare("INSERT INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES('incoming','{}','pending',?,?,?),('owner','{}','pending',?,?,?),('unscoped','{}','pending',?,?,NULL)").run(Date.now(),Date.now()+30000,guild,Date.now(),Date.now()+30000,otherGuild,Date.now(),Date.now()+30000);
+   const result=await bridge(request(),payload);
+   assert.deepEqual(result.commands,[]);
+   assert.deepEqual(sqlite.prepare('SELECT * FROM rooms').all(),rooms);
+   assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state ORDER BY key').all(),bots);
+   assert(sqlite.prepare('SELECT status FROM bot_commands').all().every(job=>job.status==='pending'));
+  }finally{context.core=null;sqlite.close();}
+ }
+});
+
+test('null command acknowledgements follow the current default guild binding even when a legacy state publication is rejected',async()=>{
+ for(const ordered of [false,true])for(const scoped of [false,true]){
+  const sqlite=fixture();
+  try{
+   const publication=authorityPublication(10,10,{guildId:otherGuild});
+   await bridge(request(),{...publication,guildId:otherGuild});
+   sqlite.prepare("INSERT INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES('owner','{}','processing',?,?,?),('unscoped','{}','processing',?,?,NULL)").run(Date.now(),Date.now()+30000,otherGuild,Date.now(),Date.now()+30000);
+   const results=[{id:'owner',ok:true,message:'Owner ack'},{id:'unscoped',ok:true,message:'Default ack'}];
+   await bridge(request(),{...scoped?{guildId:guild}:{},roomCode:'DISCORD1',state,...ordered?{bridgeRevision:100,checkpointRevision:100}:{},results});
+   assert(sqlite.prepare('SELECT status FROM bot_commands').all().every(job=>job.status==='processing'));
+   await bridge(request(),{...publication,guildId:otherGuild,bridgeRevision:11,results});
+   assert(sqlite.prepare('SELECT status FROM bot_commands').all().every(job=>job.status==='done'));
+  }finally{context.core=null;sqlite.close();}
+ }
+ const sqlite=fixture();
+ try{
+  sqlite.prepare("INSERT INTO bot_commands(id,payload,status,created_at,expires_at,guild_id) VALUES('unscoped','{}','processing',?,?,NULL)").run(Date.now(),Date.now()+30000);
+  await bridge(request(),{state,results:[{id:'unscoped',ok:true,message:'Legacy ack'}]});
+  assert.equal(sqlite.prepare("SELECT status FROM bot_commands WHERE id='unscoped'").get()!.status,'done');
+ }finally{sqlite.close();}
+});
+
+test('the surviving authoritative default heartbeat also guards an unscoped legacy alias at another room code',async()=>{
+ const sqlite=fixture();
+ try{
+  const publication=authorityPublication(10,10,{guildId:otherGuild});
+  await bridge(request(),{...publication,guildId:otherGuild});
+  sqlite.prepare('DELETE FROM rooms').run();
+  const bots=sqlite.prepare('SELECT * FROM bot_state ORDER BY key').all();
+  const result=await bridge(request(),{roomCode:'D0123456',state});
+  assert.deepEqual(result.commands,[]);
+  assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state ORDER BY key').all(),bots);
+  assert.deepEqual(sqlite.prepare('SELECT * FROM rooms').all(),[]);
+ }finally{context.core=null;sqlite.close();}
+});

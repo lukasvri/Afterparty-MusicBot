@@ -56,7 +56,7 @@ for (const { native, authority } of [
           export default {fetch(request,bindings,context){
             if(new URL(request.url).pathname==='/__fixture/checkpoint'){
               if(request.headers.get('authorization')!=='Bearer '+${JSON.stringify(bridgeKey)})return new Response('Forbidden',{status:403});
-              return bindings.DB.prepare("SELECT state,updated_at FROM bot_state WHERE key='discord:111111111111111'").first().then(row=>Response.json(row));
+              return Promise.all([bindings.DB.prepare("SELECT key,state,updated_at FROM bot_state ORDER BY key").all(),bindings.DB.prepare("SELECT code,guild_id,state,version,updated_at FROM rooms ORDER BY code").all()]).then(([bots,rooms])=>Response.json({bots:bots.results,rooms:rooms.results}));
             }
             return worker.fetch(request,bindings,context);
           }};`;
@@ -344,6 +344,24 @@ for (const { native, authority } of [
         assert.equal((await publish(10, 10)).status, 200);
         const stored = async () => (await api('/__fixture/checkpoint', bridgeKey)).data;
         const initial = await stored();
+        for (const incomingGuild of ['222222222222222', undefined]) {
+          for (const ordered of [false, true]) {
+            const rejected = await api('/api/bridge', bridgeKey, {
+              ...(incomingGuild ? { guildId: incomingGuild } : {}),
+              roomCode,
+              state: current,
+              ...(ordered ? { bridgeRevision: 100, checkpointRevision: 100 } : {}),
+            });
+            assert.equal(rejected.status, 200);
+            assert.deepEqual((rejected.data as { commands: unknown[] }).commands, []);
+            assert.deepEqual(
+              await stored(),
+              initial,
+              'a legacy guild or unscoped frame cannot replace another authority room or heartbeat',
+            );
+          }
+        }
+
         current = { ...current, position: 65 };
         await core();
         await publish(11, 10);
