@@ -89,7 +89,7 @@ See the [benchmark](../services/core/benchmarks/radio-queue.ts) and
 
 | Candidate | Priority | Risk / effort | Required evidence or constraint |
 | --- | --- | --- | --- |
-| D1 `visitors(room, until)` index | Next profiling pass | Medium / medium | Inspect real query plans and cardinality, measure read/write cost, then review a migration. No index added speculatively. |
+| D1 `visitors(room, until)` index | [Measured follow-up #135](https://github.com/lukasvri/Afterparty-MusicBot/issues/135) | Medium / medium | Synthetic plan/count comparison below confirms a full scan. Measure heartbeat write/space cost and directory behavior before reviewing a migration. |
 | Merge live room and Discord hooks | Low | High / medium | Their guild scope, epochs, leases, authentication and recovery differ. A shared abstraction needs explicit behavior tests before consolidation. |
 | Reduce the 100 ms client synchronization cadence | Profile first | High / medium | Measure browser work while preserving native scrub detection, buffering recovery, scheduled starts and stale-clock handling. |
 | Cache administrative permissions | Do not introduce without fresh authorization | High / medium | Never reuse a stale authorization decision to bypass Core's current guild-grant check. |
@@ -331,3 +331,73 @@ rendered at both widths. [Desktop](assets/tv-layout-desktop-20261018.png) and
 the existing POSIX stalled-decoder executable on Windows. Required `check:all`
 stopped at the same four Windows `fcntl` imports. Final-head Linux CI is recorded
 in the PR rather than treating these local platform limits as passing tests.
+
+
+## Room-radio queue presence checks
+
+Source base: `d9d38ee51530cd577d5d8279aab00f38f3ebd31c`. Boolean queue
+checks previously enumerated every eligible recommendation, although callers
+only needed to know whether one playable entry existed. The shared
+`room-radio.ts` policy now supports both complete selection and a lazy existence
+check. Explicit requests can satisfy existence before radio history/ranking is
+prepared. Automatic entries retain identity, style, exclusion and diversity checks;
+complete snapshots and mutations still consume the full selection.
+
+`room-state.ts` also checks action, playback timing and radio cooldown before
+asking about the queue. Pauses, seeks, ordinary additions, insufficient/duplicate
+skip votes and ineligible prefetch ticks therefore do no queue-selection work in
+these eligibility checks. Mutation/snapshot validation remains mandatory.
+There is no cross-call cache, authorization cache, schema change or new dependency.
+
+### Paired local measurements
+
+The existing [queue harness](../services/core/benchmarks/radio-queue.ts) now also
+compares full enumeration plus a length check with `hasPlayableRoomQueue` on the
+same immutable fixture. Five alternating rounds of 30 calls follow ten warmups.
+Both return values are checked outside timing. Values are median milliseconds
+per **30 calls**, on Linux, Node 24.19.0, Intel Xeon Platinum 8573C. Full enumeration
+uses the current shared selector, isolating the benefit of stopping early; this
+is not an exact historical endpoint benchmark. Historical selection measurements
+above remain tied to their original source and host.
+
+| Synthetic queue | Full enumeration ms | First playable ms |
+| --- | ---: | ---: |
+| empty queue | 0.0239 | 0.0170 |
+| manual queue | 0.0906 | 0.0070 |
+| usual single suggestion, no history | 2.1659 | 2.2057 |
+| usual single suggestion, full history | 22.6022 | 22.5889 |
+| manual priority with one suggestion | 25.6274 | 0.0051 |
+| stress: twenty automatic suggestions, no history | 55.5948 | 3.1111 |
+| stress: twenty automatic suggestions, full history | 74.3603 | 21.6308 |
+
+[Raw samples and environment](../services/core/benchmarks/results/radio-queue-presence.json)
+include full-selection parity against the retained independent previous policy.
+Reproduce with `node services/core/benchmarks/radio-queue.ts`.
+One automatic suggestion still requires its history and ranking, so that common
+case has no meaningful speedup. Multiple suggestions and manual-priority queues
+avoid substantial work, but sub-millisecond results remain sensitive to host
+load and measurement noise. These are synchronous microbenchmarks, not page
+latency, provider availability, live Discord quality or production CPU savings.
+The full local application checks were running during this capture.
+
+Work-count and differential regressions cover early termination, unused history,
+rejected automatic choices, radio enabling, skip votes, prefetch cooldown,
+changing exclusions/history and independent room calls. Full selection still
+matches the independent sequential policy across 80 mixed fixtures. Live transport
+cadence, queue revisions and persistence remain unchanged.
+
+### Visitor-count investigation
+
+The exact current room-count query was run against the website schema after all
+existing `drizzle/*.sql` migrations, using in-memory SQLite 3.53.1 with 10,000
+synthetic visitors across 100 rooms. The current plan is `SCAN visitors`;
+a temporary covering `(room, until)` index changes it to an indexed range search.
+Both return 67 visitors. SQLite VM instructions fall from 30,281 to 222 in this
+fixture. VM instructions are not D1 billing rows or production latency.
+
+[Raw query plans and fixture description](assets/visitor-count-investigation.json)
+retain the isolated comparison. The temporary index was not added to the schema
+or migration history. [Issue #135](https://github.com/lukasvri/Afterparty-MusicBot/issues/135)
+tracks directory-query parity, insert/renewal/delete overhead, index space and a
+reviewable migration if justified. Expiry cleanup has an `until`-only predicate,
+so this composite index must not be claimed to solve that separate query.
