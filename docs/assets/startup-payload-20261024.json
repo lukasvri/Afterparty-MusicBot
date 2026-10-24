@@ -1,0 +1,95 @@
+{
+  "baselineRef": "20c930225c97848cf2f72d0267000bcf853eaaca",
+  "runtime": "Node 24.19.0",
+  "browser": "Chromium 154.0.8037.57",
+  "server": "local built Cloudflare Worker",
+  "scope": "Synthetic welcome, joined empty browser room and game landing; no provider or Discord requests. Same 1440px/390px journeys before and after lazy loading. Gzip values recompress individual decoded responses; these are not measured wire transfer or field timing.",
+  "before": [
+    {
+      "viewport": 1440,
+      "scenario": "welcome",
+      "scriptRequests": 16,
+      "decodedJavaScriptBytes": 202527,
+      "sumIndividualGzipBytes": 70701
+    },
+    {
+      "viewport": 1440,
+      "scenario": "joined-room",
+      "scriptRequests": 16,
+      "decodedJavaScriptBytes": 202527,
+      "sumIndividualGzipBytes": 70701
+    },
+    {
+      "viewport": 1440,
+      "scenario": "games",
+      "scriptRequests": 14,
+      "decodedJavaScriptBytes": 153022,
+      "sumIndividualGzipBytes": 57268
+    },
+    {
+      "viewport": 390,
+      "scenario": "welcome",
+      "scriptRequests": 16,
+      "decodedJavaScriptBytes": 202527,
+      "sumIndividualGzipBytes": 70701
+    },
+    {
+      "viewport": 390,
+      "scenario": "joined-room",
+      "scriptRequests": 16,
+      "decodedJavaScriptBytes": 202527,
+      "sumIndividualGzipBytes": 70701
+    },
+    {
+      "viewport": 390,
+      "scenario": "games",
+      "scriptRequests": 14,
+      "decodedJavaScriptBytes": 153022,
+      "sumIndividualGzipBytes": 57268
+    }
+  ],
+  "after": [
+    {
+      "viewport": 1440,
+      "scenario": "welcome",
+      "scriptRequests": 17,
+      "decodedJavaScriptBytes": 158973,
+      "sumIndividualGzipBytes": 60859
+    },
+    {
+      "viewport": 1440,
+      "scenario": "joined-room",
+      "scriptRequests": 17,
+      "decodedJavaScriptBytes": 158973,
+      "sumIndividualGzipBytes": 60859
+    },
+    {
+      "viewport": 1440,
+      "scenario": "games",
+      "scriptRequests": 13,
+      "decodedJavaScriptBytes": 141226,
+      "sumIndividualGzipBytes": 52687
+    },
+    {
+      "viewport": 390,
+      "scenario": "welcome",
+      "scriptRequests": 17,
+      "decodedJavaScriptBytes": 158973,
+      "sumIndividualGzipBytes": 60859
+    },
+    {
+      "viewport": 390,
+      "scenario": "joined-room",
+      "scriptRequests": 17,
+      "decodedJavaScriptBytes": 158973,
+      "sumIndividualGzipBytes": 60859
+    },
+    {
+      "viewport": 390,
+      "scenario": "games",
+      "scriptRequests": 13,
+      "decodedJavaScriptBytes": 141226,
+      "sumIndividualGzipBytes": 52687
+    }
+  ]
+}

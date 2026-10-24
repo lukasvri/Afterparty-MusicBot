@@ -18,6 +18,7 @@ case "${1:-check}" in
     ;;
   check)
     npm run lint
+    npm run audit:unused
     python3 -m unittest discover -s tests -v
     node node_modules/typescript/bin/tsc --noEmit --incremental false
     npm run test:unit

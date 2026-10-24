@@ -4,7 +4,6 @@
   import Icon from '#lib/Icon.svelte';
   import RoomAudio from '#lib/RoomAudio.svelte';
   import RoomSocial from '#lib/RoomSocial.svelte';
-  import MusicLibrary from '#lib/MusicLibrary.svelte';
   import RoomDirectory from '#lib/RoomDirectory.svelte';
   import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import { time } from '../../../../../lib/types.ts';
@@ -472,12 +471,25 @@
           >
         </nav>
         {#if panel === 'library'}
-          {#key room.code}<MusicLibrary
-              tracks={[...(room.current ? [room.current] : []), ...room.queue]}
-              history={room.history ?? []}
-              busy={view.busy || importing || view.connection !== 'connected'}
-              onAdd={addTracks}
-            />{/key}
+          {#key room.code}
+            {#await import('#lib/MusicLibrary.svelte')}
+              <p class="search-summary" role="status">Opening your library…</p>
+            {:then { default: MusicLibrary }}
+              <MusicLibrary
+                tracks={[...(room.current ? [room.current] : []), ...room.queue]}
+                history={room.history ?? []}
+                busy={view.busy || importing || view.connection !== 'connected'}
+                onAdd={addTracks}
+              />
+            {:catch}
+              <div class="error-message" role="alert">
+                <p>The library could not load. Check your connection and reload the page.</p>
+                <button class="button secondary" onclick={() => location.reload()}
+                  >Reload page</button
+                >
+              </div>
+            {/await}
+          {/key}
         {:else if panel === 'settings'}
           <section class="room-settings" aria-labelledby="settings-title">
             <h2 id="settings-title">Make it your room</h2>

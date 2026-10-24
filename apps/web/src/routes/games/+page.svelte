@@ -4,7 +4,7 @@
   import GameAudio from '#lib/GameAudio.svelte';
   import Icon from '#lib/Icon.svelte';
   import { createGameClient, type GameScope, type GameView } from '#lib/game-client.ts';
-  import { createRoomClient } from '#lib/room-client.ts';
+  import type { createRoomClient as RoomClientFactory } from '#lib/room-client.ts';
   import {
     gamePresets,
     presetSettings,
@@ -24,7 +24,7 @@
     answer = $state('');
   let scope = $state<GameScope | null>(null);
   let client: ReturnType<typeof createGameClient> | undefined;
-  let creatingRoom: ReturnType<typeof createRoomClient> | undefined;
+  let creatingRoom: ReturnType<typeof RoomClientFactory> | undefined;
   let view = $state<GameView>({ data: null, ready: false, busy: false, error: '', signIn: false });
   let tick = $state(0),
     dirty = $state(false),
@@ -172,13 +172,17 @@
     if (hosting || !mounted) return;
     hosting = true;
     lobbyError = '';
-    const creator = createRoomClient();
-    creatingRoom = creator;
+    let creator: ReturnType<typeof RoomClientFactory> | undefined;
+    let stop = () => {};
     let message = '';
-    const stop = creator.subscribe((value) => {
-      message = value.error;
-    });
     try {
+      const { createRoomClient } = await import('#lib/room-client.ts');
+      if (!mounted) return;
+      creator = createRoomClient();
+      creatingRoom = creator;
+      stop = creator.subscribe((value) => {
+        message = value.error;
+      });
       if (
         !(await creator.create(nickname.trim() ? `${nickname.trim()}'s game night` : 'Game night'))
       )
@@ -195,10 +199,13 @@
       join();
     } catch (error) {
       if (mounted)
-        lobbyError = error instanceof Error ? error.message : 'Your game could not start.';
+        lobbyError =
+          creator && error instanceof Error
+            ? error.message
+            : 'Game hosting could not load. Check your connection and try again.';
     } finally {
       stop();
-      creator.destroy();
+      creator?.destroy();
       if (creatingRoom === creator) creatingRoom = undefined;
       hosting = false;
     }

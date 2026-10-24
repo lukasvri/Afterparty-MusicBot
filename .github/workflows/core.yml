@@ -88,6 +88,7 @@ jobs:
       - name: Lint, typecheck, browser behavior tests and production build
         run: |
           npm run lint
+          npm run audit:unused
           node node_modules/typescript/bin/tsc --noEmit --incremental false
           npm run test:unit
           CF_WORKER_NAME=afterparty-ci CF_D1_DATABASE_NAME=afterparty-ci-db CF_D1_DATABASE_ID=12345678-1234-4123-8123-123456789abc npm run build:cloudflare
@@ -107,6 +108,7 @@ jobs:
           preview_pid=$!
           trap 'result=$?; if [ "$result" -ne 0 ]; then tail -200 /tmp/afterparty-web-preview.log; fi; kill "$preview_pid" 2>/dev/null || true; exit "$result"' EXIT
           node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
+          npm --prefix apps/web run measure:startup
           npm --prefix apps/web run test:browser
           npm --prefix apps/web run test:stack
       - name: Preserve preview diagnostics when browser validation fails

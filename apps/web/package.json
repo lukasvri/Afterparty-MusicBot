@@ -19,7 +19,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview:standalone": "node --import ./scripts/runtime.ts node_modules/wrangler/bin/wrangler.js dev --config wrangler.standalone.jsonc --local --ip 127.0.0.1 --port 5174 --inspector-port 0",
-    "package:preview": "node scripts/package-preview.ts"
+    "package:preview": "node scripts/package-preview.ts",
+    "measure:startup": "node scripts/measure-startup.ts --verify-lazy"
   },
   "overrides": {
     "miniflare": {

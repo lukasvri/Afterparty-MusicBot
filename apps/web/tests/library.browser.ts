@@ -1,6 +1,7 @@
 // Native library journeys use synthetic API state, isolated browser storage and no media.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
 import { CONCERT_CATALOG } from '../../../lib/concert-catalog.ts';
@@ -23,7 +24,20 @@ const initial = video('queued00001', 'Current queue track');
 const imported = video('result00001', 'Playlist preview track');
 const jobId = '12345678-1234-1234-1234-123456789abc',
   jobToken = 'j'.repeat(40);
-async function fixture(width: number) {
+async function fixture(width: number, denyLibrary = false) {
+  let libraryFile = '';
+  if (denyLibrary) {
+    const manifest = JSON.parse(
+      await readFile(
+        new URL('../.svelte-kit/output/client/.vite/manifest.json', import.meta.url),
+        'utf8',
+      ),
+    ) as Record<string, { src?: string; file: string }>;
+    libraryFile =
+      Object.values(manifest).find((entry) => entry.src === 'src/lib/MusicLibrary.svelte')?.file ??
+      '';
+    assert(libraryFile, 'Build the lazy library before running this regression');
+  }
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH,
     args: ['--no-sandbox'],
@@ -71,7 +85,14 @@ async function fixture(width: number) {
     const request = route.request(),
       url = new URL(request.url());
     if (url.origin !== origin) return route.abort();
-    if (!url.pathname.startsWith('/api/')) return route.continue();
+    if (!url.pathname.startsWith('/api/')) {
+      if (
+        denyLibrary &&
+        (url.pathname === `/${libraryFile}` || url.pathname.endsWith('/MusicLibrary.svelte'))
+      )
+        return route.abort();
+      return route.continue();
+    }
     const input = request.method() === 'POST' ? request.postDataJSON() : null;
     if (url.pathname === `/api/rooms/${code}`) {
       assert.equal(request.headers()['x-afterparty-visitor'], visitor);
@@ -293,3 +314,23 @@ test(
     }
   },
 );
+
+test('a failed optional library download leaves the room usable and never changes its queue', async () => {
+  const f = await fixture(390, true);
+  try {
+    await f.page.getByRole('alert').filter({ hasText: 'The library could not load.' }).waitFor();
+    assert.equal(await f.page.getByRole('button', { name: 'Reload page', exact: true }).count(), 1);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.jobs, []);
+    await f.page.getByRole('button', { name: 'Discover', exact: true }).click();
+    await f.page.getByRole('button', { name: 'Find music', exact: true }).waitFor();
+    assert.equal(
+      await f.page.getByRole('heading', { name: 'Library evening', exact: true }).count(),
+      1,
+    );
+    assert.equal(await f.page.getByRole('alert').count(), 0);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});

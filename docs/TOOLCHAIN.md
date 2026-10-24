@@ -41,6 +41,7 @@ The existing website and Core remain the release baseline.
 | Vitest | Preferred for new Svelte component/unit tests when it gives useful framework integration. Do not replace all existing tests or add it before needed. | **Not yet adopted** |
 | Vite | Use the toolchain integrated with the chosen framework. | Used by the Vinext baseline and the isolated SvelteKit candidate; no production cutover |
 | ESLint | Retain existing checks and zero-warning discipline. | Already configured |
+| Knip | Review unused module files with explicit framework, manual test and operational entry points. | Pinned at 6.43.0; `npm run audit:unused` runs in local checks and CI. Findings require source verification before deletion. |
 | Prettier | Scope formatting to the new Svelte candidate with the Svelte plugin. | Adopted in `apps/web/` only; legacy formatting remains unchanged |
 | Wrangler and Cloudflare | Validate the actual target Workers/D1 build locally in isolation; do not enable deployment or modify secrets/DNS. | Cloudflare tooling already present; production cutover not established |
 | Drizzle ORM | Retain typed schema/data access where already suitable. Test migrations against synthetic data only. | Already present |
@@ -111,3 +112,10 @@ currently deployed source commit.
 - [Node.js release status](https://nodejs.org/en/about/previous-releases).
 - This file is **documentation only**. It does not install dependencies,
   update lockfiles, run tests, migrate the website or alter production.
+
+## Startup verification
+
+Use the existing Playwright browser and Vite production manifest for repeatable
+[local startup payload measurements](FRONTEND_PERFORMANCE.md). The check verifies
+that the library loads on demand. These observations are not production timing
+or full-application performance claims.
