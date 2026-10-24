@@ -381,3 +381,137 @@ test("fallback command receipts remain scoped to the selected guild", async () =
     sqlite.close();
   }
 });
+
+test("five-minute idle and advancing windows measure checkpoint writes without changing the heartbeat budget", async (t) => {
+  let now = 1800000000000;
+  t.mock.method(Date, 'now', () => now);
+  const measured: Record<string, number> = {};
+  const concert = { id: 'abcdefghijk', title: 'Synthetic concert', artist: 'Synthetic artist', duration: 600, concert: true };
+  for (const active of [false, true]) for (const checkpointed of [false, true]) {
+    const sqlite = fixture();
+    try {
+      const base = now;
+      let baseline = 0;
+      for (let sample = 0; sample <= 60; sample++) {
+        now = base + sample * 5000;
+        await bridge(request(), {
+          guildId: guild, roomCode: 'DISCORD1',
+          ...(checkpointed ? { bridgeRevision: sample + 1, checkpointRevision: active ? 1 + Math.floor(sample / 12) * 12 : 1 } : {}),
+          state: { ...state, current: active ? concert : null, playing: active, position: active ? sample * 5 : 0 },
+        });
+        if (sample === 0) baseline = Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n);
+      }
+      const writes = Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n) - baseline;
+      measured[`${active ? 'active' : 'idle'}-${checkpointed ? 'checkpointed' : 'legacy'}`] = writes;
+      assert.equal(writes, active ? checkpointed ? 65 : 120 : 60);
+      assert.equal((await discord()).state?.online, true);
+    } finally { sqlite.close(); }
+  }
+  t.diagnostic(`Five-minute table-row writes excluding initial seed: ${JSON.stringify(measured)}`);
+});
+
+test("monotonic room checkpoints preserve pause, seek, replacement and newer restart state against delayed publications", async (t) => {
+  const sqlite = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, 'now', () => now);
+  const concert = { id: 'abcdefghijk', title: 'Synthetic concert', artist: 'Synthetic artist', duration: 600, concert: true };
+  const publish = (bridgeRevision: number, checkpointRevision: number, playing: boolean, position: number, current = concert) =>
+    bridge(request(), { guildId: guild, roomCode: 'DISCORD1', bridgeRevision, checkpointRevision, state: { ...state, current, playing, position, playbackKey: `core:${current.id}` } });
+  const saved = () => sqlite.prepare("SELECT * FROM rooms WHERE code='DISCORD1'").get()!;
+  try {
+    await publish(1, 1, true, 10);
+    const initial = saved();
+    now += 5000;
+    await publish(2, 1, true, 15);
+    assert.deepEqual(saved(), initial, 'advancing presence does not rewrite the durable checkpoint');
+    await publish(3, 3, false, 15);
+    assert.equal(JSON.parse(String(saved().state)).playing, false);
+    await publish(4, 4, false, 42);
+    assert.equal(JSON.parse(String(saved().state)).position, 42);
+    const replacement = { ...concert, id: 'bcdefghijkl', title: 'Replacement concert' };
+    await publish(5, 5, false, 0, replacement);
+    await publish(6, 6, false, 0, replacement);
+    const restarted = saved();
+    const presence = sqlite.prepare('SELECT * FROM bot_state').get();
+    now += 5000;
+    for (const old of [[2, 1], [3, 3], [6, 6], [7, 1]]) await publish(old[0], old[1], true, 99);
+    assert.deepEqual(saved(), restarted);
+    assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state').get(), presence, 'late samples cannot extend liveness or restore older intent');
+    assert.equal((await discord()).state?.current?.id, replacement.id);
+    assert.equal((await discord()).state?.playing, false);
+    now += 10000;
+    assert.equal((await discord()).state?.online, false, 'retries do not renew the exact 15-second boundary');
+  } finally { sqlite.close(); }
+});
+
+test("stale checkpoints can acknowledge idempotent history and results without overwriting playback or crossing guilds", async () => {
+  const sqlite = fixture();
+  const now = Date.now();
+  const concert = { id: 'abcdefghijk', title: 'Synthetic concert', artist: 'Synthetic artist', duration: 600, concert: true };
+  try {
+    await bridge(request(), { guildId: guild, roomCode: 'DISCORD1', bridgeRevision: 10, checkpointRevision: 10, state });
+    await bridge(request(), { guildId: otherGuild, roomCode: 'D0123456', bridgeRevision: 1, checkpointRevision: 1, state: { ...state, volume: 20 } });
+    assert.equal((await discord(false, otherGuild)).state?.volume, 20, 'revision order is local to the selected guild');
+    const saved = sqlite.prepare('SELECT * FROM rooms ORDER BY code').all();
+    const presence = sqlite.prepare('SELECT * FROM bot_state ORDER BY key').all();
+    for (const id of ['own', 'foreign']) sqlite.prepare("INSERT INTO bot_commands(id,guild_id,payload,status,created_at,expires_at) VALUES(?,?,'{}','processing',?,?)").run(id, id === 'own' ? guild : otherGuild, now, now + 30000);
+    const replay = () => bridge(request(), {
+      guildId: guild, roomCode: 'DISCORD1', bridgeRevision: 9, checkpointRevision: 9,
+      state: { ...state, current: concert, playing: true, position: 99 },
+      events: [{ id: 'synthetic-event', at: now, video: concert }],
+      results: [{ id: 'own', ok: true, message: 'Confirmed once' }, { id: 'foreign', ok: true }],
+    });
+    await replay();
+    await replay();
+    assert.deepEqual(sqlite.prepare('SELECT * FROM rooms ORDER BY code').all(), saved);
+    assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state ORDER BY key').all(), presence);
+    assert.equal(sqlite.prepare("SELECT status FROM bot_commands WHERE id='own'").get()!.status, 'done');
+    assert.equal(sqlite.prepare("SELECT status FROM bot_commands WHERE id='foreign'").get()!.status, 'processing');
+    assert.equal(sqlite.prepare('SELECT count(*) AS n FROM playback_history').get()!.n, 1);
+  } finally { sqlite.close(); }
+});
+
+test("invalid checkpoint counters are rejected before any durable state or receipts are written", async () => {
+  const sqlite = fixture();
+  try {
+    for (const fields of [
+      { bridgeRevision: 1 }, { checkpointRevision: 1 },
+      { bridgeRevision: 1, checkpointRevision: 2 },
+      { bridgeRevision: 0, checkpointRevision: 0 },
+      { bridgeRevision: 1.5, checkpointRevision: 1 },
+      { bridgeRevision: Number.MAX_SAFE_INTEGER + 1, checkpointRevision: 1 },
+      { bridgeRevision: '2', checkpointRevision: 1 },
+    ]) await assert.rejects(bridge(request(), { ...fields, state }), (error: unknown) => error instanceof Error && 'status' in error && error.status === 400);
+    assert.equal(sqlite.prepare('SELECT total_changes() AS n').get()!.n, 0);
+  } finally { sqlite.close(); }
+});
+
+test("equal publication counters with altered checkpoint or payload cannot update or recreate a room", async (t) => {
+  const sqlite = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, 'now', () => now);
+  const publish = (checkpointRevision: number, changedState = state) => bridge(request(), {
+    guildId: guild, roomCode: 'DISCORD1', bridgeRevision: 10, checkpointRevision, state: changedState,
+  });
+  try {
+    await publish(5);
+    const room = sqlite.prepare('SELECT * FROM rooms').all();
+    const presence = sqlite.prepare('SELECT * FROM bot_state').all();
+    const before = Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n);
+    now += 5000;
+    await publish(10, { ...state, volume: 20 });
+    await publish(5, { ...state, volume: 30 });
+    assert.deepEqual(sqlite.prepare('SELECT * FROM rooms').all(), room);
+    assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state').all(), presence);
+    assert.equal(Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n), before);
+    sqlite.prepare("DELETE FROM rooms WHERE code='DISCORD1'").run();
+    await publish(5, { ...state, volume: 30 });
+    assert.equal(sqlite.prepare('SELECT count(*) AS n FROM rooms').get()!.n, 0,
+      'an equal revision with a different canonical payload cannot recreate a deleted/restored room');
+    assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state').all(), presence);
+    await publish(5);
+    assert.equal(sqlite.prepare('SELECT count(*) AS n FROM rooms').get()!.n, 1,
+      'an exact duplicate may reconstruct only its previously accepted checkpoint');
+    assert.deepEqual(sqlite.prepare('SELECT * FROM bot_state').all(), presence, 'exact retries never extend liveness');
+  } finally { sqlite.close(); }
+});

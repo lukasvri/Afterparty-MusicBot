@@ -4,6 +4,7 @@ import {coreUrl,commandTicket,coreRequest} from './core-server';
 import {adminState} from './discord-auth';
 import {constantEqual} from './password';
 import type {Video,DiscordState} from './types';
+import {validBridgeCheckpoint} from '../services/core/src/bridge-checkpoint.ts';
 export const botActions=['pause','resume','skip','stop','shuffle','clear','volume','seek','enqueue'] as const;
 function cleanVideo(value:unknown):Video|null{
  if(value===null)return null;if(!value||typeof value!=='object')fail(400,'Ugyldig videodata.');const v=value as Video;
@@ -26,15 +27,27 @@ export async function bridge(request:Request,input:Record<string,unknown>){
  const key=(env as unknown as {ADMIN_BRIDGE_KEY?:string}).ADMIN_BRIDGE_KEY;
  const provided=(request.headers.get('authorization')??'').replace(/^Bearer /,'');
  if(!key||!constantEqual(await hash(provided),await hash(key)))fail(403,'Brokoblingen har ikke tilgang.');
+ const checkpointed=input.bridgeRevision!==undefined||input.checkpointRevision!==undefined;
+ if(checkpointed&&!validBridgeCheckpoint(input))fail(400,'Ugyldig publiseringsrevisjon.');
+ const bridgeRevision=checkpointed?Number(input.bridgeRevision):null;
+ const checkpointRevision=checkpointed?Number(input.checkpointRevision):null;
  const guildId=typeof input.guildId==='string'?input.guildId:null,roomCode=typeof input.roomCode==='string'?input.roomCode:'DISCORD1';if(guildId&&!/^\d{14,22}$/.test(guildId)||!/^[A-Z0-9]{8}$/.test(roomCode))fail(400,'Ugyldig serverkobling.');const botKey=guildId?'discord:'+guildId:'discord';
  const raw=input.state as Record<string,unknown>;
  if(!raw||typeof raw!=='object'||!Array.isArray(raw.queue)||raw.queue.length>40||typeof raw.ready!=='boolean'||typeof raw.connected!=='boolean'||typeof raw.playing!=='boolean'||!Number.isFinite(raw.position)||Number(raw.position)<0||!Number.isFinite(raw.volume)||Number(raw.volume)<0||Number(raw.volume)>100||typeof raw.queueRevision!=='string'||raw.queueRevision.length>100)fail(400,'Ugyldig spillerstatus.');
  const concert=cleanVideo(raw.current);
  const state={buffering:raw.buffering===true,ready:raw.ready,connected:raw.connected,playing:Boolean(concert?.concert)&&raw.playing,position:concert?.concert?Number(raw.position):0,volume:Number(raw.volume),current:concert?.concert?concert:null,queue:raw.queue.map(cleanVideo).filter((v):v is Video=>Boolean(v?.concert)),queueRevision:raw.queueRevision};
- const now=Date.now();const age=Number.isFinite(input.sampledAt)?Math.max(0,Math.min(12000,now-Number(input.sampledAt))):0;const playbackKey=typeof raw.playbackKey==='string'?raw.playbackKey.slice(0,160):undefined;const position=state.position+(state.playing&&!state.buffering?age/1000:0);const serialized=JSON.stringify({...state,position,playbackKey,...guildId?{guildId,roomCode,guildName:String(input.guildName??'Discord').slice(0,80)}:{}});
+ const now=Date.now();const age=Number.isFinite(input.sampledAt)?Math.max(0,Math.min(12000,now-Number(input.sampledAt))):0;const playbackKey=typeof raw.playbackKey==='string'?raw.playbackKey.slice(0,160):undefined;const position=state.position+(state.playing&&!state.buffering?age/1000:0);const serialized=JSON.stringify({...state,position,playbackKey,...checkpointed?{bridgeRevision,checkpointRevision}:{},...guildId?{guildId,roomCode,guildName:String(input.guildName??'Discord').slice(0,80)}:{}});
  // bot_state owns the live heartbeat. Persist unchanged room snapshots only
  // when their 48-hour lease needs renewal, keeping polls free of room writes.
- const statements=[db().prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at").bind(botKey,serialized,now),db().prepare("INSERT INTO rooms(code,name,owner_hash,state,version,updated_at,expires_at,guild_id) VALUES(?,?, 'private-discord',?,1,?,?,?) ON CONFLICT(code) DO UPDATE SET state=excluded.state,version=version+1,updated_at=excluded.updated_at,expires_at=excluded.expires_at,guild_id=excluded.guild_id WHERE rooms.state IS NOT excluded.state OR rooms.guild_id IS NOT excluded.guild_id OR rooms.expires_at<=excluded.updated_at+86400000").bind(roomCode,'Discord · '+String(input.guildName??'Afterparty').slice(0,80),JSON.stringify({current:state.current,queue:state.queue,playing:state.playing,buffering:state.buffering,position,playbackKey}),now,now+172800000,guildId)];
+ const roomState=JSON.stringify({current:state.current,queue:state.queue,playing:state.playing,buffering:state.buffering,position,playbackKey,...checkpointed?{checkpointRevision}:{}});
+ const roomName='Discord · '+String(input.guildName??'Afterparty').slice(0,80);
+ // A newer publication must win before its room checkpoint can be installed.
+ // The same transaction keeps delayed retries from restoring an older pause,
+ // seek or queue. Legacy publishers retain the existing rolling-upgrade path.
+ const roomStatement=checkpointed
+  ?db().prepare("INSERT INTO rooms(code,name,owner_hash,state,version,updated_at,expires_at,guild_id) SELECT ?,?,'private-discord',?,1,?,?,? WHERE EXISTS(SELECT 1 FROM bot_state WHERE key=? AND state=? AND json_extract(state,'$.bridgeRevision')=? AND json_extract(state,'$.checkpointRevision')=?) ON CONFLICT(code) DO UPDATE SET state=excluded.state,version=version+1,updated_at=excluded.updated_at,expires_at=excluded.expires_at,guild_id=excluded.guild_id WHERE rooms.guild_id IS NOT excluded.guild_id OR COALESCE(json_extract(rooms.state,'$.checkpointRevision'),0)<json_extract(excluded.state,'$.checkpointRevision')").bind(roomCode,roomName,roomState,now,now+172800000,guildId,botKey,serialized,bridgeRevision,checkpointRevision)
+  :db().prepare("INSERT INTO rooms(code,name,owner_hash,state,version,updated_at,expires_at,guild_id) VALUES(?,?,'private-discord',?,1,?,?,?) ON CONFLICT(code) DO UPDATE SET state=excluded.state,version=version+1,updated_at=excluded.updated_at,expires_at=excluded.expires_at,guild_id=excluded.guild_id WHERE rooms.state IS NOT excluded.state OR rooms.guild_id IS NOT excluded.guild_id OR rooms.expires_at<=excluded.updated_at+86400000").bind(roomCode,roomName,roomState,now,now+172800000,guildId);
+ const statements=[db().prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at WHERE ? IS NULL OR (COALESCE(json_extract(bot_state.state,'$.bridgeRevision'),0)<? AND COALESCE(json_extract(bot_state.state,'$.checkpointRevision'),0)<=?)").bind(botKey,serialized,now,bridgeRevision,bridgeRevision,checkpointRevision),roomStatement];
  if(input.events!==undefined&&!Array.isArray(input.events))fail(400,'Ugyldig historikk.');
  for(const event of (input.events as Record<string,unknown>[]??[]).slice(0,20)){
   if(!event||typeof event.id!=='string'||event.id.length>160||typeof event.at!=='number'||!Number.isFinite(event.at)||event.at>now+60000||event.at<now-7776000000)fail(400,'Ugyldig spillehendelse.');const video=cleanVideo(event.video);if(video?.concert)statements.push(db().prepare('INSERT OR IGNORE INTO playback_history(event_id,video_id,video,source,played_at) VALUES(?,?,?,?,?)').bind(`discord:${event.id}`,video.id,JSON.stringify(video),'discord',event.at));

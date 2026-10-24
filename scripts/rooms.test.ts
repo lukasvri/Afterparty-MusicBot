@@ -236,6 +236,48 @@ test("Discord heartbeat lookup preserves guild isolation and legacy room-only fa
   }
 });
 
+test("checkpointed Discord rooms use only their canonical transient clock and stop across outage and paused reconnect", async (t) => {
+  const f = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, 'now', () => now);
+  const guildId = '111111111111111', roomCode = 'D0123456';
+  const concert = { ...seed, concert: true };
+  try {
+    await f.save(roomCode, { current: concert, queue: [], playing: true, position: 0 });
+    f.sqlite.prepare('UPDATE rooms SET guild_id=?,updated_at=? WHERE code=?').run(guildId, now - 45000, roomCode);
+    const snapshot = f.roomRow(roomCode);
+    const heartbeat = (extra: Record<string, unknown> = {}) => f.sqlite.prepare('INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at').run(
+      `discord:${guildId}`, JSON.stringify({ guildId, roomCode, bridgeRevision: 10, checkpointRevision: 1, current: concert, queue: [], playing: true, position: 60, ...extra }), now,
+    );
+    heartbeat();
+    now += 2000;
+    const first = await publicRoom(f.request, snapshot, false);
+    assert.equal(first.position, 62, 'the old room checkpoint does not freeze an advancing guild clock at twelve seconds');
+    assert.equal(first.playing, true);
+    assert.equal(first.isHost, false);
+    assert.equal(first.syncValidForMs, 10000);
+    heartbeat({ bridgeRevision: 11, checkpointRevision: 11, playing: false, position: 42, queue: [concert, { ...next, concert: false }] });
+    const paused = await publicRoom(f.request, snapshot, false);
+    assert.equal(paused.position, 42);
+    assert.equal(paused.playing, false);
+    assert.deepEqual(paused.queue.map(video => video.id), [concert.id], 'private music stays out of fallback concert responses');
+    now += 14999;
+    assert.equal((await publicRoom(f.request, snapshot, false)).discordOnline, true);
+    now++;
+    const offline = await publicRoom(f.request, snapshot, false);
+    assert.equal(offline.discordOnline, false);
+    assert.equal(offline.playing, false);
+    assert.equal(offline.syncValidForMs, 0);
+    heartbeat({ bridgeRevision: 12, checkpointRevision: 11, playing: false, position: 42 });
+    const reconnected = await publicRoom(f.request, snapshot, false);
+    assert.equal(reconnected.discordOnline, true);
+    assert.equal(reconnected.playing, false, 'a read-only browser reconnect cannot resume a deliberately paused song');
+    heartbeat({ guildId: '222222222222222', position: 99 });
+    assert.equal((await publicRoom(f.request, snapshot, false)).position, 12, 'mismatched guild payloads cannot supply another room clock');
+    assert.deepEqual(f.roomRow(roomCode), snapshot, 'repeated reads never write the durable checkpoint');
+  } finally { f.close(); }
+});
+
 test("D1 own-room radio advances the queue, keeps manual priority and hides its bounded history", async () => {
   const f = fixture();
   try {

@@ -19,6 +19,7 @@ import {
   roomRecommendation,
   playableRoomQueue,
 } from "../services/core/src/room-radio.ts";
+import { validBridgeCheckpoint } from "../services/core/src/bridge-checkpoint.ts";
 type Env = Cloudflare.Env & {
   YOUTUBE_API_KEY?: string;
   ADMIN_BRIDGE_KEY?: string;
@@ -375,11 +376,36 @@ export async function publicRoom(
   // Read liveness from the same guild's heartbeat, retaining legacy room-only
   // snapshots when no bot_state record has been published yet.
   const bridgeHeartbeat = discord
-    ? await db().prepare("SELECT updated_at FROM bot_state WHERE key=?")
+    ? await db().prepare("SELECT state,updated_at FROM bot_state WHERE key=?")
       .bind(value.guild_id ? `discord:${value.guild_id}` : "discord")
-      .first<{ updated_at: number }>()
+      .first<{ state: string; updated_at: number }>()
     : null;
   const heartbeatAt = bridgeHeartbeat?.updated_at ?? value.updated_at;
+  let positionAt = value.updated_at;
+  if (discord && bridgeHeartbeat) {
+    // New publishers checkpoint explicit intent separately. Use only this room's
+    // canonical, sanitized heartbeat for its advancing clock, never another guild
+    // or a legacy alias. The durable room remains the restart checkpoint.
+    const transient = JSON.parse(bridgeHeartbeat.state) as Record<string, unknown>;
+    if (validBridgeCheckpoint(transient) &&
+      (value.guild_id
+        ? transient.guildId === value.guild_id && transient.roomCode === value.code
+        : !transient.guildId && value.code === "DISCORD1")) {
+      const playback = transient as unknown as {
+        current: Video | null; queue: Video[]; playing: boolean;
+        buffering?: boolean; position: number; playbackKey?: string;
+      };
+      Object.assign(state, {
+        current: playback.current?.concert === true ? playback.current : null,
+        queue: Array.isArray(playback.queue) ? playback.queue.filter(video => video.concert === true) : [],
+        playing: playback.current?.concert === true && playback.playing,
+        buffering: playback.buffering,
+        position: playback.current?.concert === true ? playback.position : 0,
+        playbackKey: playback.playbackKey,
+      });
+      positionAt = heartbeatAt;
+    }
+  }
   const discordOnline = discord && now - heartbeatAt < 15000;
   if (discord && !discordOnline) state.playing = false;
   const visibleState = publicPlayback(state);
@@ -446,7 +472,7 @@ export async function publicRoom(
     state.position +
     (state.playing && !state.buffering
       ? (discord
-          ? Math.min(12000, now - value.updated_at)
+          ? Math.min(12000, now - positionAt)
           : now - value.updated_at) / 1000
       : 0);
   return {

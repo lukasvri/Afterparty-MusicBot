@@ -9,6 +9,9 @@ import { Publisher } from "../src/publisher.ts";
 import type { Sink } from "../src/audio.ts";
 import type { PublicTrack } from "../src/types.ts";
 import { deferred } from "./deferred.ts";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const video: PublicTrack = {
   id: "abcdefghijk", title: "Synthetic concert", artist: "Test artist",
@@ -29,6 +32,68 @@ function fixture() {
     close() { commands.close(); engine.close(); store.close(); },
   };
 }
+
+test("publication ordering survives database reopen and refuses corrupt or exhausted counters", () => {
+  const directory = mkdtempSync(join(tmpdir(), 'afterparty-publication-'));
+  const file = join(directory, 'synthetic.sqlite');
+  let store: Store | undefined;
+  try {
+    store = new Store(file);
+    assert.equal(store.nextBridgeRevision(), 1);
+    assert.equal(store.nextBridgeRevision(), 2);
+    store.close();
+    store = new Store(file);
+    assert.equal(store.nextBridgeRevision(), 3);
+    store.set('bridge-publication-revision', Number.MAX_SAFE_INTEGER);
+    assert.throws(() => store!.nextBridgeRevision(), /invalid or exhausted/);
+    store.set('bridge-publication-revision', -1);
+    assert.throws(() => store!.nextBridgeRevision(), /invalid or exhausted/);
+  } finally {
+    store?.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("advancing positions reuse their checkpoint, while pause, seek, replacement and restart publish new intent", async (t) => {
+  const f = fixture();
+  let monotonic = 1000;
+  t.mock.method(performance, 'now', () => monotonic);
+  let snapshot = { ...f.engine.websiteSnapshot(), current: video, playing: true, sequence: 1, position: 10 };
+  t.mock.method(f.engine, 'websiteSnapshot', () => ({ ...snapshot }));
+  const sent: Array<{ bridgeRevision: number; checkpointRevision: number }> = [];
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+    sent.push(JSON.parse(String(init.body)));
+    return Response.json({ serverTime: Date.now(), commands: [] });
+  });
+  let publisher = new Publisher(f.engine, f.commands, 'https://synthetic.invalid', 'test-key');
+  try {
+    await setImmediate();
+    monotonic += 5000;
+    snapshot.position = 15;
+    await publisher.sync();
+    assert.deepEqual(sent.map(value => [value.bridgeRevision, value.checkpointRevision]), [[1, 1], [2, 1]]);
+    snapshot = { ...snapshot, sequence: 2, playing: false };
+    await publisher.sync();
+    snapshot = { ...snapshot, sequence: 3, position: 42 };
+    await publisher.sync();
+    snapshot = { ...snapshot, sequence: 4, current: { ...video, id: 'bcdefghijkl' } };
+    await publisher.sync();
+    assert.deepEqual(sent.slice(2).map(value => value.checkpointRevision), [3, 4, 5]);
+    monotonic += 60000;
+    await publisher.sync();
+    assert.equal(sent.at(-1)?.checkpointRevision, 5, 'an idle publisher does not add minute checkpoints');
+    snapshot = { ...snapshot, sequence: 5, playing: true };
+    await publisher.sync();
+    monotonic += 60000;
+    await publisher.sync();
+    assert.equal(sent.at(-1)?.checkpointRevision, 8, 'active position is bounded by a minute checkpoint');
+    publisher.close();
+    publisher = new Publisher(f.engine, f.commands, 'https://synthetic.invalid', 'test-key');
+    await setImmediate();
+    assert.equal(sent.at(-1)?.bridgeRevision, 9);
+    assert.equal(sent.at(-1)?.checkpointRevision, 9, 'a new publisher always establishes a newer checkpoint');
+  } finally { publisher.close(); f.close(); }
+});
 
 test("publisher validates replies before acknowledging and keeps private music off the bridge", async (t) => {
   const f = fixture();

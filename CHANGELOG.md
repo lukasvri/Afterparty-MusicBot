@@ -14,6 +14,7 @@ See [release policy](docs/RELEASING.md).
 - Guess the Song has a dedicated game-night lobby with private hosting and invite links, recording-aware pace presets, one-step start, clearer live points and hints, focused reveals and final standings that recognize ties. Game audio can follow new rounds after explicit activation, with separate local volume and safe stop/cancel controls.
 - Room playback adds local volume, mute and fullscreen controls, and follows the shared timeline with stream leases and read-only reconnection. This is an alpha review build; live provider playback, Discord listening and production login still require acceptance testing.
 - The listening room loads library, playlist and festival tools when you open them, reducing the initial JavaScript payload while keeping those tools available. Game hosting code also loads on demand.
+- Core saves pause and resume choices immediately for restart recovery, closing the gap before the next playback clock tick.
 
 ## v2.4.0-alpha.15: Prepare an opt-in Cloudflare website build
 

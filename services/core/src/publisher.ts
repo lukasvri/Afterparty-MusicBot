@@ -1,5 +1,6 @@
 import { Engine } from "./engine.ts";
 import { Commands } from "./commands.ts";
+import { BRIDGE_CHECKPOINT_MS } from "./bridge-checkpoint.ts";
 
 const HEARTBEAT_MS = 5000;
 const CHANGE_DELAY_MS = 50;
@@ -51,6 +52,9 @@ export class Publisher {
   private retryAt = 0;
   private failures = 0;
   private request: AbortController | null = null;
+  private checkpointRevision = 0;
+  private checkpointIntent = '';
+  private checkpointAt = -Infinity;
 
   constructor(
     engine: Engine,
@@ -113,6 +117,17 @@ export class Publisher {
             : null,
         queue: state.queue.filter((track) => /^[\w-]{11}$/.test(track.id)),
       };
+      const bridgeRevision = this.engine.store.nextBridgeRevision();
+      // Engine state revisions include explicit pause/seek/queue changes. Buffering
+      // can change between those events, so it also participates in the intent key.
+      // Advancing position and presence do not create a durable room checkpoint.
+      const intent = JSON.stringify([state.epoch, state.sequence, state.buffering]);
+      const checkpointInterval = state.playing ? BRIDGE_CHECKPOINT_MS : 86400000;
+      if (intent !== this.checkpointIntent || started - this.checkpointAt >= checkpointInterval) {
+        this.checkpointRevision = bridgeRevision;
+        this.checkpointIntent = intent;
+        this.checkpointAt = started;
+      }
       const response = await fetch(new URL("/api/bridge", this.url), {
         method: "POST",
         redirect: "error",
@@ -122,6 +137,8 @@ export class Publisher {
         },
         body: JSON.stringify({
           ...this.context,
+          bridgeRevision,
+          checkpointRevision: this.checkpointRevision,
           state: publicState,
           sampledAt: state.serverTime + this.offset,
           events: events.filter((event) => event.video.concert),

@@ -12,6 +12,7 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5175').origin;
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname));
 const visitor = 'c'.repeat(32);
+const bridgeKey = 'synthetic-local-checkpoint-key';
 const track: Video = {
   id: 'synthetic01',
   title: 'Local D1 soundtrack',
@@ -41,6 +42,7 @@ for (const native of [false, true])
           compatibility_flags: builtApi.compatibility_flags,
           assets: { directory: `${root}dist/client` },
           compatibility_date: '2026-05-15',
+          vars: { ADMIN_BRIDGE_KEY: bridgeKey },
           d1_databases: [
             {
               binding: 'DB',
@@ -104,7 +106,11 @@ for (const native of [false, true])
                 ],
               }
             : {}),
-          vars: { AFTERPARTY_BETA_ENTRY: '1', ...(native ? { AFTERPARTY_NATIVE_API: '1' } : {}) },
+          vars: {
+            AFTERPARTY_BETA_ENTRY: '1',
+            ADMIN_BRIDGE_KEY: bridgeKey,
+            ...(native ? { AFTERPARTY_NATIVE_API: '1' } : {}),
+          },
         }),
       );
       let output = '';
@@ -223,6 +229,76 @@ for (const native of [false, true])
           );
         }
       }
+      // Exercise the real bridge SQL in both Worker topologies. These are public
+      // concert snapshots only; no Core, Discord or provider is contacted.
+      const concertPath = '/api/rooms/D0C0FFEE';
+      const concertState = {
+        ready: true,
+        connected: true,
+        playing: true,
+        position: 5,
+        volume: 50,
+        current: { ...track, concert: true },
+        queue: [{ ...track, concert: false, title: 'Private Discord music' }],
+        queueRevision: 'synthetic-checkpoint-queue',
+        playbackKey: 'core:synthetic-entry',
+      };
+      const publishCheckpoint = (
+        bridgeRevision: number,
+        checkpointRevision: number,
+        state = concertState,
+      ) =>
+        api('/api/bridge', bridgeKey, {
+          guildId: '111111111111111',
+          guildName: 'Synthetic checkpoint guild',
+          roomCode: 'D0C0FFEE',
+          bridgeRevision,
+          checkpointRevision,
+          state,
+        });
+      assert.equal((await publishCheckpoint(1, 1)).status, 200);
+      const firstCheckpoint = (await api<Room>(concertPath)).data;
+      assert.equal((await publishCheckpoint(2, 1, { ...concertState, position: 60 })).status, 200);
+      const advancing = (await api<Room>(concertPath)).data;
+      assert.equal(
+        advancing.version,
+        firstCheckpoint.version,
+        'advancing heartbeat does not rewrite the D1 room',
+      );
+      assert(advancing.position >= 60 && advancing.position < 65);
+      assert.deepEqual(
+        advancing.queue,
+        [],
+        'ordinary Discord music is absent from public fallback',
+      );
+      assert.equal(advancing.isHost, false);
+      await publishCheckpoint(3, 3, { ...concertState, playing: false, position: 60 });
+      await publishCheckpoint(4, 4, { ...concertState, playing: false, position: 42 });
+      const replacement = {
+        ...concertState,
+        playing: false,
+        position: 0,
+        current: {
+          ...track,
+          id: 'checkpoint1',
+          title: 'Replacement checkpoint concert',
+          concert: true,
+        },
+      };
+      await publishCheckpoint(5, 5, replacement);
+      const replaced = (await api<Room>(concertPath)).data;
+      assert.equal(replaced.current?.id, 'checkpoint1');
+      assert.equal(replaced.playing, false);
+      await publishCheckpoint(2, 1, concertState);
+      const afterReplay = (await api<Room>(concertPath)).data;
+      assert.equal(afterReplay.version, replaced.version);
+      assert.equal(afterReplay.current?.id, 'checkpoint1');
+      assert.equal(afterReplay.playing, false);
+      assert.equal(
+        (await api('/api/bridge', 'wrong-synthetic-key', { state: concertState })).status,
+        403,
+      );
+
       const created = await api<{ room: Room; token: string }>('/api/rooms', undefined, {
         name: 'Synthetic D1 room',
         isPublic: false,
@@ -326,6 +402,37 @@ for (const native of [false, true])
           .fill('synthetic afterparty');
         await page.getByRole('button', { name: 'Find music' }).click();
         await page.getByRole('button', { name: `Add ${track.title} to queue` }).waitFor();
+        const browserCheckpoint = await page.evaluate(async (path) => {
+          const response = await fetch(path, { cache: 'no-store' });
+          return response.json() as Promise<{
+            playing: boolean;
+            current: { id: string };
+            isHost: boolean;
+          }>;
+        }, concertPath);
+        assert.equal(browserCheckpoint.current.id, 'checkpoint1');
+        assert.equal(browserCheckpoint.playing, false);
+        assert.equal(browserCheckpoint.isHost, false);
+        await page.reload();
+        await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
+        assert.equal(await page.getByRole('button', { name: 'Resume playback' }).isEnabled(), true);
+        if (native) {
+          await page.goto(`${origin}/patch-notes`);
+          await page
+            .getByText(
+              'Core saves pause and resume choices immediately for restart recovery, closing the gap before the next playback clock tick.',
+              { exact: true },
+            )
+            .waitFor();
+          for (const width of [390, 1440]) {
+            await page.setViewportSize({ width, height: 1000 });
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+            await page
+              .locator('article')
+              .first()
+              .screenshot({ path: `${root}.sites-runtime/checkpoint-notes-${width}.png` });
+          }
+        }
         assert.deepEqual(external, []);
       } finally {
         await browser.close();
