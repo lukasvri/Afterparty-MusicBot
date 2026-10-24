@@ -47,6 +47,8 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 
 ## Engineering records
 
+- [D1 bridge write budget](D1_WRITE_BUDGET.md): measured write sources, unchanged snapshot handling and validation boundaries.
+
 - [Music source investigation](MUSIC_SOURCE_INVESTIGATION.md): verified Jockie features, independently documented source architecture and current quiz scope.
 
 These are dated reviews of specific changes, not a live checklist of production status. Their test counts and baselines refer to the snapshot they describe.

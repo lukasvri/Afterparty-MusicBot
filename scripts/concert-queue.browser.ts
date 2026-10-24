@@ -238,4 +238,22 @@ try{
   try{await f.open();assert.equal(await page.locator('.social-queue .radio-retry').count(),0);}finally{await page.close();}
  }
  console.log('PASS Discord queue does not offer room-only radio retries');
+ {
+  const f=await fixture(),{page}=f;
+  let reads=0;
+  f.source.get=async()=>{reads++;return false;};
+  try{
+   await f.open();
+   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+   const hiddenReads=reads;
+   await page.waitForTimeout(3400);
+   assert.equal(reads,hiddenReads,'Hidden queue views must not spend D1 limiter writes');
+   const resumed=deferred<void>();
+   f.source.get=async()=>{reads++;resumed.resolve();return false;};
+   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
+   await resumed.promise;
+   assert.equal(reads,hiddenReads+1,'Visible views refresh immediately once');
+  }finally{await page.close();}
+ }
+ console.log('PASS hidden Discord queues pause polling and refresh immediately on return');
 }finally{await browser.close();}
