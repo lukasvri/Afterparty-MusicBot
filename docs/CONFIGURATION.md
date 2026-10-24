@@ -13,6 +13,12 @@ selects that target; the default build preserves Sites rollback support. See
 [Cloudflare preparation](CLOUDFLARE.md) for runtime settings, isolated staging,
 D1 migration precautions and the separately approved GitHub build setup.
 
+## Optional diagnostics
+
+Optional browser-only Sentry build variables and the Codecov account gate are
+documented in [observability and coverage](OBSERVABILITY.md). They are disabled
+without explicit configuration and do not instrument Core.
+
 ## Core variables
 
 File: `services/core/.env`. Docker Compose loads this file. After editing it, run `docker compose up -d --force-recreate` from `services/core/`.

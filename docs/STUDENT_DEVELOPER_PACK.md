@@ -51,13 +51,14 @@ additional AI usage disabled. Other partner subscriptions remain unverified.
 | --- | --- | --- |
 | GitHub Pro / Codespaces | Isolated development and validation | A separate 2-core environment created and tested within included usage |
 | Copilot Student | Code completion and repository-aware assistance | Account activation verified; editor sign-in is separate |
-| Codecov | Compare test coverage in pull requests | Deferred until coverage reports and repository access are deliberately configured |
+| Codecov | Compare instrumented unit-test coverage in pull requests | Scoped LCOV and optional OIDC workflow prepared; account gate controls upload |
 | Polypane | Responsive and accessibility review | Optional one-year student offer; license and installation not activated |
-| Sentry | Runtime error investigation | Deferred pending a concrete need, data filtering and separate service approval |
+| Sentry | Browser error investigation | Shared privacy filter and opt-in SDK prepared; empty DSN keeps it off |
 
 See the current [Student Developer Pack](https://education.github.com/pack)
 before redeeming an offer. Availability, eligibility and renewal terms can change.
-OpenWorks remains a static portal without analytics or a monitoring SDK.
+See [observability and coverage](OBSERVABILITY.md) for actual scope and activation
+boundaries. OpenWorks is configured independently in its own repository.
 
 Codespaces compute and storage are shared across your personal account, including
 both repositories. GitHub Pro currently includes 180 core-hours and 20 GB-month
@@ -81,9 +82,9 @@ extension or subscription is installed or enabled by these source changes.
 
 Keep existing Cloudflare hosting and independent project credentials. Cloud
 credits, new domains and replacement databases are not needed for this setup.
-Do not start time-limited trials merely to reserve them. Codecov requires real
-coverage instrumentation; adding an upload step without a report is not an
-integration. Sentry would need a separate review of outbound data and quotas.
+Do not start time-limited trials merely to reserve them. Review outbound data,
+provider quotas, zero-overage settings and actual report/event acceptance before
+calling either optional integration active.
 
 ## Verification on 24 October 2026
 

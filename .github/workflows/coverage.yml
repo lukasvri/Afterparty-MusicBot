@@ -1,0 +1,46 @@
+name: Unit coverage
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: coverage-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  coverage:
+    # Opt in after the free account/repository is linked. Forks receive no OIDC grant.
+    if: vars.CODECOV_ENABLED == 'true' && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            services/core/package-lock.json
+            apps/web/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: npm ci --no-audit --no-fund
+      - run: npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
+      - run: npm --prefix apps/web ci --no-audit --no-fund
+      - run: npm run coverage:unit
+      - name: Upload the three scoped reports once, without a long-lived token
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: coverage/classic.lcov,coverage/core.lcov,coverage/v3.lcov
+          disable_search: true
+          disable_telem: true
+          fail_ci_if_error: true
+          handle_no_reports_found: false
