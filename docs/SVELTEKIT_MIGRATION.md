@@ -5,6 +5,24 @@ The `3.0.0-alpha.1` candidate in `apps/web/` implements the native Svelte websit
 review material, not evidence of production deployment or stable 3.0 acceptance.
 The existing website and Node 24 Core remain the operational rollback baseline.
 
+## Candidate scope
+
+The source scope for `3.0.0-alpha.1` is the native website and existing
+non-Activity Core integration described below. Embedded Discord Activity stays
+on its separate beta line; it is not a prerequisite for this alpha candidate.
+Node 26 qualification is independent of the website migration, and Node 24
+remains the Core release baseline. No Rust adoption or database rewrite is part
+of this scope.
+
+The native interface uses English while retaining existing local library,
+ownership and language preferences. Classic remains the explicit rollback and
+provides its existing translated interface when its service binding is present.
+This is a defined alpha candidate, not a claim of full translated parity,
+licensed real-song availability, stable 3.0 acceptance or approval to launch.
+The remaining catalog, real-device listening and live-release gates stay in
+[issue #92](https://github.com/lukasvri/Afterparty-MusicBot/issues/92) and
+[issue #37](https://github.com/lukasvri/Afterparty-MusicBot/issues/37).
+
 ## Implemented journeys
 
 - Private/public browser rooms, open-room discovery and invitation links.
@@ -39,10 +57,13 @@ in storage and Classic remains available when an API service binding is configur
 ```mermaid
 flowchart LR
   Browser -->|/v3 + afterparty-app assets| Svelte[SvelteKit 3 Worker]
-  Svelte -->|same-origin API and unported routes| Binding[AFTERPARTY_API service binding]
+  Svelte -->|bridge API mode and Classic fallback| Binding[AFTERPARTY_API service binding]
   Binding --> Legacy[Existing website Worker]
-  Legacy --> D1[D1 / existing SQL and Drizzle schema]
-  Legacy -->|existing authenticated protocol| Core[Node 24 Core / shared clock]
+  Svelte -->|native API mode / same handlers| D1[D1 / existing SQL and Drizzle schema]
+  Legacy --> D1
+  Svelte -->|native authenticated API| Core[Node 24 Core / shared clock]
+  Legacy -->|bridge authenticated API| Core
+  Browser <-->|ticketed live transport| Core
 ```
 
 The locked candidate uses SvelteKit 3.1.0, Svelte 5.57.2, TypeScript 6.0.3,
@@ -86,12 +107,17 @@ send recovery play/skip commands. Polling uses the existing shared playback help
 Search and radio-dependent next retain the existing 35-second catalog budget;
 editing a query immediately cancels and retires its previous request.
 Server/Core progression owns automatic next; delayed browser end events never
-advance the shared queue. Discord rooms are explicitly rejected by this slice.
+advance the shared queue. The private browser-room client rejects Discord room
+identifiers; public Discord concerts use their dedicated, server-scoped client.
 
-No schema, queue, authentication, persisted identifier, Discord isolation or Core
-protocol migration is required. Existing D1/Drizzle access stays in the API Worker.
-The built adapter proves the Worker target; local stack tests verify the binding
-against real isolated D1 storage. Provider credentials and live Discord are excluded.
+Frontend adoption does not require a schema, queue, authentication, persisted
+identifier or Discord-isolation migration. Both API modes reuse the same
+D1/Drizzle handlers against the intended existing bindings. The built adapter
+proves the Worker target; local stack tests verify both the service binding and
+native packaged API against real isolated D1 storage. Bridge checkpoint/presence
+changes have their own compatibility and rollback contract in
+[the D1 write guide](D1_WRITE_BUDGET.md). Provider credentials and live Discord
+are excluded from these local tests.
 
 ## Run locally
 

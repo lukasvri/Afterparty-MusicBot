@@ -12,6 +12,7 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5175').origin;
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname));
 const visitor = 'c'.repeat(32);
+const bridgeKey = 'synthetic-local-checkpoint-key';
 const track: Video = {
   id: 'synthetic01',
   title: 'Local D1 soundtrack',
@@ -22,25 +23,84 @@ const track: Video = {
   embeddable: true,
 };
 
-for (const native of [false, true])
+for (const { native, authority } of [
+  { native: false, authority: false },
+  { native: true, authority: false },
+  { native: true, authority: true },
+])
   test(
-    `${native ? 'Native Svelte API' : 'Cloudflare service binding'} preserves D1 rooms, host guards, CSRF, revisions and UI readback`,
+    authority
+      ? 'Native Core authority checkpoints presence, returns offline fallback and rejects stale restoration'
+      : `${native ? 'Native Svelte API' : 'Cloudflare service binding'} preserves D1 rooms, host guards, CSRF, revisions and UI readback`,
     { timeout: 60000 },
     async (context) => {
       await mkdir(`${root}.sites-runtime`, { recursive: true });
       const runtime = await mkdtemp(`${root}.sites-runtime/svelte-test-`);
       const config = `${runtime}/d1.json`;
+      const coreOrigin = 'https://synthetic-core.invalid';
+      const coreConfig = `${runtime}/core.json`;
+      const apiEntry = `${root}dist/server/checkpoint-fixture.js`;
+      const webEntry = `${root}apps/web/.svelte-kit/v3-artifact/checkpoint-fixture.js`;
+      context.after(async () => {
+        if (authority)
+          await Promise.all([rm(apiEntry, { force: true }), rm(webEntry, { force: true })]);
+      });
+      if (authority) {
+        // Test-only fixed-origin fetch routing. Production HTTPS validation and
+        // the actual Core/Worker protocol remain intact; no real host is contacted.
+        const wrapper = (
+          entry: string,
+        ) => `import worker from '${entry}';import {env} from 'cloudflare:workers';
+          const original=globalThis.fetch.bind(globalThis);
+          globalThis.fetch=(input,init)=>new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url).origin===${JSON.stringify(coreOrigin)}?env.CORE_FIXTURE.fetch(new Request(input,init)):original(input,init);
+          export default {fetch(request,bindings,context){
+            if(new URL(request.url).pathname==='/__fixture/checkpoint'){
+              if(request.headers.get('authorization')!=='Bearer '+${JSON.stringify(bridgeKey)})return new Response('Forbidden',{status:403});
+              return Promise.all([bindings.DB.prepare("SELECT key,state,updated_at FROM bot_state ORDER BY key").all(),bindings.DB.prepare("SELECT code,guild_id,state,version,updated_at FROM rooms ORDER BY code").all()]).then(([bots,rooms])=>Response.json({bots:bots.results,rooms:rooms.results}));
+            }
+            return worker.fetch(request,bindings,context);
+          }};`;
+        await writeFile(apiEntry, wrapper('./index.js'));
+        await writeFile(webEntry, wrapper('./_worker.js'));
+        await writeFile(
+          `${runtime}/core.js`,
+          `let state=null,available=true;export default{async fetch(request){
+          const url=new URL(request.url);if(url.pathname==='/health')return new Response('ok');
+          if(request.headers.get('authorization')!=='Bearer '+${JSON.stringify(bridgeKey)})return new Response('Forbidden',{status:403});
+          if(url.pathname==='/fixture'&&request.method==='POST'){const input=await request.json();state=input.state??state;available=input.available!==false;return Response.json({ok:true});}
+          if(!available)return new Response('Offline',{status:503});
+          if(!state||url.searchParams.has('guildId')&&url.searchParams.get('guildId')!==state.guildId||url.searchParams.has('room')&&url.searchParams.get('room')!==state.roomCode)return new Response('Wrong guild',{status:404});
+          return Response.json({state:{...state,online:true,serverTime:Date.now()}});
+        }};`,
+        );
+        await writeFile(
+          coreConfig,
+          JSON.stringify({
+            name: 'afterparty-core-fixture',
+            main: `${runtime}/core.js`,
+            compatibility_date: '2026-05-15',
+          }),
+        );
+      }
+
       const builtApi = JSON.parse(await readFile(`${root}dist/server/wrangler.json`, 'utf8'));
       await writeFile(
         config,
         JSON.stringify({
           name: 'afterparty-api-test',
-          main: `${root}dist/server/index.js`,
+          main: authority ? apiEntry : `${root}dist/server/index.js`,
           no_bundle: true,
           rules: builtApi.rules,
           compatibility_flags: builtApi.compatibility_flags,
           assets: { directory: `${root}dist/client` },
           compatibility_date: '2026-05-15',
+          vars: {
+            ADMIN_BRIDGE_KEY: bridgeKey,
+            ...(authority ? { GUTTA_CORE_PUBLIC_URL: coreOrigin } : {}),
+          },
+          ...(authority
+            ? { services: [{ binding: 'CORE_FIXTURE', service: 'afterparty-core-fixture' }] }
+            : {}),
           d1_databases: [
             {
               binding: 'DB',
@@ -85,13 +145,18 @@ for (const native of [false, true])
         webConfig,
         JSON.stringify({
           name: 'afterparty-web-test',
-          main: native
-            ? `${root}apps/web/.svelte-kit/v3-artifact/_worker.js`
-            : `${root}apps/web/.svelte-kit/cloudflare/_worker.js`,
+          main: authority
+            ? webEntry
+            : native
+              ? `${root}apps/web/.svelte-kit/v3-artifact/_worker.js`
+              : `${root}apps/web/.svelte-kit/cloudflare/_worker.js`,
           compatibility_date: '2026-05-15',
           compatibility_flags: ['nodejs_compat'],
           assets: { directory: `${root}apps/web/.svelte-kit/cloudflare`, binding: 'ASSETS' },
-          services: [{ binding: 'AFTERPARTY_API', service: 'afterparty-api-test' }],
+          services: [
+            { binding: 'AFTERPARTY_API', service: 'afterparty-api-test' },
+            ...(authority ? [{ binding: 'CORE_FIXTURE', service: 'afterparty-core-fixture' }] : []),
+          ],
           ...(native
             ? {
                 d1_databases: [
@@ -104,7 +169,12 @@ for (const native of [false, true])
                 ],
               }
             : {}),
-          vars: { AFTERPARTY_BETA_ENTRY: '1', ...(native ? { AFTERPARTY_NATIVE_API: '1' } : {}) },
+          vars: {
+            AFTERPARTY_BETA_ENTRY: '1',
+            ADMIN_BRIDGE_KEY: bridgeKey,
+            ...(authority ? { GUTTA_CORE_PUBLIC_URL: coreOrigin } : {}),
+            ...(native ? { AFTERPARTY_NATIVE_API: '1' } : {}),
+          },
         }),
       );
       let output = '';
@@ -176,6 +246,15 @@ for (const native of [false, true])
       // Each application retains its tested Wrangler version. The shared local
       // registry connects the same service binding used by the preview topology.
       const apiPort = Number(new URL(origin).port) + 1;
+      const fixtureOrigin = `http://${new URL(origin).hostname}:${apiPort + 1}`;
+      if (authority) {
+        const coreWorker = startWorker(
+          `${root}node_modules/wrangler/bin/wrangler.js`,
+          coreConfig,
+          apiPort + 1,
+        );
+        await waitForWorker(fixtureOrigin + '/health', coreWorker);
+      }
       const apiWorker = startWorker(
         `${root}node_modules/wrangler/bin/wrangler.js`,
         config,
@@ -200,7 +279,7 @@ for (const native of [false, true])
         // Stop the API Worker after proving rollback. Every following API/D1 and
         // browser operation must succeed in the standalone Svelte Worker.
         process.kill(-apiWorker.pid!, 'SIGTERM');
-        await workers[0].closed;
+        await workers.find((worker) => worker.process === apiWorker)!.closed;
       }
 
       async function api<T>(path: string, token?: string, input?: unknown, sourceOrigin = origin) {
@@ -223,6 +302,195 @@ for (const native of [false, true])
           );
         }
       }
+      if (authority) {
+        const guildId = '111111111111111',
+          roomCode = 'D0C0FFEE',
+          path = '/api/rooms/' + roomCode;
+        let current = {
+          ready: true,
+          connected: true,
+          playing: true,
+          position: 5,
+          volume: 50,
+          current: { ...track, concert: true },
+          queue: [{ ...track, concert: false }],
+          queueRevision: 'queue',
+          playbackKey: 'core:entry',
+          epoch: 'epoch-current',
+          sequence: 1,
+          buffering: false,
+          guildId,
+          roomCode,
+          engine: 'gutta-krutt-core',
+        };
+        const core = async (available = true) => {
+          const result = await fetch(fixtureOrigin + '/fixture', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + bridgeKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: current, available }),
+          });
+          assert.equal(result.status, 200);
+        };
+        const publish = (bridgeRevision: number, checkpointRevision: number, state = current) =>
+          api('/api/bridge', bridgeKey, {
+            guildId,
+            roomCode,
+            presenceCapability: 'core-authority-v1',
+            bridgeRevision,
+            checkpointRevision,
+            state,
+          });
+        await core();
+        assert.equal((await publish(10, 10)).status, 200);
+        const stored = async () => (await api('/__fixture/checkpoint', bridgeKey)).data;
+        const initial = await stored();
+        for (const incomingGuild of ['222222222222222', undefined]) {
+          for (const ordered of [false, true]) {
+            const rejected = await api('/api/bridge', bridgeKey, {
+              ...(incomingGuild ? { guildId: incomingGuild } : {}),
+              roomCode,
+              state: current,
+              ...(ordered ? { bridgeRevision: 100, checkpointRevision: 100 } : {}),
+            });
+            assert.equal(rejected.status, 200);
+            assert.deepEqual((rejected.data as { commands: unknown[] }).commands, []);
+            assert.deepEqual(
+              await stored(),
+              initial,
+              'a legacy guild or unscoped frame cannot replace another authority room or heartbeat',
+            );
+          }
+        }
+
+        current = { ...current, position: 65 };
+        await core();
+        await publish(11, 10);
+        assert.deepEqual(await stored(), initial, 'advancing Core presence does not touch D1');
+        const live = (await api<Room>(path)).data;
+        assert.equal(live.position, 65);
+        assert.equal(live.playing, true);
+        assert.equal(live.queue.length, 0);
+        assert.equal(live.syncSource, 'live');
+        current = { ...current, playing: false, position: 42, sequence: 2 };
+        await core();
+        await publish(12, 12);
+        const paused = (await api<Room>(path)).data;
+        assert.equal(paused.playing, false);
+        assert.equal(paused.position, 42);
+        await core(false);
+        const before = await stored();
+        await publish(13, 12);
+        assert.deepEqual(await stored(), before);
+        const offline = (await api<Room>(path)).data;
+        assert.equal(offline.discordOnline, false);
+        assert.equal(offline.playing, false);
+        assert.equal(offline.position, 42);
+        assert.equal(offline.syncValidForMs, 0);
+        const control = await api('/api/discord', undefined, {
+          action: 'resume',
+          guildId,
+          playbackKey: 'core:entry',
+          commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        });
+        assert.equal(control.status, 503);
+        await core();
+        assert.equal((await api<Room>(path)).data.playing, false);
+        current = { ...current, epoch: 'restored-backup', sequence: 0 };
+        await core();
+        const restored = await publish(2, 2);
+        assert.equal(restored.status, 409);
+        assert.equal((restored.data as { code: string }).code, 'bridge_reconciliation_required');
+        const browser = await chromium.launch({
+          headless: true,
+          executablePath: process.env.CHROMIUM_PATH ?? '/usr/bin/chromium',
+          args: ['--no-sandbox'],
+        });
+        try {
+          const page = await browser.newPage();
+          await page.goto(origin + '/v3');
+          const result = await page.evaluate(async (path) => {
+            const first = (await (await fetch(path)).json()) as Room;
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            return { first, second: (await (await fetch(path)).json()) as Room };
+          }, path);
+          assert.equal(result.first.playing, false);
+          assert.equal(result.second.playing, false);
+          assert.equal(result.second.isHost, false);
+        } finally {
+          await browser.close();
+        }
+        return;
+      }
+      // Exercise the real bridge SQL in both Worker topologies. These are public
+      // concert snapshots only; no Core, Discord or provider is contacted.
+      const concertPath = '/api/rooms/D0C0FFEE';
+      const concertState = {
+        ready: true,
+        connected: true,
+        playing: true,
+        position: 5,
+        volume: 50,
+        current: { ...track, concert: true },
+        queue: [{ ...track, concert: false, title: 'Private Discord music' }],
+        queueRevision: 'synthetic-checkpoint-queue',
+        playbackKey: 'core:synthetic-entry',
+      };
+      const publishCheckpoint = (
+        bridgeRevision: number,
+        checkpointRevision: number,
+        state = concertState,
+      ) =>
+        api('/api/bridge', bridgeKey, {
+          guildId: '111111111111111',
+          guildName: 'Synthetic checkpoint guild',
+          roomCode: 'D0C0FFEE',
+          bridgeRevision,
+          checkpointRevision,
+          state,
+        });
+      assert.equal((await publishCheckpoint(1, 1)).status, 200);
+      const firstCheckpoint = (await api<Room>(concertPath)).data;
+      assert.equal((await publishCheckpoint(2, 1, { ...concertState, position: 60 })).status, 200);
+      const advancing = (await api<Room>(concertPath)).data;
+      assert.equal(
+        advancing.version,
+        firstCheckpoint.version,
+        'advancing heartbeat does not rewrite the D1 room',
+      );
+      assert(advancing.position >= 60 && advancing.position < 65);
+      assert.deepEqual(
+        advancing.queue,
+        [],
+        'ordinary Discord music is absent from public fallback',
+      );
+      assert.equal(advancing.isHost, false);
+      await publishCheckpoint(3, 3, { ...concertState, playing: false, position: 60 });
+      await publishCheckpoint(4, 4, { ...concertState, playing: false, position: 42 });
+      const replacement = {
+        ...concertState,
+        playing: false,
+        position: 0,
+        current: {
+          ...track,
+          id: 'checkpoint1',
+          title: 'Replacement checkpoint concert',
+          concert: true,
+        },
+      };
+      await publishCheckpoint(5, 5, replacement);
+      const replaced = (await api<Room>(concertPath)).data;
+      assert.equal(replaced.current?.id, 'checkpoint1');
+      assert.equal(replaced.playing, false);
+      await publishCheckpoint(2, 1, concertState);
+      const afterReplay = (await api<Room>(concertPath)).data;
+      assert.equal(afterReplay.version, replaced.version);
+      assert.equal(afterReplay.current?.id, 'checkpoint1');
+      assert.equal(afterReplay.playing, false);
+      assert.equal(
+        (await api('/api/bridge', 'wrong-synthetic-key', { state: concertState })).status,
+        403,
+      );
+
       const created = await api<{ room: Room; token: string }>('/api/rooms', undefined, {
         name: 'Synthetic D1 room',
         isPublic: false,
@@ -326,6 +594,37 @@ for (const native of [false, true])
           .fill('synthetic afterparty');
         await page.getByRole('button', { name: 'Find music' }).click();
         await page.getByRole('button', { name: `Add ${track.title} to queue` }).waitFor();
+        const browserCheckpoint = await page.evaluate(async (path) => {
+          const response = await fetch(path, { cache: 'no-store' });
+          return response.json() as Promise<{
+            playing: boolean;
+            current: { id: string };
+            isHost: boolean;
+          }>;
+        }, concertPath);
+        assert.equal(browserCheckpoint.current.id, 'checkpoint1');
+        assert.equal(browserCheckpoint.playing, false);
+        assert.equal(browserCheckpoint.isHost, false);
+        await page.reload();
+        await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
+        assert.equal(await page.getByRole('button', { name: 'Resume playback' }).isEnabled(), true);
+        if (native) {
+          await page.goto(`${origin}/patch-notes`);
+          await page
+            .getByText(
+              'Core saves pause and resume choices immediately for restart recovery, closing the gap before the next playback clock tick.',
+              { exact: true },
+            )
+            .waitFor();
+          for (const width of [390, 1440]) {
+            await page.setViewportSize({ width, height: 1000 });
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+            await page
+              .locator('article')
+              .first()
+              .screenshot({ path: `${root}.sites-runtime/checkpoint-notes-${width}.png` });
+          }
+        }
         assert.deepEqual(external, []);
       } finally {
         await browser.close();

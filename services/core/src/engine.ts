@@ -210,12 +210,15 @@ export class Engine extends EventEmitter {
   }
   websiteSnapshot(): PublicState {
     const state = this.snapshot(),
+      blocked = this.store.get('bridge-reconciliation-block', false),
       current = state.current?.concert ? state.current : null;
     return {
       ...state,
+      ready: !blocked && state.ready,
+      online: !blocked && state.online,
       current,
       queue: state.queue.filter((t) => t.concert),
-      playing: Boolean(current) && state.playing,
+      playing: !blocked && Boolean(current) && state.playing,
       position: current ? state.position : 0,
       playbackKey: current ? state.playbackKey : null,
     };
@@ -602,6 +605,8 @@ export class Engine extends EventEmitter {
     if (!this.current) throw new UserError("No song is playing.");
     this.paused = true;
     this.sink.pause();
+    // A crash before the next consumed-position tick must retain explicit pause.
+    this.checkpoint();
     this.changed();
   }
   resume() {
@@ -610,6 +615,7 @@ export class Engine extends EventEmitter {
     if (this.current) {
       this.paused = false;
       this.sink.resume();
+      this.checkpoint();
       this.changed();
     } else if (this.queue.length) void this.startNext();
     else throw new UserError("There is no song to resume.");
