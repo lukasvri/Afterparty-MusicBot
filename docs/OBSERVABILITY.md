@@ -44,8 +44,10 @@ The fetch transport omits credentials and referrers. Direct ingestion still make
 a network request from the browser; provider-side IP retention/filtering must be
 reviewed before activation. Do not claim that a browser request conceals its IP.
 Error sampling is 10%, with at most five accepted sampled errors per page load
-and a bounded transport buffer. This limits bursts but does not replace provider
-quotas or zero-overage billing controls.
+and a bounded transport buffer. The cap runs in the transport after SDK sampling;
+sampled-out errors do not consume it. The SDK runs `beforeSend` before sampling,
+so that callback only filters private data. This limits bursts but does not
+replace provider quotas or zero-overage billing controls.
 
 ## Codecov: real, scoped LCOV
 

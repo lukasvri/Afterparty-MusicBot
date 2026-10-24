@@ -64,7 +64,6 @@ export function sanitizeErrorEnvelope(envelope: Envelope, surface: ErrorSurface)
 }
 
 export function errorReportingOptions(dsn: string, surface: ErrorSurface): BrowserOptions {
-  let accepted = 0;
   return {
     dsn,
     defaultIntegrations: false,
@@ -83,8 +82,21 @@ export function errorReportingOptions(dsn: string, surface: ErrorSurface): Brows
     beforeSendMetric: () => null,
     beforeSend(event, hint) {
       hint.attachments = [];
-      const clean = sanitizeErrorEvent(event, surface);
-      return clean && accepted++ < 5 ? clean : null;
+      return sanitizeErrorEvent(event, surface);
+    },
+  };
+}
+
+/** The SDK samples after beforeSend, so count only sampled transport events. */
+export function errorReportingTransport(transport: Transport, surface: ErrorSurface): Transport {
+  let accepted = 0;
+  return {
+    flush: timeout => transport.flush(timeout),
+    send(envelope) {
+      const clean = sanitizeErrorEnvelope(envelope, surface);
+      if (!clean[1].length || accepted >= 5) return Promise.resolve({ statusCode: 200 });
+      accepted++;
+      return transport.send(clean);
     },
   };
 }
@@ -101,13 +113,7 @@ export async function initializeErrorReporting(dsn: string | undefined, surface:
       transport(options) {
         const transport = sdk.makeFetchTransport({ ...options, bufferSize: 5,
           fetchOptions: { credentials: "omit", referrerPolicy: "no-referrer" } });
-        return {
-          flush: timeout => transport.flush(timeout),
-          send(envelope) {
-            const clean = sanitizeErrorEnvelope(envelope, surface);
-            return clean[1].length ? transport.send(clean) : Promise.resolve({ statusCode: 200 });
-          },
-        };
+        return errorReportingTransport(transport, surface);
       },
     });
     return true;

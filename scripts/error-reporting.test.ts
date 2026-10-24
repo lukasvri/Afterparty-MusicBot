@@ -2,8 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import type { BrowserOptions, Event, EventHint } from "@sentry/browser";
+import { BrowserClient, defaultStackParser } from "@sentry/browser";
 import type { Envelope, EventEnvelope } from "@sentry/core";
-import { errorReportingOptions, initializeErrorReporting, sanitizeErrorEnvelope, sanitizeErrorEvent, validErrorDsn } from "../lib/error-reporting.ts";
+import { errorReportingOptions, errorReportingTransport, initializeErrorReporting, sanitizeErrorEnvelope, sanitizeErrorEvent, validErrorDsn } from "../lib/error-reporting.ts";
 
 const dsn = "https://" + "a".repeat(32) + "@o123.ingest.us.sentry.io/456";
 const sensitive = "private-room-token-guild-111111111111111@example.invalid";
@@ -58,7 +59,7 @@ test("transport removes attachments and all non-error envelope items and metadat
   assert.equal(sanitizeErrorEnvelope([{ event_id: "b".repeat(32), sent_at: "" }, [[{ type: "attachment", length: 1, filename: "x" }, "x"]]], "v3")[1].length, 0);
 });
 
-test("SDK policy disables data collection and caps accepted sampled errors at five per page", async () => {
+test("SDK policy disables data collection and sanitizes errors before sampling", async () => {
   const options = errorReportingOptions(dsn, "classic");
   assert.equal(options.defaultIntegrations, false);
   assert.equal(options.sampleRate, 0.1);
@@ -70,7 +71,7 @@ test("SDK policy disables data collection and caps accepted sampled errors at fi
   for (let n = 0; n < 6; n++) {
     const hint: EventHint = { attachments: [{ filename: "private.txt", data: sensitive }] };
     const clean = await options.beforeSend?.({ ...event(), type: undefined }, hint);
-    assert.equal(clean !== null, n < 5);
+    assert.notEqual(clean, null);
     assert.deepEqual(hint.attachments, []);
   }
   assert.deepEqual(options.dataCollection, {
@@ -78,6 +79,37 @@ test("SDK policy disables data collection and caps accepted sampled errors at fi
     genAI: { inputs: false, outputs: false }, mcp: { inputs: false, outputs: false }, graphQL: { document: false, variables: false },
     databaseQueryData: false, queues: false, stackFrameVariables: false, frameContextLines: 0,
   });
+});
+
+test("real SDK sampling does not consume the five-event transport limit", async t => {
+  let acceptSample = false;
+  let sent = 0;
+  let flushed = 0;
+  t.mock.method(Math, "random", () => acceptSample ? 0.01 : 0.9);
+  const client = new BrowserClient({
+    ...errorReportingOptions(dsn, "classic"),
+    stackParser: defaultStackParser,
+    integrations: [],
+    transport: () => errorReportingTransport({
+      flush: async () => { flushed++; return true; },
+      send: async envelope => {
+        sent++;
+        assert.equal(envelope[1].length, 1);
+        assert(!JSON.stringify(envelope).includes(sensitive));
+        return { statusCode: 200 };
+      },
+    }, "classic"),
+  });
+  client.init();
+  for (let n = 0; n < 50; n++) client.captureEvent(event());
+  await client.flush(1000);
+  assert.equal(sent, 0, "SDK sampling rejects the first fifty errors");
+  acceptSample = true;
+  for (let n = 0; n < 7; n++) client.captureEvent(event());
+  await client.flush(1000);
+  assert.equal(sent, 5, "five later sampled errors reach transport, then the cap applies");
+  assert(flushed > 0, "flush delegates to the underlying transport");
+  await client.close(1000);
 });
 
 test("configured browser SDK uses only global errors and privacy-filtered transport", async t => {
