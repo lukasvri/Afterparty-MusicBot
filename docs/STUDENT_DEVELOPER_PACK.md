@@ -44,13 +44,13 @@ local private files. Keep OpenWorks in a separate environment.
 ## Student benefits and account setup
 
 The owner confirmed that the Student Developer Pack is active on 24 October
-2026. Individual partner subscriptions and remaining account quotas have not
-been independently verified.
+2026. The GitHub account page subsequently confirmed Copilot Student active and
+additional AI usage disabled. Other partner subscriptions remain unverified.
 
 | Benefit | Use here | Status |
 | --- | --- | --- |
-| GitHub Pro / Codespaces | Isolated development and validation | Repository configuration prepared; no cloud environment started |
-| Copilot Student | Code completion and repository-aware assistance | Instructions prepared; subscription activation not verified |
+| GitHub Pro / Codespaces | Isolated development and validation | A separate 2-core environment created and tested within included usage |
+| Copilot Student | Code completion and repository-aware assistance | Account activation verified; editor sign-in is separate |
 | Codecov | Compare test coverage in pull requests | Deferred until coverage reports and repository access are deliberately configured |
 | Polypane | Responsive and accessibility review | Optional one-year student offer; license and installation not activated |
 | Sentry | Runtime error investigation | Deferred pending a concrete need, data filtering and separate service approval |
@@ -85,13 +85,17 @@ Do not start time-limited trials merely to reserve them. Codecov requires real
 coverage instrumentation; adding an upload step without a report is not an
 integration. Sentry would need a separate review of outbound data and quotas.
 
-## Verification boundary
+## Verification on 24 October 2026
 
-Configuration and documentation can be reviewed locally. A successful image
-build, dependency installation, private browser preview and test run in a real
-Codespace are still required to establish that the cloud environment works.
-No Codespace, partner account, service authorization or production deployment
-is created by this change.
+The configured environment built and installed its locked dependencies in a real
+2-core Codespace. `npm run check:all` completed with exit code 0, including the Core FFmpeg tests
+and the isolated SvelteKit candidate. Runtime checks showed Node 24.21.0,
+Python 3.11.2 and FFmpeg 5.1.9.
+The account's paid Codespaces budget remained at zero. Copilot Student was
+confirmed active in GitHub settings; no Copilot prompt or editor sign-in was
+needed to establish subscription status. Private forwarded browser previews are
+verified separately from command-line tests. No production deployment or plan
+upgrade was performed.
 
 References: [Codespaces billing](https://docs.github.com/en/billing/concepts/product-billing/github-codespaces),
 [included usage](https://docs.github.com/en/codespaces/troubleshooting/troubleshooting-included-usage),
