@@ -1,0 +1,13 @@
+{
+  "name": "Afterparty development",
+  "build": { "dockerfile": "Dockerfile", "context": "." },
+  "remoteUser": "node",
+  "postCreateCommand": ["npm", "run", "setup:cloud"],
+  "waitFor": "postCreateCommand",
+  "forwardPorts": [5173, 5174],
+  "portsAttributes": {
+    "5173": { "label": "Afterparty website", "onAutoForward": "notify" },
+    "5174": { "label": "SvelteKit candidate", "onAutoForward": "notify" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "ignore" }
+}
