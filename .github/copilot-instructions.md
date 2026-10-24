@@ -6,6 +6,8 @@ and no em dashes.
 
 - Keep website source, Core (`services/core`) and the opt-in SvelteKit candidate
   (`apps/web`) within their existing contracts. OpenWorks is a separate project.
+- Apply `AGENTS.md#keep-every-change-organized` to every change: reuse canonical
+  rules, keep related feature code together and maintain the source map.
 - Preserve per-server authorization, queues, settings and databases. Owner access
   never grants access to another server. Ordinary Discord music stays private.
 - Preserve queue revisions, stale-command protection and the shared playback

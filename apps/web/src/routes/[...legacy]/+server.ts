@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { bridge, type ApiBinding } from '#lib/api-bridge.ts';
+import { bridge, type ApiBinding } from '#lib/server/api-bridge.ts';
 import type { RequestHandler } from './$types';
 
 // Unported pages, OAuth callbacks and API endpoints keep their existing handlers.

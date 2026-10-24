@@ -90,9 +90,11 @@ until its ownership and purpose are established. No CI auto-deployment is added.
 
 The beta-only `AFTERPARTY_BETA_ENTRY=1` setting redirects `/` to `/v3` with room
 query parameters preserved. `/?classic=1` opens the existing interface, including
-Discord controls. The new Svelte interface currently supports private browser
-rooms; it does not implement Discord controls. API routes, OAuth callbacks and
-all other unported pages continue through the existing beta API Worker.
+Discord controls. The Svelte interface now includes browser rooms, library/playlists, public
+concert controls, administration, games and public information pages. Bridge mode
+keeps API routes and OAuth callbacks on the existing beta API Worker. Native API
+mode is a separate reviewed option described in the migration guide; do not
+enable it on the beta without supplying its existing D1/Core configuration.
 
 Check HTTPS and assets, the root redirect, Classic, private-room host/guest
 permissions and persistence, search, playback controls, login/logout and the test

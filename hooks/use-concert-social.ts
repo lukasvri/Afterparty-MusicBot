@@ -3,18 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { headers } from "@/lib/browser-api";
 import type { Room } from "@/lib/types";
 
-export const REACTIONS = ["🔥", "❤️", "👏", "🤘", "✨", "🎉"] as const;
-export type ConcertSocialState = {
-  scope: "room" | "guild"; scopeId: string; playbackKey: string; revision: number; enabled: boolean;
-  reactions: { id: string; emoji: string; at: number }[];
-  highlights: { id: string; text: string; position: number; videoId: string; at: number }[];
-  bingo: { cells: string[]; marked: number[]; active: boolean } | null;
-};
-type Action = "reaction" | "highlight" | "remove-highlight" | "bingo-start" | "bingo-mark" | "bingo-stop" | "configure";
-const validState = (s: ConcertSocialState) => s && Number.isSafeInteger(s.revision) && s.revision >= 0 && typeof s.enabled === "boolean" &&
-  Array.isArray(s.reactions) && s.reactions.length <= 20 && s.reactions.every(r => r && typeof r.id === "string" && r.id.length <= 128 && REACTIONS.some(e => e === r.emoji) && Number.isFinite(r.at)) &&
-  Array.isArray(s.highlights) && s.highlights.length <= 30 && s.highlights.every(h => h && typeof h.id === "string" && h.id.length <= 128 && typeof h.text === "string" && h.text.length <= 160 && /^[\w-]{11}$/.test(h.videoId) && Number.isFinite(h.position) && h.position >= 0 && Number.isFinite(h.at)) &&
-  (s.bingo === null || (s.bingo && typeof s.bingo.active === "boolean" && Array.isArray(s.bingo.cells) && s.bingo.cells.length === 9 && s.bingo.cells.every(c => typeof c === "string" && c.trim().length > 0 && c.length <= 60) && Array.isArray(s.bingo.marked) && s.bingo.marked.length <= 9 && s.bingo.marked.every(n => Number.isInteger(n) && n >= 0 && n < 9)));
+import { validSocial as validState, type SocialAction as Action, type SocialState } from "../services/core/src/social-protocol.ts";
+import { createReactionWindow } from "../lib/social-reactions.ts";
+export { SOCIAL_REACTIONS as REACTIONS } from "../services/core/src/social-protocol.ts";
+export type ConcertSocialState = SocialState;
 
 /** An opt-in, independent social channel. Failed mutations are never replayed. */
 export function useConcertSocial(room: Room, open: boolean) {
@@ -39,21 +31,12 @@ export function useConcertSocial(room: Room, open: boolean) {
     const visible = () => document.visibilityState !== "hidden";
     const availability = (value: boolean) => { available = value; setReady(value); };
     const invalidate = () => { sessionEpoch++; availability(false); streamController?.abort(); requestController?.abort(); };
-    const receivedReactions = new Map<string, number>();
-    const mergeReactions = (previous: ConcertSocialState["reactions"], next: ConcertSocialState["reactions"]) => {
-      const now = performance.now();
-      for (const reaction of next) if (!receivedReactions.has(reaction.id)) receivedReactions.set(reaction.id, now);
-      const merged = [...new Map([...previous, ...next].filter(r => now - (receivedReactions.get(r.id) ?? -Infinity) < 6000).map(r => [r.id, r])).values()].slice(-20);
-      // Retain recent seen IDs to prevent a repeated frame restarting an expired reaction.
-      for (const [id, at] of receivedReactions) if (now - at > 60000) receivedReactions.delete(id);
-      while (receivedReactions.size > 200) receivedReactions.delete(receivedReactions.keys().next().value!);
-      return merged;
-    };
+    const reactions = createReactionWindow(() => performance.now());
     const accept = (data: { social: ConcertSocialState; canManage?: boolean }) => {
       const next = data.social;
       if (!validState(next) || next.scope !== scope || next.scopeId !== scopeId || next.playbackKey !== playbackKey) throw new Error("Waiting for this concert’s latest state.");
       if (!alive || !visible() || !navigator.onLine) return;
-      if (next.revision >= revision) { availability(true); revision = next.revision; setSocial(previous => ({ ...next, reactions: next.enabled ? mergeReactions(previous?.reactions ?? [], next.reactions) : [] })); setCanManage(data.canManage === true); }
+      if (next.revision >= revision) { availability(true); revision = next.revision; setSocial(previous => ({ ...next, reactions: next.enabled ? reactions.merge(previous?.reactions ?? [], next.reactions) : [] })); setCanManage(data.canManage === true); }
     };
     const controller = new AbortController();
     const send = async (action: Action | "join" | "read", fields: Record<string, unknown> = {}): Promise<boolean> => {
@@ -139,7 +122,7 @@ export function useConcertSocial(room: Room, open: boolean) {
       setError("Reconnecting concert extras…");
       if (!streaming) void poll();
     };
-    const expiry = setInterval(() => { if (alive) setSocial(previous => previous ? { ...previous, reactions: mergeReactions(previous.reactions, []) } : previous); }, 2000);
+    const expiry = setInterval(() => { if (alive) setSocial(previous => previous ? { ...previous, reactions: reactions.merge(previous.reactions, []) } : previous); }, 2000);
     window.addEventListener("online", reconnect);
     window.addEventListener("offline", reconnect);
     document.addEventListener("visibilitychange", reconnect);

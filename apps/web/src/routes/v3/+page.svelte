@@ -1,12 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createRoomClient, type RoomClientState } from '#lib/room-client.ts';
-  import Icon from '#lib/Icon.svelte';
-  import RoomAudio from '#lib/RoomAudio.svelte';
+  import { createRoomClient, type RoomClientState } from '#lib/rooms/room-client.ts';
+  import Icon from '#lib/ui/Icon.svelte';
+  import RoomAudio from '#lib/rooms/RoomAudio.svelte';
+  import RoomSocial from '#lib/social/RoomSocial.svelte';
+  import RoomDirectory from '#lib/rooms/RoomDirectory.svelte';
+  import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import { time } from '../../../../../lib/types.ts';
   import '../../app.css';
 
-  let client: ReturnType<typeof createRoomClient> | undefined;
+  let roomSession = 0;
+  let client = $state<ReturnType<typeof createRoomClient>>();
   let view = $state<RoomClientState>({
     room: null,
     connection: 'idle',
@@ -21,6 +25,13 @@
     roomCode = $state(''),
     query = $state(''),
     copied = $state(false);
+  let panel = $state<'discover' | 'library' | 'settings'>('discover');
+  let directory = $state(false),
+    publicRoom = $state(false),
+    displayName = $state('');
+  let importing = $state(false),
+    invitationLink = $state(''),
+    invitationError = $state('');
   let seekValue = $state<number | null>(null);
   let tick = $state(0);
   const room = $derived(view.room);
@@ -32,12 +43,30 @@
     room ? `/?classic=1&room=${encodeURIComponent(room.code)}` : '/?classic=1',
   );
   onMount(() => {
+    displayName = browserStorage.get('afterparty-display-name') ?? '';
+    directory = new URL(location.href).searchParams.get('view') === 'rooms';
     client = createRoomClient();
     const unsubscribe = client.subscribe((value) => {
+      if (view.room && !value.room) {
+        roomSession++;
+        invitationLink = '';
+        invitationError = '';
+        copied = false;
+      }
       view = value;
     });
-    const initial = new URL(location.href).searchParams.get('room');
-    if (initial) void client.join(initial);
+    const initialUrl = new URL(location.href);
+    const initial = initialUrl.searchParams.get('room');
+    const access = new URLSearchParams(initialUrl.hash.slice(1));
+    const invitation = access.get('host') ?? undefined;
+    const credential = access.get('access');
+    if (initial && /^[A-Z0-9]{8}$/.test(initial) && credential && /^[a-f0-9]{64}$/.test(credential))
+      browserStorage.set(`afterparty-host:${initial}`, credential);
+    if (initialUrl.hash) {
+      initialUrl.hash = '';
+      history.replaceState(history.state, '', initialUrl);
+    }
+    if (initial) void client.join(initial, invitation);
     const timer = setInterval(() => {
       tick++;
     }, 250);
@@ -51,10 +80,11 @@
     if (await client?.join(roomCode)) rememberRoom();
   }
   async function create() {
-    if (await client?.create(roomName.trim() || 'The listening room')) rememberRoom();
+    if (await client?.create(roomName.trim() || 'The listening room', publicRoom)) rememberRoom();
   }
   function rememberRoom() {
     if (!view.room) return;
+    directory = false;
     const url = new URL(location.href);
     url.searchParams.set('room', view.room.code);
     history.replaceState(history.state, '', url);
@@ -67,8 +97,46 @@
       copied = false;
     }
   }
+  async function invite(type: 'cohost' | 'transfer') {
+    invitationError = '';
+    invitationLink = '';
+    const code = view.room?.code;
+    const token = await client?.createInvitation(type);
+    if (!token || view.room?.code !== code) return;
+    const url = new URL('/v3', location.origin);
+    url.searchParams.set('room', code!);
+    url.hash = new URLSearchParams({ host: token }).toString();
+    invitationLink = url.href;
+    try {
+      await navigator.clipboard.writeText(url.href);
+    } catch {
+      invitationError = 'Copy the invitation link below.';
+    }
+  }
+  async function addTracks(ids: readonly string[]) {
+    const code = view.room?.code;
+    const session = roomSession;
+    if (!code || importing) return;
+    importing = true;
+    try {
+      for (const id of ids) {
+        if (view.room?.code !== code || roomSession !== session)
+          throw new Error('Room changed. Check the queue before importing again.');
+        if (!(await client?.add(id)))
+          throw new Error(
+            view.error ||
+              'Not all selected tracks could be added. Check the queue before retrying.',
+          );
+      }
+    } finally {
+      importing = false;
+    }
+  }
   function leave() {
     client?.leave();
+    panel = 'discover';
+    invitationLink = '';
+    invitationError = '';
     copied = false;
     seekValue = null;
     history.replaceState(history.state, '', '/v3');
@@ -102,11 +170,20 @@
       <a class="nav-link active" href="/v3" aria-current="page" onclick={goHome}
         ><Icon name="headphones" />Listening room</a
       >
-      <a class="nav-link" href={classic} data-sveltekit-reload
-        ><Icon name="music" />Classic Afterparty<Icon name="arrow" size={16} /></a
+      <button
+        class="nav-link"
+        class:active={directory}
+        onclick={() => {
+          directory = !directory;
+        }}
+        aria-pressed={directory}><Icon name="users" />Open rooms</button
       >
+      <a class="nav-link" href="/v3/discord"><Icon name="music" />Discord & concerts</a>
       <a class="nav-link" href="/admin" data-sveltekit-reload
         ><Icon name="settings" />Server settings</a
+      >
+      <a class="nav-link" href={room ? `/games?room=${encodeURIComponent(room.code)}` : '/games'}
+        ><Icon name="users" />Games</a
       >
     </nav>
     <div class="sidebar-bottom">
@@ -131,7 +208,18 @@
       </div>
     </header>
     <main id="main">
-      {#if !room}
+      {#if directory}
+        <RoomDirectory
+          busy={view.busy || view.connection === 'connecting'}
+          onJoin={async (code) => {
+            if (await client?.join(code)) rememberRoom();
+          }}
+          onCreate={() => {
+            directory = false;
+            leave();
+          }}
+        />
+      {:else if !room}
         <section class="welcome">
           <p class="eyebrow red">GOOD MUSIC NEEDS GOOD COMPANY</p>
           <h1>Your music.<br />Your people<span class="red">.</span></h1>
@@ -152,10 +240,14 @@
                 maxlength="48"
                 autocomplete="off"
               />
+              <label class="checkbox-label"
+                ><input type="checkbox" bind:checked={publicRoom} /> List this room in Open rooms</label
+              >
               <button
                 class="button primary"
-                disabled={view.busy || view.connection === 'connecting'}
-                >Create private room <Icon name="arrow" /></button
+                disabled={!client || view.busy || view.connection === 'connecting'}
+                >{publicRoom ? 'Create public room' : 'Create private room'}
+                <Icon name="arrow" /></button
               >
             </form>
             <form
@@ -179,13 +271,13 @@
               />
               <button
                 class="button secondary"
-                disabled={view.busy || view.connection === 'connecting'}
+                disabled={!client || view.busy || view.connection === 'connecting'}
                 >Join room <Icon name="arrow" /></button
               >
             </form>
           </div>
           <div class="welcome-foot">
-            <span>PRIVATE BY DEFAULT</span><span>SHARED IN REAL TIME</span><span
+            <span>YOU CHOOSE WHO JOINS</span><span>SHARED IN REAL TIME</span><span
               >NO ACCOUNT NEEDED</span
             >
           </div>
@@ -299,6 +391,43 @@
                       <strong>{video.title}</strong><span>{video.artist}</span>
                     </div>
                     <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span>
+                    <div class="queue-actions">
+                      {#if room.isHost}
+                        <button
+                          class="icon-button"
+                          aria-label={`Play ${video.title} now`}
+                          disabled={view.busy || view.connection !== 'connected'}
+                          onclick={() => {
+                            void client?.playVideo(video.id);
+                          }}><Icon name="play" size={16} /></button
+                        >
+                        <button
+                          class="icon-button"
+                          aria-label={`Move ${video.title} up`}
+                          disabled={index === 0 || view.busy || view.connection !== 'connected'}
+                          onclick={() => {
+                            void client?.move(video.id, index - 1);
+                          }}>↑</button
+                        >
+                        <button
+                          class="icon-button"
+                          aria-label={`Remove ${video.title}`}
+                          disabled={view.busy || view.connection !== 'connected'}
+                          onclick={() => {
+                            void client?.remove(video.id);
+                          }}>×</button
+                        >
+                      {:else}
+                        <button
+                          class="icon-button"
+                          aria-label={`Vote for ${video.title}`}
+                          disabled={view.busy || view.connection !== 'connected'}
+                          onclick={() => {
+                            void client?.action('vote', { videoId: video.id });
+                          }}>↑ {room.voteCounts?.[video.id] ?? 0}</button
+                        >
+                      {/if}
+                    </div>
                   </li>{/each}
               </ol>
             {:else}<div class="empty-queue">
@@ -311,64 +440,256 @@
             </div>
           </section>
         </div>
-        <section class="discovery" aria-labelledby="discover-title">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow red">PASS THE AUX</p>
-              <h2 id="discover-title">What’s the next track?</h2>
-            </div>
-          </div>
-          <form
-            class="search-form"
-            role="search"
-            onsubmit={(event) => {
-              event.preventDefault();
-              void client?.search(query);
+        {#key room.code}<RoomSocial {room} />{/key}
+        <nav class="room-tabs" aria-label="Room tools">
+          <button
+            class="button"
+            class:primary={panel === 'discover'}
+            class:secondary={panel !== 'discover'}
+            onclick={() => {
+              panel = 'discover';
             }}
+            aria-pressed={panel === 'discover'}>Discover</button
           >
-            <label class="sr-only" for="search">Search songs or artists</label><Icon
-              name="search"
-            /><input
-              id="search"
-              bind:value={query}
-              oninput={() => client?.cancelSearch()}
-              placeholder="A song, an artist, a whole mood…"
-              required
-              maxlength="120"
-              autocomplete="off"
-            /><button class="button primary" disabled={view.searching}
-              >{view.searching ? 'Searching…' : 'Find music'}</button
+          <button
+            class="button"
+            class:primary={panel === 'library'}
+            class:secondary={panel !== 'library'}
+            onclick={() => {
+              panel = 'library';
+            }}
+            aria-pressed={panel === 'library'}>Library & playlists</button
+          >
+          <button
+            class="button"
+            class:primary={panel === 'settings'}
+            class:secondary={panel !== 'settings'}
+            onclick={() => {
+              panel = 'settings';
+            }}
+            aria-pressed={panel === 'settings'}>Room settings</button
+          >
+        </nav>
+        {#if panel === 'library'}
+          {#key room.code}
+            {#await import('#lib/library/MusicLibrary.svelte')}
+              <p class="search-summary" role="status">Opening your library…</p>
+            {:then { default: MusicLibrary }}
+              <MusicLibrary
+                tracks={[...(room.current ? [room.current] : []), ...room.queue]}
+                history={room.history ?? []}
+                busy={view.busy || importing || view.connection !== 'connected'}
+                onAdd={addTracks}
+              />
+            {:catch}
+              <div class="error-message" role="alert">
+                <p>The library could not load. Check your connection and reload the page.</p>
+                <button class="button secondary" onclick={() => location.reload()}
+                  >Reload page</button
+                >
+              </div>
+            {/await}
+          {/key}
+        {:else if panel === 'settings'}
+          <section class="room-settings" aria-labelledby="settings-title">
+            <h2 id="settings-title">Make it your room</h2>
+            <label for="display-name">Your display name</label>
+            <input
+              id="display-name"
+              maxlength="32"
+              bind:value={displayName}
+              oninput={() => browserStorage.set('afterparty-display-name', displayName)}
+              placeholder="Guest"
+            />
+            {#if room.isHost}
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  checked={room.radio !== false}
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onchange={(event) => {
+                    void client?.action('radio', { enabled: event.currentTarget.checked });
+                  }}
+                /> Keep the music going with radio</label
+              >
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  checked={room.approvalRequired === true}
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onchange={(event) => {
+                    void client?.action('approval', { enabled: event.currentTarget.checked });
+                  }}
+                /> Approve guest requests</label
+              >
+              {#if room.isOwner}<label class="checkbox-label"
+                  ><input
+                    type="checkbox"
+                    checked={room.isPublic === true}
+                    disabled={view.busy || view.connection !== 'connected'}
+                    onchange={(event) => {
+                      void client?.setVisibility(event.currentTarget.checked);
+                    }}
+                  /> List this room in Open rooms</label
+                >{/if}
+              <div class="room-actions">
+                <button
+                  class="button secondary"
+                  disabled={view.busy || !room.queue.length || view.connection !== 'connected'}
+                  onclick={() => {
+                    if (confirm('Clear the upcoming queue?')) void client?.action('clear');
+                  }}>Clear queue</button
+                >
+                <button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    void client?.action('undo');
+                  }}>Undo queue change</button
+                >
+              </div>
+              {#if room.requests?.length}<h3>Guest requests</h3>
+                <ul class="search-results">
+                  {#each room.requests as video (video.id)}<li>
+                      <div class="track-info">
+                        <strong>{video.title}</strong><span
+                          >{video.requestedBy ?? video.artist}</span
+                        >
+                      </div>
+                      <button
+                        class="button secondary"
+                        disabled={view.busy || view.connection !== 'connected'}
+                        onclick={() => {
+                          void client?.action('approve', { videoId: video.id });
+                        }}>Approve</button
+                      ><button
+                        class="button secondary"
+                        disabled={view.busy || view.connection !== 'connected'}
+                        onclick={() => {
+                          void client?.action('reject', { videoId: video.id });
+                        }}>Reject</button
+                      >
+                    </li>{/each}
+                </ul>{/if}
+            {:else}
+              <p class="permission-note">
+                The host manages the room. Vote for the next track in the queue or request a skip.
+              </p>
+              <button
+                class="button secondary"
+                disabled={view.busy || !room.current || view.connection !== 'connected'}
+                onclick={() => {
+                  void client?.action('skip-vote');
+                }}>Vote to skip ({room.skipVotes ?? 0})</button
+              >
+              {#if room.approvalRequired}<p class="permission-note">
+                  Your song requests need host approval.
+                </p>{/if}
+            {/if}
+            {#if room.isOwner}
+              <h3>Share hosting</h3>
+              <p class="permission-note">
+                One-use invitations grant room controls. An ownership transfer gives the recipient
+                full ownership when accepted.
+              </p>
+              <div class="room-actions">
+                <button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    void invite('cohost');
+                  }}>Invite a co-host</button
+                ><button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    if (confirm('Create a link that transfers room ownership when accepted?'))
+                      void invite('transfer');
+                  }}>Transfer ownership</button
+                ><button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    if (confirm('Revoke all co-host access and pending invitations?')) {
+                      invitationLink = '';
+                      void client?.revokeHosts();
+                    }
+                  }}>Revoke shared access</button
+                >
+              </div>
+              {#if invitationLink}<label for="invitation-link">Private invitation link</label><input
+                  id="invitation-link"
+                  readonly
+                  value={invitationLink}
+                  onclick={(event) => event.currentTarget.select()}
+                />
+                <p role="status">
+                  {invitationError ||
+                    'Invitation copied. Share privately with the intended person.'}
+                </p>{/if}
+            {/if}
+          </section>
+        {:else}
+          <section class="discovery" aria-labelledby="discover-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow red">PASS THE AUX</p>
+                <h2 id="discover-title">What’s the next track?</h2>
+              </div>
+            </div>
+            <form
+              class="search-form"
+              role="search"
+              onsubmit={(event) => {
+                event.preventDefault();
+                void client?.search(query);
+              }}
             >
-          </form>
-          <div role="status" class="search-summary">
-            {#if view.searching}Looking for your soundtrack…{:else if view.query}{view.results
-                .length
-                ? `${view.results.length} results for “${view.query}”`
-                : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
-              YouTube and add a track to the shared queue.{/if}
-          </div>
-          {#if view.results.length}<ul class="search-results">
-              {#each view.results as video, index (`${video.id}:${index}`)}<li>
-                  <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
-                  <div class="track-info">
-                    <strong>{video.title}</strong><span>{video.artist}</span>
-                  </div>
-                  <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span><button
-                    class="icon-button add-track"
-                    aria-label={`Add ${video.title} to queue`}
-                    disabled={view.busy ||
-                      view.connection !== 'connected' ||
-                      video.embeddable === false}
-                    onclick={() => {
-                      void client?.add(video.id);
-                    }}><Icon name="add" /></button
-                  >
-                </li>{/each}
-            </ul>{/if}
-        </section>
+              <label class="sr-only" for="search">Search songs or artists</label><Icon
+                name="search"
+              /><input
+                id="search"
+                bind:value={query}
+                oninput={() => client?.cancelSearch()}
+                placeholder="A song, an artist, a whole mood…"
+                required
+                maxlength="120"
+                autocomplete="off"
+              /><button class="button primary" disabled={view.searching}
+                >{view.searching ? 'Searching…' : 'Find music'}</button
+              >
+            </form>
+            <div role="status" class="search-summary">
+              {#if view.searching}Looking for your soundtrack…{:else if view.query}{view.results
+                  .length
+                  ? `${view.results.length} results for “${view.query}”`
+                  : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
+                YouTube and add a track to the shared queue.{/if}
+            </div>
+            {#if view.results.length}<ul class="search-results">
+                {#each view.results as video, index (`${video.id}:${index}`)}<li>
+                    <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
+                    <div class="track-info">
+                      <strong>{video.title}</strong><span>{video.artist}</span>
+                    </div>
+                    <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span
+                    ><button
+                      class="icon-button add-track"
+                      aria-label={`Add ${video.title} to queue`}
+                      disabled={view.busy ||
+                        view.connection !== 'connected' ||
+                        video.embeddable === false}
+                      onclick={() => {
+                        void client?.add(video.id);
+                      }}><Icon name="add" /></button
+                    >
+                  </li>{/each}
+              </ul>{/if}
+          </section>
+        {/if}
         <div class="room-bottom">
           <span>KEEP THE GOOD MUSIC GOING.</span><a href={classic} data-sveltekit-reload
-            >Radio, playlists & more in Classic <Icon name="arrow" size={16} /></a
+            >Open Classic <Icon name="arrow" size={16} /></a
           >
         </div>
       {/if}

@@ -4,6 +4,8 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import ts from 'typescript';
+import * as socialProtocol from '../services/core/src/social-protocol.ts';
+import {createReactionWindow} from '../lib/social-reactions.ts';
 
 const hash = async (value: string) => createHash('sha256').update(value).digest('hex');
 const code = ts.transpileModule(readFileSync(new URL('../lib/social-server.ts', import.meta.url), 'utf8'), {
@@ -17,6 +19,7 @@ async function fixture() {
   const calls: unknown[][] = [], limits: unknown[][] = [];
   const exports: Record<string, unknown> = {};
   runInNewContext(code, {exports, require: (name: string) => {
+    if (name === '../services/core/src/social-protocol.ts') return socialProtocol;
     if (name === '@/lib/server') return {
       body: async (request: Request) => request.json(), hash,
       fail: (status: number, message: string) => {throw Object.assign(new Error(message), {status});},
@@ -69,4 +72,29 @@ test('Discord-linked browser scope, invalid scopes and missing Core cannot becom
   f.offline();
   await assert.rejects(f.call({}), (error: unknown) => typeof error === 'object' && error !== null && 'status' in error && error.status === 503);
   assert.deepEqual(f.calls, []);
+});
+
+test('the shared social contract rejects malformed frames in either frontend', () => {
+  const state: socialProtocol.SocialState = {scope: 'room', scopeId: 'TESTROOM', playbackKey: 'track', revision: 1, enabled: true, reactions: [], highlights: [], bingo: null};
+  assert.equal(socialProtocol.validSocial(state), true);
+  assert.equal(socialProtocol.validSocial({...state, revision: -1}), false);
+  assert.equal(socialProtocol.validSocial({...state, reactions: [{id: 'event', emoji: 'invalid', at: 0}]}), false);
+  const bingo = {active: true, marked: [], cells: Array.from({length: 9}, (_, n) => `Cell ${n}`)};
+  assert.equal(socialProtocol.validSocial({...state, bingo}), true);
+  assert.equal(socialProtocol.validSocial({...state, bingo: {...bingo, cells: Array(9).fill('same')}}), false);
+  assert.equal(socialProtocol.validSocial({...state, bingo: {...bingo, cells: [...bingo.cells.slice(0, 8), 'bad\u0000text']}}), false);
+});
+
+test('shared reaction receipt windows expire repeated frames and stay isolated', () => {
+  let at = 0;
+  const first = createReactionWindow(() => at), second = createReactionWindow(() => at);
+  const events = [{id: 'event', emoji: '🔥', at: 123456}];
+  assert.deepEqual(first.merge([], events), events);
+  at = 6000;
+  assert.deepEqual(first.merge(events, events), []);
+  assert.deepEqual(second.merge([], events), events);
+  first.clear();
+  assert.deepEqual(first.merge([], events), events);
+  const many = Array.from({length: 40}, (_, n) => ({...events[0], id: `event-${n}`}));
+  assert.deepEqual(first.merge([], many), many.slice(-20));
 });

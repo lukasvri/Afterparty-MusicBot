@@ -1,9 +1,49 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-  import { loadYoutube, type Player } from '../../../../lib/youtube-player.ts';
-  import { canCorrectPlayback, shouldCorrect } from '../../../../lib/playback-sync.ts';
-  import type { Room } from '../../../../lib/types.ts';
-  import Icon from './Icon.svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { loadYoutube, type Player } from '../../../../../lib/youtube-player.ts';
+  import { canCorrectPlayback, shouldCorrect } from '../../../../../lib/playback-sync.ts';
+  import type { Room } from '../../../../../lib/types.ts';
+  import Icon from '../ui/Icon.svelte';
+  import { browserStorage } from '../../../../../lib/browser-storage.ts';
+  import {
+    applyAudioPreferences,
+    changeAudioLevel,
+    defaultAudio,
+    readAudioPreferences,
+    toggleAudioMute,
+  } from '../../../../../lib/audio-preferences.ts';
+  let audio = $state({ ...defaultAudio });
+  let stage: HTMLDivElement;
+  let fullscreen = $state(false);
+  function saveAudio() {
+    browserStorage.set('afterparty-audio', JSON.stringify(audio));
+  }
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await stage.requestFullscreen();
+    } catch {
+      message = 'Fullscreen is unavailable in this browser.';
+    }
+  }
+  onMount(() => {
+    const read = () => {
+      audio = readAudioPreferences(
+        browserStorage.get('afterparty-audio'),
+        browserStorage.get('afterparty-volume'),
+      );
+    };
+    read();
+    const unsubscribe = browserStorage.subscribe('afterparty-audio', read);
+    const changed = () => {
+      fullscreen = document.fullscreenElement === stage;
+    };
+    document.addEventListener('fullscreenchange', changed);
+    return () => {
+      unsubscribe();
+      document.removeEventListener('fullscreenchange', changed);
+    };
+  });
 
   let {
     room,
@@ -76,6 +116,7 @@
             if (!disposed) {
               ready = true;
               loading = false;
+              applyAudioPreferences(player!, audio);
               sync(true);
             }
           },
@@ -101,6 +142,9 @@
     void room;
     if (ready) sync();
   });
+  $effect(() => {
+    if (ready && player) applyAudioPreferences(player, audio);
+  });
   onDestroy(() => {
     disposed = true;
     player?.destroy();
@@ -108,8 +152,14 @@
   });
 </script>
 
-<div class="audio-stage" class:enabled>
+<div class="audio-stage" class:enabled bind:this={stage}>
   <div bind:this={container}></div>
+  {#if fullscreen}<button
+      class="button secondary exit-fullscreen"
+      onclick={() => {
+        void toggleFullscreen();
+      }}>Exit fullscreen</button
+    >{/if}
   {#if !enabled}
     <div class="audio-prompt">
       <div class="record" aria-hidden="true"><span>ap<span class="red">.</span></span></div>
@@ -120,9 +170,70 @@
     </div>
   {/if}
 </div>
+<div class="local-audio" aria-label="Audio on this device">
+  <button
+    class="button secondary"
+    aria-pressed={audio.muted}
+    onclick={() => {
+      audio = toggleAudioMute(audio);
+      saveAudio();
+    }}>{audio.muted ? 'Unmute' : 'Mute'}</button
+  >
+  <label for="local-volume">Volume on this device</label><input
+    id="local-volume"
+    aria-label="Volume on this device"
+    type="range"
+    min="0"
+    max="100"
+    value={audio.level}
+    oninput={(event) => {
+      audio = changeAudioLevel(audio, Number(event.currentTarget.value));
+      saveAudio();
+    }}
+  />
+  <button
+    class="button secondary"
+    onclick={() => {
+      void toggleFullscreen();
+    }}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button
+  >
+</div>
 {#if message}
   <div class="audio-message" role="status">
     <p>{message}</p>
     <button class="button secondary" onclick={activate}>Enable audio</button>
   </div>
 {/if}
+
+<style>
+  .local-audio {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .local-audio label {
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .local-audio input {
+    min-width: 80px;
+    max-width: 180px;
+    flex: 1;
+    accent-color: var(--red);
+  }
+  .exit-fullscreen {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 2;
+  }
+  .audio-stage:fullscreen {
+    width: 100vw;
+    height: 100vh;
+    border: 0;
+    border-radius: 0;
+    background: #000;
+  }
+</style>
