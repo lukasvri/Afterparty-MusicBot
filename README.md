@@ -71,16 +71,17 @@ keeps the reveal and next-round controls. See the [two-client test guide](docs/G
 
 ## Stable and experimental channels
 
-The opt-in [SvelteKit listening-room candidate](docs/SVELTEKIT_MIGRATION.md) starts
-the Afterparty 3.0 frontend migration with private rooms, search, queues and host
-transport at `/v3` in local preview. It is separate from the current release and
-does not change the production website or restart the Activity/Rust experiments.
+The opt-in [Afterparty 3 SvelteKit candidate](docs/SVELTEKIT_MIGRATION.md) starts
+the `3.0.0-alpha.1` review build at `/v3`, including rooms, library/playlists,
+concerts, administration, games and native API mode. It preserves the Node 24
+Core and existing storage contracts. Review builds do not establish production
+deployment or restart the Activity/Rust experiments.
 
 Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
 
 ## Concert extras preview
 
-The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The combined `2.4.0-alpha.3` preparation candidate remains review source with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
+The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The `3.0.0-alpha.1` candidate includes native opt-in extras with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
 
 ## Run your own Afterparty
 

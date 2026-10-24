@@ -4,6 +4,15 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-alpha.1: Afterparty 3 website preview
+
+2026-10-24
+
+- The expanded v3 interface brings open and private listening rooms, host and co-host invitations, shared queue editing, voting, guest request approval and radio into one responsive music workspace.
+- Use your existing saved evenings and favorites, back up or import your library, preview YouTube and Spotify playlists before adding songs, and browse official festival sets by event and year.
+- Server administration, public concerts with opt-in synchronized browser audio, Guess the Song, installation, support and policy pages now have native v3 views. Server selection and permissions continue to scope controls to the intended Discord server.
+- Room playback adds local volume, mute and fullscreen controls, and follows the shared timeline with stream leases and read-only reconnection. This is an alpha review build; live provider playback, Discord listening and production login still require acceptance testing.
+
 ## v2.4.0-alpha.15: Prepare an opt-in Cloudflare website build
 
 2026-10-21

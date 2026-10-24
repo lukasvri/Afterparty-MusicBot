@@ -98,6 +98,8 @@ jobs:
           npm --prefix apps/web run check
           npm --prefix apps/web test
           npm --prefix apps/web run build
+      - name: Bundle the tested v3 candidate without publishing
+        run: npm --prefix apps/web run package:preview
       - name: Check SvelteKit desktop and mobile journeys with synthetic data
         run: |
           npx playwright install --with-deps chromium
@@ -107,6 +109,17 @@ jobs:
           node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
           npm --prefix apps/web run test:browser
           npm --prefix apps/web run test:stack
+      - name: Preserve the v3 review bundle separately from operational releases
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: v3-review-website
+          path: |
+            apps/web/.svelte-kit/v3-artifact/
+            apps/web/.svelte-kit/cloudflare/
+          if-no-files-found: error
+          retention-days: 7
+          archive: true
+          overwrite: true
       - name: Package the tested website output without rebuilding
         run: python3 scripts/build_release.py website
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

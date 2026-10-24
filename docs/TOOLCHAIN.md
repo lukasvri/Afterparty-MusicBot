@@ -27,7 +27,7 @@ reason to add Astro to this application's runtime.
 
 ## Developer workflow and testing
 
-The repository includes an isolated SvelteKit 3/Svelte 5/TypeScript 6 listening-room
+The repository includes an SvelteKit 3/Svelte 5/TypeScript 6 website
 candidate in `apps/web/`. See [the migration guide](SVELTEKIT_MIGRATION.md) for its
 locked versions, service-binding/D1 boundary, local verification and limitations.
 The existing website and Core remain the release baseline.

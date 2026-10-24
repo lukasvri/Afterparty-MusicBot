@@ -297,7 +297,12 @@ for (const width of [1440, 390]) {
       assert.equal(await add.evaluate((element) => element === document.activeElement), true);
       await page.keyboard.press('Enter');
       await page.locator('.queue-list').getByText(results[0].title, { exact: true }).waitFor();
-      assert.deepEqual(f.writes[0], { action: 'add', version: 1, videoId: results[0].id });
+      assert.deepEqual(f.writes[0], {
+        action: 'add',
+        version: 1,
+        videoId: results[0].id,
+        displayName: 'Guest',
+      });
       await noOverflow(page);
       assert.deepEqual(f.external, [], 'no remote content is requested before audio consent');
       assert.equal(
