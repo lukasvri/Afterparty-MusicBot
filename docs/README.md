@@ -34,6 +34,8 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 
 ## Develop and release
 
+- [Student development tools](STUDENT_DEVELOPER_PACK.md): isolated Codespaces, Copilot instructions and student account setup.
+
 - [Contributing](../CONTRIBUTING.md): current source, code boundaries and PR validation.
 - [Cloud development](CLOUD_DEVELOPMENT.md): source-only cloud development and the local production boundary.
 - [TypeScript conventions](TYPESCRIPT.md): application code, Node tooling and incremental consolidation.
