@@ -93,6 +93,49 @@ Practical standards:
 4. A successful Node 26 CI workflow is not evidence that a website has
    been published or that audible Discord playback was tested.
 
+### Core qualification evidence, 24 October 2026
+
+Tracking: [issue #117](https://github.com/lukasvri/Afterparty-MusicBot/issues/117).
+Tested source: main `7cd059c5ae921287629eaaf7a18d976f49eda7e7`, product
+`3.0.0-alpha.1`. A clean archive of tracked `services/core` files was extracted
+into a temporary directory, excluding local credentials, databases and installed
+dependencies. Node 26 installed the existing lockfile with the same flags as the
+Core Docker dependency stage: `npm ci --omit=peer --ignore-scripts --no-audit
+--no-fund`. No lockfile or dependency versions changed.
+
+| Check | Node 24.19.0 baseline | Node 26.12.1 qualification |
+| --- | --- | --- |
+| Platform | Linux x64 | Linux x64 |
+| Node module ABI / OpenSSL | 137 / 3.5.7 | 147 / 3.5.9 |
+| Core strict typecheck | Passed | Passed after clean install |
+| Core unit, HTTP, isolation, recovery and audio tests | 741 passed | 741 passed; none failed or skipped |
+| FFmpeg | 7.1.5, real local synthetic audio | Same FFmpeg; real local synthetic audio |
+
+The Node 24 baseline is the full local validation of code head `6b8c9ee`,
+whose `services/core` tree is unchanged in this main commit. Its subsequent
+documentation-only follow-up and merge passed Core Docker validation on Node 24
+in [GitHub run 40129899214](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40129899214).
+Core executes TypeScript directly; it has no separate application compilation
+step. Successful local tests do not qualify a Node 26 container image.
+
+To reproduce, select Node 26.12.1 in an isolated source checkout, verify
+`node --version`, then run:
+
+```sh
+npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
+npm --prefix services/core run check
+npm --prefix services/core test
+```
+
+Remaining gates: confirm actual LTS/security status after the scheduled
+28 October transition; verify an immutable `linux/amd64` Node 26 image digest;
+run the actual candidate image and its recovery/package checks; prepare host
+staging, backup and rollback; separately authorize live listening and any runtime
+switch. The cloud Docker daemon socket was inaccessible, so no Node 26 image
+build or image probe is claimed. No real Discord account, provider recording,
+production data, deployment, restart or Dockerfile change was used. Node 24
+remains the Core image/runtime baseline.
+
 ## Technology choices for other projects
 
 For new independent projects, evaluate Go, Rust, Python, TypeScript or other

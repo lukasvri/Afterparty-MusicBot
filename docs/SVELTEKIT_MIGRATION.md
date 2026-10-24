@@ -178,9 +178,11 @@ configuration) is identical at 1440px and 390px:
 That historical slice served fewer features. These numbers describe the scoped
 first slice only, not this expanded candidate or a measured whole-product speedup.
 
-Local validation ran on Node 24.19.0, with an additional successful candidate
-typecheck and Cloudflare production build on Node 26.12.1. Core was tested only
-on Node 24 and its runtime configuration was not changed.
+That baseline's local validation ran on Node 24.19.0, with an additional
+successful candidate typecheck and Cloudflare production build on Node 26.12.1.
+Later [Core qualification](TOOLCHAIN.md#core-qualification-evidence-24-october-2026)
+also passed the Core source suite on Node 26.12.1. Its Docker image and production
+runtime remain on Node 24; no production switch is established by these tests.
 
 ## Acceptance and rollout boundary
 
