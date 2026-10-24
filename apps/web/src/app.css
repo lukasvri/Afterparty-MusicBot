@@ -1002,3 +1002,73 @@ main {
     gap: 8px;
   }
 }
+
+button.nav-link {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: 5px;
+}
+.room-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 34px 0 24px;
+  flex-wrap: wrap;
+}
+.room-settings {
+  border-top: 1px solid var(--line);
+  padding-top: 28px;
+  display: grid;
+  gap: 22px;
+}
+.room-settings > input {
+  max-width: 400px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: #151517;
+  color: inherit;
+}
+.checkbox-label,
+.room-forms .checkbox-label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.checkbox-label input,
+.room-forms .checkbox-label input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--red);
+}
+.queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 88px;
+}
+.queue-actions .icon-button {
+  width: 40px;
+  height: 44px;
+}
+.queue-list li:has(.queue-actions) {
+  flex-wrap: wrap;
+}
+.queue-list li:has(.queue-actions) .track-info {
+  flex-basis: 45%;
+}
+@media (max-width: 800px) {
+  button.nav-link {
+    width: auto;
+  }
+  .sidebar nav {
+    overflow-x: auto;
+  }
+  .nav-link {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}

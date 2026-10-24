@@ -2,15 +2,9 @@ import { EventEmitter } from 'node:events';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { UserError } from './types.ts';
 import type { Store } from './store.ts';
-export type SocialPlayback = { playbackKey: string | null; videoId: string | null; position: number };
-export type SocialState = {
-  scope: 'room' | 'guild'; scopeId: string; playbackKey: string | null; revision: number; enabled: boolean;
-  reactions: { id: string; emoji: string; at: number }[];
-  highlights: { id: string; text: string; position: number; videoId: string; at: number }[];
-  bingo: { cells: string[]; marked: number[]; active: boolean } | null;
-};
-const emojis = ['❤️', '🔥', '👏', '🤘', '✨', '🎉'];
-const hostActions = new Set(['configure', 'remove-highlight', 'bingo-start', 'bingo-mark', 'bingo-stop']);
+import { SOCIAL_REACTIONS, SOCIAL_HOST_ACTIONS, SOCIAL_ACTIONS, type SocialState, type SocialPlayback } from './social-protocol.ts';
+export type { SocialState, SocialPlayback } from './social-protocol.ts';
+const hostActions = new Set<string>(SOCIAL_HOST_ACTIONS);
 /** Social writes never touch engine/room state or their command revisions. */
 export class Social extends EventEmitter {
   private rates = new Map<string, { until: number; count: number }>();
@@ -54,7 +48,7 @@ export class Social extends EventEmitter {
   /** Check authority before charging participant or playback request budgets. */
   authorize(input: Record<string, unknown>, host: boolean) {
     if (!['room', 'guild'].includes(String(input.scope)) || typeof input.scopeId !== 'string' || !(input.scope === 'room' ? /^[A-Z0-9]{8}$/ : /^\d{14,22}$/).test(input.scopeId)) throw new UserError('Invalid social scope.');
-    if (!['join', 'read', 'stream', 'reaction', 'highlight', ...hostActions].includes(String(input.action))) throw new UserError('Unknown social action.');
+    if (!SOCIAL_ACTIONS.some(action => action === input.action)) throw new UserError('Unknown social action.');
     if (input.action !== 'join') this.actor(input.token, input.scope + ':' + input.scopeId);
     if (hostActions.has(String(input.action)) && !host) throw new UserError('Host access required.', 403);
     if (!['join', 'read', 'stream'].includes(String(input.action)) && (typeof input.eventId !== 'string' || !/^[a-f0-9-]{36}$/.test(input.eventId))) throw new UserError('Invalid social event.');
@@ -96,7 +90,7 @@ export class Social extends EventEmitter {
     if (this.recent.size >= 4096) throw new UserError('Social is busy. Try later.', 429);
     this.budget(key + ':' + actor, 20);
     if (input.action === 'reaction') {
-      if (!emojis.includes(String(input.emoji))) throw new UserError('Choose a reaction.');
+      if (!SOCIAL_REACTIONS.some(emoji => emoji === input.emoji)) throw new UserError('Choose a reaction.');
       this.budget('reactions', 90); this.budget(key + ':reactions', 30); this.budget(key + ':' + actor + ':reaction', 6);
       if (!this.reactions.has(reactionKey) && this.reactions.size >= 128) {
         for (const [id, events] of this.reactions) if (!events.some(e => now - e.at < 6000)) this.reactions.delete(id);

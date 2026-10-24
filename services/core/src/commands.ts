@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ConcertQueue } from './concert-queue.ts';
 import { Engine } from './engine.ts';
 import { UserError, type Track, type Settings, type SavedQueue } from './types.ts';
+import { validSettingValue } from './settings.ts';
 
 const REVISION_ACTIONS = new Set([
     'pause', 'resume', 'skip', 'next', 'seek', 'seek-relative', 'replay', 'unskip',
@@ -185,18 +186,11 @@ export class Commands {
         this.note(action === 'pause' ? 'Playback paused' : action === 'resume' ? 'Playback resumed' : action === 'skip' ? 'Skipped to the next song' : 'Performed ' + action);
         return 'Done by the Afterparty bot.';
     }
-    updateSettings(input: Record<string, unknown>) { const bounds: Record<string, [
-        number,
-        number
-    ]> = { playlistLimit: [1, 1000], secondsToWaitAfterQueueEmpties: [0, 86400], defaultVolume: [0, 100], defaultQueuePageSize: [1, 30], turnDownVolumeWhenPeopleSpeakTarget: [0, 100], crossfade: [0, 12], audioBitrateKbps: [64, 384] }; const next: Partial<Settings> = {}; for (const key of Object.keys(this.engine.settings)) {
+    updateSettings(input: Record<string, unknown>) { const next: Partial<Settings> = {}; for (const key of Object.keys(this.engine.settings)) {
         if (!(key in input))
             continue;
         const value = input[key];
-        if (key in bounds) {
-            if (!Number.isInteger(value) || Number(value) < bounds[key][0] || Number(value) > bounds[key][1])
-                throw new UserError('Invalid value for ' + key);
-        }
-        else if (typeof value !== 'boolean')
+        if (!validSettingValue(key, value))
             throw new UserError('Invalid value for ' + key);
         (next as Record<string, unknown>)[key] = value;
     } this.engine.setSettings(next); return { ...this.engine.settings, updatedAt: new Date().toISOString() }; }

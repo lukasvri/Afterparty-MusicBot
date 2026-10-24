@@ -1,24 +1,38 @@
-# SvelteKit listening-room candidate
+# Afterparty 3 SvelteKit candidate
 
-This is the first working vertical slice of [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114),
-under `apps/web/`. It is an opt-in development candidate at `/v3`, not a production
-cutover or a completed Afterparty 3.0 release. The existing website, Core, product
-version and public patch notes remain the release baseline.
+The `3.0.0-alpha.1` candidate in `apps/web/` implements the native Svelte website for
+[issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114). It is
+review material, not evidence of production deployment or stable 3.0 acceptance.
+The existing website and Node 24 Core remain the operational rollback baseline.
 
-## Implemented journey
+## Implemented journeys
 
-Create an unlisted private browser room, or join using its existing eight-character
-code. Search the existing catalog API, add songs, inspect the shared queue, invite
-friends and use host-only play, pause, next and seek controls. Audio uses the
-official YouTube iframe API after an explicit local activation. A guest can add
-music but cannot control the host's timeline. Leaving destroys local playback and
-cancels polling and in-flight work while preserving saved ownership.
+- Private/public browser rooms, open-room discovery and invitation links.
+- Shared search, queue editing, votes, guest request approval, radio, host/cohost
+  controls, ownership transfer/revocation and persisted browser ownership.
+- YouTube playback after explicit consent, local volume/mute preferences and
+  fullscreen, with the shared server clock and stale-command protection.
+- Existing saved evenings/favorites, library backup/import, YouTube/Spotify
+  playlist preview and selection, and curated festival sets by event/year.
+- Discord public concert view with explicit server selection, command receipts,
+  voting, authorized queue moderation and consent-based browser audio from a
+  calibrated, leased Core stream. Ordinary Discord music stays private.
+- Native administration with OAuth/password session gates, selected-server
+  settings, queue/player controls, channels, timers, saved queues and diagnostics.
+- Opt-in reactions, timestamped shared moments and host bingo with existing Core grants.
+- Native Guess the Song game-night hosting/invites, recording-aware presets,
+  one-step save/start, focused rounds/reveals, tie-aware standings and optional
+  audio continuity across rounds. Local game volume is separate from music
+  volume. Scoped grants, scoring, hints and game rules remain server-owned.
+- Native install, support, privacy, terms, copyright and patch-note routes. The
+  copyright notice remains device-only until the user chooses an external action.
 
-The interface uses the canonical vector logo and self-hosted Inter font directly
-from `public/`, black surfaces, red controls, keyboard focus, touch targets and
-reduced-motion support. Desktop and mobile use the same component tree. Styling
-is a small CSS token system; the legacy Tailwind 4 stack is retained without
-adding a second utility compiler to this slice.
+The interface uses the canonical vector logo, self-hosted Inter font, black/red
+surfaces, keyboard focus, touch targets and reduced-motion support. Desktop and
+mobile use the same native component trees. Existing local libraries, room tokens,
+preferences, database tables and Core identifiers retain their storage formats.
+The native UI currently uses English. Saved Classic language choices are retained
+in storage and Classic remains available when an API service binding is configured.
 
 ## Architecture and compatibility
 
@@ -40,13 +54,28 @@ for Wrangler/Miniflare's local development dependencies.
 Kit 3 configuration lives in the Vite plugin, uses `#lib` package imports and
 `$app/tsconfig`, and accesses bindings through `cloudflare:workers`.
 
-The catch-all server endpoint forwards the original `Request` to a fixed service
-binding and returns the original `Response`, including cookies, redirects and
-unbuffered streams. No browser-controlled upstream URL, secrets, D1 connection or
-new authentication namespace is introduced. OAuth callbacks and unported pages
-remain handled by the existing Worker, with the public request URL, Origin,
-HttpOnly cookies and authorization headers intact. Local templates contain no
-production Worker/database identity. The new asset namespace avoids legacy assets.
+Two API modes use the same existing framework-independent request handlers:
+
+- **Bridge mode** (default) forwards API requests through `AFTERPARTY_API`.
+- **Native mode** (`AFTERPARTY_NATIVE_API=1`) dispatches the existing `app/api/`
+  handlers inside the Svelte Worker against its own existing D1/Core bindings.
+  The Svelte build resolves these shared server modules without a React/Vinext
+  runtime. The fixed adapter preserves requests, cookies, redirects, streams,
+  origin checks and dynamic room parameters. Unsupported methods fail with 405.
+
+`apps/web/wrangler.standalone.jsonc` is an isolated local template for native
+mode. Its database ID is synthetic. Production adoption requires binding the
+existing intended database and required runtime variables/secrets after review;
+no database copy, import or schema rewrite is part of this frontend migration.
+Do not use the local template's database identity for production. Native mode
+must receive all existing configuration previously supplied to the API Worker,
+including any copyright operator contact override.
+
+The catch-all retains the fixed service binding for legacy routes. An explicit
+`?classic=1` bypass preserves the original page when that binding exists. Missing
+bindings fail closed; no browser-controlled upstream URL or new authentication
+namespace is introduced. OAuth callbacks retain the public request URL, Origin,
+HttpOnly cookies and authorization headers.
 
 Browser storage reuses the existing lazy preference/ownership migration helper.
 Room mutations include the latest version and existing visitor/host headers.
@@ -93,12 +122,26 @@ local. For HMR, use `npm run dev:web`; its loopback API proxy preserves the publ
 Host/Origin relationship. Unported pages should be tested through the Worker
 preview rather than the HMR server. Restart previews after rebuilding output.
 
+## Standalone local API
+
+After building, `npm --prefix apps/web run preview:standalone` runs the native API
+with the synthetic local D1 template. Apply the existing `drizzle/` migrations to
+that isolated local database using Wrangler's `--local` flag before testing rooms.
+Do not copy production variables or data into this workspace. This local template
+has no service binding, so the optional Classic fallback is unavailable.
+
+The stack test runs both bridge and native API modes with fresh synthetic data.
+In native mode it loads the separately bundled review artifact, verifies Classic
+once, stops the legacy API Worker, then runs
+all remaining API and browser assertions against Svelte and its direct D1 binding.
+
 ## Validation
 
 ```bash
 npm run check:all
 npm --prefix apps/web run format:check
 CHROMIUM_PATH=/usr/bin/chromium npm --prefix apps/web run test:browser
+npm --prefix apps/web run package:preview
 CHROMIUM_PATH=/usr/bin/chromium npm --prefix apps/web run test:stack
 ```
 
@@ -132,43 +175,49 @@ configuration) is identical at 1440px and 390px:
 | Uncompressed bytes | 773,392 | 111,763 |
 | Sum of individually gzipped bytes | 235,630 | 43,586 |
 
-The candidate serves fewer features. These numbers are evidence for the scoped
-slice only, not a measured whole-product speedup.
+That historical slice served fewer features. These numbers describe the scoped
+first slice only, not this expanded candidate or a measured whole-product speedup.
 
 Local validation ran on Node 24.19.0, with an additional successful candidate
 typecheck and Cloudflare production build on Node 26.12.1. Core was tested only
 on Node 24 and its runtime configuration was not changed.
 
-## Remaining work and rollout boundary
+## Acceptance and rollout boundary
 
-- Browser rooms currently use authoritative one-second polling, not SSE. Forwarding
-  supports streaming, but a Svelte subscription/lease/recovery implementation and
-  two-client transport tests remain future slices.
-- Discord control, concerts, playlists/library, games, advanced room moderation,
-  saved language choices and the three administration settings groups remain in
-  Classic through existing links. These capabilities are not removed or ported.
-- The reported radio discovery failure has no established reproduction in this
-  task. Existing diagnostics and provider availability need a focused synthetic
-  capture. This frontend migration does not claim to fix radio.
-- Live YouTube embeds, browser autoplay behavior and source availability still need
-  owner-approved acceptance outside cloud tests. Tests use a deterministic player
-  boundary; they do not establish audible provider playback.
+Browser rooms now subscribe to Core SSE when an authenticated read establishes
+its epoch. The client samples the existing clock, validates leased timelines,
+preserves authenticated roles and uses authoritative polling for metadata and
+fallback. Epoch changes require a new authenticated read. Invalid, late and
+retired frames cannot alter a newer room or replay a command. D1-only operation
+continues with one-second polling. Actual browser EventSource coverage uses a
+local synthetic HTTP/SSE fixture; live deployed transport is a separate check.
 
-The owner-requested isolated beta has a dedicated
-[deployment runbook](SVELTEKIT_BETA.md) and `apps/web/wrangler.beta.jsonc` template
-for `ap.beta.openworks.no`, using the existing laptop beta and Afterparty test bot.
-The beta-only entry flag selects `/v3` at the root; `/?classic=1` retains Classic.
-These files prepare deployment and do not establish live availability.
+Core is retained on Node 24 with its existing clocks, persistence, isolation and
+protocol. No alternate Core language/runtime or paused Rust work is introduced.
+Its synthetic and real FFmpeg suite verifies implementation contracts, not what
+someone hears in a Discord voice channel.
 
-A production rollout would bind the candidate to the existing API service
-under the same public origin and validate the real OAuth callback, session cookies,
-bindings, host state and legacy route/asset behavior. Keep `/` on the existing
-application until feature and acceptance gates pass. A frontend rollback removes
-candidate routing and serves the previous website artifact; D1 and Core require
-no rollback migration because this slice changes neither schema nor protocol.
-Do not delete databases or ownership storage. The beta request does not authorize
-a production deployment, merge or automatic release changes.
+The native concert page plays public concerts from an authoritative Core stream
+after explicit audio consent. Bridge polling cannot activate browser audio, and
+ordinary Discord music is never exposed. Adding Discord music uses the bot or
+administration. Native translated copy remains a gap; existing saved language
+choices remain in storage and available through Classic during review. Do not describe this candidate as full feature
+parity or a stable 3.0 release while those gaps remain.
 
-No public release bullet or product version bump is appropriate for this opt-in
-migration candidate. Its complete change and validation record belongs in the
-draft PR, following [the release policy](RELEASING.md#notes-for-every-change).
+Live YouTube/source availability, production OAuth cookies/callbacks, actual
+Discord audio and owner acceptance still require authorized validation outside
+cloud tests. A frontend port alone does not establish a provider/radio bug fix.
+
+The existing isolated beta has a [deployment runbook](SVELTEKIT_BETA.md).
+The beta-only entry flag selects `/v3` at the root. These templates prepare a
+reviewable build and do not establish live availability. CI preserves a separate `v3-review-website` artifact with the tested bundled
+Worker and assets. `npm --prefix apps/web run package:preview` bundles an already
+built candidate with Wrangler `--dry-run`; it never publishes. The signed automatic
+release artifact remains the existing operational website; the candidate is not
+silently promoted by CI.
+
+A production rollout requires reviewed feature/acceptance gates and explicit
+owner approval. A frontend rollback restores the previous website artifact and
+routing. D1 and Core require no schema rollback. Never delete databases or room
+ownership storage. This cloud task does not merge, publish, deploy or change
+production configuration.

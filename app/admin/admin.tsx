@@ -21,6 +21,7 @@ import {
 import { useLanguage, LanguageSwitch } from "@/components/language";
 import { Sidebar } from "@/components/afterparty-navigation";
 import type { DiscordState, Room } from "@/lib/types";
+import { settingGroups } from "@/services/core/src/settings";
 import "./settings.css";
 type Guild = { id: string; name: string; roomCode: string; installed: boolean };
 type Job = {
@@ -63,7 +64,6 @@ async function api<T>(
   if (!r.ok) throw Object.assign(Error(d.error ?? "Tjenesten svarer ikke."), {status: r.status});
   return d;
 }
-type SettingField = {key: string; label: string; help: string; min?: number; max?: number; toggle?: boolean};
 function safeInviteUrl(value: string, guildId?: string) {
   if (!value) return "";
   try {
@@ -80,24 +80,6 @@ function safeInviteUrl(value: string, guildId?: string) {
     return "";
   }
 }
-const settingGroups: {title: string; description: string; fields: SettingField[]}[] = [
-  {title: "Audio playback", description: "Playback defaults for this Discord server.", fields: [
-    {key: "defaultVolume", label: "Default volume", min: 0, max: 100, help: "0–100%. Current playback volume has its own control."},
-    {key: "audioBitrateKbps", label: "Audio bitrate", min: 64, max: 384, help: "64–384 kbit/s. Applies at the next playback start, capped by the voice channel."},
-    {key: "crossfade", label: "Crossfade", min: 0, max: 12, help: "0–12 seconds between tracks. Set 0 to turn crossfade off."},
-    {key: "radio", label: "Radio when the queue is empty", toggle: true, help: "Prepare related music when the manual queue runs out."},
-  ]},
-  {title: "Voice and listeners", description: "Connection behavior and volume while people speak.", fields: [
-    {key: "secondsToWaitAfterQueueEmpties", label: "Wait after the queue empties", min: 0, max: 86400, help: "0–86400 seconds. Set 0 to stay connected indefinitely after the queue ends."},
-    {key: "leaveIfNoListeners", label: "Leave when no listeners remain", toggle: true, help: "Disconnect when everyone else leaves the voice channel."},
-    {key: "turnDownVolumeWhenPeopleSpeak", label: "Lower volume while people speak", toggle: true, help: "Voice detection is enabled when joining. Reconnect after changing this option."},
-    {key: "turnDownVolumeWhenPeopleSpeakTarget", label: "Volume while people speak", min: 0, max: 100, help: "0–100%. Used while voice volume reduction is enabled."},
-  ]},
-  {title: "Queue and playlists", description: "Import limits and the Discord queue display.", fields: [
-    {key: "playlistLimit", label: "Playlist limit", min: 1, max: 1000, help: "1–1000 tracks imported from a playlist."},
-    {key: "defaultQueuePageSize", label: "Tracks per queue page", min: 1, max: 30, help: "1–30 tracks shown by the Discord queue command."},
-  ]},
-];
 export default function Admin() {
   const { t, language } = useLanguage();
   const [authenticated, setAuthenticated] = useState(false),

@@ -70,6 +70,30 @@ use em dashes. Keep global personal preferences out of repository instructions.
   or secrets, spend money, destroy important data or restart paused Rust work.
   Explicit owner approval is still required for those protected actions.
 
+## Keep every change organized
+
+- Treat source consolidation and navigability as acceptance criteria for every
+  change, not a separate cleanup task. Before adding a module, setting, type,
+  validation rule or helper, find its existing owner in the
+  [source map](docs/ARCHITECTURE.md#source-map) and reuse or extend it.
+- Keep related components, clients and behavior helpers together in their
+  feature folder. Keep routes thin. Avoid a new parallel implementation when
+  an existing shared contract or pure function serves the same responsibility.
+- Settings, bounds, protocol types and validation rules shared by Core, Classic
+  and v3 must have one canonical browser-safe definition. Keep authorization,
+  persistence and distinct UI lifecycles in their appropriate implementations.
+- Remove duplication and dead code introduced or exposed by the current change
+  when its callers and compatibility requirements are understood. Preserve
+  migrations, public entry points, rollback and operational recovery tools.
+  Compression means less duplication and clearer ownership, not minified source
+  or unrelated wholesale rewrites.
+- Update the canonical source map when adding, moving or changing ownership of
+  a feature. Link to existing guidance rather than creating competing overviews.
+- Before submitting, review the diff for misplaced files, duplicate definitions,
+  stale imports and unnecessary dependencies. Run the required checks, including
+  the existing unused-file audit and affected browser/contract tests. State any
+  remaining structural limitation in the PR; do not claim unperformed cleanup.
+
 ## Technology decisions
 
 - Choose technologies for measured product needs, operational reliability,

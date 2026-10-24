@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { betaEntry, bridge } from '../src/lib/api-bridge.ts';
+import { betaEntry, bridge } from '../src/lib/server/api-bridge.ts';
 
 test('the beta landing preserves room links and keeps Classic and API callbacks reachable', () => {
   const room = new Request('https://ap.beta.openworks.no/?room=TESTROOM');
