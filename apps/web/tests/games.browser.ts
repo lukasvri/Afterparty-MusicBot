@@ -113,8 +113,11 @@ for (const width of [1440, 390])
         );
         await page.getByLabel('Nickname', { exact: true }).fill('Synthetic player');
         await page.getByRole('button', { name: 'Join lobby', exact: true }).click();
-        await page.getByRole('heading', { name: 'The room is ready. Are you?' }).waitFor();
+        await page
+          .getByRole('heading', { name: host ? 'Set the mood.' : 'Get comfortable.', exact: true })
+          .waitFor();
         if (host) {
+          await page.getByText('Fine-tune the game', { exact: false }).click();
           await page.getByLabel('Rounds', { exact: true }).fill('2');
           await page.getByRole('button', { name: 'Save settings', exact: true }).click();
           await page.getByRole('button', { name: 'Start game', exact: true }).click();
@@ -124,16 +127,25 @@ for (const width of [1440, 390])
           await page.getByRole('button', { name: 'Reveal answer', exact: true }).click();
           await page.getByRole('heading', { name: 'Test Tone One', exact: true }).waitFor();
           await page.getByRole('button', { name: 'Next round', exact: true }).click();
-          await page.getByRole('heading', { name: 'That’s a wrap.', exact: true }).waitFor();
+          await page.getByRole('heading', { name: 'Synthetic player.', exact: true }).waitFor();
           await page.getByRole('button', { name: 'Back to lobby', exact: true }).click();
-          await page.getByRole('heading', { name: 'The room is ready. Are you?' }).waitFor();
+          await page
+            .getByRole('heading', {
+              name: host ? 'Set the mood.' : 'Get comfortable.',
+              exact: true,
+            })
+            .waitFor();
           assert(actions.includes('guess'));
         } else {
           assert.equal(
             await page.getByRole('button', { name: 'Start game', exact: true }).count(),
             0,
           );
-          assert.equal(await page.getByLabel('Rounds', { exact: true }).isDisabled(), true);
+          assert.equal(
+            await page.getByLabel('Rounds', { exact: true }).count(),
+            0,
+            'guests see a concise summary instead of a disabled settings wall',
+          );
           assert.deepEqual(
             actions.filter((action) => !['read', 'join'].includes(action)),
             [],

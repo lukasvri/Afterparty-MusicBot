@@ -183,7 +183,9 @@
       <a class="nav-link" href="/admin" data-sveltekit-reload
         ><Icon name="settings" />Server settings</a
       >
-      <a class="nav-link" href="/games"><Icon name="users" />Games</a>
+      <a class="nav-link" href={room ? `/games?room=${encodeURIComponent(room.code)}` : '/games'}
+        ><Icon name="users" />Games</a
+      >
     </nav>
     <div class="sidebar-bottom">
       <div class="brand-line"></div>

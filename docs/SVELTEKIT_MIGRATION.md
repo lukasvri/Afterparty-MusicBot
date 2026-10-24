@@ -20,8 +20,10 @@ The existing website and Node 24 Core remain the operational rollback baseline.
 - Native administration with OAuth/password session gates, selected-server
   settings, queue/player controls, channels, timers, saved queues and diagnostics.
 - Opt-in reactions, timestamped shared moments and host bingo with existing Core grants.
-- Native Guess the Song host/guest lifecycle with scoped grants, server-owned
-  game rules, settings, reveal, results and leaderboard.
+- Native Guess the Song game-night hosting/invites, recording-aware presets,
+  one-step save/start, focused rounds/reveals, tie-aware standings and optional
+  audio continuity across rounds. Local game volume is separate from music
+  volume. Scoped grants, scoring, hints and game rules remain server-owned.
 - Native install, support, privacy, terms, copyright and patch-note routes. The
   copyright notice remains device-only until the user chooses an external action.
 
