@@ -54,42 +54,43 @@
       "scenario": "welcome",
       "scriptRequests": 17,
       "decodedJavaScriptBytes": 158973,
-      "sumIndividualGzipBytes": 60859
+      "sumIndividualGzipBytes": 60858
     },
     {
       "viewport": 1440,
       "scenario": "joined-room",
       "scriptRequests": 17,
       "decodedJavaScriptBytes": 158973,
-      "sumIndividualGzipBytes": 60859
+      "sumIndividualGzipBytes": 60858
     },
     {
       "viewport": 1440,
       "scenario": "games",
       "scriptRequests": 13,
       "decodedJavaScriptBytes": 141226,
-      "sumIndividualGzipBytes": 52687
+      "sumIndividualGzipBytes": 52686
     },
     {
       "viewport": 390,
       "scenario": "welcome",
       "scriptRequests": 17,
       "decodedJavaScriptBytes": 158973,
-      "sumIndividualGzipBytes": 60859
+      "sumIndividualGzipBytes": 60858
     },
     {
       "viewport": 390,
       "scenario": "joined-room",
       "scriptRequests": 17,
       "decodedJavaScriptBytes": 158973,
-      "sumIndividualGzipBytes": 60859
+      "sumIndividualGzipBytes": 60858
     },
     {
       "viewport": 390,
       "scenario": "games",
       "scriptRequests": 13,
       "decodedJavaScriptBytes": 141226,
-      "sumIndividualGzipBytes": 52687
+      "sumIndividualGzipBytes": 52686
     }
-  ]
+  ],
+  "afterSourceRef": "1698c1e94136f145ddd7d0bdc2206cd2b3ab0ffb"
 }

@@ -139,6 +139,8 @@ async function fixture(width: number, denyLibrary = false) {
   await page.goto(`${origin}/v3?room=${code}`);
   await page.getByRole('heading', { name: 'Library evening', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+  if (!denyLibrary)
+    await page.getByRole('button', { name: 'Add Saved favorite to queue', exact: true }).waitFor();
   return {
     page,
     writes,

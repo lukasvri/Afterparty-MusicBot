@@ -8,9 +8,9 @@ Desktop (1440px) and mobile (390px) returned the same script totals in each scen
 
 | Scenario | Decoded JavaScript before | After | Change | Per-response gzip before | After | Script requests before / after |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| welcome | 202,527 B | 158,973 B | -21.5% | 70,701 B | 60,859 B | 16 / 17 |
-| joined-room | 202,527 B | 158,973 B | -21.5% | 70,701 B | 60,859 B | 16 / 17 |
-| games | 153,022 B | 141,226 B | -7.7% | 57,268 B | 52,687 B | 14 / 13 |
+| welcome | 202,527 B | 158,973 B | -21.5% | 70,701 B | 60,858 B | 16 / 17 |
+| joined-room | 202,527 B | 158,973 B | -21.5% | 70,701 B | 60,858 B | 16 / 17 |
+| games | 153,022 B | 141,226 B | -7.7% | 57,268 B | 52,686 B | 14 / 13 |
 
 This measures successful decoded script responses, not wall-clock speed, provider latency, audible playback, Lighthouse, field performance or the full Classic application. Gzip values sum separately recompressed response bodies and do not claim actual wire transfer. Code splitting adds one request to listening-room startup while reducing its payload.
 
@@ -29,7 +29,7 @@ Omit `CHROMIUM_PATH` when using the matching installed Playwright browser. The s
 ## Tools and maintenance
 
 - The legacy Miniflare declarations import Zod 3 types directly. A development-only Zod 3 pin preserves strict Worker fixture typing while Knip keeps its own compatible Zod 4 dependency.
-- Knip 6.43.0 is pinned as a development dependency. `npm run audit:unused` checks files using declared framework, test and operational entry points. It runs in full local validation and CI. Review findings before deletion; keep compatibility adapters and manual recovery tools.
+- Knip 6.43.0 is pinned as a development dependency. `npm run audit:unused` checks files using declared framework, test and operational entry points. It generates SvelteKit configuration first so clean checkouts work, then runs in full local validation and CI. Review findings before deletion; keep compatibility adapters and manual recovery tools.
 - Playwright exercises user journeys and records decoded built-script responses. Its existing browser installation is reused.
 - Vite’s production manifest identifies the optional library chunk, so eager-loading regressions fail verification without guessing hashed asset names.
 - Existing CodeQL and dependency review remain the security checks. No telemetry service, new paid account or production monitoring SDK was enabled.
