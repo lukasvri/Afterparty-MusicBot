@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
+import { visitorSQL } from '../../../lib/room-visitors.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5175').origin;
@@ -51,13 +52,13 @@ for (const native of [false, true])
           ],
         }),
       );
-      const wrangler = async (...args: string[]) =>
+      const wrangler = async (toolchain: 'classic' | 'native', ...args: string[]) =>
         promisify(execFile)(
           process.execPath,
           [
             '--import',
             `${root}apps/web/scripts/runtime.ts`,
-            `${root}node_modules/wrangler/bin/wrangler.js`,
+            `${root}${toolchain === 'native' ? 'apps/web/' : ''}node_modules/wrangler/bin/wrangler.js`,
             'd1',
             ...args,
             '--local',
@@ -68,8 +69,34 @@ for (const native of [false, true])
           ],
           { cwd: root, env: { ...process.env, XDG_CONFIG_HOME: `${root}.sites-runtime/config` } },
         );
-      await wrangler('migrations', 'apply', 'DB');
+      await wrangler('classic', 'migrations', 'apply', 'DB');
       const sqlValue = (value: string) => `'${value.replaceAll("'", "''")}'`;
+      const bindSQL = (query: string, ...values: (string | number)[]) => {
+        let index = 0;
+        const bound = query.replace(/\?/g, () => {
+          const value = values[index++];
+          assert.notEqual(value, undefined, 'Every fixture SQL parameter must be bound');
+          return typeof value === 'string' ? sqlValue(value) : String(value);
+        });
+        assert.equal(index, values.length);
+        return bound;
+      };
+      const executeSQL = async (query: string) => {
+        // Native Workerd can upgrade its private SQLite metadata. Use the CLI
+        // matching the active DB owner, not the older Classic CLI after upgrade.
+        const { stdout } = await wrangler(
+          native ? 'native' : 'classic',
+          'execute',
+          'DB',
+          '--command',
+          query,
+          '--json',
+        );
+        return JSON.parse(stdout) as {
+          results: Record<string, unknown>[];
+          meta?: { rows_read?: number; rows_written?: number };
+        }[];
+      };
       const rows = [`videos:v4:${track.id}`, 'search:v5:user:synthetic afterparty'];
       const sql = rows
         .map(
@@ -78,7 +105,7 @@ for (const native of [false, true])
         )
         .join('\n');
       await writeFile(`${runtime}/metadata.sql`, sql);
-      await wrangler('execute', 'DB', '--file', `${runtime}/metadata.sql`);
+      await wrangler('classic', 'execute', 'DB', '--file', `${runtime}/metadata.sql`);
 
       const webConfig = `${runtime}/web.json`;
       await writeFile(
@@ -293,6 +320,56 @@ for (const native of [false, true])
       assert.equal(
         (await api<Room>(`/api/rooms/${another.data.room.code}`, another.data.token)).data.current,
         null,
+      );
+
+      // The real migrated Worker must count only this room's unexpired visitors
+      // and retain private/guild/expired directory filtering after index creation.
+      const listed = await api<{ room: Room; token: string }>('/api/rooms', undefined, {
+        name: 'Listed synthetic room',
+        isPublic: true,
+      });
+      assert.equal(listed.status, 200);
+      const listedCode = listed.data.room.code;
+      const presenceNow = Date.now();
+      const presenceSQL = [
+        `DELETE FROM visitors WHERE room=${sqlValue(listedCode)}`,
+        ...[1, 2, 3].map(
+          (id) =>
+            `INSERT INTO visitors VALUES(${sqlValue(`synthetic-active-${id}`)},${sqlValue(listedCode)},${presenceNow + 120000})`,
+        ),
+        `INSERT INTO visitors VALUES('synthetic-expired',${sqlValue(listedCode)},${presenceNow - 1})`,
+        `INSERT INTO visitors VALUES('synthetic-private',${sqlValue(initial.code)},${presenceNow + 120000})`,
+        `INSERT INTO rooms(code,name,owner_hash,state,version,updated_at,expires_at,is_public,guild_id) VALUES('GUILD001','Hidden guild','synthetic','{}',1,${presenceNow},${presenceNow + 120000},1,'111111111111111')`,
+        `INSERT INTO rooms(code,name,owner_hash,state,version,updated_at,expires_at,is_public) VALUES('EXPIRED1','Expired room','synthetic','{}',1,${presenceNow},${presenceNow - 1},1)`,
+        `EXPLAIN QUERY PLAN ${bindSQL(visitorSQL.count, listedCode, presenceNow)}`,
+        `EXPLAIN QUERY PLAN ${bindSQL(visitorSQL.directory, presenceNow, presenceNow)}`,
+      ].join(';\n');
+      const plans = await executeSQL(presenceSQL);
+      const details = plans.flatMap((entry) => entry.results).filter((row) => 'detail' in row);
+      assert.equal(
+        details.filter((row) => String(row.detail).includes('COVERING INDEX visitors_room_until'))
+          .length,
+        2,
+      );
+      const directory = await api<{ rooms: { code: string; viewers: number }[] }>('/api/rooms');
+      assert.equal(directory.status, 200);
+      assert.deepEqual(
+        directory.data.rooms.map((row) => [row.code, row.viewers]),
+        [[listedCode, 3]],
+      );
+      const counted = (await api<Room>(`/api/rooms/${listedCode}`)).data;
+      assert.equal(counted.viewers, 4, 'the API read adds its own visitor heartbeat');
+      const renewed = await executeSQL(
+        bindSQL(
+          visitorSQL.heartbeat,
+          'synthetic-active-1',
+          listedCode,
+          presenceNow + 180000,
+          presenceNow + 120001,
+        ),
+      );
+      context.diagnostic(
+        `Indexed local D1 heartbeat rows_written: ${renewed[0].meta?.rows_written ?? 'not exposed by local Wrangler'}`,
       );
 
       const browser = await chromium.launch({

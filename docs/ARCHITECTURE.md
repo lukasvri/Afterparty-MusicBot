@@ -42,6 +42,7 @@ Start with the responsibility below rather than reading every file. There are tw
 | v3 feature implementations | `apps/web/src/lib/` | Feature folders below |
 | Shared website API handlers | `app/api/` | `route.ts` adapters into `lib/` |
 | Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
+| Website visitor counts, heartbeat and directory SQL | `lib/room-visitors.ts` | `server.ts` owns access; `db/schema.ts` and `drizzle/` own the index; `scripts/measure-room-visitors.ts` measures isolated read/write/space cost |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
 | Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core, Classic and v3 |
