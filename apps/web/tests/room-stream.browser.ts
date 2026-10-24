@@ -1,7 +1,7 @@
 // A real browser EventSource talks to a loopback synthetic Core protocol fixture.
 // Only the official player boundary is simulated. No provider or Discord is contacted.
 import assert from 'node:assert/strict';
-import { createServer, type ServerResponse } from 'node:http';
+import { createServer, request as httpRequest, type ServerResponse } from 'node:http';
 import { test } from 'node:test';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
@@ -68,7 +68,9 @@ async function liveFixture() {
       response.write(`data: ${JSON.stringify({ type: 'room', room })}\n\n`);
   };
   const server = createServer(async (request, response) => {
-    const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+    if (!request.url?.startsWith('/') || request.url.startsWith('//'))
+      return json(response, { error: 'Only relative fixture paths are accepted' }, 400);
+    const url = new URL(request.url, 'http://127.0.0.1');
     try {
       if (url.pathname === '/api/realtime/clock') {
         clockReads++;
@@ -119,8 +121,12 @@ async function liveFixture() {
       if (url.pathname.startsWith('/api/'))
         return json(response, { error: 'Unused synthetic endpoint' }, 404);
       // Serve the built candidate unchanged. All application API traffic stays here.
-      const upstream = await fetch(new URL(request.url ?? '/', preview), {
+      const target = new URL(preview);
+      target.pathname = url.pathname;
+      target.search = url.search;
+      const upstream = await fetch(target, {
         signal: AbortSignal.timeout(15000),
+        redirect: 'error',
       });
       const headers = Object.fromEntries(upstream.headers);
       for (const key of ['content-encoding', 'content-length', 'transfer-encoding', 'connection'])
@@ -420,3 +426,21 @@ test(
     }
   },
 );
+
+// Absolute-form request targets must never replace the fixture's loopback upstream.
+test('the loopback SSE fixture rejects external request targets before forwarding', async (context) => {
+  const fixture = await liveFixture();
+  context.after(() => fixture.close());
+  for (const path of ['http://outside.invalid/v3', '//outside.invalid/v3']) {
+    const status = await new Promise<number | undefined>((resolve, reject) => {
+      const outgoing = httpRequest(new URL(fixture.origin), { method: 'GET', path }, (response) => {
+        response.resume();
+        response.once('end', () => resolve(response.statusCode));
+      });
+      outgoing.once('error', reject);
+      outgoing.end();
+    });
+    assert.equal(status, 400);
+  }
+  assert.deepEqual(fixture.errors, []);
+});
