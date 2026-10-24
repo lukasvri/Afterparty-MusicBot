@@ -123,6 +123,97 @@ const request = () =>
     headers: { Authorization: "Bearer synthetic-key" },
   });
 
+test("idle bridge heartbeats update presence without rewriting unchanged room snapshots", async (t) => {
+  const sqlite = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    const publish = () => bridge(request(), { guildId: guild, roomCode: "DISCORD1", state });
+    await publish();
+    const readRoom = () => sqlite.prepare("SELECT * FROM rooms WHERE code='DISCORD1'").get();
+    const initial = readRoom();
+    const changes = () => Number(sqlite.prepare("SELECT total_changes() AS n").get()!.n);
+    for (let i = 0; i < 6; i++) {
+      const before = changes();
+      now += 5000;
+      await publish();
+      assert.equal(changes() - before, 2, "Only the guild heartbeat and default alias are written");
+      assert.deepEqual(readRoom(), initial);
+      const heartbeats = sqlite.prepare("SELECT updated_at FROM bot_state").all();
+      assert.equal(heartbeats.length, 2);
+      assert(heartbeats.every(row => row.updated_at === now));
+    }
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("changed bridge playback snapshots and guild bindings persist immediately", async (t) => {
+  const sqlite = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  const concert = { id: "abcdefghijk", title: "Synthetic concert", artist: "Synthetic artist", duration: 120, concert: true };
+  try {
+    const publish = (playingState: Record<string, unknown>, guildId = guild) =>
+      bridge(request(), { guildId, roomCode: "D0123456", state: playingState });
+    await publish(state);
+    now += 50;
+    await publish({ ...state, current: concert, playing: true, position: 10 });
+    const first = sqlite.prepare("SELECT state,version,updated_at FROM rooms WHERE code='D0123456'").get()!;
+    assert.equal(first.version, 2);
+    assert.equal(first.updated_at, now);
+    assert.equal(JSON.parse(String(first.state)).position, 10);
+    now += 50;
+    await publish({ ...state, current: concert, playing: true, position: 12 });
+    const moved = sqlite.prepare("SELECT state,version,updated_at FROM rooms WHERE code='D0123456'").get()!;
+    assert.equal(moved.version, 3);
+    assert.equal(moved.updated_at, now);
+    assert.equal(JSON.parse(String(moved.state)).position, 12);
+    now += 50;
+    await publish({ ...state, current: concert, playing: false, position: 12 });
+    const paused = sqlite.prepare("SELECT state,version,updated_at FROM rooms WHERE code='D0123456'").get()!;
+    assert.equal(paused.version, 4);
+    assert.equal(paused.updated_at, now);
+    assert.equal(JSON.parse(String(paused.state)).playing, false);
+    now += 50;
+    await publish(state, otherGuild);
+    const rebound = sqlite.prepare("SELECT state,version,guild_id FROM rooms WHERE code='D0123456'").get()!;
+    assert.equal(rebound.version, 5);
+    assert.equal(rebound.guild_id, otherGuild);
+    now += 50;
+    await publish(state, guild);
+    const reboundAgain = sqlite.prepare("SELECT version,guild_id FROM rooms WHERE code='D0123456'").get()!;
+    assert.equal(reboundAgain.version, 6, "An identical state with a changed guild still updates");
+    assert.equal(reboundAgain.guild_id, guild);
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("unchanged bridge rooms renew their 48-hour expiry only when 24 hours remain", async (t) => {
+  const sqlite = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    const publish = () => bridge(request(), { guildId: guild, roomCode: "D0123456", state });
+    await publish();
+    const readRoom = () => sqlite.prepare("SELECT version,updated_at,expires_at FROM rooms WHERE code='D0123456'").get()!;
+    const initial = readRoom();
+    now += 86400000 - 1;
+    await publish();
+    assert.deepEqual(readRoom(), initial);
+    now += 1;
+    await publish();
+    assert.deepEqual({ ...readRoom() }, { version: 2, updated_at: now, expires_at: now + 172800000 });
+    const renewed = readRoom();
+    now += 5000;
+    await publish();
+    assert.deepEqual(readRoom(), renewed);
+  } finally {
+    sqlite.close();
+  }
+});
+
 test("all twenty Core results are durable before a full batch is acknowledged, with server isolation", async () => {
   const sqlite = fixture();
   try {

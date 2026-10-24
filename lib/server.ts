@@ -371,7 +371,16 @@ export async function publicRoom(
   const actor = visitorIdentity(request.headers);
   const now = Date.now();
   const discord = Boolean(value.guild_id) || value.code === "DISCORD1";
-  const discordOnline = discord && now - value.updated_at < 15000;
+  // Unchanged room snapshots do not need a write on every bridge heartbeat.
+  // Read liveness from the same guild's heartbeat, retaining legacy room-only
+  // snapshots when no bot_state record has been published yet.
+  const bridgeHeartbeat = discord
+    ? await db().prepare("SELECT updated_at FROM bot_state WHERE key=?")
+      .bind(value.guild_id ? `discord:${value.guild_id}` : "discord")
+      .first<{ updated_at: number }>()
+    : null;
+  const heartbeatAt = bridgeHeartbeat?.updated_at ?? value.updated_at;
+  const discordOnline = discord && now - heartbeatAt < 15000;
   if (discord && !discordOnline) state.playing = false;
   const visibleState = publicPlayback(state);
   const actorHash = await hash(bearer(request));
@@ -462,7 +471,7 @@ export async function publicRoom(
           guildId: value.guild_id,
           discordOnline,
           buffering:state.buffering,
-          syncValidForMs: Math.max(0, 12000 - (now - value.updated_at)),
+          syncValidForMs: Math.max(0, 12000 - (now - heartbeatAt)),
         }
       : {}),
   };
