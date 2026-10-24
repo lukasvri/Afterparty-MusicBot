@@ -176,6 +176,66 @@ function fixture() {
     },
   };
 }
+test("Discord room presence follows its guild heartbeat independently of the saved snapshot", async (t) => {
+  const f = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    await f.save("D0123456", { current: seed, queue: [], playing: false, position: 25 });
+    f.sqlite.prepare("UPDATE rooms SET guild_id=?,updated_at=? WHERE code='D0123456'")
+      .run("111111111111111", now - 3600000);
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,'{}',?)")
+      .run("discord:111111111111111", now);
+    const initial = f.roomRow("D0123456");
+    const online = await publicRoom(f.request, initial, false);
+    assert.equal(online.discordOnline, true);
+    assert.equal(online.syncValidForMs, 12000);
+    assert.equal(online.playing, false);
+    assert.equal(online.position, 25);
+    assert.deepEqual(f.roomRow("D0123456"), initial, "Reading heartbeat presence does not write the room");
+    now += 14999;
+    assert.equal((await publicRoom(f.request, initial, false)).discordOnline, true);
+    now += 1;
+    const offline = await publicRoom(f.request, initial, false);
+    assert.equal(offline.discordOnline, false);
+    assert.equal(offline.syncValidForMs, 0);
+    f.sqlite.prepare("UPDATE bot_state SET updated_at=? WHERE key=?")
+      .run(now, "discord:111111111111111");
+    assert.equal((await publicRoom(f.request, initial, false)).discordOnline, true);
+  } finally {
+    f.close();
+  }
+});
+
+test("Discord heartbeat lookup preserves guild isolation and legacy room-only fallback", async (t) => {
+  const f = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    await f.save("DISCORD1", { current: seed, queue: [], playing: false, position: 25 });
+    const saved = f.roomRow("DISCORD1");
+    assert.equal((await publicRoom(f.request, saved, false)).discordOnline, true);
+    now += 20000;
+    assert.equal((await publicRoom(f.request, saved, false)).discordOnline, false);
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES('discord','{}',?)").run(now);
+    assert.equal((await publicRoom(f.request, saved, false)).discordOnline, true);
+    f.sqlite.prepare("UPDATE rooms SET guild_id=? WHERE code='DISCORD1'").run("111111111111111");
+    const scoped = f.roomRow("DISCORD1");
+    assert.equal((await publicRoom(f.request, scoped, false)).discordOnline, false,
+      "A scoped default room must not reuse the legacy unscoped heartbeat");
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,'{}',?)")
+      .run("discord:222222222222222", now);
+    assert.equal((await publicRoom(f.request, scoped, false)).discordOnline, false,
+      "Another guild's fresh heartbeat cannot keep this room online");
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,'{}',?)")
+      .run("discord:111111111111111", now - 20000);
+    assert.equal((await publicRoom(f.request, { ...scoped, updated_at: now }, false)).discordOnline, false,
+      "An existing expired heartbeat takes precedence over a fresh room-only snapshot");
+  } finally {
+    f.close();
+  }
+});
+
 test("D1 own-room radio advances the queue, keeps manual priority and hides its bounded history", async () => {
   const f = fixture();
   try {

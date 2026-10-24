@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { headers, request } from "@/lib/browser-api";
+import { startForegroundPolling } from "@/lib/foreground-poll";
 import type { Room } from "@/lib/types";
 type QueueState = Pick<Room, "queue" | "requests" | "approvalRequired" | "voteCounts" | "skipVotes"> & { revision: string };
 type QueueData = { state: QueueState; canManage: boolean };
@@ -36,14 +37,11 @@ export function useConcertQueue(guildId: string | undefined) {
     if (!guildId) return;
     const target: Session = { guildId, serial: 0, pending: false, controller: new AbortController(), actionDone: Promise.resolve(true) };
     session.current = target;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
+    const stopPolling = startForegroundPolling(async () => {
       if (!target.pending) await refresh(target);
-      if (current(target)) timer = setTimeout(poll, 3000);
-    };
-    void poll();
+    });
     return () => {
-      target.controller.abort(); clearTimeout(timer);
+      stopPolling(); target.controller.abort();
       if (session.current === target) session.current = null;
     };
   }, [guildId, current, refresh]);
