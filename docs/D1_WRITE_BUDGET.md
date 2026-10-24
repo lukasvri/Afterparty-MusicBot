@@ -255,10 +255,13 @@ clear a reconciliation block, delete the D1 watermark or resume old backup inten
 The publisher block only stops website publishing and does not stop existing
 Discord audio or make old-backup audio recovery safe by itself.
 
-Issue #132 remains open for reviewed manual recovery/fencing acceptance, production
-write telemetry and owner-run outage/restart/concurrent-guild listening evidence.
-The source implements the opt-in bounded offline contract; synthetic tests do not
-establish live Discord audio, provider correctness or deployment readiness.
+The bounded source slice in issue #132 is implemented and covered by synthetic
+outage, restart, reconnect, isolation and SQL write-budget tests. Its manual
+recovery precondition and fencing limits are explicit above; full automatic
+backup-restore/concurrent-publisher fencing is outside this slice. Production
+telemetry and live listening are not established by these tests. Live Discord
+acceptance and release readiness remain tracked separately in issues #37 and #92;
+merging this source change does not authorize deployment.
 
 References: [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/),
 [metrics and query insights](https://developers.cloudflare.com/d1/observability/metrics-analytics/),
