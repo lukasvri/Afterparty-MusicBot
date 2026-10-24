@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { request } from '../../../../lib/browser-api.ts';
-  import type { OpenRoom } from '../../../../lib/types.ts';
+  import { request } from '../../../../../lib/browser-api.ts';
+  import type { OpenRoom } from '../../../../../lib/types.ts';
   let {
     busy,
     onJoin,

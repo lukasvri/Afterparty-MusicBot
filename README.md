@@ -147,6 +147,8 @@ Back up the complete `/data` volume, including `guilds/`, before an update. `doc
 
 ## Work on the project
 
+Use the [source map](docs/ARCHITECTURE.md#source-map) to find a feature, its shared rules and its tests. The v3 candidate groups rooms, concerts, games, library, social tools and administration in `apps/web/src/lib/`; Classic and v3 share the existing API handlers, bot settings and social contracts.
+
 With Node.js 24.17+, Python 3.11+ and FFmpeg installed:
 
 ```bash

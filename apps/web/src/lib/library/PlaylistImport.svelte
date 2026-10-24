@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createPlaylistImport, type PlaylistState } from '#lib/playlist-import-client.ts';
+  import { createPlaylistImport, type PlaylistState } from '#lib/library/playlist-import-client.ts';
   let {
     busy,
     capacity = 50,

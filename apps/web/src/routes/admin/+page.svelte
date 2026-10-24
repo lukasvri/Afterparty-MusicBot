@@ -5,7 +5,7 @@
     createAdminClient,
     safeAdminLink,
     type AdminState,
-  } from '#lib/admin-client.ts';
+  } from '#lib/admin/admin-client.ts';
   import { time } from '../../../../../lib/types.ts';
   import '../../app.css';
 

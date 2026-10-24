@@ -1,15 +1,15 @@
-import { request as browserRequest } from '../../../../lib/browser-api.ts';
-import { browserStorage } from '../../../../lib/browser-storage.ts';
-import { LiveClock } from '../../../../lib/live-clock.ts';
-import { elapsedPlayingMs, readRoomTimeline } from '../../../../services/core/src/protocol.ts';
+import { request as browserRequest } from '../../../../../lib/browser-api.ts';
+import { browserStorage } from '../../../../../lib/browser-storage.ts';
+import { LiveClock } from '../../../../../lib/live-clock.ts';
+import { elapsedPlayingMs, readRoomTimeline } from '../../../../../services/core/src/protocol.ts';
 import {
   compensateDelivery,
   isDuplicateSnapshot,
   isOlderSnapshot,
   playbackTarget,
   roomPollUpdate,
-} from '../../../../lib/playback-sync.ts';
-import type { Room, Video } from '../../../../lib/types.ts';
+} from '../../../../../lib/playback-sync.ts';
+import type { Room, Video } from '../../../../../lib/types.ts';
 
 export type RoomAction =
   | 'add'

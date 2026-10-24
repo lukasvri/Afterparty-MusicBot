@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { registerHooks } from 'node:module';
-import type { AdminDetail, AdminState } from '../src/lib/admin-client.ts';
+import type { AdminDetail, AdminState } from '../src/lib/admin/admin-client.ts';
 import type { request } from '../../../lib/browser-api.ts';
 
 const hook = registerHooks({
@@ -11,7 +11,7 @@ const hook = registerHooks({
     return next(specifier, context);
   },
 });
-const { createAdminClient, safeAdminLink } = await import('../src/lib/admin-client.ts');
+const { createAdminClient, safeAdminLink } = await import('../src/lib/admin/admin-client.ts');
 hook.deregister();
 
 const first = '111111111111111111',

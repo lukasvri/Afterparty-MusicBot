@@ -1,17 +1,17 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { loadYoutube, type Player } from '../../../../lib/youtube-player.ts';
-  import { canCorrectPlayback, shouldCorrect } from '../../../../lib/playback-sync.ts';
-  import type { Room } from '../../../../lib/types.ts';
-  import Icon from './Icon.svelte';
-  import { browserStorage } from '../../../../lib/browser-storage.ts';
+  import { loadYoutube, type Player } from '../../../../../lib/youtube-player.ts';
+  import { canCorrectPlayback, shouldCorrect } from '../../../../../lib/playback-sync.ts';
+  import type { Room } from '../../../../../lib/types.ts';
+  import Icon from '../ui/Icon.svelte';
+  import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import {
     applyAudioPreferences,
     changeAudioLevel,
     defaultAudio,
     readAudioPreferences,
     toggleAudioMute,
-  } from '../../../../lib/audio-preferences.ts';
+  } from '../../../../../lib/audio-preferences.ts';
   let audio = $state({ ...defaultAudio });
   let stage: HTMLDivElement;
   let fullscreen = $state(false);

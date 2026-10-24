@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PublicPage from '#lib/PublicPage.svelte';
+  import PublicPage from '#lib/ui/PublicPage.svelte';
 </script>
 
 <PublicPage title="Support and privacy requests">

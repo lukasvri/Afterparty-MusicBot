@@ -3,8 +3,8 @@ export type Track={genres?:string[];music?:boolean;aiGenerated?:boolean;id:strin
 export type PublicTrack=Pick<Track,'genres'|'music'|'aiGenerated'|'id'|'title'|'artist'|'image'|'duration'|'live'|'embeddable'|'source'|'url'|'concert'>;
 export type PublicState={ready:boolean;connected:boolean;playing:boolean;position:number;volume:number;current:PublicTrack|null;queue:PublicTrack[];queueRevision:string;playbackKey:string|null;lastSeen:number;online:boolean;engine:'gutta-krutt-core';epoch:string;sequence:number;serverTime:number;buffering:boolean};
 export function publicTrack(t:Track|null):PublicTrack|null{return t?{id:t.id,title:t.title,artist:t.artist,image:t.image,duration:t.duration,live:t.live,embeddable:t.embeddable,genres:t.genres,...(t.music!==undefined?{music:t.music}:{}),...(t.aiGenerated===true?{aiGenerated:true}:{}),concert:t.concert===true,...(t.source==='soundcloud'?{source:t.source,url:t.url}:{})}:null;}
-export type Settings={playlistLimit:number;secondsToWaitAfterQueueEmpties:number;leaveIfNoListeners:boolean;queueAddResponseEphemeral:boolean;autoAnnounceNextSong:boolean;defaultVolume:number;defaultQueuePageSize:number;turnDownVolumeWhenPeopleSpeak:boolean;turnDownVolumeWhenPeopleSpeakTarget:number;crossfade:number;radio:boolean;audioBitrateKbps:number};
-export const defaultSettings:Settings={playlistLimit:50,secondsToWaitAfterQueueEmpties:300,leaveIfNoListeners:true,queueAddResponseEphemeral:true,autoAnnounceNextSong:false,defaultVolume:100,defaultQueuePageSize:10,turnDownVolumeWhenPeopleSpeak:false,turnDownVolumeWhenPeopleSpeakTarget:30,crossfade:6,radio:true,audioBitrateKbps:192};
+export type {Settings} from './settings.ts';
+export {defaultSettings} from './settings.ts';
 export class UserError extends Error{status:number;constructor(message:string,status=400){super(message);this.status=status;}}
 
 export type SavedQueue = {id: string; name: string; createdAt: string; tracks: Track[]};

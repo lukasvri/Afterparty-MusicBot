@@ -4,7 +4,7 @@ import {
   createPlaylistImport,
   playlistJob,
   type PlaylistState,
-} from '../src/lib/playlist-import-client.ts';
+} from '../src/lib/library/playlist-import-client.ts';
 const id = '12345678-1234-1234-1234-123456789abc';
 const token = 'a'.repeat(40);
 const job = (status: 'processing' | 'done' = 'processing') => ({

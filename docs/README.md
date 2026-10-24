@@ -10,7 +10,7 @@
 | --- | --- |
 | Install your own bot and website | [Installation](INSTALLATION.md) |
 | Find a variable or hosting requirement | [Configuration](CONFIGURATION.md) |
-| Understand the two services and their data | [Architecture](ARCHITECTURE.md) |
+| Understand the two services and find code by feature | [Architecture and source map](ARCHITECTURE.md#source-map) |
 | Run, update or recover Core | [Operations and recovery](../services/core/PUBLIC_RELEASE.md) |
 
 ## Run a host

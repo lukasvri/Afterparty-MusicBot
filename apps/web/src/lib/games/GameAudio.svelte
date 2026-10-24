@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { browserStorage } from '../../../../lib/browser-storage.ts';
+  import { browserStorage } from '../../../../../lib/browser-storage.ts';
   let {
     available,
     active,

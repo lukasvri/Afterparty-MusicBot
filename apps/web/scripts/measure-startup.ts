@@ -16,7 +16,7 @@ const manifest = JSON.parse(
   ),
 ) as Record<string, { file: string; src?: string; name?: string }>;
 const library = Object.values(manifest).find(
-  (entry) => entry.src === 'src/lib/MusicLibrary.svelte',
+  (entry) => entry.src === 'src/lib/library/MusicLibrary.svelte',
 );
 if (verify) assert(library, 'Build must keep the optional library in its own chunk');
 const browser = await chromium.launch({

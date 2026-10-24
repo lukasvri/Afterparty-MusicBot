@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PublicPage from '#lib/PublicPage.svelte';
+  import PublicPage from '#lib/ui/PublicPage.svelte';
   import releases from '../../../../../lib/releases.json';
   import { legacyUpdates } from '../../../../../lib/legacy-updates.ts';
 

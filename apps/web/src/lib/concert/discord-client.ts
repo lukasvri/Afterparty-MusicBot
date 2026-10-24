@@ -1,6 +1,6 @@
-import { request as browserRequest } from '../../../../lib/browser-api.ts';
-import { browserStorage } from '../../../../lib/browser-storage.ts';
-import type { DiscordState, Room, Video } from '../../../../lib/types.ts';
+import { request as browserRequest } from '../../../../../lib/browser-api.ts';
+import { browserStorage } from '../../../../../lib/browser-storage.ts';
+import type { DiscordState, Room, Video } from '../../../../../lib/types.ts';
 import { createConcertAudio, type ConcertAudioOptions } from './concert-audio.ts';
 
 export type ConcertState = DiscordState & { playbackKey?: string | null };

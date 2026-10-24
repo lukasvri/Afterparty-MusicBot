@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chromium, type Page } from 'playwright';
 import { guessWave } from '../../../services/core/src/guess-audio-format.ts';
-import type { GameResponse } from '../src/lib/game-client.ts';
+import type { GameResponse } from '../src/lib/games/game-client.ts';
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5174').origin;
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname));
 type AudioProbe = {

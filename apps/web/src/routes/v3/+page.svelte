@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createRoomClient, type RoomClientState } from '#lib/room-client.ts';
-  import Icon from '#lib/Icon.svelte';
-  import RoomAudio from '#lib/RoomAudio.svelte';
-  import RoomSocial from '#lib/RoomSocial.svelte';
-  import RoomDirectory from '#lib/RoomDirectory.svelte';
+  import { createRoomClient, type RoomClientState } from '#lib/rooms/room-client.ts';
+  import Icon from '#lib/ui/Icon.svelte';
+  import RoomAudio from '#lib/rooms/RoomAudio.svelte';
+  import RoomSocial from '#lib/social/RoomSocial.svelte';
+  import RoomDirectory from '#lib/rooms/RoomDirectory.svelte';
   import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import { time } from '../../../../../lib/types.ts';
   import '../../app.css';
@@ -472,7 +472,7 @@
         </nav>
         {#if panel === 'library'}
           {#key room.code}
-            {#await import('#lib/MusicLibrary.svelte')}
+            {#await import('#lib/library/MusicLibrary.svelte')}
               <p class="search-summary" role="status">Opening your library…</p>
             {:then { default: MusicLibrary }}
               <MusicLibrary

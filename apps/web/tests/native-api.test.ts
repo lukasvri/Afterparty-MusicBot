@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { nativeApi, nativeRoutes, type NativeLoader } from '../src/lib/native-api.ts';
+import { nativeApi, nativeRoutes, type NativeLoader } from '../src/lib/server/native-api.ts';
 
 const origin = 'https://afterparty.invalid';
 
@@ -13,10 +13,13 @@ test('the native map covers every existing API route and imports its canonical h
     .map((file) => '/api/' + file.slice(0, -'/route.ts'.length))
     .sort();
   assert.deepEqual(Object.keys(nativeRoutes).sort(), paths);
-  const source = await readFile(new URL('../src/lib/native-api.ts', import.meta.url), 'utf8');
+  const source = await readFile(
+    new URL('../src/lib/server/native-api.ts', import.meta.url),
+    'utf8',
+  );
   for (const path of paths) {
     assert(
-      source.includes(`import('../../../../app${path}/route.ts')`),
+      source.includes(`import('../../../../../app${path}/route.ts')`),
       `${path} reuses its canonical handler`,
     );
   }

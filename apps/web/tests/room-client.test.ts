@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 import type { Room } from '../../../lib/types.ts';
-import type { RoomClientOptions, RoomClientState } from '../src/lib/room-client.ts';
+import type { RoomClientOptions, RoomClientState } from '../src/lib/rooms/room-client.ts';
 
 // The shared browser helper predates Node's explicit TypeScript extensions.
 const hook = registerHooks({
@@ -12,7 +12,7 @@ const hook = registerHooks({
     return next(specifier, context);
   },
 });
-const { createRoomClient } = await import('../src/lib/room-client.ts');
+const { createRoomClient } = await import('../src/lib/rooms/room-client.ts');
 hook.deregister();
 
 const room = (code = 'ROOM0001', version = 1, isHost = true): Room => ({

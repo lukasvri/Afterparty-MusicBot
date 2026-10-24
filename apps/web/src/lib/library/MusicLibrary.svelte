@@ -1,15 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import PlaylistImport from '#lib/PlaylistImport.svelte';
-  import ConcertCatalog from '#lib/ConcertCatalog.svelte';
-  import { browserStorage } from '../../../../lib/browser-storage.ts';
+  import PlaylistImport from '#lib/library/PlaylistImport.svelte';
+  import ConcertCatalog from '#lib/library/ConcertCatalog.svelte';
+  import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import {
     emptyLibrary,
     readLibrary,
     uniqueEveningTracks,
     type EveningLibrary,
-  } from '../../../../lib/evening-library.ts';
-  import type { Video } from '../../../../lib/types.ts';
+  } from '../../../../../lib/evening-library.ts';
+  import type { Video } from '../../../../../lib/types.ts';
   let {
     tracks,
     history,

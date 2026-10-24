@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { betaEntry, bridge, type ApiBinding } from '#lib/api-bridge.ts';
+import { betaEntry, bridge, type ApiBinding } from '#lib/server/api-bridge.ts';
 import type { RequestHandler } from './$types';
 
 const forward: RequestHandler = ({ request }) =>

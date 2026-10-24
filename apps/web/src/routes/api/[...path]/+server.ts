@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
-import { bridge, type ApiBinding } from '#lib/api-bridge.ts';
-import { nativeApi } from '#lib/native-api.ts';
+import { bridge, type ApiBinding } from '#lib/server/api-bridge.ts';
+import { nativeApi } from '#lib/server/native-api.ts';
 import type { RequestHandler } from './$types';
 
 // Keep the API binding as an explicit rollback path until native mode is selected.

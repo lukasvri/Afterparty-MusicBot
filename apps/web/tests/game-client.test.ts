@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
-import type { GameResponse, GameView } from '../src/lib/game-client.ts';
+import type { GameResponse, GameView } from '../src/lib/games/game-client.ts';
 const hook = registerHooks({
   resolve(specifier, context, next) {
     if (context.parentURL?.endsWith('/lib/browser-api.ts') && specifier === './browser-storage')
@@ -9,7 +9,7 @@ const hook = registerHooks({
     return next(specifier, context);
   },
 });
-const { createGameClient } = await import('../src/lib/game-client.ts');
+const { createGameClient } = await import('../src/lib/games/game-client.ts');
 hook.deregister();
 const response = (revision = 1): GameResponse => ({
   canManage: true,

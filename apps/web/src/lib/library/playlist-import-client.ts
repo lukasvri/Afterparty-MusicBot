@@ -1,5 +1,5 @@
-import type { Video } from '../../../../lib/types.ts';
-import { normalizePlaylistUrl } from '../../../../services/core/src/playlist-url.ts';
+import type { Video } from '../../../../../lib/types.ts';
+import { normalizePlaylistUrl } from '../../../../../services/core/src/playlist-url.ts';
 
 export type PlaylistJob = {
   id: string;

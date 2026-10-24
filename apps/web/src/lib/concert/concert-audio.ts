@@ -1,13 +1,13 @@
-import { LiveClock } from '../../../../lib/live-clock.ts';
+import { LiveClock } from '../../../../../lib/live-clock.ts';
 import {
   acceptsLiveState,
   DISCORD_LIVE_LEASE_MS,
   liveRoom,
   readLiveState,
   type LiveState,
-} from '../../../../lib/live-room.ts';
-import { playbackTarget } from '../../../../lib/playback-sync.ts';
-import type { Room } from '../../../../lib/types.ts';
+} from '../../../../../lib/live-room.ts';
+import { playbackTarget } from '../../../../../lib/playback-sync.ts';
+import type { Room } from '../../../../../lib/types.ts';
 
 export type ConcertAudioView = {
   room: Room | null;

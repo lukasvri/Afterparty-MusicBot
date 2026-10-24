@@ -1,6 +1,6 @@
 <script lang="ts">
-  import PublicPage from '#lib/PublicPage.svelte';
-  import CopyrightForm from '#lib/CopyrightForm.svelte';
+  import PublicPage from '#lib/ui/PublicPage.svelte';
+  import CopyrightForm from '#lib/ui/CopyrightForm.svelte';
 
   let { data }: { data: { contactEmail: string | null } } = $props();
 </script>

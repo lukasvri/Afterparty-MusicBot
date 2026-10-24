@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createConcertAudio, type ConcertAudioView } from '../src/lib/concert-audio.ts';
+import { createConcertAudio, type ConcertAudioView } from '../src/lib/concert/concert-audio.ts';
 import type { LiveState } from '../../../lib/live-room.ts';
 
 const guildId = '123456789012345678',

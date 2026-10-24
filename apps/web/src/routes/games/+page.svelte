@@ -1,16 +1,16 @@
 <script lang="ts">
   import { onMount, tick as afterRender } from 'svelte';
   import { replaceState } from '$app/navigation';
-  import GameAudio from '#lib/GameAudio.svelte';
-  import Icon from '#lib/Icon.svelte';
-  import { createGameClient, type GameScope, type GameView } from '#lib/game-client.ts';
-  import type { createRoomClient as RoomClientFactory } from '#lib/room-client.ts';
+  import GameAudio from '#lib/games/GameAudio.svelte';
+  import Icon from '#lib/ui/Icon.svelte';
+  import { createGameClient, type GameScope, type GameView } from '#lib/games/game-client.ts';
+  import type { createRoomClient as RoomClientFactory } from '#lib/rooms/room-client.ts';
   import {
     gamePresets,
     presetSettings,
     rankPlayers,
     validGameSettings,
-  } from '#lib/game-experience.ts';
+  } from '#lib/games/game-experience.ts';
   import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import { guessAvailability } from '../../../../../lib/guess-availability.ts';
   import type { GuessSettings } from '../../../../../services/core/src/guess-game.ts';
@@ -176,7 +176,7 @@
     let stop = () => {};
     let message = '';
     try {
-      const { createRoomClient } = await import('#lib/room-client.ts');
+      const { createRoomClient } = await import('#lib/rooms/room-client.ts');
       if (!mounted) return;
       creator = createRoomClient();
       creatingRoom = creator;

@@ -34,8 +34,8 @@ async function fixture(width: number, denyLibrary = false) {
       ),
     ) as Record<string, { src?: string; file: string }>;
     libraryFile =
-      Object.values(manifest).find((entry) => entry.src === 'src/lib/MusicLibrary.svelte')?.file ??
-      '';
+      Object.values(manifest).find((entry) => entry.src === 'src/lib/library/MusicLibrary.svelte')
+        ?.file ?? '';
     assert(libraryFile, 'Build the lazy library before running this regression');
   }
   const browser = await chromium.launch({

@@ -31,6 +31,47 @@ flowchart TB
     Audio --> Voice[Discord voice channels]
 ```
 
+## Source map
+
+Start with the responsibility below rather than reading every file. There are two website implementations during the migration: Classic remains the operational baseline and explicit rollback; `apps/web` is the v3 candidate. Both use the existing API handlers and shared domain rules. A second UI does not imply a second database or a second Core.
+
+| Responsibility | Canonical location | Entry point |
+| --- | --- | --- |
+| Classic pages and interface | `app/`, `components/`, `hooks/` | `app/page.tsx`, `app/admin/admin.tsx` |
+| v3 routes and page composition | `apps/web/src/routes/` | `v3/+page.svelte`, `games/+page.svelte` |
+| v3 feature implementations | `apps/web/src/lib/` | Feature folders below |
+| Shared website API handlers | `app/api/` | `route.ts` adapters into `lib/` |
+| Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
+| Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
+| Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
+| Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core, Classic and v3 |
+| Shared social messages and validation | `services/core/src/social-protocol.ts` | Browser-safe; no database, token signing or Node imports |
+| Device-local reaction expiry | `lib/social-reactions.ts` | Shared by both website implementations |
+| Discord/Core startup | `services/core/src/` | `main.ts`, `guilds.ts`, `server.ts` |
+| Playback and source extraction | `services/core/src/` | `engine.ts`, `audio.ts`, `providers.ts`, `extractor.ts` |
+| Core rooms, games and social authority | `services/core/src/` | `rooms.ts`, `guess-game.ts`, `social.ts` |
+| Website schema and migrations | `db/`, `drizzle/` | Existing D1 migration sequence |
+| Core schema and data | `services/core/src/` | `store.ts`, `migrate.ts`; private data stays outside Git |
+| Local checks, builds and browser fixtures | `scripts/`, `apps/web/scripts/`, `apps/web/tests/`, `services/core/tests/` | `npm run check:all` plus browser suites |
+| Host update and recovery | `operations/`, `services/core/` | [Operations](../services/core/PUBLIC_RELEASE.md) |
+
+The v3 feature folders keep each component beside its client and behavior helpers:
+
+| Folder in `apps/web/src/lib/` | Contents |
+| --- | --- |
+| `rooms/` | Room discovery, lifecycle, queue client and synchronized browser player |
+| `concert/` | Public Discord concert client and shared-clock audio adapter |
+| `games/` | Guess the Song client, presets, ranking and game audio |
+| `library/` | Favorites/evenings, playlist import and festival catalog |
+| `social/` | Reactions, moments and host bingo |
+| `admin/` | Server-scoped administration client |
+| `server/` | Native API dispatch and fixed service-binding bridge |
+| `ui/` | Shared icons, public-page frame and copyright form |
+
+Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
+
+Shared contracts belong in browser-safe modules; authorization and persistence remain in their server implementations. Reuse contracts and pure rules across Classic and v3 without forcing different UI lifecycles into a single controller. Keep the 26 existing API route adapters so URLs, authorization and rollback continue using the same handlers.
+
 ## Discord playback
 
 `services/core/src/main.ts` connects the Discord bot, creates the guild registry, starts the HTTP services and runs the website bridge. Each guild has an engine, commands and store. The initial owner server uses `/data/core.sqlite`; additional servers use `/data/guilds/<server-id>/core.sqlite`.

@@ -1,16 +1,18 @@
-import { browserStorage } from '../../../../lib/browser-storage.ts';
-import type { Room } from '../../../../lib/types.ts';
-import type { SocialState } from '../../../../services/core/src/social.ts';
+import { browserStorage } from '../../../../../lib/browser-storage.ts';
+import type { Room } from '../../../../../lib/types.ts';
+import {
+  SOCIAL_HOST_ACTIONS,
+  validSocial,
+  type SocialAction,
+  type SocialState,
+} from '../../../../../services/core/src/social-protocol.ts';
+export {
+  SOCIAL_REACTIONS,
+  validSocial,
+  type SocialAction,
+} from '../../../../../services/core/src/social-protocol.ts';
+import { createReactionWindow } from '../../../../../lib/social-reactions.ts';
 
-export const SOCIAL_REACTIONS = ['🔥', '❤️', '👏', '🤘', '✨', '🎉'] as const;
-export type SocialAction =
-  | 'reaction'
-  | 'highlight'
-  | 'remove-highlight'
-  | 'bingo-start'
-  | 'bingo-mark'
-  | 'bingo-stop'
-  | 'configure';
 export type SocialView = {
   social: SocialState | null;
   ready: boolean;
@@ -28,61 +30,7 @@ type Options = {
   clearTimeout?: typeof clearTimeout;
   stream?: boolean;
 };
-const hostActions = new Set<SocialAction>([
-  'configure',
-  'remove-highlight',
-  'bingo-start',
-  'bingo-mark',
-  'bingo-stop',
-]);
-const cleanText = (value: unknown, length: number) =>
-  typeof value === 'string' &&
-  value.trim().length > 0 &&
-  value.length <= length &&
-  !/[\u0000-\u001f\u007f]/.test(value);
-export function validSocial(value: SocialState): boolean {
-  return Boolean(
-    value &&
-    ['room', 'guild'].includes(value.scope) &&
-    typeof value.scopeId === 'string' &&
-    Number.isSafeInteger(value.revision) &&
-    value.revision >= 0 &&
-    typeof value.enabled === 'boolean' &&
-    Array.isArray(value.reactions) &&
-    value.reactions.length <= 20 &&
-    value.reactions.every(
-      (reaction) =>
-        reaction &&
-        typeof reaction.id === 'string' &&
-        reaction.id.length <= 128 &&
-        SOCIAL_REACTIONS.some((emoji) => emoji === reaction.emoji) &&
-        Number.isFinite(reaction.at),
-    ) &&
-    Array.isArray(value.highlights) &&
-    value.highlights.length <= 30 &&
-    value.highlights.every(
-      (highlight) =>
-        highlight &&
-        typeof highlight.id === 'string' &&
-        highlight.id.length <= 128 &&
-        cleanText(highlight.text, 160) &&
-        /^[\w-]{11}$/.test(highlight.videoId) &&
-        Number.isFinite(highlight.position) &&
-        highlight.position >= 0 &&
-        Number.isFinite(highlight.at),
-    ) &&
-    (value.bingo === null ||
-      (value.bingo &&
-        typeof value.bingo.active === 'boolean' &&
-        Array.isArray(value.bingo.cells) &&
-        value.bingo.cells.length === 9 &&
-        value.bingo.cells.every((cell) => cleanText(cell, 60)) &&
-        new Set(value.bingo.cells.map((cell) => cell.trim().toLowerCase())).size === 9 &&
-        Array.isArray(value.bingo.marked) &&
-        value.bingo.marked.length <= 9 &&
-        value.bingo.marked.every((cell) => Number.isInteger(cell) && cell >= 0 && cell < 9))),
-  );
-}
+const hostActions = new Set<SocialAction>(SOCIAL_HOST_ACTIONS);
 
 /** Independent opt-in social channel. Reconnection reads authority and never replays events. */
 export function createRoomSocialClient(
@@ -100,7 +48,7 @@ export function createRoomSocialClient(
     scopeId = scope === 'guild' ? room.guildId : room.code;
   const playbackKey = room.playbackKey;
   const listeners = new Set<(view: SocialView) => void>();
-  const seenReactions = new Map<string, number>();
+  const reactions = createReactionWindow(now);
   let view: SocialView = {
     social: null,
     ready: false,
@@ -144,21 +92,6 @@ export function createRoomSocialClient(
       ...(host ? { Authorization: `Bearer ${host}` } : {}),
     };
   };
-  const mergeReactions = (previous: SocialState['reactions'], next: SocialState['reactions']) => {
-    const at = now();
-    for (const reaction of next)
-      if (!seenReactions.has(reaction.id)) seenReactions.set(reaction.id, at);
-    const merged = [
-      ...new Map(
-        [...previous, ...next]
-          .filter((reaction) => at - (seenReactions.get(reaction.id) ?? -Infinity) < 6000)
-          .map((reaction) => [reaction.id, reaction]),
-      ).values(),
-    ].slice(-20);
-    for (const [id, received] of seenReactions) if (at - received > 60000) seenReactions.delete(id);
-    while (seenReactions.size > 200) seenReactions.delete(seenReactions.keys().next().value!);
-    return merged;
-  };
   const invalidate = () => {
     epoch++;
     requestController?.abort();
@@ -181,7 +114,9 @@ export function createRoomSocialClient(
     publish({
       social: {
         ...next,
-        reactions: next.enabled ? mergeReactions(view.social?.reactions ?? [], next.reactions) : [],
+        reactions: next.enabled
+          ? reactions.merge(view.social?.reactions ?? [], next.reactions)
+          : [],
       },
       canManage: data.canManage === true,
       ready: true,
@@ -388,7 +323,9 @@ export function createRoomSocialClient(
   const expire = () => {
     if (!alive) return;
     if (view.social)
-      publish({ social: { ...view.social, reactions: mergeReactions(view.social.reactions, []) } });
+      publish({
+        social: { ...view.social, reactions: reactions.merge(view.social.reactions, []) },
+      });
     expiry = schedule(expire, 2000);
   };
   return {
@@ -426,7 +363,7 @@ export function createRoomSocialClient(
       if (retry !== undefined) cancel(retry);
       if (expiry !== undefined) cancel(expiry);
       listeners.clear();
-      seenReactions.clear();
+      reactions.clear();
       token = '';
     },
   };

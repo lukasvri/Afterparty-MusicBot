@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CONCERT_CATALOG } from '../../../../lib/concert-catalog.ts';
+  import { CONCERT_CATALOG } from '../../../../../lib/concert-catalog.ts';
   let { busy, onAdd }: { busy: boolean; onAdd: (ids: readonly string[]) => Promise<void> | void } =
     $props();
   const events = [...new Map(CONCERT_CATALOG.map((entry) => [entry.eventId, entry.eventName]))];

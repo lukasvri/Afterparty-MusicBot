@@ -1,6 +1,7 @@
 import { body, fail, hash, limit, row } from "@/lib/server";
 import { discordSession } from "@/lib/discord-auth";
 import { coreRequest, coreUrl } from "@/lib/core-server";
+import { SOCIAL_ACTIONS } from "../services/core/src/social-protocol.ts";
 import type { RoomState } from "@/lib/types";
 
 /** Social traffic has its own budget and never enters a playback command route. */
@@ -13,7 +14,7 @@ export async function socialInput(request: Request, stream = false) {
   if (scope !== "room" && scope !== "guild") fail(400, "Choose a room or server.");
   if (typeof scopeId !== "string" || !(scope === "room" ? /^[A-Z0-9]{8}$/ : /^\d{14,22}$/).test(scopeId))
     fail(400, "Invalid social scope.");
-  if (!["stream", "join", "read", "reaction", "highlight", "remove-highlight", "bingo-start", "bingo-mark", "bingo-stop", "configure"].includes(String(action)))
+  if (!SOCIAL_ACTIONS.some(allowed => allowed === action))
     fail(400, "Unknown social action.");
   await limit(request, "social-visitor", 30, 60000);
   if (action === "join") await limit(request, "social-join", 6, 60000);

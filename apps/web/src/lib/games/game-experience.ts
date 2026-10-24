@@ -1,6 +1,9 @@
-import { guessAvailability } from '../../../../lib/guess-availability.ts';
-import type { GuessCategorySummary } from '../../../../services/core/src/guess-catalog.ts';
-import type { GuessPublicState, GuessSettings } from '../../../../services/core/src/guess-game.ts';
+import { guessAvailability } from '../../../../../lib/guess-availability.ts';
+import type { GuessCategorySummary } from '../../../../../services/core/src/guess-catalog.ts';
+import type {
+  GuessPublicState,
+  GuessSettings,
+} from '../../../../../services/core/src/guess-game.ts';
 
 export const gamePresets = [
   {

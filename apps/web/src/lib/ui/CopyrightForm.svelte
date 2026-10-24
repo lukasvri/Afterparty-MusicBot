@@ -6,7 +6,7 @@
     copyrightContactEmail,
     copyrightMailto,
     copyrightNoticeText,
-  } from '../../../../lib/copyright-notice.ts';
+  } from '../../../../../lib/copyright-notice.ts';
 
   let { contactEmail }: { contactEmail: string | null } = $props();
   let hydrated = $state(false);

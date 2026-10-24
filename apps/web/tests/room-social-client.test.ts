@@ -4,7 +4,7 @@ import {
   createRoomSocialClient,
   validSocial,
   type SocialView,
-} from '../src/lib/room-social-client.ts';
+} from '../src/lib/social/room-social-client.ts';
 import type { SocialState } from '../../../services/core/src/social.ts';
 const code = 'TESTROOM',
   playbackKey = 'synthetic-playback';

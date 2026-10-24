@@ -3,8 +3,8 @@
     createRoomSocialClient,
     SOCIAL_REACTIONS,
     type SocialView,
-  } from '#lib/room-social-client.ts';
-  import { time, type Room } from '../../../../lib/types.ts';
+  } from '#lib/social/room-social-client.ts';
+  import { time, type Room } from '../../../../../lib/types.ts';
   let { room }: { room: Room } = $props();
   const code = $derived(room.code),
     mode = $derived(room.mode),

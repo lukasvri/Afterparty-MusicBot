@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { bridge, type ApiBinding } from '#lib/api-bridge.ts';
+import { bridge, type ApiBinding } from '#lib/server/api-bridge.ts';
 import type { Handle } from '@sveltejs/kit/hooks';
 
 // An explicit fallback keeps the original application reviewable during migration.

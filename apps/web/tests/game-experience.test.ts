@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { presetSettings, rankPlayers, validGameSettings } from '../src/lib/game-experience.ts';
+import {
+  presetSettings,
+  rankPlayers,
+  validGameSettings,
+} from '../src/lib/games/game-experience.ts';
 const settings = {
   durationSeconds: 30,
   roundCount: 5,

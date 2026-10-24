@@ -1,11 +1,11 @@
-import { headers as browserHeaders } from '../../../../lib/browser-api.ts';
-import { validGuessCategories } from '../../../../lib/guess-availability.ts';
+import { headers as browserHeaders } from '../../../../../lib/browser-api.ts';
+import { validGuessCategories } from '../../../../../lib/guess-availability.ts';
 import {
   GUESS_AUDIO_MAX_BYTES,
   guessWaveSeconds,
   readGuessBytes,
-} from '../../../../services/core/src/guess-audio-format.ts';
-import type { GuessResult, GuessPublicState } from '../../../../services/core/src/guess-game.ts';
+} from '../../../../../services/core/src/guess-audio-format.ts';
+import type { GuessResult, GuessPublicState } from '../../../../../services/core/src/guess-game.ts';
 export type GameScope = { scope: 'room' | 'guild'; scopeId: string; nickname: string };
 export type GameResponse = GuessResult & {
   canManage: boolean;

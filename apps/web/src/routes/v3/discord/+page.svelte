@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createDiscordClient, type ConcertView } from '#lib/discord-client.ts';
+  import { createDiscordClient, type ConcertView } from '#lib/concert/discord-client.ts';
   import { request } from '../../../../../../lib/browser-api.ts';
   import { time } from '../../../../../../lib/types.ts';
-  import Icon from '#lib/Icon.svelte';
-  import RoomAudio from '#lib/RoomAudio.svelte';
-  import RoomSocial from '#lib/RoomSocial.svelte';
+  import Icon from '#lib/ui/Icon.svelte';
+  import RoomAudio from '#lib/rooms/RoomAudio.svelte';
+  import RoomSocial from '#lib/social/RoomSocial.svelte';
   import '../../../app.css';
 
   let client: ReturnType<typeof createDiscordClient> | undefined;

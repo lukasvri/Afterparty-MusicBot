@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
-import type { ConcertState, ConcertView } from '../src/lib/discord-client.ts';
-import type { ConcertAudioOptions } from '../src/lib/concert-audio.ts';
+import type { ConcertState, ConcertView } from '../src/lib/concert/discord-client.ts';
+import type { ConcertAudioOptions } from '../src/lib/concert/concert-audio.ts';
 
 const hook = registerHooks({
   resolve(specifier, context, next) {
@@ -11,7 +11,7 @@ const hook = registerHooks({
     return next(specifier, context);
   },
 });
-const { createDiscordClient } = await import('../src/lib/discord-client.ts');
+const { createDiscordClient } = await import('../src/lib/concert/discord-client.ts');
 hook.deregister();
 const guildA = '123456789012345678',
   guildB = '223456789012345678';

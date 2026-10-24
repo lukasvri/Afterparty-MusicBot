@@ -1,5 +1,6 @@
-import { request as browserRequest } from '../../../../lib/browser-api.ts';
-import type { DiscordState, Room } from '../../../../lib/types.ts';
+import { request as browserRequest } from '../../../../../lib/browser-api.ts';
+import type { DiscordState, Room } from '../../../../../lib/types.ts';
+import { settingGroupsFor } from '../../../../../services/core/src/settings.ts';
 
 export type AdminGuild = { id: string; name: string; roomCode: string; installed: boolean };
 export type AdminDetail = {
@@ -41,93 +42,7 @@ export type AdminState = {
   channels: Array<{ id: string; name: string; voice: boolean }>;
   rooms: Room[];
 };
-export const adminSettingGroups = [
-  {
-    title: 'Audio playback',
-    description: 'Playback defaults for this Discord server.',
-    fields: [
-      {
-        key: 'defaultVolume',
-        label: 'Default volume',
-        min: 0,
-        max: 100,
-        help: '0–100%. Current playback volume has its own control.',
-      },
-      {
-        key: 'audioBitrateKbps',
-        label: 'Audio bitrate',
-        min: 64,
-        max: 384,
-        help: '64–384 kbit/s. Applies at the next playback start, capped by the voice channel.',
-      },
-      {
-        key: 'crossfade',
-        label: 'Crossfade',
-        min: 0,
-        max: 12,
-        help: '0–12 seconds between tracks. Set 0 to turn crossfade off.',
-      },
-      {
-        key: 'radio',
-        label: 'Radio when the queue is empty',
-        toggle: true,
-        help: 'Prepare related music when the manual queue runs out.',
-      },
-    ],
-  },
-  {
-    title: 'Voice and listeners',
-    description: 'Connection behavior and volume while people speak.',
-    fields: [
-      {
-        key: 'secondsToWaitAfterQueueEmpties',
-        label: 'Wait after the queue empties',
-        min: 0,
-        max: 86400,
-        help: '0–86400 seconds. Set 0 to stay connected indefinitely after the queue ends.',
-      },
-      {
-        key: 'leaveIfNoListeners',
-        label: 'Leave when no listeners remain',
-        toggle: true,
-        help: 'Disconnect when everyone else leaves the voice channel.',
-      },
-      {
-        key: 'turnDownVolumeWhenPeopleSpeak',
-        label: 'Lower volume while people speak',
-        toggle: true,
-        help: 'Reconnect after changing this option to update voice detection.',
-      },
-      {
-        key: 'turnDownVolumeWhenPeopleSpeakTarget',
-        label: 'Volume while people speak',
-        min: 0,
-        max: 100,
-        help: '0–100%. Used while voice volume reduction is enabled.',
-      },
-    ],
-  },
-  {
-    title: 'Queue and playlists',
-    description: 'Import limits and the Discord queue display.',
-    fields: [
-      {
-        key: 'playlistLimit',
-        label: 'Playlist limit',
-        min: 1,
-        max: 1000,
-        help: '1–1000 tracks imported from a playlist.',
-      },
-      {
-        key: 'defaultQueuePageSize',
-        label: 'Tracks per queue page',
-        min: 1,
-        max: 30,
-        help: '1–30 tracks shown by the Discord queue command.',
-      },
-    ],
-  },
-] as const;
+export const adminSettingGroups = settingGroupsFor('svelte');
 
 export function safeAdminLink(value: string, guildId?: string): string {
   if (!value) return '';
