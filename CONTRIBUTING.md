@@ -49,6 +49,8 @@ These commands install the locked website and Core dependency trees, run deploym
 
 ## Make the change reviewable
 
+Apply the [source organization rules](AGENTS.md#keep-every-change-organized) to every change: reuse canonical definitions, keep related feature code together, remove verified duplication and update the source map when ownership changes.
+
 Keep the change focused, update the relevant guide and describe the resulting behavior. Public documentation is English. Use TypeScript for new application code and first-party Node tooling; see [TypeScript conventions](docs/TYPESCRIPT.md).
 
 Report the checks you actually ran and anything you could not verify. For playback UI changes, add the relevant local Chromium checks described in the [release review](docs/RELEASE_REVIEW.md#verification). For documentation, check local links, image paths and the rendered layout. Run lint with zero warnings for code changes; report failures honestly and do not disable rules to hide them.
