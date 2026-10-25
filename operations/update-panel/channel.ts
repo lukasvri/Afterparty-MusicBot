@@ -1,7 +1,7 @@
 import {
   viewState,
   frozenRequest,
-  stages,
+  progressSteps,
   parsePanelState,
   type PanelState,
   type PanelStep,
@@ -182,18 +182,7 @@ function initializeChannelPicker() {
       find("action-title").textContent = view.actionTitle;
       const list = find("steps");
       list.replaceChildren();
-      const stepValues: PanelStep[] =
-        Array.isArray(value.steps) && value.steps.length
-          ? value.steps
-          : stages.map(([name, label]) => ({
-              label,
-              status:
-                value.stage === "done"
-                  ? "done"
-                  : value.running && name === value.stage
-                    ? "running"
-                    : "pending",
-            }));
+      const stepValues: PanelStep[] = progressSteps(value);
       for (const step of stepValues) {
         const li = document.createElement("li");
         li.className = ["done", "succeeded", "success"].includes(step.status)

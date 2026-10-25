@@ -79,7 +79,8 @@ class BetaUpdater:
         result = {key: state[key] for key in fields if key in state}
         result.update(environment='Beta', site_url='https://ap.beta.openworks.no',
                       branch='beta-svelte-3', checking=self.checking)
-        result['running'] = bool(state.get('running') or self._pending(state) or self._service_active())
+        pending = self._pending(state)
+        result['running'] = bool(state.get('running') or pending or self._service_active())
         checked = state.get('checked_at', 0)
         result['ready'] = bool(state.get('ready') is True and isinstance(checked, (int, float))
                                and 0 <= time.time() - checked < 1800 and not result['running'])
@@ -99,26 +100,40 @@ class BetaUpdater:
         check_failure = failed and state.get('operation') == 'check'
         live = result['running']
         phase = state.get('stage')
-        worker = previous.get('active_worker')
-        completed = previous.get('completed_builds', {}) if phase in ('cloudflare', 'verify', 'done') else {}
+        checking = self.checking or phase == 'checking' or check_failure
+        publishing = (not checking and state.get('operation') != 'check'
+                      and (phase in ('validate', 'cloudflare', 'verify')
+                           or (phase == 'done' and not pending)
+                           or (failed and state.get('operation') == 'publish')))
+        finished = publishing and phase == 'done' and not live
+        started = previous.get('started_at')
+        same_job = (previous.get('commit') == state.get('commit')
+                    and isinstance(started, (int, float))
+                    and isinstance(checked, (int, float)) and started >= checked)
+        worker = previous.get('active_worker') if same_job else None
+        completed = previous.get('completed_builds', {}) if same_job and phase != 'validate' else {}
         labels = [('validate', 'Kontroller kilde og GitHub-tester'),
                   ('api', 'Bygg og publiser betaens API'),
                   ('frontend', 'Bygg og publiser betaens frontend'),
                   ('verify', 'Kontroller betasiden og forbindelsen'),
                   ('done', 'Lagre kontrollert resultat')]
-        result['progress_kind'] = 'current' if live or (failed and not check_failure) else 'last' if recorded else 'none'
+        result['progress_kind'] = 'completed' if finished else 'current' if publishing else 'none'
         steps = []
         for name, label in labels:
             status = 'pending'
-            if not live and (not failed or check_failure) and recorded:
+            if not publishing:
+                pass
+            elif finished:
                 status = 'done'
             elif name == 'validate':
-                status = 'running' if live and phase == 'validate' else 'done' if phase in ('cloudflare', 'verify', 'done') else 'failed' if failed else 'pending'
+                status = ('running' if live and phase == 'validate' else 'done'
+                          if phase in ('cloudflare', 'verify', 'done') or (failed and same_job)
+                          else 'pending')
             elif name in ('api', 'frontend'):
                 target = 'afterparty-staging' if name == 'api' else 'afterparty-web-beta'
-                if isinstance(completed, dict) and completed.get(target, {}).get('status') == 'succeeded':
+                if isinstance(completed, dict) and isinstance(completed.get(target), dict) and completed[target].get('status') == 'succeeded':
                     status = 'done'
-                elif phase == 'cloudflare' and worker == target:
+                elif (phase == 'cloudflare' or failed) and worker == target:
                     status = 'running' if live else 'failed' if failed else 'pending'
             elif name == 'verify' and phase in ('verify', 'done'):
                 status = 'running' if live and phase == 'verify' else 'done'
