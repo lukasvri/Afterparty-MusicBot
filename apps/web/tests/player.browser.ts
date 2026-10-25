@@ -532,8 +532,8 @@ for (const [width, height] of [
   test(
     `native TV invitations and fullscreen preserve the player at ${width}x${height}`,
     { timeout: 20000 },
-    async () => {
-      const f = await fixture(width, true, true);
+    async (t) => {
+      const f = await fixture(t, width, true, true);
       try {
         await f.page.setViewportSize({ width, height });
         await f.page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
@@ -617,8 +617,8 @@ for (const [width, height] of [
     },
   );
 
-test('saved motion preference and system reduced motion remain independent of audio and room control', async () => {
-  const f = await fixture(390, true, true);
+test('saved motion preference and system reduced motion remain independent of audio and room control', async (t) => {
+  const f = await fixture(t, 390, true, true);
   try {
     await f.page.evaluate(() => localStorage.setItem('afterparty-motion', 'off'));
     await f.page.reload();
