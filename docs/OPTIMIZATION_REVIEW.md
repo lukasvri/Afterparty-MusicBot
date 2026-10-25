@@ -568,3 +568,68 @@ quarter-capped overlap. Track IDs and extraction offsets remain protected.
 
 These are synthetic/locally decoded regression measurements, not proof of human
 Discord listening quality, provider delivery speed or zero network latency.
+
+
+## CI validation time, 2026-10-26
+
+The last successful sampled GitHub run
+[40239011597](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40239011597)
+spent 327 seconds in browser/startup/stack journeys and 136 seconds probing and
+packing the Core image. Dependency installation was already cached and was not
+the main bottleneck. A later coverage run spent 11 minutes 3 seconds installing FFmpeg, mostly
+downloading its dependencies;
+[40243082047](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40243082047)
+also lost its Wrangler preview and continued until the eight-minute journey limit.
+
+On the same local built main candidate, all 88 browser cases passed with both
+one and two concurrent files: 327.539 seconds versus 172.258 seconds, about 47%
+less elapsed time in this sample. Tests within a file stay sequential, fixtures
+remain isolated, and the complete suite is retained. This is a local paired
+measurement, not a guaranteed GitHub runner improvement.
+
+One intervening two-file run lost its preview and failed. That result is retained
+in the [raw measurements](assets/ci-validation-20261026.json), not counted as a
+successful speed result. The blank error matches the symptom described in
+[upstream Wrangler issue 15451](https://github.com/cloudflare/workers-sdk/issues/15451).
+The pipeline now supervises the preview and validation process groups, fails on
+preview exit even with status zero, cleans up both groups on cancellation and
+preserves Wrangler debug logs. It does not restart the preview or retry failed
+tests. The upstream crash itself is not claimed fixed; the new logs allow its
+actual cause to be distinguished on subsequent failures.
+
+Core packaging now uses streaming gzip level 1 instead of the implicit level 9.
+A 204,544,000-byte local sample containing Core source/dependencies, the Node
+binary and FFmpeg binary compressed in 2.047 instead of 20.930 seconds, with
+68,252,470 instead of 59,377,384 output bytes (about 15% larger). Both outputs
+round-tripped to the same SHA-256. This sample is not a Docker image; actual
+GitHub packaging time and artifact transfer size remain CI measurements. Existing
+image probes, archive validation, signed digest checks and publication gates are
+preserved. The producer regression also compares the full saved archive bytes.
+
+Coverage caches downloaded FFmpeg `.deb` archives, leaving APT metadata and
+package checksum verification in charge of selecting valid versions. It reuses
+an available FFmpeg executable, otherwise bounds installation to three minutes with one download retry and 20-second network timeouts. An absent
+or broken tool fails validation. Actionlint 1.7.12 validates all three workflow
+files; lifecycle regressions execute the actual journey shell with controlled
+children for success, suite failure, preview exit and cancellation. The old shell
+reproduced waiting after preview death; the corrected shell completes those
+regressions. These changes are internal CI work, not public product release notes.
+
+
+Pull requests also stop producing release archives that no downstream PR job
+consumes. They run the shared Core runtime probe through `core-probe`, while
+main pushes retain `core-package`, website packaging, archive validation,
+uploads and the unchanged signed release dependency chain. Automated coverage
+is limited to main and explicit dispatch; all three ordinary unit suites still
+run on PRs. The active main ruleset requires `deployer`, `core`, `website` and
+`dependency-review`; those contexts are preserved.
+
+GitHub validation of the first candidate passed all jobs plus separately
+dispatched coverage. Against the same main source baseline, the combined
+startup/browser/stack step measured 203 seconds instead of 277, and Core probing
+plus packaging measured 29 seconds instead of 117. The sample Core artifact was
+322,909,801 bytes versus 290,899,179 in the earlier sampled playback candidate;
+source revisions and runner conditions differ, so these are observed samples,
+not a controlled transfer benchmark. PRs now omit that archive entirely.
+The FFmpeg installer completed in 20 seconds and saved 62,790,608 bytes of APT
+packages for reuse. Exact run/commit identifiers are retained in the raw results.

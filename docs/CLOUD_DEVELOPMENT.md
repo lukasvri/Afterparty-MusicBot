@@ -19,6 +19,29 @@ Keep production secrets and private-network access outside the environment. Do n
 
 The check command runs isolated automated suites. Integration scripts such as `smoke.ts`, `open-rooms.test.ts` and `discord-transport.test.ts` require an explicitly configured test service. They are not production release evidence from cloud validation.
 
+## CI validation timing and failures
+
+`npm run test:browser` runs at most two browser test files concurrently. Tests
+within each file keep their existing sequencing and isolated fixtures. The CI
+website job supervises its local preview and validation process groups; a preview
+exit fails validation immediately, and failure/cancellation retires both trees.
+Failure artifacts retain the preview output and Wrangler diagnostic log.
+
+Pull requests run the required `deployer`, `core`, `website` and dependency
+checks, including the final Core image probe. They do not create or upload
+release archives. Main pushes retain exact-image/archive validation, packaging,
+artifact uploads and the existing signed release gates. `core-probe` and
+`core-package` share the same runtime probe in `scripts/build_release.py`.
+
+Instrumented coverage runs on main pushes and explicit workflow dispatch, rather
+than repeating the three unit suites on PRs. Coverage requires FFmpeg, caches
+APT-verified package downloads, checks an existing executable first, and bounds
+installation to three minutes. Missing or broken tools fail the job. Main image
+packaging uses gzip level 1 and preserves the saved image bytes and digest checks.
+See the [measured validation review](OPTIMIZATION_REVIEW.md#ci-validation-time-2026-10-26)
+for baseline timings and the compression size tradeoff. CI-only changes do not
+belong in public product patch notes.
+
 ## Keep existing configuration local
 
 For an existing installation, keep its private Compose configuration outside Git and link it as `services/core/compose.local.yml`. Preserve the existing build context, environment file, production `/data` binding and any read-only legacy binding. `core-control.sh` automatically selects this file; `CORE_COMPOSE_FILE` can select another file explicitly. Plain `docker compose` uses the public template, so use the control script or explicitly pass the private file on an existing host.
