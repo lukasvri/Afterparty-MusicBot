@@ -746,16 +746,16 @@
   }
   .tv-mode main {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 270px;
-    gap: 20px;
-    padding: 24px;
+    grid-template-columns: minmax(0, 1fr) var(--tv-sidebar);
+    gap: var(--tv-gap);
+    padding: var(--tv-space);
   }
   .tv-mode .room-heading {
     grid-column: 1 / -1;
     margin: 0;
   }
   .tv-mode .room-heading h1 {
-    font-size: 30px;
+    font-size: var(--tv-title);
   }
   .tv-mode .room-share {
     grid-column: 2;
@@ -783,7 +783,7 @@
     padding: 8px 0;
   }
   .tv-mode .track-meta h2 {
-    font-size: 22px;
+    font-size: var(--tv-track);
     margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -792,7 +792,7 @@
     overflow: hidden;
   }
   .tv-mode :global(.audio-stage:not(.fullscreen)) {
-    width: min(100%, calc((100dvh - 310px) * 16 / 9));
+    width: min(100%, calc((100dvh - var(--tv-control-space)) * 16 / 9));
     margin-inline: auto;
   }
   @media (max-width: 700px) {

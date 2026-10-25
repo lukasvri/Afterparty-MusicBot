@@ -68,6 +68,8 @@ The v3 feature folders keep each component beside its client and behavior helper
 | `server/` | Native API dispatch and host-transition guard |
 | `ui/` | Shared icons, public-page frame, saved motion preference and copyright form |
 
+Shared fluid TV sizing lives in `apps/web/src/app.css`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
+
 Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
 
 Shared contracts belong in browser-safe modules; authorization and persistence remain in their server implementations. Reuse the existing contracts and pure rules across Core and the website. The 26 API route adapters in `lib/api/` preserve URLs and authorization without a second frontend.

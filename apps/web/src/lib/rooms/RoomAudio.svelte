@@ -449,7 +449,7 @@
   .local-sync {
     margin-top: 12px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--tv-body, 12px);
   }
   .local-sync summary {
     cursor: pointer;
@@ -480,12 +480,12 @@
     margin-top: 12px;
   }
   .local-audio label {
-    font-size: 10px;
+    font-size: var(--tv-body, 10px);
     color: var(--muted);
   }
   .local-audio input {
     min-width: 80px;
-    max-width: 180px;
+    max-width: clamp(180px, 9.375vw, 360px);
     flex: 1;
     accent-color: var(--red);
   }

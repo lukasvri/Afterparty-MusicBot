@@ -19,7 +19,13 @@ const track = (id: string, title: string, concert = true) => ({
   concert,
 });
 
-for (const width of [1440, 390]) {
+for (const [width, height] of [
+  [3840, 2160],
+  [2560, 1440],
+  [1920, 1080],
+  [1440, 1000],
+  [390, 1000],
+]) {
   test(`public concert keeps transport and votes scoped at ${width}px`, async () => {
     const browser = await chromium.launch({
       headless: true,
@@ -28,7 +34,7 @@ for (const width of [1440, 390]) {
     });
     try {
       const page = await browser.newPage({
-        viewport: { width, height: 1000 },
+        viewport: { width, height },
         reducedMotion: 'reduce',
       });
       const errors: string[] = [],
@@ -139,6 +145,27 @@ for (const width of [1440, 390]) {
         `${origin}/discord?guildId=${guildId}`,
       );
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.screenshot({
+        path: `/tmp/afterparty-native-concert-tv-${width}.png`,
+        fullPage: true,
+      });
+      if (width >= 1920) {
+        const stage = await page.locator('.concert-share').boundingBox();
+        const content = await page.locator('.concert-content').boundingBox();
+        assert(stage && stage.width >= width * 0.13, 'Concert invitation grows with the viewport');
+        assert(
+          content && content.width >= width * 0.9,
+          'TV concert uses the available screen width',
+        );
+        assert(
+          await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1),
+          'Concert TV controls and invitation fit the screen',
+        );
+      }
+      await page.screenshot({
+        path: `/tmp/afterparty-native-concert-tv-${width}.png`,
+        fullPage: true,
+      });
       await page.getByRole('button', { name: 'Exit TV mode', exact: true }).click();
       assert.equal(writes.length, commandsBeforeTV, 'TV invitations cannot issue concert commands');
       assert.deepEqual(errors, []);

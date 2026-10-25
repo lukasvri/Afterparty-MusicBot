@@ -11,7 +11,7 @@
       "Room playback adds local volume, mute and fullscreen controls, and follows the shared timeline with stream leases and read-only reconnection. This is an alpha review build; live provider playback, Discord listening and production login still require acceptance testing.",
       "The listening room loads library, playlist and festival tools when you open them, reducing the initial JavaScript payload while keeping those tools available. Game hosting code also loads on demand.",
       "The native v3 source now provides the sole interface at the home address, with public concerts at /discord. Existing v3 bookmarks keep working; the Classic interface and its fallback have been retired while APIs and saved data retain their existing contracts.",
-      "TV mode, local QR invitations and keyboard fullscreen/mute controls now use the native player. Switching views retains the active player; public invitation links exclude private host credentials.",
+      "TV mode scales video, QR invitations and controls dynamically from 1080p through QHD and 4K. Local QR invitations and keyboard fullscreen/mute controls now use the native player. Switching views retains the active player; public invitation links exclude private host credentials.",
       "Reconnect game can rejoin after Core loses its in-memory game membership. Existing games retain their scores; lost games return to a lobby without replaying guesses or starting a round automatically."
     ]
   },

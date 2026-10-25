@@ -593,26 +593,30 @@
   .tv-mode .permission-note {
     display: none;
   }
+  .concert-shell.tv-mode {
+    max-width: none;
+  }
   .tv-mode main {
-    padding: 20px 24px;
+    padding: var(--tv-gap) var(--tv-space);
   }
   .tv-mode .concert-content {
-    grid-template-columns: minmax(0, 1fr) 270px;
-    gap: 24px;
+    grid-template-columns: minmax(0, 1fr) var(--tv-sidebar);
+    gap: var(--tv-space);
   }
   .tv-mode .concert-share {
     grid-column: 2;
     grid-row: 1;
   }
+  .tv-mode .concert-art,
   .tv-mode :global(.audio-stage:not(.fullscreen)) {
-    width: min(100%, calc((100dvh - 330px) * 16 / 9));
+    width: min(100%, calc((100dvh - var(--tv-control-space) - 90px) * 16 / 9));
     margin-inline: auto;
   }
   .tv-mode .track-meta {
     padding-block: 8px;
   }
   .tv-mode .track-meta h2 {
-    font-size: 24px;
+    font-size: var(--tv-track);
   }
   @media (max-width: 700px) {
     .tv-mode .concert-content {
@@ -622,6 +626,7 @@
       grid-column: 1;
       grid-row: auto;
     }
+    .tv-mode .concert-art,
     .tv-mode :global(.audio-stage:not(.fullscreen)) {
       width: 100%;
     }

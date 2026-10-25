@@ -482,6 +482,8 @@ for (const width of [1440, 390]) {
 }
 
 for (const [width, height] of [
+  [3840, 2160],
+  [2560, 1440],
   [1920, 1080],
   [1280, 720],
   [390, 844],
@@ -510,7 +512,12 @@ for (const [width, height] of [
         await f.page.evaluate(() => document.fonts.ready);
         assert.equal(new URL(f.page.url()).searchParams.get('tv'), '1');
         assert(await f.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-        await f.page.screenshot({ path: `/tmp/afterparty-native-tv-${width}.png`, fullPage: true });
+        if (width >= 1920) {
+          const video = await f.page.locator('.audio-stage').boundingBox();
+          const qr = await f.page.getByAltText('QR code to join this listening room').boundingBox();
+          assert(video && video.width >= width * 0.6, 'TV video grows with the viewport');
+          assert(qr && qr.width >= width * 0.1, 'QR invitation scales for TV viewing');
+        }
         if (width > 700)
           assert(
             await f.page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1),

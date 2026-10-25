@@ -1072,3 +1072,62 @@ button.nav-link {
     white-space: nowrap;
   }
 }
+
+/* Shared fluid TV sizing for listening rooms and public concerts. */
+.tv-mode {
+  --tv-space: clamp(24px, 1.25vw, 48px);
+  --tv-gap: clamp(20px, 1.042vw, 40px);
+  --tv-sidebar: clamp(270px, 14.063vw, 540px);
+  --tv-title: clamp(30px, 1.563vw, 60px);
+  --tv-track: clamp(22px, 1.146vw, 44px);
+  --tv-body: clamp(13px, 0.677vw, 26px);
+  --tv-control-space: clamp(310px, 16.146vw, 620px);
+}
+.tv-mode main {
+  align-content: start;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+.tv-mode .button {
+  font-size: var(--tv-body);
+  padding: clamp(10px, 0.521vw, 20px) clamp(16px, 0.833vw, 32px);
+}
+.tv-mode .local-audio,
+.tv-mode .local-sync,
+.tv-mode .clock-phase {
+  font-size: var(--tv-body);
+}
+.tv-mode .room-sharing .invitation {
+  max-width: none;
+  padding: clamp(18px, 0.938vw, 36px);
+}
+.tv-mode .room-sharing img {
+  max-width: clamp(240px, 12.5vw, 480px);
+}
+.tv-mode .room-sharing strong {
+  font-size: clamp(24px, 1.25vw, 48px);
+}
+.tv-mode .room-sharing p {
+  font-size: var(--tv-body);
+}
+.tv-mode .room-sharing input {
+  font-size: clamp(11px, 0.573vw, 22px);
+  padding: clamp(10px, 0.521vw, 20px);
+}
+
+.tv-mode .play-control {
+  width: clamp(48px, 2.5vw, 96px);
+  height: clamp(48px, 2.5vw, 96px);
+}
+.tv-mode .icon-button {
+  width: clamp(44px, 2.292vw, 88px);
+  height: clamp(44px, 2.292vw, 88px);
+}
+.tv-mode .transport svg {
+  width: clamp(24px, 1.25vw, 48px);
+  height: clamp(24px, 1.25vw, 48px);
+}
+.tv-mode .timecodes {
+  font-size: clamp(11px, 0.573vw, 22px);
+}

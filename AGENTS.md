@@ -27,6 +27,10 @@ use em dashes. Keep global personal preferences out of repository instructions.
   are not included; run relevant browser suites for UI/playback changes. Docker
   is not required for these checks. For internal documentation-only edits,
   verify links and the diff without running the full application suite.
+- For playback and TV layout changes, prioritize 3840×2160 (4K),
+  2560×1440 (QHD/2K) and 1920×1080 (1080p), while retaining mobile coverage.
+  Use fluid viewport sizing with readable bounds; check screenshots as well as
+  overflow and player/QR/control visibility.
 - Core lives in `services/core/src/`; the only website is in `apps/web/`.
   Shared browser/domain services live in `lib/`, with API handlers in `lib/api/`.
   Preserve third-party license notices.
