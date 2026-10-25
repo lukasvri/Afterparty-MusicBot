@@ -28,7 +28,7 @@ const results = [
     'An equally long synthetic artist credit',
   ),
 ];
-type Write = { action: string; version: number; videoId?: string; position?: number };
+type Write = { action: string; version: number; videoId?: string; position?: number; to?: number };
 
 async function fixtureBrowser(registerCleanup: (cleanup: () => Promise<void>) => void) {
   const browser = await chromium.launch({
@@ -82,6 +82,7 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
     viewport: { width, height: 1000 },
     reducedMotion: 'reduce',
   });
+  page.setDefaultTimeout(8000);
   const errors: string[] = [],
     external: string[] = [],
     writes: Write[] = [];
@@ -278,6 +279,13 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       } else if (input.action === 'pause') playing = false;
       else if (input.action === 'play') playing = true;
       else if (input.action === 'seek') position = input.position;
+      else if (input.action === 'move') {
+        const index = queue.findIndex((item) => item.id === input.videoId);
+        assert(index >= 0);
+        const [selected] = queue.splice(index, 1);
+        queue.splice(input.to, 0, selected);
+      } else if (input.action === 'remove')
+        queue = queue.filter((item) => item.id !== input.videoId);
       else assert.fail(`Unexpected synthetic command: ${input.action}`);
       version++;
       return route.fulfill({ json: { room: snapshot(authorized) } });
@@ -347,6 +355,7 @@ test(
 );
 
 async function find(page: Page, query: string) {
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   const input = page.getByRole('textbox', { name: 'Search songs or artists' });
   await input.fill(query);
   await input.press('Enter');
@@ -355,10 +364,13 @@ async function find(page: Page, query: string) {
 test('an explicit open-rooms bookmark stays in the directory after its saved room reconnects', async (t) => {
   const f = await fixture(t, 390, true, true);
   try {
-    await f.page.goto(`${origin}/?room=${code}&view=rooms`);
-    await f.page.waitForFunction(() =>
-      document.querySelector('.top-status')?.textContent?.includes('Connected'),
+    const reconnected = f.page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/rooms/${code}` &&
+        response.request().method() === 'GET',
     );
+    await f.page.goto(`${origin}/?room=${code}&view=rooms`);
+    await reconnected;
     assert.equal(
       await f.page.getByRole('heading', { name: 'Find your people.', exact: true }).isVisible(),
       true,
@@ -383,7 +395,7 @@ test('a created room remains bookmarked after its first ownership read fails and
     await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
     assert.equal(f.creates, 1);
     assert.equal(new URL(f.page.url()).searchParams.get('room'), code);
-    assert.equal(await f.page.getByRole('button', { name: 'Pause playback' }).isEnabled(), true);
+    assert.equal(await f.page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
     await f.page.reload();
     await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
     assert.equal(f.creates, 1);
@@ -436,7 +448,7 @@ for (const width of [1440, 390]) {
         token,
       );
       assert.equal(new URL(page.url()).searchParams.get('room'), code);
-      assert.equal(await page.getByRole('button', { name: 'Pause playback' }).isEnabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
       await find(page, 'night');
       await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
       const input = page.getByRole('textbox', { name: 'Search songs or artists' });
@@ -455,6 +467,7 @@ for (const width of [1440, 390]) {
       });
       assert.equal(await add.evaluate((element) => element === document.activeElement), true);
       await page.keyboard.press('Enter');
+      await page.getByRole('button', { name: /^Queue/ }).click();
       await page.locator('.queue-list').getByText(results[0].title, { exact: true }).waitFor();
       assert.deepEqual(f.writes[0], {
         action: 'add',
@@ -559,7 +572,7 @@ for (const width of [1440, 390]) {
       await page.getByRole('button', { name: 'Join room', exact: true }).click();
       await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
       assert.equal(
-        await page.getByRole('button', { name: 'Pause playback' }).isEnabled(),
+        await page.getByRole('button', { name: 'Next track' }).isEnabled(),
         true,
         'joining again restores saved host permissions',
       );
@@ -595,12 +608,9 @@ for (const width of [1440, 390]) {
     try {
       const { page } = f;
       await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
-      for (const control of [
-        page.getByRole('button', { name: 'Pause playback' }),
-        page.getByRole('button', { name: 'Next track' }),
-        page.getByRole('slider', { name: 'Playback position' }),
-      ])
-        assert.equal(await control.isDisabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Next track' }).isDisabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Pause playback' }).count(), 0);
+      assert.equal(await page.getByRole('slider', { name: 'Playback position' }).count(), 0);
       await page
         .getByText('The host controls playback. Everyone can add to the queue.', { exact: true })
         .waitFor();
@@ -616,6 +626,7 @@ for (const width of [1440, 390]) {
       await page
         .getByRole('button', { name: `Add ${results[1].title} to queue`, exact: true })
         .click();
+      await page.getByRole('button', { name: /^Queue/ }).click();
       await page.locator('.queue-list').getByText(results[1].title, { exact: true }).waitFor();
       assert.equal(await page.getByRole('alert').count(), 0);
       assert.deepEqual(
@@ -635,11 +646,11 @@ for (const width of [1440, 390]) {
   });
 }
 
-test('search stays available beside library and settings without discarding unfinished inputs', async (t) => {
+test('music tabs preserve searches and unfinished library inputs beside the player', async (t) => {
   const f = await fixture(t, 1920, true, true);
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Room settings', exact: true }).click();
+    await page.getByText('Room settings', { exact: true }).click();
     await page.getByLabel('Your display name', { exact: true }).fill('Night host');
     await find(page, 'night');
     await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
@@ -657,12 +668,31 @@ test('search stays available beside library and settings without discarding unfi
       'https://www.youtube.com/playlist?list=PL1234567890123456789',
     );
     const searchBox = await page.locator('.discovery').boundingBox();
-    const libraryBox = await page
-      .getByRole('region', { name: 'Your music library', exact: true })
-      .boundingBox();
+    const playerBox = await page.locator('.now-playing').boundingBox();
     assert(
-      searchBox && libraryBox && libraryBox.x > searchBox.x + searchBox.width,
-      'wide screens keep search and tools side by side',
+      searchBox && playerBox && searchBox.x > playerBox.x + playerBox.width,
+      'wide screens keep the music workspace beside the player',
+    );
+    assert.equal(
+      await page.getByLabel('Your display name', { exact: true }).inputValue(),
+      'Night host',
+    );
+    await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    assert.equal(
+      await link.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
+      'changing tools preserves the import draft',
+    );
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    assert.equal(
+      await page.getByRole('region', { name: 'Your music library', exact: true }).count(),
+      0,
+      'inactive tools are hidden from accessibility navigation',
+    );
+    await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    assert.equal(
+      await link.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
     );
     assert.deepEqual(f.writes, []);
     assert.deepEqual(f.errors, []);
@@ -671,6 +701,227 @@ test('search stays available beside library and settings without discarding unfi
     await f.close();
   }
 });
+
+test('familiar navigation and player workspace fit 4K, QHD, 1080p and mobile with quick access', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    for (const [width, height] of [
+      [3840, 2160],
+      [2560, 1440],
+      [1920, 1080],
+      [390, 844],
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate(() => document.fonts.ready);
+      const rows = await page
+        .locator('.app-header nav .nav-link')
+        .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
+      assert(Math.max(...rows) - Math.min(...rows) <= 1, 'main navigation stays in one row');
+      assert.equal(await page.getByRole('slider', { name: 'Playback position' }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Pause playback' }).count(), 0);
+      await noOverflow(page);
+      const player = await page.locator('.now-playing').boundingBox();
+      const workspace = await page.locator('.music-workspace').boundingBox();
+      assert(player && workspace);
+      if (width >= 1920)
+        assert(
+          workspace.x >= player.x + player.width && player.width > workspace.width,
+          'one compact workspace sits beside the larger player',
+        );
+      else
+        assert(
+          workspace.y >= player.y + player.height,
+          'mobile stacks the workspace beneath the player',
+        );
+      await page.screenshot({
+        path: `/tmp/afterparty-familiar-room-${width}.png`,
+        fullPage: width >= 900,
+      });
+    }
+    await page.getByRole('button', { name: 'Open search', exact: true }).click();
+    const search = page.getByRole('textbox', { name: 'Search songs or artists' });
+    assert.equal(await search.evaluate((node) => node === document.activeElement), true);
+    await search.fill('late night draft');
+    await page.getByRole('button', { name: 'Open library', exact: true }).click();
+    const playlist = page.getByLabel('Playlist link', { exact: true });
+    await playlist.fill('https://www.youtube.com/playlist?list=PL1234567890123456789');
+    await page.getByRole('button', { name: 'Go to player', exact: true }).click();
+    assert.equal(
+      await page.locator('#room-player').evaluate((node) => node === document.activeElement),
+      true,
+    );
+    await page.getByRole('button', { name: 'Open queue', exact: true }).click();
+    assert.equal(
+      await page.getByRole('heading', { name: 'Up next', exact: true }).isVisible(),
+      true,
+    );
+    await page.getByRole('button', { name: 'Open library', exact: true }).click();
+    assert.equal(
+      await playlist.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
+    );
+    await page.getByRole('button', { name: 'Open search', exact: true }).click();
+    assert.equal(await search.inputValue(), 'late night draft');
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('one invitation panel copies only the public link and offers selection after clipboard failure', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async () => {
+            throw new Error('Synthetic clipboard failure');
+          },
+        },
+      }),
+    );
+    const invite = page.getByRole('button', { name: /^Invite friends/ });
+    await invite.click();
+    const link = page.getByRole('textbox', { name: 'Public room invitation link' });
+    assert.equal(await link.inputValue(), `${origin}/?room=${code}`);
+    await page.getByRole('button', { name: 'Copy room link', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Copy the selected link above.' }).waitFor();
+    assert.equal(
+      await link.evaluate(
+        (node) =>
+          node === document.activeElement &&
+          (node as HTMLInputElement).selectionEnd === (node as HTMLInputElement).value.length,
+      ),
+      true,
+    );
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (value: string) => {
+            (window as typeof window & { copiedRoomLink: string }).copiedRoomLink = value;
+          },
+        },
+      }),
+    );
+    await page.getByRole('button', { name: 'Copy room link', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Room link copied.' }).waitFor();
+    assert.equal(
+      await page.evaluate(
+        () => (window as typeof window & { copiedRoomLink: string }).copiedRoomLink,
+      ),
+      `${origin}/?room=${code}`,
+    );
+    await invite.click();
+    assert.equal(await link.isVisible(), false);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('room browsing returns to the existing host room without issuing commands or restarting audio', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'load',
+      ),
+    );
+    await page.getByRole('button', { name: 'Open rooms', exact: true }).click();
+    await page.getByRole('heading', { name: 'Find your people.', exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('view'), 'rooms');
+    assert.equal(
+      await page.locator('nav[aria-label="Main navigation"] [aria-current="page"]').count(),
+      1,
+    );
+    await page.getByRole('link', { name: 'Music', exact: true }).click();
+    await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('room'), code);
+    assert.equal(new URL(page.url()).searchParams.has('view'), false);
+    assert.equal(
+      await page.getByRole('button', { name: 'Next track', exact: true }).isEnabled(),
+      true,
+    );
+    assert.equal(
+      await page.getByRole('button', { name: 'Enable room audio', exact: true }).isVisible(),
+      true,
+    );
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'construct',
+          ).length,
+      ),
+      1,
+      'navigation does not automatically grant audio consent',
+    );
+    await page.getByRole('link', { name: 'Music', exact: true }).click();
+    assert.equal(
+      await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).count(),
+      1,
+    );
+    assert.deepEqual(f.writes, []);
+    assert.equal(f.creates, 0);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+for (const width of [1440, 390])
+  test(`queue options support keyboard reorder and removal at ${width}px`, async (t) => {
+    const f = await fixture(t, width, true, true);
+    try {
+      const { page } = f;
+      const second = page.locator('summary[aria-label="Track options for City after dark"]');
+      await second.focus();
+      await page.keyboard.press('Enter');
+      const menu = page.getByRole('group', { name: 'Actions for City after dark', exact: true });
+      await menu.getByRole('button', { name: 'Move up', exact: true }).focus();
+      await page.keyboard.press('Escape');
+      assert.equal(await second.evaluate((node) => node === document.activeElement), true);
+      await page.keyboard.press('Enter');
+      await menu.getByRole('button', { name: 'Move up', exact: true }).click();
+      await page.waitForFunction(
+        () => document.querySelector('.queue-list li strong')?.textContent === 'City after dark',
+      );
+      assert.equal(
+        await second.evaluate((node) => node === document.activeElement),
+        true,
+        'focus follows the reordered recording',
+      );
+      await page.keyboard.press('Enter');
+      await menu.getByRole('button', { name: 'Remove', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('.count')?.textContent === '1');
+      const next = page.locator('summary[aria-label="Track options for Stay a little longer"]');
+      assert.equal(
+        await next.evaluate((node) => node === document.activeElement),
+        true,
+        'removing a row keeps keyboard focus in the queue',
+      );
+      assert.deepEqual(
+        f.writes.map((write) => [write.action, write.version]),
+        [
+          ['move', 1],
+          ['remove', 2],
+        ],
+      );
+      assert.equal(f.writes[0].to, 0);
+      assert.deepEqual(f.errors, []);
+      await noOverflow(page);
+    } finally {
+      await f.close();
+    }
+  });
 
 test('native pause remains local while a queue addition is awaiting its response', async (t) => {
   const f = await fixture(t, 1440, true, true);
@@ -688,6 +939,7 @@ test('native pause remains local while a queue addition is awaiting its response
     await native.getByRole('button', { name: 'Pause video', exact: true }).click();
     await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
     release();
+    await page.getByRole('button', { name: /^Queue/ }).click();
     await page.locator('.queue-list').getByText(results[0].title, { exact: true }).waitFor();
     await page.waitForFunction(
       () => !(document.querySelector('.search-results button') as HTMLButtonElement)?.disabled,
@@ -710,6 +962,35 @@ test('native pause remains local while a queue addition is awaiting its response
     assert.deepEqual(f.errors, []);
   } finally {
     release();
+    await f.close();
+  }
+});
+
+test('a completed queue action preserves focus when the host has moved to search', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    const release = f.holdNextMutation();
+    await page.locator('summary[aria-label="Track options for City after dark"]').click();
+    await page
+      .getByRole('group', { name: 'Actions for City after dark', exact: true })
+      .getByRole('button', { name: 'Move up', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    const input = page.getByRole('textbox', { name: 'Search songs or artists' });
+    await input.fill('keep typing');
+    release();
+    await page.waitForFunction(
+      () => document.querySelector('.queue-list li strong')?.textContent === 'City after dark',
+    );
+    assert.equal(await input.evaluate((node) => node === document.activeElement), true);
+    assert.equal(await input.inputValue(), 'keep typing');
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['move'],
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
     await f.close();
   }
 });
@@ -787,7 +1068,7 @@ for (const [width, height] of [
             (call) => call.action === 'load',
           ),
         );
-        await f.page.getByRole('button', { name: 'Show QR invitation', exact: true }).click();
+        await f.page.getByRole('button', { name: /^Invite friends/ }).click();
         await f.page.getByAltText('QR code to join this listening room').waitFor();
         assert.equal(
           await f.page.getByRole('textbox', { name: 'Public room invitation link' }).inputValue(),
@@ -835,9 +1116,18 @@ for (const [width, height] of [
         await f.page.locator('.fullscreen-fallback').waitFor();
         await f.page.keyboard.press('Escape');
         await f.page.locator('.fullscreen-fallback').waitFor({ state: 'hidden' });
+        const settings = f.page.getByText('Room settings', { exact: true });
+        await settings.focus();
         await f.page.keyboard.press('m');
-        await f.page.getByText('Playback settings', { exact: true }).click();
-        await f.page.getByRole('button', { name: 'Unmute', exact: true }).waitFor();
+        await settings.click();
+        assert.equal(
+          await f.page.evaluate(() => JSON.parse(localStorage.getItem('afterparty-audio')!).muted),
+          true,
+        );
+        assert.equal(
+          await f.page.getByRole('slider', { name: 'Volume on this device' }).count(),
+          0,
+        );
         await f.page.getByRole('button', { name: 'Exit TV mode', exact: true }).click();
         await f.page.getByText('Playback diagnostics', { exact: true }).click();
         const diagnostics = await f.page.locator('.playback-diagnostics pre').innerText();

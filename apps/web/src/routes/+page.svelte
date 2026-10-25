@@ -5,11 +5,12 @@
   import { onMount, tick as afterRender } from 'svelte';
   import { createRoomClient, type RoomClientState } from '#lib/rooms/room-client.ts';
   import Icon from '#lib/ui/Icon.svelte';
+  import MusicWorkspace from '#lib/ui/MusicWorkspace.svelte';
   import RoomAudio from '#lib/rooms/RoomAudio.svelte';
   import RoomSocial from '#lib/social/RoomSocial.svelte';
   import RoomDirectory from '#lib/rooms/RoomDirectory.svelte';
   import RoomSharing from '#lib/rooms/RoomSharing.svelte';
-  import { publicRoomLink } from '#lib/rooms/room-links.ts';
+  import RoomQueue from '#lib/rooms/RoomQueue.svelte';
   import { browserStorage } from '../../../../lib/browser-storage.ts';
   import { time } from '../../../../lib/types.ts';
   import releases from '../../../../lib/releases.json';
@@ -28,23 +29,35 @@
   let roomName = $state(''),
     roomCode = $state(''),
     query = $state(''),
-    copied = $state(false);
-  let panel = $state<'discover' | 'library' | 'settings'>('discover');
+    invitationExpanded = $state(false);
+  let panel = $state<'queue' | 'discover' | 'library'>('queue');
   let directory = $state(false),
     publicRoom = $state(false),
     displayName = $state('');
   let importing = $state(false),
     invitationLink = $state(''),
     invitationError = $state('');
-  let seekValue = $state<number | null>(null);
   let tick = $state(0);
   let tv = $state(false);
-  let playerActive = $state(false);
   let welcomeScene = $state(false);
   async function findMusic() {
     panel = 'discover';
     await afterRender();
     document.getElementById('search')?.focus();
+  }
+  async function openMusic(value: 'player' | typeof panel) {
+    if (value !== 'player') panel = value;
+    await afterRender();
+    const destination = document.getElementById(
+      value === 'player' ? 'room-player' : 'room-workspace',
+    );
+    destination?.scrollIntoView({ block: 'start' });
+    if (value === 'discover') document.getElementById('search')?.focus({ preventScroll: true });
+    else if (value === 'player') destination?.focus({ preventScroll: true });
+    else
+      destination
+        ?.querySelector<HTMLElement>(`[data-panel="${value}"]`)
+        ?.focus({ preventScroll: true });
   }
   const room = $derived(view.room);
   const target = $derived.by(() => {
@@ -60,11 +73,11 @@
     client = createRoomClient();
     const unsubscribe = client.subscribe((value) => {
       const changedRoom = value.room && value.room.code !== view.room?.code;
+      if (changedRoom) invitationExpanded = false;
       if (view.room && !value.room) {
-        playerActive = false;
         invitationLink = '';
         invitationError = '';
-        copied = false;
+        invitationExpanded = false;
       }
       view = value;
       // Initial reads can fail after creation. Keep the room recoverable when
@@ -102,23 +115,18 @@
     if (await client?.join(roomCode)) rememberRoom();
   }
   async function create() {
-    if (await client?.create(roomName.trim() || 'The listening room', publicRoom)) rememberRoom();
+    if (await client?.create(roomName.trim() || 'The listening room', publicRoom)) {
+      panel = 'discover';
+      rememberRoom();
+    }
   }
   function rememberRoom() {
     if (!view.room) return;
     directory = false;
     const url = new URL(location.href);
+    url.searchParams.delete('view');
     url.searchParams.set('room', view.room.code);
     history.replaceState(history.state, '', url);
-  }
-  async function share() {
-    try {
-      if (!room) return;
-      await navigator.clipboard.writeText(publicRoomLink(location.origin, room.code));
-      copied = true;
-    } catch {
-      copied = false;
-    }
   }
   async function invite(type: 'cohost' | 'transfer') {
     invitationError = '';
@@ -149,11 +157,10 @@
     welcomeScene = true;
     tv = false;
     client?.leave();
-    panel = 'discover';
+    panel = 'queue';
     invitationLink = '';
     invitationError = '';
-    copied = false;
-    seekValue = null;
+    invitationExpanded = false;
     history.replaceState(history.state, '', '/');
   }
   function toggleTV() {
@@ -167,6 +174,19 @@
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     leave();
+  }
+  function goListening(event: MouseEvent) {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if (!room) return goHome(event);
+    event.preventDefault();
+    rememberRoom();
+  }
+  function toggleDirectory() {
+    directory = !directory;
+    const url = new URL(location.href);
+    if (directory) url.searchParams.set('view', 'rooms');
+    else url.searchParams.delete('view');
+    history.replaceState(history.state, '', url);
   }
 </script>
 
@@ -187,54 +207,36 @@
 
 <a class="skip-link" href="#main">Skip to music</a>
 <div class="app-shell" class:tv-mode={tv && Boolean(room)}>
-  <aside class="sidebar">
+  <header class="app-header">
     <a class="brand" href="/" aria-label="Afterparty home" onclick={goHome}
       ><img src="/afterparty-mark.svg" width="42" height="42" alt="" /><span
         >afterparty<span class="red">.</span></span
       ></a
     >
-    <p class="nav-label">YOUR SPACE</p>
     <nav aria-label="Main navigation">
-      <a class="nav-link active" href="/" aria-current="page" onclick={goHome}
-        ><Icon name="headphones" />Listening room</a
+      <a
+        class="nav-link"
+        class:active={!directory}
+        href={room ? `/?room=${room.code}` : '/'}
+        aria-current={directory ? undefined : 'page'}
+        onclick={goListening}><Icon name="headphones" />Music</a
       >
       <button
         class="nav-link"
         class:active={directory}
-        onclick={() => {
-          directory = !directory;
-        }}
+        onclick={toggleDirectory}
+        aria-current={directory ? 'page' : undefined}
         aria-pressed={directory}><Icon name="users" />Open rooms</button
       >
-      <a class="nav-link" href="/discord"><Icon name="music" />Discord & concerts</a>
-      <a class="nav-link" href="/admin" data-sveltekit-reload
-        ><Icon name="settings" />DJ & server tools</a
-      >
+      <a class="nav-link" href="/discord"><Icon name="music" />Concerts</a>
+      <a class="nav-link" href="/admin" data-sveltekit-reload><Icon name="settings" />DJ tools</a>
       <a class="nav-link" href={room ? `/games?room=${encodeURIComponent(room.code)}` : '/games'}
         ><Icon name="users" />Games</a
       >
     </nav>
-    <div class="sidebar-bottom">
-      <div class="brand-line"></div>
-      <p>Music brings us here.<br />You make it a party.</p>
-      <a href="/patch-notes" data-sveltekit-reload>What’s new <Icon name="arrow" size={16} /></a>
-    </div>
-  </aside>
+  </header>
 
   <div class="workspace">
-    <header class="topbar">
-      <span class="eyebrow">THE LISTENING ROOM</span>
-      <div class="top-status">
-        <span class="status-dot" class:online={view.connection === 'connected'}
-        ></span>{view.connection === 'connected'
-          ? 'Connected'
-          : view.connection === 'reconnecting'
-            ? 'Reconnecting…'
-            : view.connection === 'connecting'
-              ? 'Connecting…'
-              : 'Make yourself at home'}
-      </div>
-    </header>
     <main id="main">
       {#if directory}
         <RoomDirectory
@@ -252,8 +254,8 @@
           <div class="welcome-hero">
             <div class="welcome-copy">
               <p class="eyebrow red">GOOD MUSIC NEEDS GOOD COMPANY</p>
-              <h1>Your music.<br />Your people<span class="red">.</span></h1>
-              <p class="intro">One room. One shared queue. A soundtrack you make together.</p>
+              <h1>afterparty<span class="red">.</span></h1>
+              <p class="intro">Play music and video together. One room, one shared soundtrack.</p>
             </div>
             <div class="welcome-stage">
               {#if welcomeScene}{@render scenery('welcome')}{/if}
@@ -320,10 +322,6 @@
       {:else}
         <section class="room-heading">
           <div>
-            <p class="eyebrow">
-              <Icon name="users" size={15} />{room.isPublic ? 'PUBLIC ROOM' : 'PRIVATE ROOM'}
-              <span> / </span>{room.isHost ? 'YOU’RE THE HOST' : 'LISTENING TOGETHER'}
-            </p>
             <h1>{room.name}</h1>
           </div>
           <div class="room-actions">
@@ -332,30 +330,219 @@
             >
             <button class="button secondary" onclick={leave}>Leave room</button><button
               class="button secondary invite"
-              onclick={share}
-              ><Icon name="link" />{copied ? 'Link copied' : 'Invite friends'}<span
-                class="room-code">{room.code}</span
-              ></button
+              aria-expanded={invitationExpanded || tv}
+              aria-controls="room-invitation"
+              onclick={() => (invitationExpanded = !invitationExpanded)}
+              ><Icon name="link" />Invite friends<span class="room-code">{room.code}</span></button
             >
           </div>
         </section>
         <div class="room-share">
-          {#key room.code}<RoomSharing code={room.code} {tv} />{/key}
+          {#key room.code}<RoomSharing
+              code={room.code}
+              {tv}
+              bind:expanded={invitationExpanded}
+              showToggle={false}
+              id="room-invitation"
+            />{/key}
         </div>
+        {#snippet roomControls()}
+          <section class="room-settings" aria-labelledby="settings-title">
+            <h2 id="settings-title">Make it your room</h2>
+            <label for="display-name">Your display name</label>
+            <input
+              id="display-name"
+              maxlength="32"
+              bind:value={displayName}
+              oninput={() => browserStorage.set('afterparty-display-name', displayName)}
+              placeholder="Guest"
+            />
+            {#if room.isHost}
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  checked={room.radio !== false}
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onchange={(event) => {
+                    void client?.action('radio', { enabled: event.currentTarget.checked });
+                  }}
+                /> Keep the music going with radio</label
+              >
+              <p class="permission-note">
+                Radio skips declared AI, vlogs and song recreations. Matching music videos are
+                preferred when available.
+              </p>
+              <label class="checkbox-label"
+                ><input
+                  type="checkbox"
+                  checked={room.approvalRequired === true}
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onchange={(event) => {
+                    void client?.action('approval', {
+                      enabled: event.currentTarget.checked,
+                    });
+                  }}
+                /> Approve guest requests</label
+              >
+              {#if room.isOwner}<label class="checkbox-label"
+                  ><input
+                    type="checkbox"
+                    checked={room.isPublic === true}
+                    disabled={view.busy || view.connection !== 'connected'}
+                    onchange={(event) => {
+                      void client?.setVisibility(event.currentTarget.checked);
+                    }}
+                  /> List this room in Open rooms</label
+                >{/if}
+              <div class="room-actions">
+                <button
+                  class="button secondary"
+                  disabled={view.busy || !room.queue.length || view.connection !== 'connected'}
+                  onclick={() => {
+                    if (confirm('Clear the upcoming queue?')) void client?.action('clear');
+                  }}>Clear queue</button
+                >
+                <button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    void client?.action('undo');
+                  }}>Undo queue change</button
+                >
+              </div>
+              {#if room.requests?.length}<h3>Guest requests</h3>
+                <ul class="search-results">
+                  {#each room.requests as video (video.id)}<li>
+                      <div class="track-info">
+                        <strong>{video.title}</strong><span
+                          >{video.requestedBy ?? video.artist}</span
+                        >
+                      </div>
+                      <button
+                        class="button secondary"
+                        disabled={view.busy || view.connection !== 'connected'}
+                        onclick={() => {
+                          void client?.action('approve', { videoId: video.id });
+                        }}>Approve</button
+                      ><button
+                        class="button secondary"
+                        disabled={view.busy || view.connection !== 'connected'}
+                        onclick={() => {
+                          void client?.action('reject', { videoId: video.id });
+                        }}>Reject</button
+                      >
+                    </li>{/each}
+                </ul>{/if}
+            {:else}
+              <p class="permission-note">
+                The host manages the room. Vote for the next track in the queue or request a skip.
+              </p>
+              <button
+                class="button secondary"
+                disabled={view.busy || !room.current || view.connection !== 'connected'}
+                onclick={() => {
+                  void client?.action('skip-vote');
+                }}>Vote to skip ({room.skipVotes ?? 0})</button
+              >
+              {#if room.approvalRequired}<p class="permission-note">
+                  Your song requests need host approval.
+                </p>{/if}
+            {/if}
+            {#if room.isOwner}
+              <h3>Share hosting</h3>
+              <p class="permission-note">
+                One-use invitations grant room controls. An ownership transfer gives the recipient
+                full ownership when accepted.
+              </p>
+              <div class="room-actions">
+                <button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    void invite('cohost');
+                  }}>Invite a co-host</button
+                ><button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    if (confirm('Create a link that transfers room ownership when accepted?'))
+                      void invite('transfer');
+                  }}>Transfer ownership</button
+                ><button
+                  class="button secondary"
+                  disabled={view.busy || view.connection !== 'connected'}
+                  onclick={() => {
+                    if (confirm('Revoke all co-host access and pending invitations?')) {
+                      invitationLink = '';
+                      void client?.revokeHosts();
+                    }
+                  }}>Revoke shared access</button
+                >
+              </div>
+              {#if invitationLink}<label for="invitation-link">Private invitation link</label><input
+                  id="invitation-link"
+                  readonly
+                  value={invitationLink}
+                  onclick={(event) => event.currentTarget.select()}
+                />
+                <p role="status">
+                  {invitationError ||
+                    'Invitation copied. Share privately with the intended person.'}
+                </p>{/if}
+            {/if}
+          </section>
+        {/snippet}
         <div class="listening-grid">
-          <section class="now-playing" aria-labelledby="now-title">
-            <div class="section-heading">
-              <h2 id="now-title">Now playing</h2>
-              <span class="eyebrow">{target.playing ? 'ON AIR' : 'TAKE YOUR TIME'}</span>
+          <section class="now-playing" aria-labelledby="now-title" id="room-player" tabindex="-1">
+            <div class="player-bar section-heading">
+              <h2 id="now-title" class="sr-only">Now playing</h2>
+              <span
+                ><Icon name="music" size={15} />{room.isPublic ? 'Public room' : 'Private room'} · {room.isHost
+                  ? "You're the host"
+                  : 'Listening together'}</span
+              >
+              <div class="top-status">
+                <span class="status-dot" class:online={view.connection === 'connected'}
+                ></span>{view.connection === 'connected'
+                  ? 'Connected'
+                  : view.connection === 'reconnecting'
+                    ? 'Reconnecting…'
+                    : view.connection === 'connecting'
+                      ? 'Connecting…'
+                      : 'Make yourself at home'}
+              </div>
             </div>
             {#if room.current}
+              {#snippet transportFooter()}
+                {#if room.current}<div class="playback-footer">
+                    <div class="track-meta">
+                      <h2>{room.current.title}</h2>
+                      <p>{room.current.artist}</p>
+                    </div>
+                    <div class="transport">
+                      <button
+                        class="button secondary next-track"
+                        aria-label="Next track"
+                        disabled={!room.isHost || view.busy || view.connection !== 'connected'}
+                        onclick={() => {
+                          void client?.control('next');
+                        }}><Icon name="next" /><span>Next track</span></button
+                      >
+                    </div>
+                    {#if !room.isHost}<p class="permission-note">
+                        The host controls playback. Everyone can add to the queue.
+                      </p>{/if}
+                  </div>{/if}
+              {/snippet}
               {#key room.code}<RoomAudio
                   {room}
+                  settings={roomControls}
+                  settingsLabel="Room settings"
+                  footer={transportFooter}
                   position={target.position}
                   playing={target.playing}
                   canControl={room.isHost && view.connection === 'connected'}
                   controlBusy={view.busy}
-                  onActiveChange={(active) => (playerActive = active)}
                   onIntent={async (intent) => {
                     if (
                       !client ||
@@ -368,69 +555,6 @@
                     return client.control(intent.action, intent.position);
                   }}
                 />{/key}
-              <div class="track-meta">
-                <span class="eyebrow red"
-                  >{room.current.live ? 'LIVE' : 'THE CURRENT SOUNDTRACK'}</span
-                >
-                <h2>{room.current.title}</h2>
-                <p>{room.current.artist}</p>
-              </div>
-              <div class="transport">
-                {#if !playerActive}
-                  <button
-                    class="play-control"
-                    aria-label={room.playing ? 'Pause playback' : 'Resume playback'}
-                    disabled={!room.isHost || view.busy || view.connection !== 'connected'}
-                    onclick={() => {
-                      void client?.control(room.playing ? 'pause' : 'play');
-                    }}><Icon name={room.playing ? 'pause' : 'play'} size={24} /></button
-                  >
-                {/if}
-                <button
-                  class="button secondary next-track"
-                  aria-label="Next track"
-                  disabled={!room.isHost || view.busy || view.connection !== 'connected'}
-                  onclick={() => {
-                    void client?.control('next');
-                  }}><Icon name="next" /><span>Next track</span></button
-                >
-                {#if !playerActive}<div class="timeline">
-                    <label class="sr-only" for="seek">Playback position</label><input
-                      id="seek"
-                      type="range"
-                      min="0"
-                      max={Math.max(1, room.current.duration)}
-                      step="1"
-                      value={seekValue ?? Math.min(target.position, room.current.duration)}
-                      disabled={!room.isHost ||
-                        room.current.live ||
-                        view.busy ||
-                        view.connection !== 'connected'}
-                      oninput={(event) => {
-                        seekValue = Number(event.currentTarget.value);
-                      }}
-                      onchange={(event) => {
-                        void client
-                          ?.control('seek', Number(event.currentTarget.value))
-                          .finally(() => {
-                            seekValue = null;
-                          });
-                      }}
-                    />
-                    <div class="timecodes">
-                      <span>{time(target.position)}</span><span
-                        >{room.current.live ? 'LIVE' : time(room.current.duration)}</span
-                      >
-                    </div>
-                  </div>{:else}<p class="native-control-note">
-                    Use the video controls to {room.isHost
-                      ? 'play, pause or seek for everyone'
-                      : 'listen on this device'}.
-                  </p>{/if}
-              </div>
-              {#if !room.isHost}<p class="permission-note">
-                  The host controls playback. Everyone can add to the queue.
-                </p>{/if}
             {:else}
               <div class="empty-stage">
                 {@render scenery('room')}
@@ -438,329 +562,120 @@
                   <span>ap<span class="red">.</span></span>
                 </div>
                 <h2>Every great night starts<br />with one song.</h2>
-                <p>Find your first track below. We’ll take it from there.</p>
+                <p>Choose a song and make this room your own.</p>
+                <button class="button primary" onclick={() => void findMusic()}
+                  ><Icon name="search" />Choose a song</button
+                >
               </div>
+              <details class="room-settings-empty">
+                <summary>Room settings</summary>{@render roomControls()}
+              </details>
             {/if}
-          </section>
-          <section class="queue-panel" aria-labelledby="queue-title">
-            <div class="section-heading">
-              <h2 id="queue-title">Up next</h2>
-              <span class="count">{room.queue.length}</span>
-            </div>
-            {#if room.queue.length}<ol class="queue-list">
-                {#each room.queue as video, index (`${video.entryId ?? video.id}:${index}`)}<li>
-                    <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
-                    <div class="track-info">
-                      <strong>{video.title}</strong><span>{video.artist}</span>
-                    </div>
-                    <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span>
-                    <div class="queue-actions">
-                      {#if room.isHost}
-                        <button
-                          class="icon-button"
-                          aria-label={`Play ${video.title} now`}
-                          disabled={view.busy || view.connection !== 'connected'}
-                          onclick={() => {
-                            void client?.playVideo(video.id);
-                          }}><Icon name="play" size={16} /></button
-                        >
-                        <button
-                          class="icon-button"
-                          aria-label={`Move ${video.title} up`}
-                          disabled={index === 0 || view.busy || view.connection !== 'connected'}
-                          onclick={() => {
-                            void client?.move(video.id, index - 1);
-                          }}>↑</button
-                        >
-                        <button
-                          class="icon-button"
-                          aria-label={`Remove ${video.title}`}
-                          disabled={view.busy || view.connection !== 'connected'}
-                          onclick={() => {
-                            void client?.remove(video.id);
-                          }}>×</button
-                        >
-                      {:else}
-                        <button
-                          class="icon-button"
-                          aria-label={`Vote for ${video.title}`}
-                          disabled={view.busy || view.connection !== 'connected'}
-                          onclick={() => {
-                            void client?.action('vote', { videoId: video.id });
-                          }}>↑ {room.voteCounts?.[video.id] ?? 0}</button
-                        >
-                      {/if}
-                    </div>
-                  </li>{/each}
-              </ol>
-            {:else}<div class="empty-queue">
-                <Icon name="music" size={30} />
-                <h3>Room for your next favourite</h3>
-                <p>Add a song below.<br />The best queues are a group effort.</p>
-                <button class="button secondary" onclick={() => void findMusic()}
-                  >Find a song</button
-                >
-              </div>{/if}
-            <div class="queue-footer">
-              <span class="status-dot online"></span>One queue. Everyone in sync.
+            <div class="player-extras">
+              {#key room.code}<RoomSocial {room} />{/key}
             </div>
           </section>
-        </div>
-        <div class="room-tools" class:workspace-expanded={panel !== 'discover'} id="room-workspace">
-          <nav class="room-tabs" aria-label="Room tools">
-            <button
-              class="button"
-              class:primary={panel === 'discover'}
-              class:secondary={panel !== 'discover'}
-              onclick={() => {
-                void findMusic();
-              }}
-              aria-pressed={panel === 'discover'}>Discover</button
-            >
-            <button
-              class="button"
-              class:primary={panel === 'library'}
-              class:secondary={panel !== 'library'}
-              onclick={() => {
-                panel = 'library';
-              }}
-              aria-pressed={panel === 'library'}>Library & playlists</button
-            >
-            <button
-              class="button"
-              class:primary={panel === 'settings'}
-              class:secondary={panel !== 'settings'}
-              onclick={() => {
-                panel = 'settings';
-              }}
-              aria-pressed={panel === 'settings'}>Room settings</button
-            >
-          </nav>
-          <section class="discovery" aria-labelledby="discover-title">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow red">PASS THE AUX</p>
-                <h2 id="discover-title">What’s the next track?</h2>
-              </div>
-            </div>
-            <form
-              class="search-form"
-              role="search"
-              onsubmit={(event) => {
-                event.preventDefault();
-                void client?.search(query);
-              }}
-            >
-              <label class="sr-only" for="search">Search songs or artists</label><Icon
-                name="search"
-              /><input
-                id="search"
-                bind:value={query}
-                oninput={() => client?.cancelSearch()}
-                placeholder="A song, an artist, a whole mood…"
-                required
-                maxlength="120"
-                autocomplete="off"
-              /><button class="button primary" disabled={view.searching}
-                >{view.searching ? 'Searching…' : 'Find music'}</button
+          <div class="room-side" id="room-workspace">
+            {#key room.code}<MusicWorkspace
+                bind:active={panel}
+                searchInputId="search"
+                queueCount={room.queue.length}
               >
-            </form>
-            <div role="status" class="search-summary">
-              {#if view.searching}Looking for your soundtrack…{:else if view.query}{view.results
-                  .length
-                  ? `${view.results.length} results for “${view.query}”`
-                  : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
-                YouTube and add a track to the shared queue.{/if}
-            </div>
-            {#if view.results.length}<ul class="search-results">
-                {#each view.results as video, index (`${video.id}:${index}`)}<li>
-                    <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
-                    <div class="track-info">
-                      <strong>{video.title}</strong><span>{video.artist}</span>
+                {#snippet search()}
+                  <section class="discovery" aria-labelledby="discover-title">
+                    <div class="section-heading">
+                      <div>
+                        <p class="eyebrow red">PASS THE AUX</p>
+                        <h2 id="discover-title">What’s the next track?</h2>
+                      </div>
                     </div>
-                    <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span
-                    ><button
-                      class="icon-button add-track"
-                      aria-label={`Add ${video.title} to queue`}
-                      disabled={view.busy ||
-                        view.connection !== 'connected' ||
-                        video.embeddable === false}
-                      onclick={() => {
-                        void client?.add(video.id);
-                      }}><Icon name="add" /></button
-                    >
-                  </li>{/each}
-              </ul>{/if}
-          </section>
-
-          {#if panel === 'library'}
-            {#key room.code}
-              {#await import('#lib/library/MusicLibrary.svelte')}
-                <p class="search-summary" role="status">Opening your library…</p>
-              {:then { default: MusicLibrary }}
-                <MusicLibrary
-                  tracks={[...(room.current ? [room.current] : []), ...room.queue]}
-                  history={room.history ?? []}
-                  capacity={roomQueueCapacity(room.queue.length, room.requests?.length)}
-                  pendingIds={room.requests?.map((video) => video.id) ?? []}
-                  busy={view.busy || importing || view.connection !== 'connected'}
-                  onAdd={addTracks}
-                />
-              {:catch}
-                <div class="error-message" role="alert">
-                  <p>The library could not load. Check your connection and reload the page.</p>
-                  <button class="button secondary" onclick={() => location.reload()}
-                    >Reload page</button
-                  >
-                </div>
-              {/await}
-            {/key}
-          {:else if panel === 'settings'}
-            <section class="room-settings" aria-labelledby="settings-title">
-              <h2 id="settings-title">Make it your room</h2>
-              <label for="display-name">Your display name</label>
-              <input
-                id="display-name"
-                maxlength="32"
-                bind:value={displayName}
-                oninput={() => browserStorage.set('afterparty-display-name', displayName)}
-                placeholder="Guest"
-              />
-              {#if room.isHost}
-                <label class="checkbox-label"
-                  ><input
-                    type="checkbox"
-                    checked={room.radio !== false}
-                    disabled={view.busy || view.connection !== 'connected'}
-                    onchange={(event) => {
-                      void client?.action('radio', { enabled: event.currentTarget.checked });
-                    }}
-                  /> Keep the music going with radio</label
-                >
-                <p class="permission-note">
-                  Radio skips declared AI, vlogs and song recreations. Matching music videos are
-                  preferred when available.
-                </p>
-                <label class="checkbox-label"
-                  ><input
-                    type="checkbox"
-                    checked={room.approvalRequired === true}
-                    disabled={view.busy || view.connection !== 'connected'}
-                    onchange={(event) => {
-                      void client?.action('approval', { enabled: event.currentTarget.checked });
-                    }}
-                  /> Approve guest requests</label
-                >
-                {#if room.isOwner}<label class="checkbox-label"
-                    ><input
-                      type="checkbox"
-                      checked={room.isPublic === true}
-                      disabled={view.busy || view.connection !== 'connected'}
-                      onchange={(event) => {
-                        void client?.setVisibility(event.currentTarget.checked);
+                    <form
+                      class="search-form"
+                      role="search"
+                      onsubmit={(event) => {
+                        event.preventDefault();
+                        void client?.search(query);
                       }}
-                    /> List this room in Open rooms</label
-                  >{/if}
-                <div class="room-actions">
-                  <button
-                    class="button secondary"
-                    disabled={view.busy || !room.queue.length || view.connection !== 'connected'}
-                    onclick={() => {
-                      if (confirm('Clear the upcoming queue?')) void client?.action('clear');
-                    }}>Clear queue</button
-                  >
-                  <button
-                    class="button secondary"
+                    >
+                      <label class="sr-only" for="search">Search songs or artists</label><Icon
+                        name="search"
+                      /><input
+                        id="search"
+                        bind:value={query}
+                        oninput={() => client?.cancelSearch()}
+                        placeholder="A song, an artist, a whole mood…"
+                        required
+                        maxlength="120"
+                        autocomplete="off"
+                      /><button class="button primary" disabled={view.searching}
+                        >{view.searching ? 'Searching…' : 'Find music'}</button
+                      >
+                    </form>
+                    <div role="status" class="search-summary">
+                      {#if view.searching}Looking for your soundtrack…{:else if view.query}{view
+                          .results.length
+                          ? `${view.results.length} results for “${view.query}”`
+                          : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
+                        YouTube and add a track to the shared queue.{/if}
+                    </div>
+                    {#if view.results.length}<ul class="search-results">
+                        {#each view.results as video, index (`${video.id}:${index}`)}<li>
+                            <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
+                            <div class="track-info">
+                              <strong>{video.title}</strong><span>{video.artist}</span>
+                            </div>
+                            <span class="duration"
+                              >{video.live ? 'LIVE' : time(video.duration)}</span
+                            ><button
+                              class="icon-button add-track"
+                              aria-label={`Add ${video.title} to queue`}
+                              disabled={view.busy ||
+                                view.connection !== 'connected' ||
+                                video.embeddable === false}
+                              onclick={() => {
+                                void client?.add(video.id);
+                              }}><Icon name="add" /></button
+                            >
+                          </li>{/each}
+                      </ul>{/if}
+                  </section>
+                {/snippet}
+                {#snippet upNext()}
+                  <RoomQueue
+                    {room}
+                    {client}
                     disabled={view.busy || view.connection !== 'connected'}
-                    onclick={() => {
-                      void client?.action('undo');
-                    }}>Undo queue change</button
-                  >
-                </div>
-                {#if room.requests?.length}<h3>Guest requests</h3>
-                  <ul class="search-results">
-                    {#each room.requests as video (video.id)}<li>
-                        <div class="track-info">
-                          <strong>{video.title}</strong><span
-                            >{video.requestedBy ?? video.artist}</span
-                          >
-                        </div>
-                        <button
-                          class="button secondary"
-                          disabled={view.busy || view.connection !== 'connected'}
-                          onclick={() => {
-                            void client?.action('approve', { videoId: video.id });
-                          }}>Approve</button
-                        ><button
-                          class="button secondary"
-                          disabled={view.busy || view.connection !== 'connected'}
-                          onclick={() => {
-                            void client?.action('reject', { videoId: video.id });
-                          }}>Reject</button
-                        >
-                      </li>{/each}
-                  </ul>{/if}
-              {:else}
-                <p class="permission-note">
-                  The host manages the room. Vote for the next track in the queue or request a skip.
-                </p>
-                <button
-                  class="button secondary"
-                  disabled={view.busy || !room.current || view.connection !== 'connected'}
-                  onclick={() => {
-                    void client?.action('skip-vote');
-                  }}>Vote to skip ({room.skipVotes ?? 0})</button
-                >
-                {#if room.approvalRequired}<p class="permission-note">
-                    Your song requests need host approval.
-                  </p>{/if}
-              {/if}
-              {#if room.isOwner}
-                <h3>Share hosting</h3>
-                <p class="permission-note">
-                  One-use invitations grant room controls. An ownership transfer gives the recipient
-                  full ownership when accepted.
-                </p>
-                <div class="room-actions">
-                  <button
-                    class="button secondary"
-                    disabled={view.busy || view.connection !== 'connected'}
-                    onclick={() => {
-                      void invite('cohost');
-                    }}>Invite a co-host</button
-                  ><button
-                    class="button secondary"
-                    disabled={view.busy || view.connection !== 'connected'}
-                    onclick={() => {
-                      if (confirm('Create a link that transfers room ownership when accepted?'))
-                        void invite('transfer');
-                    }}>Transfer ownership</button
-                  ><button
-                    class="button secondary"
-                    disabled={view.busy || view.connection !== 'connected'}
-                    onclick={() => {
-                      if (confirm('Revoke all co-host access and pending invitations?')) {
-                        invitationLink = '';
-                        void client?.revokeHosts();
-                      }
-                    }}>Revoke shared access</button
-                  >
-                </div>
-                {#if invitationLink}<label for="invitation-link">Private invitation link</label
-                  ><input
-                    id="invitation-link"
-                    readonly
-                    value={invitationLink}
-                    onclick={(event) => event.currentTarget.select()}
                   />
-                  <p role="status">
-                    {invitationError ||
-                      'Invitation copied. Share privately with the intended person.'}
-                  </p>{/if}
-              {/if}
-            </section>
-          {/if}
-          {#key room.code}<RoomSocial {room} />{/key}
+                {/snippet}
+                {#snippet library()}
+                  {#key room.code}
+                    {#await import('#lib/library/MusicLibrary.svelte')}
+                      <p class="search-summary" role="status">Opening your library…</p>
+                    {:then { default: MusicLibrary }}
+                      <MusicLibrary
+                        tracks={[...(room.current ? [room.current] : []), ...room.queue]}
+                        history={room.history ?? []}
+                        capacity={roomQueueCapacity(room.queue.length, room.requests?.length)}
+                        pendingIds={room.requests?.map((video) => video.id) ?? []}
+                        busy={view.busy || importing || view.connection !== 'connected'}
+                        onAdd={addTracks}
+                      />
+                    {:catch}
+                      <div class="error-message" role="alert">
+                        <p>
+                          The library could not load. Check your connection and reload the page.
+                        </p>
+                        <button class="button secondary" onclick={() => location.reload()}
+                          >Reload page</button
+                        >
+                      </div>
+                    {/await}
+                  {/key}
+                {/snippet}
+              </MusicWorkspace>{/key}
+          </div>
+        </div>
+        <div class="room-tools">
           <div class="room-bottom">
             <span>KEEP THE GOOD MUSIC GOING.</span><a
               href={`/games?room=${encodeURIComponent(room.code)}`}
@@ -779,6 +694,29 @@
             >{/if}
         </div>{/if}
     </main>
+    {#if room && !directory && !tv}
+      <nav class="mobile-music-nav" aria-label="Quick music navigation">
+        <button aria-label="Go to player" onclick={() => void openMusic('player')}
+          ><Icon name="play" size={18} />Player</button
+        >
+        <button
+          aria-label="Open search"
+          class:chosen={panel === 'discover'}
+          onclick={() => void openMusic('discover')}><Icon name="search" size={18} />Search</button
+        >
+        <button
+          aria-label="Open queue"
+          class:chosen={panel === 'queue'}
+          onclick={() => void openMusic('queue')}><Icon name="music" size={18} />Queue</button
+        >
+        <button
+          aria-label="Open library"
+          class:chosen={panel === 'library'}
+          onclick={() => void openMusic('library')}
+          ><Icon name="headphones" size={18} />Library</button
+        >
+      </nav>
+    {/if}
     <footer class="footer">
       <MotionPreference />
       <span>afterparty<span class="red">.</span></span><a
@@ -814,61 +752,270 @@
       justify-self: center;
     }
   }
-  .native-control-note {
-    color: var(--muted);
-    font-size: var(--tv-body, 14px);
-    line-height: 1.5;
-  }
-  .empty-stage {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-  }
-  .empty-stage :global(.concert-scenery) {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0.35;
-    z-index: -1;
-  }
   .next-track {
     flex-shrink: 0;
   }
-  .empty-queue .button {
-    margin-top: 20px;
+  .app-shell {
+    display: block;
+    background: #09090b;
   }
-  .discovery .search-results {
-    max-height: min(52dvh, 560px);
+  .app-header {
+    max-width: 2400px;
+    margin: auto;
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 18px 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .app-header nav {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .app-header .nav-link {
+    width: auto;
+    flex: 0 0 auto;
+    min-height: 44px;
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 13px;
+    gap: 8px;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+  }
+  .app-header .nav-link.active {
+    border-bottom-color: var(--red);
+    color: var(--text);
+  }
+  .workspace {
+    max-width: 2400px;
+    margin-inline: auto;
+  }
+  .workspace > main {
+    padding: clamp(20px, 2.8vw, 48px);
+  }
+  .room-heading {
+    margin-bottom: 28px;
+  }
+  .room-heading h1 {
+    margin: 0;
+    font-size: clamp(30px, 3.6vw, 52px);
+  }
+  .listening-grid {
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 28vw, 520px);
+    gap: 24px;
+  }
+  .now-playing {
+    min-width: 0;
+    overflow: clip;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #111113;
+  }
+  .player-bar {
+    min-height: 44px;
+    margin: 0;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .player-bar > span {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .now-playing :global(.audio-stage:not(.fullscreen)) {
+    border: 0;
+    border-radius: 0;
+  }
+  .now-playing :global(.player-status) {
+    margin: 0;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--line);
+    background: #0e0e11;
+  }
+  .now-playing :global(.local-sync) {
+    margin: 0;
+    padding: 18px 20px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+  }
+  .now-playing :global(.audio-message) {
+    margin: 16px;
+  }
+  .playback-footer {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 20px;
+    flex-wrap: wrap;
+  }
+  .playback-footer .track-meta {
+    padding: 0;
+    flex: 1;
+    min-width: 120px;
+  }
+  .playback-footer .track-meta h2 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: -0.4px;
+  }
+  .playback-footer .track-meta p {
+    margin-top: 4px;
+    font-size: 13px;
+  }
+  .playback-footer .permission-note {
+    width: 100%;
+    margin: 0;
+  }
+  .transport {
+    flex-wrap: wrap;
+  }
+  .next-track {
+    padding: 10px;
+    min-width: 44px;
+  }
+  .next-track span {
+    display: none;
+  }
+  .room-settings {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 22px 0 0;
+  }
+  .room-settings h2 {
+    font-size: 18px;
+  }
+  .room-settings-empty {
+    padding: 18px 20px;
+    border-top: 1px solid var(--line);
+  }
+  .room-settings-empty > summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 650;
+  }
+  .player-extras :global(.room-social) {
+    margin: 0;
+    padding: 18px 20px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+  }
+  .player-extras :global(.social-heading h2) {
+    font-size: 16px;
+  }
+  .player-extras :global(.social-heading .eyebrow) {
+    display: none;
+  }
+  .room-side {
+    min-width: 0;
+    max-height: calc(100dvh - 48px);
     overflow: auto;
     scrollbar-width: thin;
     scrollbar-gutter: stable;
+    position: sticky;
+    top: 24px;
   }
-  @media (min-width: 1200px) {
-    .workspace-expanded {
+  .now-playing:has(:global(.fullscreen-fallback)) {
+    z-index: 1000;
+  }
+  .tv-mode .room-side,
+  .tv-mode .player-extras,
+  .tv-mode .room-settings-empty {
+    display: none;
+  }
+  .tv-mode .workspace {
+    max-width: none;
+  }
+  .tv-mode .now-playing {
+    position: static;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .tv-mode .playback-footer {
+    padding: 8px 0;
+  }
+  .mobile-music-nav {
+    display: none;
+  }
+  #room-player,
+  #room-workspace {
+    scroll-margin-top: 16px;
+  }
+  @media (max-width: 900px) {
+    .workspace:has(.mobile-music-nav) {
+      padding-bottom: calc(74px + env(safe-area-inset-bottom));
+    }
+    .mobile-music-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
       display: grid;
-      grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
-      align-items: start;
-      gap: 24px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid var(--line);
+      background: #111113;
+      padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
     }
-    .workspace-expanded .room-tabs,
-    .workspace-expanded :global(.room-social),
-    .workspace-expanded .room-bottom {
-      grid-column: 1 / -1;
+    .mobile-music-nav button {
+      min-height: 56px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      border-radius: 8px;
     }
-    .workspace-expanded .room-tabs {
-      margin-bottom: 0;
+    .mobile-music-nav button.chosen {
+      color: var(--text);
+      background: #222227;
+      box-shadow: inset 0 2px var(--red);
     }
-    .workspace-expanded .discovery {
-      position: sticky;
-      top: 24px;
+    .app-header {
+      display: block;
+      padding: 16px 20px;
+    }
+    .app-header nav {
+      margin-top: 12px;
+      justify-content: space-between;
+    }
+    .app-header .nav-link {
+      font-size: 12px;
+      padding: 10px 5px;
+    }
+    .app-header .nav-link :global(svg) {
+      display: none;
+    }
+    .listening-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .room-side {
+      position: static;
+      max-height: none;
+      overflow: visible;
     }
   }
   .tv-mode {
     grid-template-columns: 1fr;
   }
-  .tv-mode .sidebar,
-  .tv-mode .topbar,
+  .tv-mode .app-header,
   .tv-mode .footer {
     display: none;
   }
@@ -897,9 +1044,7 @@
   .tv-mode :global(.playback-diagnostics) {
     display: none;
   }
-  .tv-mode .queue-panel,
   .tv-mode .section-heading,
-  .tv-mode .track-meta > .eyebrow,
   .tv-mode .track-meta p {
     display: none;
   }

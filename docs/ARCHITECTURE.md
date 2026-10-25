@@ -42,6 +42,9 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Shared website API handlers | `lib/api/` | `route.ts` adapters into `lib/` |
 | Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
 | Website visitor counts, heartbeat and directory SQL | `lib/room-visitors.ts` | `server.ts` owns access; `db/schema.ts` and `drizzle/` own the index; `scripts/measure-room-visitors.ts` measures isolated read/write/space cost |
+| Public room discovery UI | `apps/web/src/lib/rooms/RoomDirectory.svelte` | Local name/code filtering and counts, single-flight visible-page refresh, retained last-good results on failure and abort on unmount; `apps/web/tests/directory.browser.ts` covers recovery and navigation |
+| Shared persistent music workspace | `apps/web/src/lib/ui/MusicWorkspace.svelte` | Room and public concert routes supply queue, search and library snippets; owns tab visibility, inactive-panel isolation, focus and first-open library mounting |
+| Browser-room queue UI | `apps/web/src/lib/rooms/RoomQueue.svelte` | Host action disclosures, guest votes and Escape/action focus recovery; scoped commands and queue revisions remain in `room-client.ts` |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Native YouTube user intent | `apps/web/src/lib/rooms/player-intent.ts` | Current iframe focus/activation, programmatic echo suppression and fresh-timeline confirmation; `RoomAudio.svelte` owns player lifecycle and permission callbacks |
 | Shared room position and future start | `services/core/src/room-state.ts` | `roomPlaybackPosition` and `changeRoom`, reused by Core and Worker |
@@ -67,18 +70,18 @@ The v3 feature folders keep each component beside its client and behavior helper
 
 | Folder in `apps/web/src/lib/` | Contents |
 | --- | --- |
-| `rooms/` | Room discovery, lifecycle, queue, public QR/TV sharing, synchronized player, local fullscreen and diagnostics |
+| `rooms/` | Filtered room discovery and refresh recovery, lifecycle, queue disclosures, public QR/TV sharing, synchronized player, local fullscreen and diagnostics |
 | `concert/` | Public Discord concert client, scoped search/additions, protected seek, session history and shared-clock audio adapter |
 | `games/` | Guess the Song client, presets, ranking and game audio |
 | `library/` | Favorites/evenings, playlist import and festival catalog |
 | `social/` | Reactions, moments and host bingo |
 | `admin/` | Server-scoped administration client, DJ desk and pure cue/transition rules |
 | `server/` | Native API dispatch and host-transition guard |
-| `ui/` | Root-rendered global theme, shared icons, public-page frame, saved motion preference, decorative concert scenery and copyright form |
+| `ui/` | Root-rendered global theme, persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery and copyright form |
 
 Shared surfaces, focus styles and fluid TV sizing live in `apps/web/src/lib/ui/AppTheme.svelte`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 
-Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Decorative concert scenery loads only for the welcome and empty-room views; active rooms do not download its SVG component. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
+Routes compose these features and import individual modules. `MusicWorkspace.svelte` keeps queue and search mounted when switching tabs, mounts the library on its first visit and retains it afterward. Inactive panels are hidden and inert; selection restores focus without recreating the player or issuing playback commands. Routes retain room/session and command authority. The optional library stays behind its dynamic import. Decorative concert scenery loads only for the welcome and empty-room views; active rooms do not download its SVG component. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
 
 The room client owns sequential library additions, capacity preflight and session
 retirement. Library tools exclude current, queued and pending tracks before an

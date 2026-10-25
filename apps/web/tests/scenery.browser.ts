@@ -58,7 +58,7 @@ for (const [width, height] of [
         await page.goto(`${origin}${path}`);
         await page
           .getByRole('heading', {
-            name: path === '/' ? 'Your music. Your people.' : 'Synthetic empty stage',
+            name: path === '/' ? 'afterparty.' : 'Synthetic empty stage',
             exact: true,
           })
           .waitFor();

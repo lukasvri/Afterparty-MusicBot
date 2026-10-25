@@ -227,6 +227,43 @@ for (const width of [1440, 390])
       }
     },
   );
+test('changing music tools keeps the existing playlist preview instead of cancelling or restarting it', async () => {
+  const f = await fixture(390);
+  try {
+    await f.page
+      .getByLabel('Playlist link', { exact: true })
+      .fill('https://www.youtube.com/playlist?list=PL1234567890123456789');
+    await f.page.getByRole('button', { name: 'Load playlist', exact: true }).click();
+    await f.page.getByText('Loading playlist…', { exact: true }).waitFor();
+    await f.page.getByRole('button', { name: 'Search', exact: true }).click();
+    await f.page.getByText('Room settings', { exact: true }).click();
+    await f.page.getByLabel('Your display name', { exact: true }).fill('Music host');
+    f.complete();
+    await f.page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    const preview = f.page.getByRole('checkbox', {
+      name: 'Playlist preview track Synthetic artist',
+      exact: true,
+    });
+    await preview.check();
+    await f.page.getByRole('button', { name: 'Search', exact: true }).click();
+    await f.page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    assert.equal(
+      await preview.isChecked(),
+      true,
+      'selection survives closing and reopening the tools',
+    );
+    assert.equal(f.jobs.filter((job) => job.action === 'start').length, 1);
+    assert.equal(f.jobs.filter((job) => job.action === 'cancel').length, 0);
+    assert.equal(f.writes.length, 0);
+    await f.page.getByRole('button', { name: 'Add 1 selected to queue', exact: true }).click();
+    await f.page.waitForFunction(() => document.querySelector('.count')?.textContent === '2');
+    assert.equal(f.writes[0].videoId, imported.id);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
 test(
   'leaving a room cancels its active playlist job and stops queue additions',
   { timeout: 20000 },
@@ -363,7 +400,7 @@ test('a failed optional library download leaves the room usable and never change
     assert.equal(await f.page.getByRole('button', { name: 'Reload page', exact: true }).count(), 1);
     assert.deepEqual(f.writes, []);
     assert.deepEqual(f.jobs, []);
-    await f.page.getByRole('button', { name: 'Discover', exact: true }).click();
+    await f.page.getByRole('button', { name: 'Search', exact: true }).click();
     await f.page.getByRole('button', { name: 'Find music', exact: true }).waitFor();
     assert.equal(
       await f.page.getByRole('heading', { name: 'Library evening', exact: true }).count(),

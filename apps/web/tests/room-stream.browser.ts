@@ -392,8 +392,8 @@ test(
       );
       assert.equal(await host.page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
       assert.equal(await guest.page.getByRole('button', { name: 'Next track' }).isDisabled(), true);
-      await host.page.getByRole('button', { name: 'Room settings', exact: true }).click();
-      await guest.page.getByRole('button', { name: 'Room settings', exact: true }).click();
+      await host.page.getByText('Room settings', { exact: true }).click();
+      await guest.page.getByText('Room settings', { exact: true }).click();
       assert.equal(
         await host.page.getByRole('button', { name: 'Invite a co-host', exact: true }).isVisible(),
         true,

@@ -2,15 +2,54 @@
   import { onMount, onDestroy } from 'svelte';
   import { publicRoomLink } from './room-links.ts';
   import { concertLink } from '../../../../../services/core/src/concert-links.ts';
-  let { code, tv = false, guildId }: { code: string; tv?: boolean; guildId?: string } = $props();
-  let expanded = $state(false),
-    origin = $state(''),
+  let {
+    code,
+    tv = false,
+    guildId,
+    expanded = $bindable(false),
+    showToggle = true,
+    id,
+  }: {
+    code: string;
+    tv?: boolean;
+    guildId?: string;
+    expanded?: boolean;
+    showToggle?: boolean;
+    id?: string;
+  } = $props();
+  let copied = $state(false),
+    copyFailed = $state(false),
+    copying = $state(false);
+  let linkInput = $state<HTMLInputElement>();
+  let origin = $state(''),
     qr = $state(''),
     failed = $state(false);
   let generation = 0;
   const link = $derived(
     origin ? (guildId ? concertLink(origin, guildId) : publicRoomLink(origin, code)) : '',
   );
+  async function copy() {
+    if (!link || copying) return;
+    const shared = link,
+      current = generation;
+    copying = true;
+    try {
+      await navigator.clipboard.writeText(shared);
+      if (current === generation) {
+        copied = true;
+        copyFailed = false;
+      }
+    } catch {
+      if (current === generation) {
+        copied = false;
+        copyFailed = true;
+        linkInput?.focus();
+        linkInput?.select();
+      }
+    } finally {
+      copying = false;
+    }
+  }
   onMount(() => {
     origin = location.origin;
   });
@@ -39,8 +78,8 @@
   });
 </script>
 
-<section class="room-sharing" aria-label="Room invitation">
-  {#if !tv}<button
+<section class="room-sharing" aria-label="Room invitation" {id}>
+  {#if !tv && showToggle}<button
       class="button secondary"
       aria-expanded={expanded}
       onclick={() => (expanded = !expanded)}
@@ -57,18 +96,34 @@
       <strong>{code}</strong>
       <p>Scan with your phone to join, search and add your songs.</p>
       <input
+        bind:this={linkInput}
         aria-label="Public room invitation link"
         readonly
         value={link}
         onclick={(event) => event.currentTarget.select()}
       />
+      {#if !tv}
+        <button
+          class="button secondary copy-link"
+          disabled={!link || copying}
+          onclick={() => void copy()}>{copied ? 'Link copied' : 'Copy room link'}</button
+        >
+        {#if copied || copyFailed}<p role="status">
+            {copyFailed ? 'Copy the selected link above.' : 'Room link copied.'}
+          </p>{/if}
+      {/if}
     </div>
   {/if}
 </section>
 
 <style>
-  .room-sharing {
+  .room-sharing:has(.invitation),
+  .room-sharing:has(> button) {
     margin-bottom: 20px;
+  }
+  .copy-link {
+    margin-top: 12px;
+    width: 100%;
   }
   .invitation {
     max-width: 320px;

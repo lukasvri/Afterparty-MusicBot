@@ -34,11 +34,19 @@ owners. Classic is retired; there is no second frontend.
 - `lib/browser-api.ts`, `lib/playback-sync.ts` and `lib/youtube-player.ts` retain
   shared transport, clock rules and official player bootstrap.
 
-Search remains available while library, import or room settings are open. Wide
-screens place search beside those tools; narrow screens use one column with a
-bounded result list. Searching does not unmount a playlist preview or discard
-unfinished fields. Optional games and social extras follow the music workspace.
-The library groups collection, import and festival sections under local jump links.
+The familiar horizontal navigation and one player card are composed in native
+Svelte. `ui/MusicWorkspace.svelte` keeps Queue, Search and Library in one tabbed
+side panel, stacked below the player on narrow screens. Hidden panels are inert,
+while searches, unfinished library fields and metadata jobs retain their state.
+The library mounts only after its first explicit visit. Room and device settings
+share the player disclosure; optional social extras stay within the player card.
+A mobile dock returns directly to player, search, queue and library. One room
+invitation panel groups QR and public-link copying, with selection after clipboard
+failure. The library groups collection, import and festival sections under local jump links.
+`rooms/RoomQueue.svelte` owns compact native track disclosures and keyboard focus;
+existing clients retain command authority and revision checks. Room discovery
+filters the loaded list locally, preserves good cards after a failed refresh and
+aborts pending reads when its view is retired.
 
 The evening library is device-local, with validated JSON import/export. It is not
 an account-synchronized cloud library. Room playback history is shared and bounded.
@@ -49,9 +57,11 @@ private recovery-link download; reloading still requires that recovery link.
 
 The official YouTube iframe owns visible playback, volume, captions, quality and
 fullscreen controls after explicit audio activation. The app retains one queue-next
-action. Before activation or after a source error, the app's transport remains
-available. Device calibration, resync, reload and diagnostics live under Playback
-settings instead of duplicating the primary player controls.
+action. The app does not add its own play/pause, seek, volume or fullscreen controls,
+including before activation or after a source error. Reload and explicit audio
+activation recover the official player; the server DJ desk remains the separate
+advanced administration surface. Device calibration, resync, reload and diagnostics
+live under Room settings (Playback settings for public concerts).
 
 `rooms/player-intent.ts` observes state changes and bounded position discontinuities.
 YouTube supplies no explicit user-intent flag or seek event. Shared commands require

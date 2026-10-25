@@ -82,19 +82,8 @@
       color: var(--red);
     }
     .app-shell {
-      display: grid;
-      grid-template-columns: clamp(208px, 15vw, 264px) minmax(0, 1fr);
+      display: block;
       min-height: 100dvh;
-    }
-    .sidebar {
-      padding: 36px 20px;
-      border-right: 1px solid var(--line);
-      display: flex;
-      flex-direction: column;
-      position: sticky;
-      top: 0;
-      height: 100dvh;
-      background: #101115;
     }
     .brand {
       display: flex;
@@ -107,13 +96,6 @@
     .brand img {
       width: 36px;
       height: 36px;
-    }
-    .nav-label {
-      font-size: 11px;
-      font-weight: 650;
-      letter-spacing: 1.7px;
-      color: var(--muted);
-      margin: 48px 14px 18px;
     }
     .nav-link {
       display: flex;
@@ -130,13 +112,6 @@
         color 160ms var(--ease),
         background 160ms var(--ease);
     }
-    .sidebar .nav-link.active {
-      background: #2b1c24;
-      color: #fff;
-      box-shadow: inset 3px 0 0 var(--red);
-      border-left: 0;
-      border-radius: 12px;
-    }
     .nav-link:hover {
       background: var(--surface-raised);
       color: #fff;
@@ -144,49 +119,14 @@
     .nav-link svg:last-child:not(:first-child) {
       margin-left: auto;
     }
-    .sidebar-bottom {
-      margin-top: auto;
-      padding: 44px 12px 0;
-    }
-    .brand-line {
-      width: 28px;
-      height: 3px;
-      background: var(--red);
-      margin-bottom: 21px;
-    }
-    .sidebar-bottom p {
-      font-size: 14px;
-      line-height: 1.8;
-      color: #a1a0a8;
-    }
-    .sidebar-bottom a {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      font-size: 14px;
-      margin-top: 24px;
-    }
     .workspace {
       min-width: 0;
-    }
-    .topbar {
-      min-height: 84px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px var(--page-space);
-      background: #101115;
     }
     .eyebrow {
       font-size: 11px;
       letter-spacing: 1.6px;
       font-weight: 700;
       line-height: 1.6;
-    }
-    .topbar > .eyebrow {
-      color: #a5a4ab;
     }
     .top-status {
       display: flex;
@@ -462,17 +402,6 @@
       align-items: center;
       gap: 13px;
     }
-    .play-control {
-      width: 48px;
-      height: 48px;
-      border: 0;
-      background: var(--red);
-      color: #0a0a0b;
-      display: grid;
-      place-content: center;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
     .icon-button {
       width: 44px;
       height: 44px;
@@ -489,21 +418,6 @@
     .timeline {
       flex: 1;
       min-width: 0;
-    }
-    .timeline input {
-      width: 100%;
-      accent-color: var(--red);
-      height: 22px;
-      display: block;
-      margin: 0;
-      cursor: pointer;
-    }
-    .timecodes {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      font-variant-numeric: tabular-nums;
-      color: var(--muted);
     }
     .permission-note {
       font-size: 13px;
@@ -712,7 +626,7 @@
       border-top: 1px solid var(--line);
       color: #a1a0a8;
     }
-    .footer > span:first-child {
+    .footer > span:first-of-type {
       font-weight: 750;
       font-size: 18px;
       letter-spacing: -0.8px;
@@ -776,17 +690,8 @@
       }
     }
     @media (max-width: 1150px) {
-      .app-shell {
-        grid-template-columns: 195px minmax(0, 1fr);
-      }
-      .sidebar {
-        padding: 30px 14px;
-      }
       .brand {
         font-size: 19px;
-      }
-      .topbar {
-        padding: 0 30px;
       }
       main {
         padding: 30px;
@@ -834,26 +739,9 @@
       .app-shell {
         display: block;
       }
-      .sidebar {
-        position: static;
-        height: auto;
-        display: block;
-        padding: 20px;
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-      }
       .brand {
         font-size: 21px;
         max-width: 190px;
-      }
-      .nav-label,
-      .sidebar-bottom {
-        display: none;
-      }
-      .sidebar nav {
-        display: flex;
-        gap: 6px;
-        margin-top: 20px;
       }
       .nav-link {
         min-height: 44px;
@@ -864,23 +752,11 @@
         font-size: 12px;
         gap: 7px;
       }
-      .sidebar .nav-link.active {
-        border-left: 0;
-        box-shadow: inset 0 -2px 0 var(--red);
-        border-radius: 10px;
-      }
       .nav-link svg {
         width: 16px;
       }
       .nav-link svg:last-child:not(:first-child) {
         display: none;
-      }
-      .topbar {
-        min-height: 64px;
-        padding: 0 22px;
-      }
-      .topbar > .eyebrow {
-        font-size: 10px;
       }
       .top-status {
         font-size: 12px;
@@ -949,6 +825,22 @@
       }
       .footer {
         padding: 25px 22px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+      }
+      .footer > span:first-of-type {
+        text-align: right;
+        font-size: 18px;
+      }
+      .footer > a {
+        grid-column: 1/-1;
+        text-align: center;
+        white-space: nowrap;
+      }
+      .footer > span:last-child {
+        grid-column: 1/-1;
+        text-align: center;
       }
       .room-forms {
         margin-top: 35px;
@@ -1055,19 +947,11 @@
     }
 
     button.nav-link {
-      width: 100%;
+      width: auto;
       text-align: left;
       border: 0;
       background: transparent;
       border-radius: 5px;
-    }
-    .room-tabs {
-      display: flex;
-      gap: 8px;
-      margin: 32px 0 24px;
-      flex-wrap: wrap;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--line);
     }
     .room-settings {
       border-top: 1px solid var(--line);
@@ -1097,28 +981,9 @@
       flex-shrink: 0;
       accent-color: var(--red);
     }
-    .queue-actions {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      max-width: 88px;
-    }
-    .queue-actions .icon-button {
-      width: 40px;
-      height: 44px;
-    }
-    .queue-list li:has(.queue-actions) {
-      flex-wrap: wrap;
-    }
-    .queue-list li:has(.queue-actions) .track-info {
-      flex-basis: 45%;
-    }
     @media (max-width: 800px) {
       button.nav-link {
         width: auto;
-      }
-      .sidebar nav {
-        overflow-x: auto;
       }
       .nav-link {
         flex-shrink: 0;
@@ -1146,7 +1011,6 @@
       font-size: var(--tv-body);
       padding: clamp(10px, 0.521vw, 20px) clamp(16px, 0.833vw, 32px);
     }
-    .tv-mode .local-audio,
     .tv-mode .local-sync,
     .tv-mode .clock-phase {
       font-size: var(--tv-body);
@@ -1169,10 +1033,6 @@
       padding: clamp(10px, 0.521vw, 20px);
     }
 
-    .tv-mode .play-control {
-      width: clamp(48px, 2.5vw, 96px);
-      height: clamp(48px, 2.5vw, 96px);
-    }
     .tv-mode .icon-button {
       width: clamp(44px, 2.292vw, 88px);
       height: clamp(44px, 2.292vw, 88px);
@@ -1180,9 +1040,6 @@
     .tv-mode .transport svg {
       width: clamp(24px, 1.25vw, 48px);
       height: clamp(24px, 1.25vw, 48px);
-    }
-    .tv-mode .timecodes {
-      font-size: clamp(11px, 0.573vw, 22px);
     }
   }
 </style>

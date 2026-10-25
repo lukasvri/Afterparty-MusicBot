@@ -666,7 +666,8 @@ for (const authority of [false, true])
         await page.goto(`${origin}/?room=${room.code}`);
         assert.equal(page.url(), `${origin}/?room=${room.code}`);
         await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
-        assert.equal(await page.getByRole('button', { name: 'Resume playback' }).isEnabled(), true);
+        assert.equal(await page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
+        await page.getByRole('button', { name: 'Search', exact: true }).click();
         await page
           .getByRole('textbox', { name: 'Search songs or artists' })
           .fill('synthetic afterparty');
@@ -685,7 +686,7 @@ for (const authority of [false, true])
         assert.equal(browserCheckpoint.isHost, false);
         await page.reload();
         await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
-        assert.equal(await page.getByRole('button', { name: 'Resume playback' }).isEnabled(), true);
+        assert.equal(await page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
 
         await page.goto(`${origin}/?room=D0ABC123&view=concert#bookmark`);
         const concertURL = new URL(page.url());

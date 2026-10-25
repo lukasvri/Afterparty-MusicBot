@@ -1,5 +1,33 @@
 # Afterparty interface review
 
+## Native v3 familiar layout, 2026-10-25
+
+The unpublished `3.0.0-alpha.2` candidate follows the older visual composition in
+the sole Svelte website. Horizontal navigation replaces the sidebar. One player
+surface contains track information, room/device settings and optional extras.
+Queue, Search and Library share a persistent tabbed panel beside the player on
+wide screens and below it on narrow screens. A mobile dock returns directly to
+these music surfaces. The official YouTube player owns playback, seek, volume and
+fullscreen controls; app duplicates are removed even before audio activation.
+
+Tab changes retain search results, unfinished library fields, playlist jobs and
+preview selections. Inactive panels are hidden and inert; the library remains
+lazy until first opened. Native track disclosures support Escape and focus after
+reorder/removal. Completed commands preserve focus when the user moves to search.
+Invitation copying and QR share one panel, with selection after clipboard failure.
+Open rooms supports name/code filtering, counts and last-good-list recovery.
+
+Synthetic browser fixtures check 3840×2160, 2560×1440, 1920×1080 and 390px mobile,
+including overflow, horizontal navigation, player/workspace geometry and mobile
+quick access. TV fixtures also check 1280×720, QR scaling and fullscreen. Local
+YouTube fixtures verify authorized native transport and guest-local pause without
+requesting live media. These checks do not establish real-device audio or rollout.
+
+[Desktop fixture](assets/v3-familiar-desktop-20261025.png) ·
+[Mobile viewport](assets/v3-familiar-mobile-20261025.png)
+
+## Historical review: 2.4.0-alpha.14
+
 Reviewed for `2.4.0-alpha.14`, based on merged main `f604b966bd22ed2243348e38bb851a4b07afa04a`.
 The scope is the existing website, with its current routes, permissions and music behavior.
 

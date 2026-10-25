@@ -126,8 +126,9 @@ for (const [width, height] of [
       assert.equal(await page.getByText('Private track must never appear').count(), 0);
       assert.equal(await page.getByRole('button', { name: /^Remove / }).count(), 0);
       assert.equal(await page.getByRole('slider', { name: 'Shared concert position' }).count(), 0);
-      await page.getByRole('button', { name: 'Resume', exact: true }).click();
-      await page.getByRole('button', { name: 'Pause', exact: true }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Resume', exact: true }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Pause', exact: true }).count(), 0);
+      await page.getByRole('button', { name: 'Next track', exact: true }).click();
       await page.getByRole('button', { name: /^Vote for An especially/ }).click();
       await page
         .getByRole('button', { name: /^Vote for An especially/ })
@@ -137,7 +138,7 @@ for (const [width, height] of [
           !(document.querySelector('button[aria-label^="Vote for"]') as HTMLButtonElement)
             ?.disabled,
       );
-      assert.equal(writes.filter((write) => write.action === 'resume').length, 1);
+      assert.equal(writes.filter((write) => write.action === 'skip').length, 1);
       assert.equal(writes.filter((write) => write.action === 'vote').length, 1);
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -183,7 +184,7 @@ for (const [width, height] of [
 }
 
 for (const width of [1440, 390])
-  test(`concert search, lazy library additions and authorized seek at ${width}px`, async () => {
+  test(`concert search and lazy library additions without duplicate transport at ${width}px`, async () => {
     const manifest = JSON.parse(
       await readFile(
         new URL('../.svelte-kit/output/client/.vite/manifest.json', import.meta.url),
@@ -297,6 +298,7 @@ for (const width of [1440, 390])
         false,
         'library remains lazy on concert startup',
       );
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page.getByRole('textbox', { name: 'Search songs or artists' }).fill('festival');
       await page.getByRole('button', { name: 'Search music', exact: true }).click();
       await page
@@ -308,22 +310,27 @@ for (const width of [1440, 390])
       await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
       await page.getByRole('heading', { name: 'Your collection', exact: true }).waitFor();
       assert(scripts.includes(`/${library.file}`));
+      await page.getByLabel('Name this evening', { exact: true }).fill('Concert plans');
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      assert.equal(
+        await page.getByRole('region', { name: 'Your music library', exact: true }).count(),
+        0,
+      );
+      await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+      assert.equal(
+        await page.getByLabel('Name this evening', { exact: true }).inputValue(),
+        'Concert plans',
+      );
       await page
         .getByRole('button', { name: 'Add Saved concert favorite to queue', exact: true })
         .click();
       await page.waitForFunction(
         () => document.querySelectorAll('.concert-queue .queue-list li').length === 2,
       );
-      const seek = page.getByRole('slider', { name: 'Shared concert position', exact: true });
-      await seek.evaluate((input) => {
-        (input as HTMLInputElement).value = '42';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-      await page.getByRole('button', { name: 'Seek concert', exact: true }).click();
-      await page.getByText('Seek confirmed by Core.', { exact: true }).waitFor();
+      assert.equal(await page.getByRole('slider', { name: 'Shared concert position' }).count(), 0);
       assert.deepEqual(
         writes.map((write) => write.path),
-        ['/api/discord', '/api/discord', '/api/admin/control'],
+        ['/api/discord', '/api/discord'],
       );
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),

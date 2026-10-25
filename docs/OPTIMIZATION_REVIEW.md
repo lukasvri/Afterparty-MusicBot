@@ -501,3 +501,25 @@ retain 20-set pages. The shared theme owns surfaces, typography and TV sizing. N
 player intent, DJ rules and decorative scenery remain with their feature owners in
 the [source map](ARCHITECTURE.md#source-map). No new runtime dependency, application
 language, remote font or second audio player was introduced.
+
+
+### Familiar layout and YouTube-only controls follow-up
+
+The follow-up restores horizontal navigation and one persistent tabbed workspace,
+adds room-directory filtering/recovery, and removes the app's duplicate transport,
+volume and seek controls. Dead sidebar, queue-action and removed-control styles
+are deleted. No runtime dependency or application language is added.
+
+[Built-Worker response measurements](assets/v3-familiar-startup-20261025.json)
+are identical at 1440px and 390px:
+
+| Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
+| --- | ---: | ---: |
+| Welcome / empty browser room, including the scene | 264,811 B | 97,681 B |
+| Active browser room, before audio consent | 248,745 B | 92,883 B |
+| Game entry | 148,186 B | 56,003 B |
+
+The active-room response total is 7,524 decoded bytes / 2,467 recomputed gzip bytes
+above the previous `b192b1e` candidate. The library still loads only after an
+explicit visit, and active rooms still exclude the optional scene. These bounded
+feature additions are not a bundle-size reduction or a field-performance claim.

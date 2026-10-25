@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick as afterRender } from 'svelte';
+  import { onDestroy, onMount, tick as afterRender, type Snippet } from 'svelte';
   import { loadYoutube, type Player, type PlayerEvent } from '../../../../../lib/youtube-player.ts';
   import {
     calibratedPlaybackPosition,
@@ -36,7 +36,6 @@
   import {
     adoptPlayerAudio,
     applyAudioPreferences,
-    changeAudioLevel,
     defaultAudio,
     readAudioPreferences,
     toggleAudioMute,
@@ -160,7 +159,9 @@
     canSeek = canControl,
     controlBusy = false,
     onIntent,
-    onActiveChange,
+    settings,
+    settingsLabel = 'Playback settings',
+    footer,
   }: {
     room: Room;
     position: number;
@@ -169,7 +170,9 @@
     canSeek?: boolean;
     controlBusy?: boolean;
     onIntent?: (intent: SharedPlayerIntent) => Promise<boolean>;
-    onActiveChange?: (active: boolean) => void;
+    settings?: Snippet;
+    settingsLabel?: string;
+    footer?: Snippet;
   } = $props();
   let container = $state<HTMLDivElement>();
   let player: Player | null = null;
@@ -520,7 +523,6 @@
     return () => clearInterval(timer);
   });
   onDestroy(() => {
-    onActiveChange?.(false);
     disposed = true;
     generation++;
     try {
@@ -529,9 +531,6 @@
       /* Removing the stage ends a stale iframe context. */
     }
     player = null;
-  });
-  $effect(() => {
-    onActiveChange?.(enabled && ready);
   });
 </script>
 
@@ -586,37 +585,10 @@
         : 'Volume and pause are local to you'}</span
   >
 </div>
+{@render footer?.()}
 <details class="local-sync">
-  <summary>Playback settings</summary>
+  <summary>{settingsLabel}</summary>
   <p>Use YouTube's controls for volume, playback, quality, captions and fullscreen.</p>
-  <div class="local-audio" aria-label="Audio on this device">
-    <button
-      class="button secondary"
-      aria-pressed={audio.muted}
-      onclick={() => {
-        audio = toggleAudioMute(audio);
-        saveAudio();
-      }}>{audio.muted ? 'Unmute' : 'Mute'}</button
-    >
-    <label for="local-volume">Volume on this device</label><input
-      id="local-volume"
-      aria-label="Volume on this device"
-      type="range"
-      min="0"
-      max="100"
-      value={audio.level}
-      oninput={(event) => {
-        audio = changeAudioLevel(audio, Number(event.currentTarget.value));
-        saveAudio();
-      }}
-    />
-    <button
-      class="button secondary"
-      onclick={() => {
-        void toggleFullscreen();
-      }}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button
-    >
-  </div>
   <p>These settings affect this device. The shared music and queue stay unchanged.</p>
   <label
     >Synchronization mode<select
@@ -657,6 +629,7 @@
     >
   </div>
   <p>Use the video's controls for quality and captions when the source supports them.</p>
+  {@render settings?.()}
   <details
     class="playback-diagnostics"
     ontoggle={(event) => {
@@ -742,23 +715,6 @@
   }
   .calibration output {
     font-variant-numeric: tabular-nums;
-  }
-  .local-audio {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 12px;
-  }
-  .local-audio label {
-    font-size: var(--tv-body, 10px);
-    color: var(--muted);
-  }
-  .local-audio input {
-    min-width: 80px;
-    max-width: clamp(180px, 9.375vw, 360px);
-    flex: 1;
-    accent-color: var(--red);
   }
   .exit-fullscreen {
     position: absolute;

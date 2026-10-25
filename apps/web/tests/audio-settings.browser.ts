@@ -265,7 +265,9 @@ for (const mode of ['room', 'discord'] as const) {
         }, state);
       }
       await page.getByRole('button', { name: 'Enable room audio', exact: true }).waitFor();
-      await page.getByText('Playback settings', { exact: true }).click();
+      await page
+        .getByText(mode === 'room' ? 'Room settings' : 'Playback settings', { exact: true })
+        .click();
       assert.equal(
         await page
           .getByRole('combobox', { name: 'Synchronization mode', exact: true })
@@ -432,19 +434,28 @@ for (const mode of ['room', 'discord'] as const) {
         0,
         'reload keeps a shared pause',
       );
-      const volume = page.getByRole('slider', { name: 'Volume on this device', exact: true });
-      await volume.evaluate((input) => {
-        (input as HTMLInputElement).value = '25';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
+      assert.equal(
+        await page.getByRole('slider', { name: 'Volume on this device', exact: true }).count(),
+        0,
+      );
+      assert.equal(
+        await page.getByRole('button', { name: /^(Mute|Unmute|Fullscreen)$/ }).count(),
+        0,
+      );
+      await page.evaluate(() => {
+        (window as unknown as ProbeWindow).__audioSettings.player!.level = 25;
       });
+      await page.waitForFunction(
+        () => JSON.parse(localStorage.getItem('afterparty-audio') ?? 'null')?.level === 25,
+      );
       await page.evaluate(() => {
         (window as unknown as ProbeWindow).__audioSettings.staleAudio = true;
       });
       await page.waitForTimeout(400);
-      assert.equal(await volume.inputValue(), '25', 'stale iframe reads respect write settling');
       assert.equal(
         await page.evaluate(() => JSON.parse(localStorage.getItem('afterparty-audio')!).level),
         25,
+        'stale iframe reads respect write settling',
       );
       await page.evaluate(() => {
         const probe = (window as unknown as ProbeWindow).__audioSettings;
@@ -456,13 +467,6 @@ for (const mode of ['room', 'discord'] as const) {
         const saved = localStorage.getItem('afterparty-audio');
         return saved && JSON.parse(saved).level === 27 && JSON.parse(saved).muted === true;
       });
-      assert.equal(await volume.inputValue(), '27');
-      assert.equal(
-        await page
-          .getByRole('button', { name: 'Unmute', exact: true })
-          .getAttribute('aria-pressed'),
-        'true',
-      );
       const savedWrites = await page.evaluate(
         () => (window as unknown as ProbeWindow).__audioSettings.audioWrites,
       );
