@@ -122,8 +122,9 @@ The verified Node 26 `linux/amd64` base is
 `node:26.12.1-bookworm-slim@sha256:1884ec272c7c06aba7696262fb822dc602f8fa5eb978d03617d6bfe487d7ebac`.
 The qualification image follows the canonical multi-stage Dockerfile with that
 base substituted in a temporary copy. Cloud proxy trust is supplied through
-BuildKit secret mounts, never copied into image layers. The production Dockerfile
-retains its pinned Node 24 base. This local experimental image is not a signed
+BuildKit secret mounts, never copied into image layers. At qualification time, the
+production source Dockerfile retained its pinned Node 24 base; the native-only
+source now pins Node 26 as described above. This local experimental image is not a signed
 production release and is not published or deployed.
 
 The final local image also passed the existing read-only runtime probe and

@@ -3,6 +3,7 @@ import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
 import { metadataAiGenerated } from "../services/core/src/music-content.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
+import { visitorSQL } from "./room-visitors.ts";
 import { env as cloudEnv } from "cloudflare:workers";
 import type { Video, RoomState, Room } from "./types";
 import { hasPasswordSession } from "./admin-session";
@@ -427,12 +428,12 @@ export async function publicRoom(
   if (heartbeat && actor && /^[a-f0-9-]{32,40}$/.test(actor))
     await db()
       .prepare(
-        "INSERT INTO visitors(key,room,until) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET until=excluded.until WHERE until<?",
+        visitorSQL.heartbeat,
       )
       .bind(`${value.code}:${actor}`, value.code, now + 45000, now + 30000)
       .run();
   const viewers = await db()
-    .prepare("SELECT count(*) AS n FROM visitors WHERE room=? AND until>?")
+    .prepare(visitorSQL.count)
     .bind(value.code, now)
     .first<{ n: number }>();
   if (!discord && coreUrl()) {
@@ -530,7 +531,7 @@ export async function createRoom(
   const token = secret();
   const now = Date.now();
   await db().batch([
-    db().prepare("DELETE FROM visitors WHERE until<?").bind(now),
+    db().prepare(visitorSQL.expire).bind(now),
     db().prepare("DELETE FROM rooms WHERE expires_at<?").bind(now),
     db().prepare("DELETE FROM cached WHERE expires_at<?").bind(now),
     db().prepare("DELETE FROM limits WHERE until<?").bind(now),
@@ -557,10 +558,7 @@ export async function openRooms(request: Request) {
   const now = Date.now();
   const result = await db()
     .prepare(
-      `SELECT r.code,r.name,r.expires_at,
-    (SELECT count(*) FROM visitors v WHERE v.room=r.code AND v.until>?) AS viewers
-    FROM rooms r WHERE r.is_public=1 AND r.expires_at>? AND r.guild_id IS NULL AND r.code!='DISCORD1'
-    ORDER BY viewers DESC,r.updated_at DESC LIMIT 60`,
+      visitorSQL.directory,
     )
     .bind(now, now)
     .all<{ code: string; name: string; expires_at: number; viewers: number }>();
@@ -793,7 +791,7 @@ export async function closeRoom(request: Request, code: string) {
   }
   await db().batch([
     db().prepare("DELETE FROM rooms WHERE code=?").bind(code),
-    db().prepare("DELETE FROM visitors WHERE room=?").bind(code),
+    db().prepare(visitorSQL.removeRoom).bind(code),
   ]);
   return { ok: true };
 }

@@ -96,6 +96,75 @@ See the [benchmark](../services/core/benchmarks/radio-queue.ts) and
 | Decoder, codec or kernel replacement | Profile first | High / high | Measure whole-pipeline CPU, memory and scheduling on an isolated intended host. Faster isolated PCM mixing does not prove a Discord improvement. |
 | Broad component memoization | Low | Medium / medium | Capture a rendering profile first. Stable player identity and correct permission/state updates take precedence over speculative caching. |
 
+## Visitor index source candidate
+
+Measured follow-up to [issue #135](https://github.com/lukasvri/Afterparty-MusicBot/issues/135)
+on source base `d9d38ee`. Count, directory, heartbeat and deletion queries now
+have one canonical owner in `lib/room-visitors.ts`; callers retain D1 access and
+authorization. Query text and bindings are unchanged. The forward-only
+`0004_room_visitors.sql` migration adds one non-unique `(room, until)` index,
+with matching generated Drizzle schema, snapshot and journal. Existing data is
+not rewritten and old code remains compatible with the indexed database.
+
+### Read benefit, write cost and space
+
+`node scripts/measure-room-visitors.ts` creates two isolated in-memory databases
+from actual migrations, removing only the candidate index for the baseline.
+It seeds 1/10/100 rooms and 100/1,000/10,000 synthetic visitors, including expired,
+exact-boundary, private and guild cases. Each pair asserts result equality before
+three warmups and five alternating rounds of ten calls. Both databases roll back
+each measured write operation. This is elapsed synchronous time on Linux,
+Node 24.19.0 and the SQLite version in the raw result, not CPU accounting,
+production latency, durable-disk throughput or D1 billing.
+
+| Rooms / visitors | Count baseline / indexed ms | Directory baseline / indexed ms | Index space |
+| --- | ---: | ---: | ---: |
+| 1 / 100 | 0.00665 / 0.00255 | 0.00875 / 0.00433 | 4 KiB |
+| 10 / 1,000 | 0.03608 / 0.00320 | 0.26503 / 0.01651 | 28 KiB |
+| 100 / 10,000 | 0.28952 / 0.00316 | 22.17940 / 0.15488 | 224 KiB |
+
+At 10,000 visitors, median milliseconds per operation (writes include rollback):
+
+| Operation | Baseline ms | Indexed ms |
+| --- | ---: | ---: |
+| insert50 | 0.11567 | 0.17913 |
+| renew50 | 0.07566 | 0.12449 |
+| suppressed50 | 0.06208 | 0.07108 |
+| expire | 1.14875 | 1.75014 |
+| removeRoom | 0.39401 | 0.12752 |
+
+The 50-row batches are not single-heartbeat times. Index maintenance increases
+insert/renewal/expiry work; suppressed heartbeats still change zero rows. Room
+removal benefits from the leading room key. `until`-only expiry cleanup still
+scans visitors and is not claimed fixed. No second index was added. At 10,000
+rows, the index adds 224 KiB; total database pages rise from 306 to 362 at 4 KiB.
+
+Both the per-room count and directory's correlated count use the covering index.
+It replaces repeated whole-visitor scans while preserving fifteen-second renewal
+suppression and directory filters/order/limit. This measured read benefit
+justifies the bounded source candidate despite extra write/space cost. It does
+not establish production savings: index maintenance costs remain, local SQLite
+timings are not D1 charged rows, and real cardinality/traffic remain unknown.
+Existing rollout approval and backup requirements still apply.
+
+[Raw paired samples, query plans and storage measurements](assets/visitor-index-measurements.json)
+retain all scenarios. Tests upgrade populated old-schema data and compare saved
+visitors and rooms; verify exact count/cleanup boundaries, immutable visitor room
+binding, suppressed renewal and room-scoped deletion; compare private/guild/
+expired filtering and the sixty-room directory limit. The Worker/D1 suite also
+exercises the migration, indexed query plans and API/browser readback in native
+and service-binding topologies. Local Wrangler does not expose heartbeat
+`rows_written` in this test setup, so no measured D1 billing claim is made.
+
+### Rollback and migration boundary
+
+Apply this forward-only source migration through the existing migration ledger
+only in a separately approved rollout. Reverting the application does not need
+to drop the index: old SQL and schema columns remain valid, and visitor keys,
+expiry, ownership and room state are retained. Keep the applied ledger intact.
+No remote migration, host change, provider connection or production telemetry
+was used for these measurements.
+
 Rust measurements remain offline research on `dev`, with bounded synthetic
 workers, process cleanup and optional FFmpeg stages. Parent-only CPU excludes
 Rust/FFmpeg execution; individual RSS peaks are not a simultaneous process-tree

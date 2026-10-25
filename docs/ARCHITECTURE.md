@@ -41,6 +41,7 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | v3 feature implementations | `apps/web/src/lib/` | Feature folders below |
 | Shared website API handlers | `lib/api/` | `route.ts` adapters into `lib/` |
 | Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
+| Website visitor counts, heartbeat and directory SQL | `lib/room-visitors.ts` | `server.ts` owns access; `db/schema.ts` and `drizzle/` own the index; `scripts/measure-room-visitors.ts` measures isolated read/write/space cost |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
 | Optional browser error privacy and initialization | `lib/error-reporting.ts` | Native root layout; [policy](OBSERVABILITY.md) |
