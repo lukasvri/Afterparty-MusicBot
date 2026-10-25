@@ -96,6 +96,7 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
     video('queued00001', 'Stay a little longer', 'Common Ground'),
     video('queued00002', 'City after dark', 'Night Bus'),
   ];
+  let heldMutation: Promise<void> | null = null;
   const snapshot = (isHost: boolean): Room => ({
     code,
     version,
@@ -265,6 +266,11 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       assert.equal(input.version, version, 'mutations carry the current server revision');
       if (input.action !== 'add') assert(authorized, 'transport requires the host token');
       writes.push(input);
+      if (heldMutation) {
+        const held = heldMutation;
+        heldMutation = null;
+        await held;
+      }
       if (input.action === 'add') {
         const selected = results.find((item) => item.id === input.videoId);
         assert(selected);
@@ -305,6 +311,13 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
     },
     failNextReads(count: number) {
       failedReads = count;
+    },
+    holdNextMutation() {
+      let release = () => {};
+      heldMutation = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return release;
     },
     async close() {
       await closeFixture(page, browser);
@@ -655,6 +668,48 @@ test('search stays available beside library and settings without discarding unfi
     assert.deepEqual(f.errors, []);
     await noOverflow(page);
   } finally {
+    await f.close();
+  }
+});
+
+test('native pause remains local while a queue addition is awaiting its response', async (t) => {
+  const f = await fixture(t, 1440, true, true);
+  let release = () => {};
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await find(page, 'night');
+    await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
+    release = f.holdNextMutation();
+    await page
+      .getByRole('button', { name: `Add ${results[0].title} to queue`, exact: true })
+      .click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+    await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    release();
+    await page.locator('.queue-list').getByText(results[0].title, { exact: true }).waitFor();
+    await page.waitForFunction(
+      () => !(document.querySelector('.search-results button') as HTMLButtonElement)?.disabled,
+    );
+    assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['add'],
+    );
+    await native.getByRole('button', { name: 'Play video', exact: true }).click();
+    await page
+      .locator('.player-status')
+      .filter({ hasText: 'Following the shared clock' })
+      .waitFor();
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['add'],
+      'a busy mutation never replays a shared pause',
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    release();
     await f.close();
   }
 });

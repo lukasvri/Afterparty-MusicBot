@@ -192,6 +192,7 @@
     deadline: number;
     version: number;
     issuedAt: number;
+    pausePinned: boolean;
   } | null>(null);
   const identity = () => `${room.code}:${room.current?.id ?? ''}:${room.playbackKey ?? ''}`;
   function command(action: 'load' | 'cue' | 'play' | 'pause' | 'seek', position?: number) {
@@ -224,8 +225,12 @@
     };
   }
   async function nativeIntent(intent: PlayerIntent) {
-    if (!ready || !player || !room.current || nativePending || controlBusy || loaded !== identity())
-      return;
+    if (!ready || !player || !room.current || loaded !== identity()) return;
+    if (intent.action === 'pause') {
+      localPaused = true;
+      if (nativePending) nativePending = { ...nativePending, pausePinned: true };
+    }
+    if (nativePending || controlBusy) return;
     if (
       intent.action === 'seek' &&
       (room.current.live ||
@@ -254,6 +259,7 @@
       deadline: issuedAt + 40000,
       version: room.version,
       issuedAt,
+      pausePinned: false,
     };
     nativePending = pending;
     if (intent.action === 'seek' && player.getPlayerState() === 1) {
@@ -281,7 +287,7 @@
     if (!accepted) {
       nativePending = null;
       message = 'Shared playback could not be updated. Reconnect before trying again.';
-    } else nativePending = { ...pending, settled: true };
+    } else nativePending = { ...pending, ...nativePending, settled: true };
     await afterRender();
     if (!disposed && generation === epoch) sync(true);
   }
@@ -310,7 +316,8 @@
         elapsed: room.buffering ? 0 : performance.now() - nativePending.issuedAt,
       });
       if (!confirmed && performance.now() < nativePending.deadline) return;
-      if (confirmed && nativePending.intent.action !== 'seek') localPaused = false;
+      if (confirmed && nativePending.intent.action !== 'seek' && !nativePending.pausePinned)
+        localPaused = false;
       if (!confirmed) {
         if (nativePending.intent.action === 'seek') localPaused = true;
         message = 'Shared playback has not caught up. Reconnect before trying again.';
@@ -559,7 +566,7 @@
       ? 'Audio is off on this device'
       : !ready
         ? 'The video player is unavailable'
-        : nativePending || controlBusy
+        : nativePending
           ? 'Updating shared playback…'
           : localPaused
             ? 'Paused on this device'
