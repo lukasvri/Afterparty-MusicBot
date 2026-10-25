@@ -3,9 +3,30 @@ import { test } from "node:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { cloudflareConfig, projectRoot, verifyCloudflareOutput, writeCloudflareConfig } from "./cloudflare-config.ts";
 
 const env = { CF_WORKER_NAME: "afterparty-test", CF_D1_DATABASE_NAME: "afterparty-test-db", CF_D1_DATABASE_ID: "12345678-1234-4123-8123-123456789abc" };
+test("Cloudflare installs the website lockfile and stops before building on installation failure", () => {
+  const directory = mkdtempSync(join(tmpdir(), "afterparty-cf-install-"));
+  const configPath = join(projectRoot, "wrangler.cloudflare.local.json");
+  let previous: Buffer | undefined;
+  try { previous = readFileSync(configPath); } catch { /* No local generated config. */ }
+  try {
+    const npm = join(directory, "npm.cjs"), receipt = join(directory, "arguments.json");
+    writeFileSync(npm, `require("node:fs").writeFileSync(${JSON.stringify(receipt)}, JSON.stringify(process.argv.slice(2))); process.exit(43);`);
+    const result = spawnSync(process.execPath, [join(projectRoot, "scripts/cloudflare.ts"), "build"], {
+      cwd: projectRoot, env: { ...process.env, ...env, npm_execpath: npm }, encoding: "utf8",
+    });
+    assert.equal(result.status, 43, result.stderr);
+    assert.deepEqual(JSON.parse(readFileSync(receipt, "utf8")), ["ci", "--prefix", "apps/web",
+      "--include=dev", "--include=optional", "--no-audit", "--no-fund"]);
+  } finally {
+    if (previous) writeFileSync(configPath, previous);
+    else rmSync(configPath, { force: true });
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 test("deployment config fails closed on absent or placeholder identities", () => {
   assert.throws(() => cloudflareConfig({}, projectRoot));
   for (const key of Object.keys(env)) {

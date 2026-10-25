@@ -20,6 +20,14 @@ function run(script: string, args: string[]) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 if (command === "build") {
+  if (!process.env.npm_execpath) throw new Error("Run this build with npm run build:cloudflare.");
+  // Workers Builds installs only the root lockfile. The native website owns a
+  // separate lockfile, including Vite, the adapter and its packaging tools.
+  const install = spawnSync(process.execPath, [process.env.npm_execpath, "ci", "--prefix", "apps/web",
+    "--include=dev", "--include=optional", "--no-audit", "--no-fund"],
+    { cwd: projectRoot, env, stdio: "inherit", timeout: 8 * 60_000, killSignal: "SIGTERM" });
+  if (install.error) throw install.error;
+  if (install.status !== 0) process.exit(install.status ?? 1);
   run("scripts/build-website.ts", []);
   writeWebsiteConfig(projectRoot, config);
 }
