@@ -1,5 +1,27 @@
 # Afterparty interface review
 
+## Advancing-clock stress follow-up, 2026-10-25
+
+A three-browser loopback test now models actual elapsed playback in each synthetic
+player, rather than a fixed current-time value. It checks host/guest clocks at
+4K, QHD and mobile, settled synchronization without repeated corrections, three
+rapid scrubs with a 1200ms held receipt, and a guest-local pause surviving a later
+host seek. The server fixture preserves elapsed position when pausing/resuming.
+
+This test reproduced one additional programmatic seek after a native scrub
+acknowledgement. An effect could already settle the intent before the completion
+callback called `sync(true)` again, defeating its recovery interval. Successful
+native seek completion now reconciles without that second forced correction.
+Queued scrubs also refresh their target from bounded, observed player progress
+when dispatched. Stale/backward, unrelated, invalid and ended-source readings
+retain the original target; paused/buffering playback never invents progress.
+The existing source identity, revision, receipt and permission guards still apply.
+
+The 750ms phase bound is an isolated test tolerance, not a real-provider latency
+claim. Real YouTube buffering, host networking and audible Discord output remain
+separate acceptance checks. No additional runtime or duplicate playback service
+was introduced.
+
 ## Continuous native playback and full-tab theater, 2026-10-25
 
 This follow-up supersedes the earlier page-width theater layout and fixed-height

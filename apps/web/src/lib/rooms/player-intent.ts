@@ -9,6 +9,31 @@ type Observation = {
 };
 export const POSITION_ACK_TOLERANCE = 2.25;
 
+/** A queued scrub may already be playing by the time the previous receipt arrives.
+ * Keep its observed progress, but reject cached backward or unrelated jumps. */
+export function refreshQueuedSeek(
+  intent: PlayerIntent,
+  position: number,
+  elapsedMs: number,
+  duration: number,
+): PlayerIntent {
+  if (
+    intent.action !== 'seek' ||
+    !Number.isFinite(intent.position) ||
+    !Number.isFinite(position) ||
+    !Number.isFinite(elapsedMs) ||
+    !Number.isFinite(duration) ||
+    elapsedMs < 0 ||
+    intent.position! < 0 ||
+    intent.position! >= duration ||
+    position >= duration ||
+    position < intent.position! ||
+    position > intent.position! + elapsedMs / 1000 + POSITION_ACK_TOLERANCE
+  )
+    return intent;
+  return { ...intent, position };
+}
+
 /** A receipt alone is not a fresh shared timeline. Allow playback progress
  * between the seek and the next authoritative sample, including a delayed start. */
 export function confirmsPlayerIntent(

@@ -21,6 +21,7 @@
   import {
     confirmsPlayerIntent,
     createPlayerIntent,
+    refreshQueuedSeek,
     POSITION_ACK_TOLERANCE,
     type PlayerIntent,
     type PlayerIntentReceipt,
@@ -201,7 +202,9 @@
   const native = createPlayerIntent();
   const correction = createPlaybackCorrection();
   let localPaused = $state(false);
-  let queuedNative = $state<Array<{ identity: string; intent: PlayerIntent }>>([]);
+  let queuedNative = $state<Array<{ identity: string; intent: PlayerIntent; sampledAt: number }>>(
+    [],
+  );
   let nativePending = $state<{
     identity: string;
     source: string;
@@ -269,7 +272,7 @@
           ...queuedNative.filter(
             (item) => (item.intent.action === 'seek') !== (intent.action === 'seek'),
           ),
-          { identity: identity(), intent },
+          { identity: identity(), intent, sampledAt: performance.now() },
         ];
       }
       return;
@@ -333,13 +336,29 @@
       message = 'The video is following the latest room state. Try the control again.';
     } else nativePending = { ...pending, ...nativePending, settled: true, receiptVersion };
     await afterRender();
-    if (!disposed && generation === epoch) sync(true);
+    // Reactive sync may already have settled the receipt. A second forced seek
+    // would discard the healthy native buffer after the user's own scrub.
+    if (!disposed && generation === epoch) sync(!accepted || intent.action !== 'seek');
   }
   function flushNative() {
     if (!ready || !player || nativePending || controlBusy || !queuedNative.length) return;
     const [next, ...rest] = queuedNative;
     queuedNative = rest;
-    if (next.identity === identity()) void nativeIntent(next.intent);
+    if (next.identity !== identity() || !room.current) return;
+    let intent = next.intent;
+    if (intent.action === 'seek') {
+      try {
+        intent = refreshQueuedSeek(
+          intent,
+          player.getCurrentTime(),
+          performance.now() - next.sampledAt,
+          room.current.duration,
+        );
+      } catch {
+        // A temporarily unavailable iframe cannot replace the observed target.
+      }
+    }
+    void nativeIntent(intent);
   }
   function readNativePosition() {
     if (!ready || !player || failedSource || loaded !== identity()) return;

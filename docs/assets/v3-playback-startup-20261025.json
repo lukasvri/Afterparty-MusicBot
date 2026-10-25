@@ -1,0 +1,67 @@
+{
+  "label": "playback-stress-candidate-20261025",
+  "metric": "Decoded successful script responses; gzip is recomputed per response, not measured wire transfer or field performance.",
+  "results": [
+    {
+      "viewport": 1440,
+      "scenario": "welcome",
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 224038,
+      "sumIndividualGzipBytes": 82897
+    },
+    {
+      "viewport": 1440,
+      "scenario": "joined-room",
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 224038,
+      "sumIndividualGzipBytes": 82897
+    },
+    {
+      "viewport": 1440,
+      "scenario": "playing-room",
+      "scriptRequests": 20,
+      "decodedJavaScriptBytes": 203657,
+      "sumIndividualGzipBytes": 76944
+    },
+    {
+      "viewport": 1440,
+      "scenario": "games",
+      "scriptRequests": 15,
+      "decodedJavaScriptBytes": 152519,
+      "sumIndividualGzipBytes": 57662
+    },
+    {
+      "viewport": 390,
+      "scenario": "welcome",
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 224038,
+      "sumIndividualGzipBytes": 82897
+    },
+    {
+      "viewport": 390,
+      "scenario": "joined-room",
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 224038,
+      "sumIndividualGzipBytes": 82897
+    },
+    {
+      "viewport": 390,
+      "scenario": "playing-room",
+      "scriptRequests": 20,
+      "decodedJavaScriptBytes": 203657,
+      "sumIndividualGzipBytes": 76944
+    },
+    {
+      "viewport": 390,
+      "scenario": "games",
+      "scriptRequests": 15,
+      "decodedJavaScriptBytes": 152519,
+      "sumIndividualGzipBytes": 57662
+    }
+  ],
+  "baseCommit": "ef3e4a5b1beefa4fc10360a5daf64a678ada58fe",
+  "sourceFilesSha256": {
+    "apps/web/src/lib/rooms/RoomAudio.svelte": "c4ee55208126ddc7f245be1a0fbec47143a7b121910c36a99bad8127884dc085",
+    "apps/web/src/lib/rooms/player-intent.ts": "bf967cefb273303db03baf3d377aa5b32d68eea27b7092ec81c8036bdb51344f"
+  }
+}

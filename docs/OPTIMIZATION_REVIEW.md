@@ -568,3 +568,34 @@ quarter-capped overlap. Track IDs and extraction offsets remain protected.
 
 These are synthetic/locally decoded regression measurements, not proof of human
 Discord listening quality, provider delivery speed or zero network latency.
+
+## Advancing-player stress review, 25 October 2026
+
+The native room follow-up uses the existing Playwright/loopback SSE harness with
+three clients at 4K, QHD and mobile. Synthetic current time advances with actual
+elapsed playback, including pause/resume and buffering transitions. Three rapid
+scrubs and a 1200ms held reply reproduced one redundant programmatic seek on the
+originating player. The successful seek's completion callback no longer forces
+that second correction, and queued targets refresh from bounded observed progress.
+The new regression passes without an additional origin-player jump; three
+consecutive stress runs also pass. Guest-local pause survives a later host seek.
+
+Startup was measured with the existing built-Worker script and `--verify-lazy`.
+At both 1440px and 390px, active-room startup contains 203,657 decoded script
+bytes and 76,944 bytes when each successful response is separately gzipped.
+Welcome/empty-room startup contains 224,038 decoded / 82,897 recomputed gzip
+bytes; games contain 152,519 / 57,662. Optional library code stays deferred and
+active rooms omit decorative stage code. The measurement contacts no providers
+before audio consent and issues no queue mutations.
+
+[Raw startup results](assets/v3-playback-startup-20261025.json) record the base
+commit and application-file fingerprints. These are isolated response sizes,
+not wire-transfer totals, field performance, or a paired before/after claim.
+The three-player 750ms phase tolerance is likewise a synthetic acceptance bound,
+not measured production or YouTube latency.
+
+The same held-reply trace identifies a further protocol opportunity: a committed
+command's SSE state arrives while the client still waits for its HTTP receipt.
+[Issue #152](https://github.com/lukasvri/Afterparty-MusicBot/issues/152) tracks
+correlated acknowledgements with room/epoch/revision guards so a later gesture
+can be safely released sooner. That protocol change is not implemented here.
