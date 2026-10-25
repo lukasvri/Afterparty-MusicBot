@@ -159,7 +159,7 @@ Older browser rooms can recover the last explicitly marked manual song from hist
 ## Similarity evidence
 
 - A specific genre such as electro house or progressive house can support recommendations across artists. Conflicting explicit styles are rejected.
-- A broad tag such as pop, rock or house does not establish that another artist belongs in the station. Without specific metadata or a vetted recording relationship, selection stays with the original artist.
+- Broad pop/rock tags alone do not establish that another artist belongs in the station. A named-artist seed explicitly tagged House can also discover other named artists explicitly tagged House. Conflicting subgenres and all content/recording checks still apply. The existing two-search budget covers genre discovery and an artist fallback; the original station anchor remains fixed.
 - Browser rooms can refine a missing or broad House genre from another upload of the same recording. Artist, song identity, version labels and duration must agree. A tutorial, cover, conflicting style or alternate instrumental cannot supply that metadata. The accepted recommendation retains private proof tied to the original video ID, so reloading or advancing a prepared queue does not discard the learned relationship. That proof is removed from public snapshots.
 - Core can use Last.fm's similarity to the original song. Missing, malformed or weaker-than-0.2 similarity scores are discarded. The score is provider evidence, not a measured audio similarity guarantee. Matched playback videos still pass content, style, history and visibility checks.
 

@@ -78,11 +78,11 @@ The v3 feature folders keep each component beside its client and behavior helper
 | `social/` | Reactions, moments and host bingo |
 | `admin/` | Server-scoped administration client, DJ desk and pure cue/transition rules |
 | `server/` | Native API dispatch and host-transition guard |
-| `ui/` | Root-rendered global theme, persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery and copyright form |
+| `ui/` | Root-rendered global theme, shared `AppNavigation.svelte`, device-local `TheaterToggle.svelte`, persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery, shared search thumbnails and copyright form |
 
 Shared surfaces, focus styles and fluid TV sizing live in `apps/web/src/lib/ui/AppTheme.svelte`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 
-Routes compose these features and import individual modules. `MusicWorkspace.svelte` keeps queue and search mounted when switching tabs, mounts the library on its first visit and retains it afterward. Inactive panels are hidden and inert; selection restores focus without recreating the player or issuing playback commands. Routes retain room/session and command authority. The optional library stays behind its dynamic import. Decorative concert scenery loads only for the welcome and empty-room views; active rooms do not download its SVG component. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
+Routes compose these features and import individual modules. `MusicWorkspace.svelte` keeps queue and search mounted when switching tabs, mounts the library on its first visit and retains it afterward. Inactive panels are hidden and inert; selection restores focus without recreating the player or issuing playback commands. Routes retain room/session and command authority. The optional library stays behind its dynamic import. Decorative concert scenery loads only for the welcome and empty-room views; active rooms do not download its SVG component. `ConcertScenery.svelte` owns SVG equipment geometry, lighting and visibility-based animation pausing; `TrackThumbnail.svelte` owns shared search-image loading and failure presentation. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
 
 The room client owns sequential library additions, capacity preflight and session
 retirement. Library tools exclude current, queued and pending tracks before an

@@ -557,6 +557,32 @@ test("radio queues the next song before the end, preserves the clock, and yields
   } finally { rooms.dispose();store.close(); }
 });
 
+test("House room prefetch fills the queue on the first playing tick without waiting for the tail", async () => {
+  const store = new Store(":memory:");
+  let now = 10000;
+  const rooms = new Rooms(store, () => now);
+  const original = { ...seed, title: "SAM WAITIN - AFTERMATH | House | NCS - Copyright Free Music", artist: "NoCopyrightSounds" };
+  const fresh = { ...next, title: "Other Artist - Synthetic Next | House" };
+  rooms.import({ code: "TESTROOM", name: "Early House radio", owner_hash: "a".repeat(64),
+    state: { current: original, queue: [], position: 0, playing: true },
+    version: 1, updated_at: now, expires_at: 100000 });
+  let searches = 0;
+  rooms.search = async query => { searches++; return query.startsWith("house audio") ? [fresh] : []; };
+  try {
+    await rooms.tick();
+    const queued = rooms.snapshot("TESTROOM");
+    assert.equal(queued.current?.id, original.id);
+    assert.equal(queued.position, 0);
+    assert.equal(queued.playing, true);
+    assert.deepEqual(queued.queue.map(song => song.id), [fresh.id]);
+    assert.equal(searches, 4, "one refinement, two discovery pools and one optional format lookup");
+    now += 1000;
+    await rooms.tick();
+    assert.equal(searches, 4, "a prepared song suppresses repeated discovery");
+    assert.equal(rooms.snapshot("TESTROOM").position, 1);
+  } finally { rooms.dispose(); store.close(); }
+});
+
 test("turning radio off removes its prepared track while an ordinary addition preserves queue order", async()=>{
  for(const action of ['radio','add']) {
   const {rooms,store}=setup();

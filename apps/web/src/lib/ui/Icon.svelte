@@ -1,6 +1,7 @@
 <script lang="ts">
   let { name, size = 20 }: { name: string; size?: number } = $props();
   const paths: Record<string, string> = {
+    theater: 'M3 6h18v12H3zM7 10l-2 2 2 2M17 10l2 2-2 2M5 12h14',
     play: 'm9 5 11 7-11 7z',
     pause: 'M8 5v14M16 5v14',
     next: 'm5 5 10 7-10 7zM19 5v14',

@@ -216,18 +216,19 @@
 
 <style>
   .playlist {
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    padding: clamp(22px, 2.2vw, 36px);
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    padding: 22px 20px;
     min-width: 0;
   }
   h2 {
-    font-size: clamp(25px, 2.2vw, 33px);
+    font-size: clamp(23px, 1.5vw, 28px);
     letter-spacing: -0.045em;
     line-height: 1.2;
     margin-bottom: 14px;
-    scroll-margin-top: 24px;
+    scroll-margin-top: 82px;
   }
   p {
     color: var(--muted);
@@ -373,7 +374,7 @@
   @media (max-width: 600px) {
     .playlist {
       padding: 22px 18px;
-      border-radius: 18px;
+      border-radius: 0;
     }
     .row input {
       flex-basis: 100%;

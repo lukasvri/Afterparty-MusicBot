@@ -118,9 +118,7 @@ for (const [width, height] of [
       await page.goto(`${origin}/v3/discord?guildId=${guildId}`);
       await page.getByRole('heading', { name: 'Together after midnight' }).waitFor();
       assert.equal(
-        await page
-          .getByRole('link', { name: 'DJ & server tools', exact: true })
-          .getAttribute('href'),
+        await page.getByRole('link', { name: 'DJ tools', exact: true }).getAttribute('href'),
         `/admin?guildId=${guildId}`,
       );
       assert.equal(await page.getByText('Private track must never appear').count(), 0);
@@ -219,7 +217,10 @@ for (const width of [1440, 390])
         scripts: string[] = [],
         writes: Array<{ path: string; body: Record<string, unknown> }> = [];
       const favorite = track('favorite001', 'Saved concert favorite');
-      const found = track('append00001', 'Website search result');
+      const found = {
+        ...track('append00001', 'Website search result'),
+        image: '/afterparty-mark.svg',
+      };
       const queued: ReturnType<typeof track>[] = [];
       let revision = 0,
         position = 20;
@@ -311,6 +312,13 @@ for (const width of [1440, 390])
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page.getByRole('textbox', { name: 'Search songs or artists' }).fill('festival');
       await page.getByRole('button', { name: 'Search music', exact: true }).click();
+      await page.waitForFunction(() => {
+        const image = document.querySelector<HTMLImageElement>(
+          '.concert-search .track-thumbnail img',
+        );
+        return image?.complete && image.naturalWidth > 0;
+      });
+
       await page
         .getByRole('button', { name: 'Add Website search result to queue', exact: true })
         .click();
@@ -611,6 +619,20 @@ for (const canManage of [false, true])
           ).__calls.find((call) => call.action === 'load')?.position,
       );
       assert(started !== undefined && started >= 25 && started < 27);
+      await page.getByRole('button', { name: 'Theater mode', exact: true }).click();
+      await page.locator('.concert-shell.theater-mode').waitFor();
+      assert.equal(
+        await page.evaluate(
+          () =>
+            (window as unknown as { __calls: { action: string }[] }).__calls.filter(
+              (call) => call.action === 'construct',
+            ).length,
+        ),
+        1,
+      );
+      assert.equal(writes.length, 0, 'concert theater mode remains device-local');
+      await page.getByRole('button', { name: 'Exit theater mode', exact: true }).click();
+
       await emit(2, false, 30);
       await page.waitForFunction(() =>
         (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(

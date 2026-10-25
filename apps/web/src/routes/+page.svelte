@@ -1,6 +1,9 @@
 <script lang="ts">
+  import AppNavigation from '#lib/ui/AppNavigation.svelte';
+  import TheaterToggle from '#lib/ui/TheaterToggle.svelte';
   import { roomQueueCapacity } from '../../../../services/core/src/protocol.ts';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
+  import TrackThumbnail from '#lib/ui/TrackThumbnail.svelte';
 
   import { onMount, tick as afterRender } from 'svelte';
   import { createRoomClient, type RoomClientState } from '#lib/rooms/room-client.ts';
@@ -37,6 +40,7 @@
   let importing = $state(false),
     invitationLink = $state(''),
     invitationError = $state('');
+  let theater = $state(false);
   let tick = $state(0);
   let tv = $state(false);
   let welcomeScene = $state(false);
@@ -206,34 +210,23 @@
 </svelte:head>
 
 <a class="skip-link" href="#main">Skip to music</a>
-<div class="app-shell" class:tv-mode={tv && Boolean(room)}>
+<div
+  class="app-shell"
+  class:tv-mode={tv && Boolean(room)}
+  class:theater-mode={theater && !tv && Boolean(room?.current)}
+>
   <header class="app-header">
     <a class="brand" href="/" aria-label="Afterparty home" onclick={goHome}
       ><img src="/afterparty-mark.svg" width="42" height="42" alt="" /><span
         >afterparty<span class="red">.</span></span
       ></a
     >
-    <nav aria-label="Main navigation">
-      <a
-        class="nav-link"
-        class:active={!directory}
-        href={room ? `/?room=${room.code}` : '/'}
-        aria-current={directory ? undefined : 'page'}
-        onclick={goListening}><Icon name="headphones" />Music</a
-      >
-      <button
-        class="nav-link"
-        class:active={directory}
-        onclick={toggleDirectory}
-        aria-current={directory ? 'page' : undefined}
-        aria-pressed={directory}><Icon name="users" />Open rooms</button
-      >
-      <a class="nav-link" href="/discord"><Icon name="music" />Concerts</a>
-      <a class="nav-link" href="/admin" data-sveltekit-reload><Icon name="settings" />DJ tools</a>
-      <a class="nav-link" href={room ? `/games?room=${encodeURIComponent(room.code)}` : '/games'}
-        ><Icon name="users" />Games</a
-      >
-    </nav>
+    <AppNavigation
+      active={directory ? 'rooms' : 'music'}
+      roomCode={room?.code}
+      onMusic={goListening}
+      onRooms={toggleDirectory}
+    />
   </header>
 
   <div class="workspace">
@@ -258,60 +251,68 @@
               <p class="intro">Play music and video together. One room, one shared soundtrack.</p>
             </div>
             <div class="welcome-stage">
-              {#if welcomeScene}{@render scenery('welcome')}{/if}
+              <div class="stage-heading">
+                <span class="eyebrow">THE AFTERPARTY STAGE</span><MotionPreference />
+              </div>
+              <div class="stage-visual">
+                {#if welcomeScene}{@render scenery('welcome')}{/if}
+              </div>
+              <div class="stage-caption">
+                <span>YOUR MUSIC. YOUR PEOPLE.</span><span>ONE SHARED SOUNDTRACK</span>
+              </div>
             </div>
-          </div>
-          <div class="room-forms">
-            <form
-              onsubmit={(event) => {
-                event.preventDefault();
-                void create();
-              }}
-            >
-              <h2>Start something good</h2>
-              <p>Create a private room and invite your people.</p>
-              <label for="room-name">Room name</label><input
-                id="room-name"
-                bind:value={roomName}
-                placeholder="The listening room"
-                maxlength="48"
-                autocomplete="off"
-              />
-              <label class="checkbox-label"
-                ><input type="checkbox" bind:checked={publicRoom} /> List this room in Open rooms</label
+            <div class="room-forms">
+              <form
+                onsubmit={(event) => {
+                  event.preventDefault();
+                  void create();
+                }}
               >
-              <button
-                class="button primary"
-                disabled={!client || view.busy || view.connection === 'connecting'}
-                >{publicRoom ? 'Create public room' : 'Create private room'}
-                <Icon name="arrow" /></button
+                <h2>Start something good</h2>
+                <p>Create a private room and invite your people.</p>
+                <label for="room-name">Room name</label><input
+                  id="room-name"
+                  bind:value={roomName}
+                  placeholder="The listening room"
+                  maxlength="48"
+                  autocomplete="off"
+                />
+                <label class="checkbox-label"
+                  ><input type="checkbox" bind:checked={publicRoom} /> List this room in Open rooms</label
+                >
+                <button
+                  class="button primary"
+                  disabled={!client || view.busy || view.connection === 'connecting'}
+                  >{publicRoom ? 'Create public room' : 'Create private room'}
+                  <Icon name="arrow" /></button
+                >
+              </form>
+              <form
+                onsubmit={(event) => {
+                  event.preventDefault();
+                  void join();
+                }}
               >
-            </form>
-            <form
-              onsubmit={(event) => {
-                event.preventDefault();
-                void join();
-              }}
-            >
-              <h2>Already invited?</h2>
-              <p>Your room code gets you straight to the music.</p>
-              <label for="room-code">Room code</label><input
-                id="room-code"
-                bind:value={roomCode}
-                placeholder="8-character code"
-                maxlength="8"
-                minlength="8"
-                required
-                autocomplete="off"
-                autocapitalize="characters"
-                spellcheck="false"
-              />
-              <button
-                class="button secondary"
-                disabled={!client || view.busy || view.connection === 'connecting'}
-                >Join room <Icon name="arrow" /></button
-              >
-            </form>
+                <h2>Already invited?</h2>
+                <p>Your room code gets you straight to the music.</p>
+                <label for="room-code">Room code</label><input
+                  id="room-code"
+                  bind:value={roomCode}
+                  placeholder="8-character code"
+                  maxlength="8"
+                  minlength="8"
+                  required
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  spellcheck="false"
+                />
+                <button
+                  class="button secondary"
+                  disabled={!client || view.busy || view.connection === 'connecting'}
+                  >Join room <Icon name="arrow" /></button
+                >
+              </form>
+            </div>
           </div>
           <div class="welcome-foot">
             <span>YOU CHOOSE WHO JOINS</span><span>SHARED IN REAL TIME</span><span
@@ -325,6 +326,10 @@
             <h1>{room.name}</h1>
           </div>
           <div class="room-actions">
+            {#if room.current && !tv}<TheaterToggle
+                bind:active={theater}
+                controls="room-player"
+              />{/if}
             <button class="button secondary" aria-pressed={tv} onclick={toggleTV}
               >{tv ? 'Exit TV mode' : 'TV mode'}</button
             >
@@ -620,7 +625,7 @@
                     </div>
                     {#if view.results.length}<ul class="search-results">
                         {#each view.results as video, index (`${video.id}:${index}`)}<li>
-                            <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
+                            <TrackThumbnail image={video.image} />
                             <div class="track-info">
                               <strong>{video.title}</strong><span>{video.artist}</span>
                             </div>
@@ -718,7 +723,7 @@
       </nav>
     {/if}
     <footer class="footer">
-      <MotionPreference />
+      {#if room || directory}<MotionPreference />{/if}
       <span>afterparty<span class="red">.</span></span><a
         href={`/patch-notes#v${releases[0].version}`}>v{releases[0].version} · Patch notes</a
       ><span>YOUR MUSIC. YOUR PEOPLE.</span>
@@ -727,29 +732,172 @@
 </div>
 
 <style>
+  .app-shell:has(.welcome) .workspace,
+  .app-shell:has(.welcome) .app-header {
+    max-width: 3200px;
+  }
+  .workspace > main:has(.welcome) {
+    max-width: none;
+    min-height: calc(100svh - 184px);
+    display: grid;
+    align-items: center;
+  }
+  .welcome {
+    max-width: none;
+    padding-top: clamp(12px, 2vh, 36px);
+  }
   .welcome-hero {
     display: grid;
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    gap: clamp(20px, 3vw, 52px);
+    column-gap: clamp(28px, 3.5vw, 80px);
+    row-gap: 30px;
     align-items: center;
   }
+  .welcome-copy {
+    grid-column: 1;
+    align-self: end;
+  }
+  .welcome h1 {
+    font-size: clamp(64px, 5.9vw, 184px);
+    margin: 20px 0;
+  }
+  .welcome .intro {
+    max-width: 520px;
+    font-size: clamp(17px, 1.1vw, 28px);
+  }
   .welcome-stage {
+    grid-column: 2;
+    grid-row: 1 / 3;
     min-width: 0;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: 1px solid #38252f;
+    border-radius: 28px;
+    background: radial-gradient(ellipse at 50% 50%, #33101e 0%, #110e15 50%, #0d0d10 85%);
+    overflow: hidden;
+  }
+  .stage-heading,
+  .stage-caption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px;
+  }
+  .stage-heading .eyebrow {
+    color: #e5bbc8;
+    font-size: clamp(10px, 0.45vw, 14px);
+  }
+  .stage-visual {
+    width: 100%;
     aspect-ratio: 16 / 9;
+    margin: auto 0;
   }
-  @media (max-width: 1000px) {
+  .stage-caption {
+    color: #b7a3af;
+    font-size: clamp(9px, 0.4vw, 13px);
+    font-weight: 650;
+    letter-spacing: 1.5px;
+  }
+  .room-forms {
+    grid-column: 1;
+    margin: 0;
+    gap: 14px;
+    align-self: start;
+  }
+  .room-forms > form {
+    padding: clamp(18px, 1.4vw, 30px);
+    border-radius: 18px;
+    background: linear-gradient(150deg, #19181e, #111216);
+  }
+  .room-forms h2 {
+    font-size: clamp(20px, 1.2vw, 32px);
+  }
+  .room-forms p {
+    font-size: clamp(13px, 0.55vw, 17px);
+  }
+  .room-forms label {
+    margin-top: 20px;
+    font-size: clamp(13px, 0.6vw, 18px);
+  }
+  .room-forms input:not([type='checkbox']) {
+    height: clamp(50px, 2vw, 64px);
+    font-size: clamp(16px, 0.7vw, 22px);
+  }
+  .room-forms .button {
+    min-height: clamp(48px, 2vw, 64px);
+    font-size: clamp(14px, 0.7vw, 20px);
+  }
+  .room-forms .checkbox-label {
+    font-size: clamp(12px, 0.55vw, 17px);
+    line-height: 1.5;
+    min-height: 36px;
+  }
+  .welcome-foot {
+    gap: 24px;
+    margin: 28px 0 0;
+    font-size: clamp(10px, 0.45vw, 14px);
+  }
+  @media (max-width: 1100px) {
     .welcome-hero {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 8px;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
     }
     .welcome-stage {
-      max-width: 560px;
+      grid-row: 1;
+    }
+    .room-forms {
+      grid-column: 1 / -1;
+    }
+    .stage-heading,
+    .stage-caption {
+      padding: 14px;
+      gap: 10px;
+    }
+    .stage-heading .eyebrow {
+      font-size: 8px;
+    }
+    .stage-caption {
+      font-size: 8px;
+      letter-spacing: 0.8px;
+    }
+    .stage-caption span:last-child {
+      display: none;
     }
   }
-  @media (max-width: 600px) {
+  @media (max-width: 650px) {
+    .welcome-hero {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .welcome h1 {
+      font-size: clamp(56px, 15vw, 82px);
+      margin: 12px 0;
+    }
+    .welcome-copy {
+      grid-column: 1;
+    }
     .welcome-stage {
-      width: min(100%, 340px);
-      justify-self: center;
+      grid-column: 1;
+      grid-row: 2;
+      border-radius: 18px;
+    }
+    .stage-caption {
+      display: none;
+    }
+    .room-forms {
+      grid-row: 3;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .room-forms > form {
+      padding: 22px;
+    }
+    .welcome-foot {
+      gap: 12px 18px;
+      line-height: 1.6;
     }
   }
   .next-track {
@@ -770,34 +918,34 @@
     padding: 18px 40px;
     border-bottom: 1px solid var(--line);
   }
-  .app-header nav {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .app-header .nav-link {
-    width: auto;
-    flex: 0 0 auto;
-    min-height: 44px;
-    margin: 0;
-    padding: 10px 12px;
-    font-size: 13px;
-    gap: 8px;
-    border-radius: 0;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-  }
-  .app-header .nav-link.active {
-    border-bottom-color: var(--red);
-    color: var(--text);
-  }
   .workspace {
     max-width: 2400px;
     margin-inline: auto;
   }
   .workspace > main {
     padding: clamp(20px, 2.8vw, 48px);
+  }
+  .theater-mode .workspace {
+    max-width: 3200px;
+  }
+  .theater-mode .workspace > main {
+    max-width: none;
+  }
+  .theater-mode .listening-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .theater-mode .room-side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    width: min(100%, 1440px);
+    margin-inline: auto;
+  }
+  @media (min-width: 1000px) {
+    .theater-mode .now-playing :global(.audio-stage:not(.fullscreen)) {
+      aspect-ratio: auto;
+      height: min(70svh, calc((100vw - 96px) * 9 / 16));
+    }
   }
   .room-heading {
     margin-bottom: 28px;
@@ -891,6 +1039,28 @@
     border-radius: 0;
     background: transparent;
     padding: 22px 0 0;
+    display: grid;
+    gap: 14px;
+    border-top: 1px solid var(--line);
+  }
+  .room-settings > label:not(.checkbox-label) {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: -6px;
+  }
+  .room-settings > input {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+  .room-settings h3 {
+    font-size: 15px;
+    margin-top: 12px;
+  }
+  .room-settings .permission-note {
+    font-size: 13px;
+    line-height: 1.65;
   }
   .room-settings h2 {
     font-size: 18px;
@@ -988,20 +1158,16 @@
       background: #222227;
       box-shadow: inset 0 2px var(--red);
     }
+    .room-heading .room-actions {
+      gap: 8px;
+    }
+    .room-heading .room-actions .invite {
+      padding-inline: 12px;
+      gap: 8px;
+    }
     .app-header {
       display: block;
       padding: 16px 20px;
-    }
-    .app-header nav {
-      margin-top: 12px;
-      justify-content: space-between;
-    }
-    .app-header .nav-link {
-      font-size: 12px;
-      padding: 10px 5px;
-    }
-    .app-header .nav-link :global(svg) {
-      display: none;
     }
     .listening-grid {
       grid-template-columns: minmax(0, 1fr);

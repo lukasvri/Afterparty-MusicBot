@@ -1,4 +1,7 @@
 <script lang="ts">
+  import AppNavigation from '#lib/ui/AppNavigation.svelte';
+  import TheaterToggle from '#lib/ui/TheaterToggle.svelte';
+  import TrackThumbnail from '#lib/ui/TrackThumbnail.svelte';
   import { roomQueueCapacity } from '../../../../../services/core/src/protocol.ts';
   import { onMount } from 'svelte';
   import { createDiscordClient, type ConcertView } from '#lib/concert/discord-client.ts';
@@ -35,6 +38,7 @@
     resultPage = $state(0);
   const shownResults = $derived(view.results.slice(resultPage * 10, (resultPage + 1) * 10));
   const resultPages = $derived(Math.max(1, Math.ceil(view.results.length / 10)));
+  let theater = $state(false);
   let tick = $state(0);
   let tv = $state(false);
   let playerFailed = $state(false);
@@ -133,22 +137,21 @@
 </svelte:head>
 
 <a class="skip-link" href="#concert">Skip to concert</a>
-<div class="concert-shell" class:tv-mode={tv && Boolean(concert?.current)}>
+<div
+  class="concert-shell"
+  class:tv-mode={tv && Boolean(concert?.current)}
+  class:theater-mode={theater && !tv && Boolean(concert?.current)}
+>
   <header class="concert-header">
     <a class="brand" href="/"
       ><img src="/afterparty-mark.svg" width="36" height="36" alt="" />afterparty<span class="red"
         >.</span
       ></a
     >
-    <nav aria-label="Concert navigation">
-      {#if view.guildId}<button class="button secondary" aria-pressed={tv} onclick={toggleTV}
-          >{tv ? 'Exit TV mode' : 'TV mode'}</button
-        >{/if}
-      <a href="/">Listening rooms</a><a
-        href={view.guildId ? `/admin?guildId=${encodeURIComponent(view.guildId)}` : '/admin'}
-        data-sveltekit-reload>DJ & server tools</a
-      >
-    </nav>
+    <AppNavigation active="concerts" guildId={view.guildId} />
+    {#if view.guildId}<button class="button secondary" aria-pressed={tv} onclick={toggleTV}
+        >{tv ? 'Exit TV mode' : 'TV mode'}</button
+      >{/if}
   </header>
   <main id="concert">
     <div class="concert-title">
@@ -198,8 +201,11 @@
 
     {#if view.loading}<p class="empty-stage" role="status">Connecting to the stage…</p>
     {:else}
+      {#if concert?.current && !tv}<div class="concert-display">
+          <TheaterToggle bind:active={theater} controls="concert-player" />
+        </div>{/if}
       <section class="concert-content" aria-label="Concert state">
-        <div class="current-track">
+        <div class="current-track" id="concert-player">
           <div class="section-heading">
             <h2>{concert?.guildName ?? 'Discord concert'}</h2>
             <span class="eyebrow"
@@ -360,9 +366,7 @@
                   </p>
                   {#if shownResults.length}<ul class="search-results">
                       {#each shownResults as video, index (`${video.id}:${index}`)}<li>
-                          <span class="track-number"
-                            >{String(resultPage * 10 + index + 1).padStart(2, '0')}</span
-                          >
+                          <TrackThumbnail image={video.image} />
                           <div class="track-info">
                             <strong>{video.title}</strong><span>{video.artist}</span>
                           </div>
@@ -527,6 +531,39 @@
 </div>
 
 <style>
+  .concert-display {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .concert-shell.theater-mode {
+    max-width: 3200px;
+  }
+  .theater-mode .concert-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .theater-mode .current-track {
+    position: static;
+  }
+  .theater-mode .concert-workspace {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    width: min(100%, 1440px);
+    margin-inline: auto;
+  }
+  @media (min-width: 1000px) {
+    .theater-mode :global(.audio-stage:not(.fullscreen)),
+    .theater-mode .concert-art {
+      aspect-ratio: auto;
+      height: min(70svh, calc((100vw - 96px) * 9 / 16));
+    }
+    .theater-mode .concert-art img {
+      object-fit: contain;
+    }
+  }
   .concert-recovery {
     margin-top: 16px;
     padding: 16px;
@@ -662,7 +699,6 @@
     gap: 26px;
     font-size: 12px;
   }
-  nav a:hover,
   .server-picker a:hover {
     color: var(--red);
   }
@@ -807,9 +843,6 @@
     .concert-header {
       padding: 20px 22px;
       flex-wrap: wrap;
-    }
-    .concert-header nav {
-      gap: 18px;
     }
     .concert-title > :global(svg) {
       display: none;

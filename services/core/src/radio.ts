@@ -26,7 +26,7 @@ export function radioStyleCompatible(seed: RadioTrack, track: RadioTrack) {
     candidate = radioGenre(track);
   // A broad House label is incomplete, not evidence against a named House
   // subgenre. This only removes a contradiction; radioRelated still requires
-  // the same artist, the same specific genre or a vetted recording relation.
+  // the same artist, a matching discovery genre or a vetted recording relation.
   // Two different specific subgenres remain incompatible.
   return (
     !genre || !candidate || genre === candidate ||
@@ -105,6 +105,14 @@ const broadGenres = new Set([
 export function specificRadioGenre(track: RadioTrack) {
   const genre = radioGenre(track);
   return genre && !broadGenres.has(genre) ? genre : null;
+}
+/** Named House recordings can discover other explicitly House-tagged songs.
+ * Keep refinement separate: an exact recording may still reveal a subgenre.
+ * Other broad genres and unknown publisher uploads retain conservative fallback.
+ */
+export function radioDiscoveryGenre(track: RadioTrack) {
+  return specificRadioGenre(track) ??
+    (radioGenre(track) === "house" && radioArtist(track) ? "house" : null);
 }
 function artistTitleParts(track: RadioTrack) {
   const colon = track.title.match(/^([^:]+):\s+(.+)$/);
@@ -258,7 +266,7 @@ export function metadataGenres(description: unknown, tags: unknown): string[] {
 export function radioQuery(track: RadioTrack) {
   const artist = radioArtist(track),
     song = radioTitle(track).replace(/"/g, "");
-  const genre = specificRadioGenre(track);
+  const genre = radioDiscoveryGenre(track);
   return `${genre ?? artist} audio${song ? ` -"${song}"` : ""}`;
 }
 export function songIdentity(track: RadioTrack) {
@@ -324,10 +332,10 @@ export function sameRadioSong(a: RadioTrack, b: RadioTrack) {
 /** A vetted catalog relationship may fill missing metadata, never a conflicting style. */
 export function radioRelated(seed: RadioTrack, track: RadioTrack, relatedRecording = false) {
   const artist = artistIdentity(seed);
-  const specific = specificRadioGenre(seed);
+  const genre = radioDiscoveryGenre(seed);
   return radioStyleCompatible(seed, track) && (
     Boolean(artist.artist && sameArtistIdentity(artist, artistIdentity(track))) ||
-    Boolean(specific && radioGenre(track) === specific) ||
+    Boolean(genre && radioGenre(track) === genre && (genre !== "house" || radioArtist(track))) ||
     relatedRecording
   );
 }

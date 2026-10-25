@@ -7,27 +7,61 @@
     animated?: boolean;
   } = $props();
   const prefix = $props.id();
+  import { onMount } from 'svelte';
+  let motionPaused = $state(false);
+  let venue = $state<HTMLDivElement>();
+  onMount(() => {
+    let inView = true;
+    const update = () => (motionPaused = !inView || document.hidden);
+    const observer = new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting;
+      update();
+    });
+    if (venue) observer.observe(venue);
+    document.addEventListener('visibilitychange', update);
+    update();
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', update);
+    };
+  });
   const lights = [180, 390, 600, 810, 1020];
 </script>
 
 <!-- A decorative venue, never a playback surface or a second set of controls. -->
-<div class="concert-scenery" class:animated data-composition={composition} aria-hidden="true">
+<div
+  class="concert-scenery"
+  bind:this={venue}
+  class:animated
+  class:motion-paused={motionPaused}
+  data-composition={composition}
+  aria-hidden="true"
+>
   <svg viewBox="0 0 1200 675" fill="none" focusable="false">
     <defs>
       <radialGradient id={`${prefix}-ambience`} cx="50%" cy="45%" r="65%">
-        <stop stop-color="#3d1723" stop-opacity=".66" />
+        <stop stop-color="#711c35" stop-opacity=".8" />
         <stop offset=".58" stop-color="#17151c" stop-opacity=".7" />
         <stop offset="1" stop-color="#0c0d10" stop-opacity="0" />
       </radialGradient>
       <linearGradient id={`${prefix}-red-beam`} x1="0" y1="0" x2="0" y2="1">
-        <stop stop-color="#ff465e" stop-opacity=".23" />
-        <stop offset=".6" stop-color="#ff263e" stop-opacity=".055" />
+        <stop stop-color="#ff465e" stop-opacity=".52" />
+        <stop offset=".6" stop-color="#ff263e" stop-opacity=".18" />
         <stop offset="1" stop-color="#ff263e" stop-opacity="0" />
       </linearGradient>
       <linearGradient id={`${prefix}-white-beam`} x1="0" y1="0" x2="0" y2="1">
-        <stop stop-color="#dfe5f1" stop-opacity=".12" />
+        <stop stop-color="#cbdfff" stop-opacity=".3" />
         <stop offset="1" stop-color="#dfe5f1" stop-opacity="0" />
       </linearGradient>
+      <linearGradient id={`${prefix}-laser`} x1="0" y1="1" x2="0" y2="0">
+        <stop stop-color="#ff4766" stop-opacity=".9" />
+        <stop offset="1" stop-color="#ff4766" stop-opacity="0" />
+      </linearGradient>
+      <radialGradient id={`${prefix}-halo`}>
+        <stop offset=".62" stop-color="#ff263e" stop-opacity="0" />
+        <stop offset=".84" stop-color="#ff263e" stop-opacity=".18" />
+        <stop offset="1" stop-color="#ff263e" stop-opacity="0" />
+      </radialGradient>
       <linearGradient id={`${prefix}-booth`} x1="0" y1="0" x2="0" y2="1">
         <stop stop-color="#292c35" />
         <stop offset="1" stop-color="#101216" />
@@ -92,45 +126,90 @@
       </g>
     {/snippet}
 
-    {#snippet deck(x: number)}
+    {#snippet deck(x: number, label: string)}
       <g class="dj-deck" transform={`translate(${x} 0)`}>
-        <rect width="108" height="76" rx="5" fill="#171b22" stroke="#8c94a2" />
-        <path d="M3 75H105V80H3Z" fill="#0a0d12" stroke="#434b59" />
-        <rect x="8" y="6" width="66" height="14" rx="2" fill="#090e14" stroke="#525b6b" />
         <path
-          d="M12 13h6l3-4 3 8 3-6h7l3 5 3-8 3 5h6l3-4 3 8 3-5h7"
-          stroke="#c0d0df"
-          stroke-width="1"
+          d="M0 5L5 0H139L144 5V102L139 108H5L0 102Z"
+          fill="#181c24"
+          stroke="#8895a9"
+          stroke-width="1.4"
         />
-        <path d="M42 7V19" stroke="#ff5e76" stroke-width="1.5" />
-        <circle cx="47" cy="44" r="23" fill="#080c12" stroke="#b1bac8" stroke-width="1.3" />
-        <circle cx="47" cy="44" r="19" fill="#29323f" stroke="#6c7788" />
-        <circle
-          class="deck-ring"
-          cx="47"
-          cy="44"
-          r="21"
-          stroke="#ff526d"
-          stroke-width="2"
-          stroke-dasharray="15 117"
-        />
-        <circle cx="47" cy="44" r="8" fill="#111720" stroke="#717d8d" />
-        <path d="M47 38V42" stroke="#e8eef4" stroke-width="1.5" />
-        <circle cx="12" cy="37" r="4" fill="#323a48" stroke="#a6afbc" />
-        <circle cx="12" cy="55" r="5" fill="#ff3855" stroke="#ffb0bc" />
-        <path d="M11 52L14 55L11 58Z" fill="#11151c" />
-        <path d="M90 27V63M86 27H95M86 63H95" stroke="#8e98a8" />
-        <rect x="86" y="42" width="9" height="5" rx="1" fill="#e0e6ec" stroke="#0b1018" />
-        {#each [0, 1, 2, 3] as pad}
+        <path d="M5 102H139V108H5Z" fill="#080b11" stroke="#444e60" />
+        <!-- Rotate the controls in the tabletop plane toward the performer. -->
+        <g class="deck-controls" transform="rotate(180 72 54)">
+          <path d="M8 9H136" stroke="#505c70" />
           <rect
-            x={23 + pad * 14}
-            y="69"
-            width="10"
-            height="4"
-            rx="1"
-            fill={pad === 0 ? '#ff526d' : '#99a4b6'}
+            class="deck-screen"
+            x="35"
+            y="13"
+            width="79"
+            height="27"
+            rx="3"
+            fill="#080e17"
+            stroke="#697d99"
           />
-        {/each}
+          <path d="M39 22H110M39 33H110" stroke="#34445c" stroke-width=".7" />
+          <path
+            d="M40 28h3l2-7 3 14 2-8h4l3-5 2 10 2-5h4l2-9 3 17 2-8h4l2-4 3 10 2-8h4l3-6 2 14 3-8h4l2-5 3 10h3"
+            stroke="#c0e5f5"
+            stroke-width="1.3"
+          />
+          <path d="M72 16V37" stroke="#ff526d" stroke-width="1.4" />
+          <text
+            x="11"
+            y="22"
+            fill="#d1d9e5"
+            font-family="Inter, Arial"
+            font-size="6"
+            font-weight="700">{label}</text
+          >
+          <text x="11" y="32" fill="#8e9db4" font-family="Inter, Arial" font-size="4.5">PLAYER</text
+          >
+          <circle
+            class="jog-wheel"
+            cx="76"
+            cy="71"
+            r="29"
+            fill="#080c12"
+            stroke="#d0d9e9"
+            stroke-width="1.6"
+          />
+          <circle cx="76" cy="71" r="25" fill="#2c3543" stroke="#6f7d93" stroke-width="1.2" />
+          <circle cx="76" cy="71" r="22" stroke="#445166" stroke-width="4" />
+          <circle
+            class="deck-ring"
+            cx="76"
+            cy="71"
+            r="27"
+            stroke="#ff5878"
+            stroke-width="2.5"
+            stroke-dasharray="25 8 2 135"
+          />
+          <circle cx="76" cy="71" r="14" fill="#101722" stroke="#8998b0" />
+          <path class="jog-needle" d="M76 58V65" stroke="#d6e7f9" stroke-width="2" />
+          <circle cx="76" cy="71" r="3" fill="#94a5bd" />
+          <circle cx="15" cy="56" r="7" fill="#182330" stroke="#b1c7de" stroke-width="1.5" />
+          <circle cx="15" cy="79" r="8" fill="#ff405e" stroke="#ff9bae" stroke-width="1.5" />
+          <path d="M13 75L18 79L13 83Z" fill="#15141b" />
+          <text x="5" y="98" fill="#a7b4c8" font-family="Inter, Arial" font-size="4.5"
+            >CUE / PLAY</text
+          >
+          <path d="M126 49V91M122 49H130M122 91H130" stroke="#b0bdce" />
+          <path d="M122 58H124M122 66H124M122 74H124M122 82H124" stroke="#6d7e96" />
+          <rect x="121" y="66" width="10" height="6" rx="1.5" fill="#e2eafa" stroke="#0a111b" />
+          <circle cx="127" cy="28" r="5" fill="#333e50" stroke="#c6d5e5" />
+          <path d="M127 24V27" stroke="#ff6580" />
+          {#each [0, 1, 2, 3] as pad}
+            <rect
+              x={45 + pad * 16}
+              y="99"
+              width="11"
+              height="4"
+              rx="1"
+              fill={pad === 0 ? '#ff526d' : '#a7bfd6'}
+            />
+          {/each}
+        </g>
       </g>
     {/snippet}
 
@@ -151,9 +230,48 @@
     />
     <g clip-path={`url(#${prefix}-screen)`}>
       <rect x="316" y="137" width="568" height="352" fill={`url(#${prefix}-led)`} />
-      <circle cx="600" cy="291" r="122" stroke="#a23950" stroke-width="1.4" opacity=".7" />
-      <circle cx="600" cy="291" r="136" stroke="#5e2d3b" opacity=".55" />
-      <path d="M471 290H729M600 162V420" stroke="#8d354a" stroke-width=".7" opacity=".22" />
+      <g class="screen-levels" fill="#ff385e" opacity=".2">
+        {#each Array.from({ length: 24 }) as _, index}
+          <rect
+            x={337 + index * 22}
+            y={450 - (24 + ((index * 17) % 70))}
+            width="9"
+            height={24 + ((index * 17) % 70)}
+            rx="2"
+            style={`--delay:${index * -0.26}s`}
+          />
+        {/each}
+      </g>
+      <circle cx="600" cy="291" r="164" fill={`url(#${prefix}-halo)`} />
+      <circle
+        class="stage-halo"
+        cx="600"
+        cy="291"
+        r="139"
+        stroke="#ff375b"
+        stroke-width="9"
+        opacity=".13"
+      />
+      <circle cx="600" cy="291" r="139" stroke="#ff4c6b" stroke-width="2" opacity=".85" />
+      <circle
+        class="stage-orbit"
+        cx="600"
+        cy="291"
+        r="150"
+        stroke="#ff6683"
+        stroke-width="3"
+        stroke-dasharray="120 40 8 40 30 78"
+      />
+      <circle
+        class="stage-orbit orbit-inner"
+        cx="600"
+        cy="291"
+        r="123"
+        stroke="#e4eaff"
+        stroke-width="1.5"
+        stroke-dasharray="44 214"
+        opacity=".7"
+      />
       <image href="/afterparty-mark.svg" x="475" y="165" width="250" height="250" opacity=".94" />
     </g>
 
@@ -199,6 +317,22 @@
       opacity=".18"
     />
     <ellipse cx="600" cy="577" rx="340" ry="30" fill="#06090d" opacity=".6" />
+    {#each [190, 1010] as x, index}
+      <g transform={`translate(${x} 511)`}>
+        <g
+          class="laser-fan"
+          style={`--delay:${index * -4.5}s`}
+          stroke={`url(#${prefix}-laser)`}
+          stroke-width="1.5"
+        >
+          {#each [-3, -2, -1, 0, 1, 2, 3] as ray}
+            <path d={`M0 0L${ray * 95 + (index ? -170 : 170)} -390`} />
+          {/each}
+        </g>
+        <rect x="-17" y="-8" width="34" height="16" rx="4" fill="#272c36" stroke="#8993a4" />
+        <circle r="3" fill="#ff6c87" />
+      </g>
+    {/each}
     {@render speaker(158, false)}
     {@render speaker(956, true)}
     {@render subwoofer(155)}
@@ -283,46 +417,48 @@
       />
       <path d="M364 486H836" stroke="#ff3c59" stroke-width="3" />
       <path d="M380 568H820M388 497L398 560M812 497L802 560" stroke="#525968" opacity=".65" />
-      <g class="control-plane" transform="translate(0 431) scale(1 .55)">
-        {@render deck(414)}
-        {@render deck(677)}
-        <g class="dj-mixer">
+      <g class="control-plane" transform="translate(0 425) scale(1 .46)">
+        {@render deck(394, 'DECK 01')}
+        {@render deck(666, 'DECK 02')}
+        <g class="dj-mixer" transform="translate(0 12)">
           <rect x="566" width="76" height="80" rx="4" fill="#111720" stroke="#a2adbd" />
-          {#each [579, 593, 607, 621] as x, channel}
-            <path d={`M${x - 5} 5V66`} stroke="#3b4555" stroke-width=".8" />
-            {#each [10, 22, 34, 45] as y, knob}
-              <circle cx={x} cy={y} r="3" fill="#333f50" stroke="#b1bccb" stroke-width=".7" />
-              <path
-                d={`M${x} ${y - 2}v1.5`}
-                stroke={knob === 0 ? '#ff627a' : '#e7edf4'}
-                stroke-width=".8"
+          <g class="mixer-controls" transform="rotate(180 604 40)">
+            {#each [579, 593, 607, 621] as x, channel}
+              <path d={`M${x - 5} 5V66`} stroke="#3b4555" stroke-width=".8" />
+              {#each [10, 22, 34, 45] as y, knob}
+                <circle cx={x} cy={y} r="3" fill="#333f50" stroke="#b1bccb" stroke-width=".7" />
+                <path
+                  d={`M${x} ${y - 2}v1.5`}
+                  stroke={knob === 0 ? '#ff627a' : '#e7edf4'}
+                  stroke-width=".8"
+                />
+              {/each}
+              <path d={`M${x} 53V66`} stroke="#8f9aab" />
+              <rect
+                x={x - 4}
+                y={55 + (channel % 3) * 3}
+                width="8"
+                height="4"
+                rx="1"
+                fill="#d2dce8"
+                stroke="#101722"
               />
             {/each}
-            <path d={`M${x} 53V66`} stroke="#8f9aab" />
-            <rect
-              x={x - 4}
-              y={55 + (channel % 3) * 3}
-              width="8"
-              height="4"
-              rx="1"
-              fill="#d2dce8"
-              stroke="#101722"
-            />
-          {/each}
-          {#each Array.from({ length: 8 }) as _, index}
-            <rect
-              class="mixer-meter"
-              x="633"
-              y={12 + index * 6}
-              width="4"
-              height="3"
-              rx=".5"
-              fill={index < 2 ? '#ff3855' : '#d7e8df'}
-              style={`--delay:${index * -0.19}s`}
-            />
-          {/each}
-          <path d="M584 74H625" stroke="#939eae" stroke-width="1.4" />
-          <rect x="601" y="71" width="6" height="7" rx="1" fill="#e6edf4" stroke="#0c1119" />
+            {#each Array.from({ length: 8 }) as _, index}
+              <rect
+                class="mixer-meter"
+                x="633"
+                y={12 + index * 6}
+                width="4"
+                height="3"
+                rx=".5"
+                fill={index < 2 ? '#ff3855' : '#d7e8df'}
+                style={`--delay:${index * -0.19}s`}
+              />
+            {/each}
+            <path d="M584 74H625" stroke="#939eae" stroke-width="1.4" />
+            <rect x="601" y="71" width="6" height="7" rx="1" fill="#e6edf4" stroke="#0c1119" />
+          </g>
         </g>
       </g>
       <text
@@ -363,6 +499,18 @@
       />
     </g>
 
+    <g class="stage-ribbon" fill="#ff526d">
+      {#each Array.from({ length: 28 }) as _, index}
+        <rect
+          x={108 + index * 36}
+          y="612"
+          width="21"
+          height="3"
+          rx="1.5"
+          style={`--delay:${index * -0.15}s`}
+        />
+      {/each}
+    </g>
     <path d="M93 615H1107" stroke="#79404d" opacity=".35" />
     {#each Array.from({ length: 17 }) as _, index}
       <g fill="#0a0d14" opacity={index % 3 ? '.94' : '.82'}>
@@ -396,13 +544,15 @@
     height: 100%;
   }
   .animated .light-beam {
-    animation: light-breathe 8s ease-in-out infinite alternate;
+    transform-box: fill-box;
+    transform-origin: 50% 0%;
+    animation: light-sweep 9s ease-in-out infinite alternate;
     animation-delay: var(--delay, 0s);
   }
   .animated .performer-head {
     transform-box: fill-box;
     transform-origin: center bottom;
-    animation: head-nod 4.6s ease-in-out infinite;
+    animation: head-nod 2.8s ease-in-out infinite;
   }
   .animated .deck-ring {
     transform-box: fill-box;
@@ -413,21 +563,79 @@
     animation: meter-breathe 1.9s ease-in-out infinite alternate;
     animation-delay: var(--delay, 0s);
   }
-  @keyframes light-breathe {
+  .animated .stage-orbit {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: platter-turn 18s linear infinite;
+  }
+  .animated .orbit-inner {
+    animation-direction: reverse;
+    animation-duration: 28s;
+  }
+  .animated .stage-halo {
+    animation: halo-breathe 4s ease-in-out infinite alternate;
+  }
+  .animated .laser-fan {
+    transform-origin: 0px 0px;
+    animation: laser-sweep 11s ease-in-out infinite alternate;
+    animation-delay: var(--delay, 0s);
+  }
+  .animated .screen-levels rect {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    animation: level-rise 3.2s ease-in-out infinite alternate;
+    animation-delay: var(--delay, 0s);
+  }
+  @keyframes level-rise {
     from {
-      opacity: 0.42;
+      transform: scaleY(0.25);
     }
     to {
+      transform: scaleY(1);
+    }
+  }
+  .animated .stage-ribbon rect {
+    animation: meter-breathe 2.8s ease-in-out infinite alternate;
+    animation-delay: var(--delay, 0s);
+  }
+  .motion-paused :global(*) {
+    animation-play-state: paused !important;
+  }
+  @keyframes light-sweep {
+    from {
+      transform: rotate(-13deg);
+      opacity: 0.6;
+    }
+    to {
+      transform: rotate(13deg);
       opacity: 1;
+    }
+  }
+  @keyframes laser-sweep {
+    from {
+      transform: rotate(-9deg);
+      opacity: 0.45;
+    }
+    to {
+      transform: rotate(9deg);
+      opacity: 0.95;
+    }
+  }
+  @keyframes halo-breathe {
+    from {
+      opacity: 0.12;
+    }
+    to {
+      opacity: 0.4;
     }
   }
   @keyframes head-nod {
     0%,
     100% {
-      transform: rotate(-1deg);
+      transform: rotate(-2deg);
     }
     50% {
-      transform: rotate(1deg) translateY(1px);
+      transform: rotate(2deg) translateY(2px);
     }
   }
   @keyframes platter-turn {

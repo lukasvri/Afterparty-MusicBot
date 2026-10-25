@@ -168,7 +168,9 @@ export class Engine extends EventEmitter {
       this.lastSecond = second;
       this.checkpoint();
     }
-    if (this.current && this.sink.advancing()) void this.ensureRadio();
+    // Discovery needs no audible frames. Use source startup/buffering time to
+    // fill the queue too; decoding and the transition remain mixer-owned.
+    if (this.current && this.connected && !this.paused) void this.ensureRadio();
     this.emit("clock");
   }
   // Reconcile the consumed segment before restarting or advancing playback.

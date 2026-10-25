@@ -1,5 +1,75 @@
 # Afterparty interface review
 
+## Navigation and theater follow-up, 2026-10-25
+
+The interactive Music, Open rooms, Concerts, DJ tools and Games links share one
+`AppNavigation.svelte` owner. Labels, active state, spacing and 44px touch targets
+stay consistent across rooms, concerts, administration and games. Existing room
+and selected-server context remain in their links. Public information pages keep
+their clear back link and legal/help footer. Generic form fields now have a
+readable baseline while feature-specific controls keep their own styles.
+
+The music workspace's column owns its scrolling. Search, queue and library lists
+no longer create nested scrolling areas inside it. Collection/import/festival
+sections share a flatter frame, smaller headings and consistent section spacing.
+The workspace tabs restore their own scroll position. On mobile the document
+scrolls naturally; the existing music shortcuts remain.
+Administration separates site navigation from its compact local Playback,
+Settings and Tools bar; Concerts in the site navigation replaces the duplicate
+Watch concert link. The game entry screen uses a wide-screen two-column
+composition with fluid type and vertically stacked room choices; narrow screens
+retain the existing stacked flow.
+
+Rooms and concerts offer a device-local theater mode. The video surface takes
+the page width and moves the music workspace below, with bounded height on wide
+screens and preserved video proportions inside the official player. Activating
+it brings the view control and player into view. The saved layout preference
+survives reload and does not enable audio, remount the player or send room/Discord
+commands. TV and native YouTube fullscreen retain their existing layouts.
+
+Synthetic Chromium checks cover navigation/active states, guild links, touch
+geometry, keyboard use, theater sizing at 4K/QHD/1080p/mobile, persistent preference,
+retained search draft and a single iframe across layout changes. Library jobs,
+selection and authorization remain covered by their existing journeys. Screenshots
+are isolated fixtures, not live music or server accounts.
+[Theater capture](assets/v3-ui-theater-desktop-20261025.png) and
+[mobile administration](assets/v3-ui-admin-mobile-20261025.png) and
+[game entry](assets/v3-ui-games-desktop-20261025.png) show this pass.
+
+
+## Animated stage and welcome layout, 2026-10-25
+
+The welcome layout gives the stage its own fluid column beside the introduction
+and create/join forms, with a 3200px readable maximum instead of the former 1280px
+welcome cap. On mobile the complete stage appears above the forms. The scene
+restores sweeping spots, two seven-ray laser fans, counter-rotating LED rings,
+a slow halo, screen levels and the stage ribbon. Both CDJ control surfaces and
+the mixer face the performer in the projected table plane. Jog wheels, displays,
+buttons and pitch controls have been redrawn; the hand layer remains in front.
+
+The animation button sits beside the stage and explains when system reduced
+motion is active. CSS transform/opacity animations pause when the scene leaves
+the viewport or the tab is hidden. System and saved reduced-motion preferences
+still suppress animation. No strobe, media request, audio analyser or frame loop
+is added. Active rooms retain the lazy scene boundary.
+
+Search results in browser rooms and public concerts share `TrackThumbnail.svelte`:
+16:9 lazy images, no referrer, stable dimensions and a music-icon fallback for
+missing or failed images. The metadata already supplied by search is reused.
+The native player settings have an explicit grid body and separate Video & sound,
+Device synchronization and room settings groups. The existing YouTube player
+manages adaptive quality; 4K depends on the source, device and connection. No
+unsupported quality-forcing API or duplicate playback controls are introduced.
+
+Synthetic Chromium journeys check actual changes to spot/laser/ring transforms,
+CDJ orientation, equipment bounds, reduced motion, saved toggle behavior and
+4K/QHD/1080p/mobile layout. Search checks cover loaded, broken and missing images
+while retaining keyboard queue actions. Settings checks preserve device-local
+preferences and the existing shared-command boundary. Captures:
+[desktop](assets/v3-stage-desktop-20261025.png),
+[mobile](assets/v3-stage-mobile-20261025.png).
+
+
 ## Native v3 familiar layout, 2026-10-25
 
 The unpublished `3.0.0-alpha.2` candidate follows the older visual composition in

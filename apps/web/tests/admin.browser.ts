@@ -138,7 +138,7 @@ for (const width of [3840, 2560, 1920, 1440, 390])
         () =>
           (document.querySelector('#setting-defaultVolume') as HTMLInputElement)?.value === '60',
       );
-      await page.getByRole('button', { name: 'Player and queue' }).click();
+      await page.getByRole('button', { name: 'Playback' }).click();
       await page.getByRole('heading', { name: 'Second server soundtrack' }).waitFor();
       await page.getByRole('button', { name: 'Resume', exact: true }).click();
       await page.getByRole('status').filter({ hasText: 'Action confirmed.' }).waitFor();
@@ -178,6 +178,15 @@ for (const width of [3840, 2560, 1920, 1440, 390])
       assert.equal((writes.at(-1)?.command as Record<string, unknown>).seconds, 90);
       await page.getByLabel('Discord server', { exact: true }).selectOption(first);
       await page.getByRole('heading', { name: 'First server soundtrack', exact: true }).waitFor();
+      const siteNavigation = page.getByRole('navigation', { name: 'Main navigation', exact: true });
+      assert.equal(
+        await siteNavigation
+          .getByRole('link', { name: 'Concerts', exact: true })
+          .getAttribute('href'),
+        `/discord?guildId=${first}`,
+      );
+      assert.equal(await siteNavigation.locator('[aria-current="page"]').innerText(), 'DJ tools');
+
       assert.equal(
         await dj.getByRole('button', { name: 'Return to cue', exact: true }).isDisabled(),
         true,

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AppNavigation from '#lib/ui/AppNavigation.svelte';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
   import DJDesk from '#lib/admin/DJDesk.svelte';
 
@@ -134,9 +135,7 @@
         >afterparty<span class="red">.</span></span
       ></a
     >
-    <nav aria-label="Administration navigation">
-      <a href="/">Listening rooms</a><a href="/discord">Concerts</a>
-    </nav>
+    <AppNavigation active="admin" guildId={view.guildId} />
     {#if view.authenticated}<button
         class="button secondary"
         disabled={view.busy}
@@ -231,12 +230,11 @@
         </section>
       {:else}
         <nav class="tabs" aria-label="Server administration">
-          {#each [['player', 'Player and queue'], ['settings', 'Settings'], ['tools', 'Tools'], ...(view.globalAdmin ? [['rooms', 'Browser rooms']] : [])] as [key, label]}<button
+          {#each [['player', 'Playback'], ['settings', 'Settings'], ['tools', 'Tools'], ...(view.globalAdmin ? [['rooms', 'Browser rooms']] : [])] as [key, label]}<button
               class:chosen={tab === key}
               aria-pressed={tab === key}
               onclick={() => openTab(key)}>{label}</button
             >{/each}
-          <a href={'/discord?guildId=' + view.guildId}>Watch concert ↗</a>
         </nav>
         {#if !detail}<p role="status">Loading {selected?.name}…</p>
           <button
@@ -645,23 +643,6 @@
     border-bottom: 1px solid var(--line);
     background: #101115;
   }
-  .admin-header nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    font-size: 14px;
-    color: #c2c4ce;
-  }
-  .admin-header nav a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 8px 12px;
-    border-radius: 10px;
-  }
-  .admin-header nav a:hover {
-    color: white;
-  }
   main {
     width: 100%;
     max-width: 1440px;
@@ -783,8 +764,7 @@
     z-index: 3;
     background: #0c0d10;
   }
-  .tabs button,
-  .tabs a {
+  .tabs button {
     min-height: 44px;
     border: 1px solid transparent;
     border-radius: 10px;
@@ -798,9 +778,6 @@
     color: #fff;
     border-color: #ff6578;
     background: #2b1b24;
-  }
-  .tabs a {
-    margin-left: auto;
   }
   .notice {
     border: 1px solid #45434d;
@@ -1051,13 +1028,17 @@
       flex-wrap: wrap;
       gap: 18px;
     }
-    .admin-header nav {
-      order: 3;
-      width: 100%;
-      gap: 20px;
-    }
     main {
       padding: 30px 20px 50px;
+    }
+    .tabs {
+      gap: 6px;
+      padding-block: 10px;
+    }
+    .tabs button {
+      flex: 1 0 auto;
+      padding: 10px;
+      font-size: 13px;
     }
     .heading {
       display: block;
@@ -1102,9 +1083,7 @@
     .enqueue input {
       flex-basis: 100%;
     }
-    .tabs a {
-      margin-left: 0;
-    }
+
     .setting-row {
       gap: 14px;
     }
