@@ -132,20 +132,7 @@ export function viewState(value: PanelState = {}) {
         : updated
           ? "Siste kontrollerte betaversjon er allerede på nett. Ingen oppdatering er nødvendig."
           : value.message || "Kontroller GitHub-versjonen før du oppdaterer.",
-    progressLabel:
-      checking || value.stage === "checking"
-      ? "Kontrollerer status. Ingen oppdatering er startet"
-      : checkFailed
-        ? "Statuskontrollen ble ikke fullført. Ingen oppdatering er startet"
-        : running
-          ? ["validate", "cloudflare", "verify"].includes(value.stage ?? "")
-            ? "Oppdatering pågår"
-            : "Oppdatering venter på oppstart"
-          : value.stage === "done" && value.operation !== "check"
-            ? "Fullført"
-            : failed && value.operation === "publish"
-              ? "Ikke fullført"
-              : "Ingen oppdatering er startet",
+    progressLabel: projectProgress("beta", value).label,
     actionTitle: updated
       ? "Beta er oppdatert"
       : ready
@@ -174,25 +161,157 @@ export function frozenRequest(
   return Object.freeze({ commit, confirmation_id, confirm: true });
 }
 
-/** Old deployment receipts must never fill the steps of a new, unstarted job. */
-export function progressSteps(value: PanelState): PanelStep[] {
-  const publishing =
-    !value.checking &&
-    value.operation !== "check" &&
-    (["validate", "cloudflare", "verify"].includes(value.stage ?? "") ||
-      (value.stage === "done" && !value.running) ||
-      (["failed", "blocked"].includes(value.stage ?? "") &&
-        value.operation === "publish"));
-  if (publishing && value.steps?.length) return value.steps;
-  return stages.map(([name, label]) => ({
-    name,
-    label,
-    status: !publishing
-      ? "pending"
-      : value.stage === "done"
+/** The same lifecycle rules are used by every project in OpenWorks Admin. */
+export function projectProgress(
+  project: "production" | "beta" | "openworks",
+  value: unknown,
+) {
+  const object = (entry: unknown): Record<string, unknown> =>
+    entry !== null && typeof entry === "object" && !Array.isArray(entry)
+      ? (entry as Record<string, unknown>)
+      : {};
+  const state = object(value),
+    progress = object(state.progress),
+    update = object(state.update);
+  const stage = String(
+    project === "production" ? (progress.stage ?? "") : (state.stage ?? ""),
+  );
+  const checking =
+    state.checking === true ||
+    update.checking === true ||
+    (state.operation === "check" && stage === "checking");
+  const checkOnly = state.operation === "check";
+  const running = state.running === true && !checking;
+  const failed =
+    !checking &&
+    !checkOnly &&
+    (project === "production"
+      ? progress.failed === true || stage === "failed"
+      : state.operation === "publish" &&
+        ["failed", "blocked", "error"].includes(stage));
+  const labels =
+    project === "production"
+      ? [
+          "Hent kilde",
+          "Kontroller GitHub-bygg",
+          "Oppdater og kontroller bot",
+          "Bygg nettsiden i Cloudflare",
+          "Kontroller publisering",
+          "Kontroller samsvar",
+        ]
+      : project === "beta"
+        ? stages.map(([, label]) => label)
+        : [
+            "Kontroller kilde og publiseringsstatus",
+            "Publiser og kontroller nettsiden",
+          ];
+  const raw = Array.isArray(progress.steps)
+    ? progress.steps
+    : Array.isArray(state.steps)
+      ? state.steps
+      : [];
+  let steps: PanelStep[] = labels.map((label, index) => {
+    const entry = object(raw[index]);
+    const status = entry.status ?? entry.state;
+    return {
+      label:
+        typeof entry.label === "string"
+          ? entry.label
+          : typeof entry.name === "string"
+            ? entry.name
+            : label,
+      status: ["done", "success", "succeeded"].includes(String(status))
         ? "done"
-        : value.running && name === value.stage
+        : ["running", "current"].includes(String(status))
           ? "running"
-          : "pending",
-  }));
+          : status === "failed"
+            ? "failed"
+            : "pending",
+    };
+  });
+  const phases =
+    project === "production"
+      ? ["prepare", "validate", "core", "cloudflare", "verify"]
+      : project === "beta"
+        ? ["validate", "cloudflare", "verify"]
+        : ["checking", "publishing"];
+  const active =
+    running &&
+    !checkOnly &&
+    phases.includes(stage) &&
+    state.progress_kind !== "last";
+  const kind = checking
+    ? "checking"
+    : active
+      ? "running"
+      : running
+        ? "waiting"
+        : failed
+          ? "failed"
+          : "planned";
+  if (!active && !failed)
+    steps = steps.map((step) => ({ ...step, status: "pending" }));
+  if (active && project === "production") {
+    const index = phases.indexOf(stage);
+    steps = steps.map((step, i) => ({
+      ...step,
+      status: i < index ? "done" : i === index ? "running" : "pending",
+    }));
+  } else if (active && project === "openworks") {
+    steps = steps.map((step, i) => ({
+      ...step,
+      status:
+        stage === "publishing"
+          ? i === 0
+            ? "done"
+            : "running"
+          : i === 0
+            ? "running"
+            : "pending",
+    }));
+  } else if (active && project === "beta") {
+    if (stage === "validate")
+      steps = steps.map((step, i) => ({
+        ...step,
+        status: i === 0 ? "running" : "pending",
+      }));
+    if (stage === "cloudflare")
+      steps = steps.map((step, i) => ({
+        ...step,
+        status: i === 0 ? "done" : i > 2 ? "pending" : step.status,
+      }));
+    if (stage === "verify")
+      steps = steps.map((step, i) => ({
+        ...step,
+        status: i < 3 ? "done" : i === 3 ? "running" : "pending",
+      }));
+  }
+  return {
+    steps,
+    kind,
+    label:
+      kind === "running"
+        ? "Oppdatering pågår"
+        : kind === "checking"
+          ? "Kontrollerer status"
+          : kind === "waiting"
+            ? "Venter på oppstart"
+            : kind === "failed"
+              ? "Oppdateringen ble ikke fullført"
+              : "Neste oppdatering",
+    note:
+      kind === "checking"
+        ? "Statuskontroll pågår. Ingen publisering er startet."
+        : kind === "running"
+          ? "Trinnene gjelder oppdateringen som kjører nå."
+          : kind === "waiting"
+            ? "Oppdateringen er mottatt, men ingen trinn er bekreftet startet."
+            : kind === "failed"
+              ? "Bare dokumentert fremdrift fra den avbrutte oppdateringen vises."
+              : "Ingen oppdatering er startet. Tidligere resultater finner du under Historikk.",
+  };
+}
+
+export function progressSteps(value: PanelState): PanelStep[] {
+  return projectProgress("beta", value).steps;
 }

@@ -50,3 +50,18 @@ export function buildUpdatePanel(source: string): Record<string, string> {
     "manifest.json": JSON.stringify(manifest, null, 2) + "\n",
   };
 }
+
+/** Standalone shared model for the existing multi-project admin host. */
+export function buildProgressModel(source: string): string {
+  return buildSync({
+    entryPoints: [resolve(source, "model.ts")],
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "browser",
+    target: "es2020",
+    legalComments: "none",
+    charset: "utf8",
+    logLevel: "silent",
+  }).outputFiles[0].text;
+}

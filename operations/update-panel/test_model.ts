@@ -1,6 +1,12 @@
+import { projectProgress } from "./model.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { viewState, frozenRequest, parsePanelState, progressSteps } from "./model.ts";
+import {
+  viewState,
+  frozenRequest,
+  parsePanelState,
+  progressSteps,
+} from "./model.ts";
 const commit = "a".repeat(40);
 const nonce = "b".repeat(64);
 test("a checked deployed version stays up to date and cannot publish again", () => {
@@ -64,7 +70,7 @@ test("old errors are not shown after a successful check", () => {
 test("a check labels progress as not started despite a legacy last-job hint", () => {
   assert.equal(
     viewState({ stage: "ready", progress_kind: "last" }).progressLabel,
-    "Ingen oppdatering er startet",
+    "Neste oppdatering",
   );
 });
 test("quota failures retain deployment history without completed progress", () => {
@@ -80,7 +86,7 @@ test("quota failures retain deployment history without completed progress", () =
   assert.equal(v.current, commit);
   assert.equal(v.ready, false);
   assert.ok(v.retrySeconds > 0);
-  assert.equal(v.progressLabel, "Statuskontrollen ble ikke fullført. Ingen oppdatering er startet");
+  assert.equal(v.progressLabel, "Neste oppdatering");
 });
 
 test("untrusted JSON cannot supply command readiness or arbitrary display objects", () => {
@@ -112,15 +118,137 @@ test("publishing steps reset before start despite stale completed backend steps"
     { stage: "ready", running: true },
     { stage: "done", checking: true },
   ]) {
-    const steps = progressSteps({ ...state, steps: [{ status: "done" }], progress_kind: "last" });
+    const steps = progressSteps({
+      ...state,
+      steps: [{ status: "done" }],
+      progress_kind: "last",
+    });
     assert.equal(steps.length, 5);
-    assert.ok(steps.every(step => step.status === "pending"));
+    assert.ok(steps.every((step) => step.status === "pending"));
   }
 });
-test("actual publish progress and completion remain visible", () => {
-  const steps = [{ name: "api", status: "running" }];
-  assert.deepEqual(progressSteps({ stage: "cloudflare", operation: "publish", running: true, steps }), steps);
-  assert.ok(progressSteps({ stage: "done", operation: "publish" }).every(step => step.status === "done"));
-  assert.equal(viewState({ stage: "done", operation: "publish" }).progressLabel, "Fullført");
-  assert.equal(viewState({ stage: "ready", running: true }).progressLabel, "Oppdatering venter på oppstart");
+test("actual publish progress stays current and completed jobs move to history", () => {
+  const steps = progressSteps({
+    stage: "cloudflare",
+    operation: "publish",
+    running: true,
+    steps: [
+      { status: "done" },
+      { status: "done" },
+      { status: "running" },
+      { status: "pending" },
+      { status: "pending" },
+    ],
+  });
+  assert.deepEqual(
+    steps.map((step) => step.status),
+    ["done", "done", "running", "pending", "pending"],
+  );
+  assert.ok(
+    progressSteps({ stage: "done", operation: "publish" }).every(
+      (step) => step.status === "pending",
+    ),
+  );
+  assert.equal(
+    viewState({ stage: "done", operation: "publish" }).progressLabel,
+    "Neste oppdatering",
+  );
+  assert.equal(
+    viewState({ stage: "ready", running: true }).progressLabel,
+    "Venter på oppstart",
+  );
+});
+
+const projects = ["production", "beta", "openworks"] as const;
+const old = {
+  stage: "done",
+  progress_kind: "last",
+  progress: {
+    stage: "done",
+    visible: true,
+    steps: Array.from({ length: 6 }, () => ({ state: "done" })),
+  },
+  steps: Array.from({ length: 5 }, () => ({ status: "done" })),
+};
+for (const project of projects) {
+  test(`${project}: completed history never fills a new job before start`, () => {
+    for (const value of [
+      old,
+      { ...old, stage: "ready" },
+      { ...old, checking: true },
+      { ...old, stage: "failed", operation: "check" },
+    ]) {
+      const view = projectProgress(project, value);
+      assert.ok(view.steps.length > 0);
+      assert.ok(view.steps.every((step) => step.status === "pending"));
+    }
+  });
+  test(`${project}: a dispatch waiting on old done state cannot appear completed`, () => {
+    const view = projectProgress(project, { ...old, running: true });
+    assert.equal(view.kind, "waiting");
+    assert.ok(view.steps.every((step) => step.status === "pending"));
+  });
+}
+test("production progress clamps old and future ticks to the current phase", () => {
+  const view = projectProgress("production", {
+    ...old,
+    progress_kind: "current",
+    running: true,
+    progress: { ...old.progress, stage: "core" },
+  });
+  assert.deepEqual(
+    view.steps.map((step) => step.status),
+    ["done", "done", "running", "pending", "pending", "pending"],
+  );
+});
+test("OpenWorks status checks do not complete publishing steps", () => {
+  const check = projectProgress("openworks", {
+    stage: "checking",
+    checking: true,
+  });
+  assert.equal(check.kind, "checking");
+  assert.ok(check.steps.every((step) => step.status === "pending"));
+  const publish = projectProgress("openworks", {
+    stage: "publishing",
+    running: true,
+  });
+  assert.deepEqual(
+    publish.steps.map((step) => step.status),
+    ["done", "running"],
+  );
+});
+test("beta failure keeps only server-recorded progress for the publishing attempt", () => {
+  const value = {
+    operation: "publish",
+    stage: "failed",
+    steps: [
+      { status: "done" },
+      { status: "done" },
+      { status: "failed" },
+      { status: "pending" },
+      { status: "pending" },
+    ],
+  };
+  assert.deepEqual(
+    projectProgress("beta", value).steps.map((step) => step.status),
+    ["done", "done", "failed", "pending", "pending"],
+  );
+  assert.ok(
+    projectProgress("beta", { ...value, operation: "check" }).steps.every(
+      (step) => step.status === "pending",
+    ),
+  );
+});
+test("unknown or malformed state stays pending without inventing success", () => {
+  for (const value of [
+    null,
+    [],
+    {},
+    { running: true, stage: "unknown", steps: [{ status: "done" }] },
+  ])
+    assert.ok(
+      projectProgress("beta", value).steps.every(
+        (step) => step.status === "pending",
+      ),
+    );
 });
