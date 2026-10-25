@@ -101,6 +101,8 @@ jobs:
       - name: Check native release desktop and mobile journeys with synthetic data
         run: |
           npx playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
           npm run start -- --port 5174 > /tmp/afterparty-web-preview.log 2>&1 &
           preview_pid=$!
           trap 'result=$?; if [ "$result" -ne 0 ]; then tail -200 /tmp/afterparty-web-preview.log; fi; kill "$preview_pid" 2>/dev/null || true; exit "$result"' EXIT

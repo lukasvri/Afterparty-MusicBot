@@ -86,7 +86,12 @@ test(
         ],
         { maxBuffer: 2_000_000, timeout: 10000 },
       );
-      assert.equal(made.status, 0, made.stderr?.toString());
+      assert.ifError(made.error);
+      assert.equal(
+        made.status,
+        0,
+        made.stderr?.toString() || 'FFmpeg must create the synthetic clip',
+      );
       encoded.set(track.videoId, made.stdout);
       titlesByInput.set(hash(made.stdout), track.title);
     }
