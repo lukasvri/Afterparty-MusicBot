@@ -155,3 +155,18 @@ test('a deliberate resume after a paused seek acknowledgement does not wait for 
     action: 'play',
   });
 });
+
+test('consecutive native scrubs are not swallowed by an automatic-correction cooldown', () => {
+  const bridge = createPlayerIntent();
+  bridge.reset(observation().identity);
+  bridge.time(observation({ now: 2000, position: 10 }));
+  assert.deepEqual(bridge.time(observation({ now: 2250, position: 42 })), {
+    action: 'seek',
+    position: 42,
+  });
+  assert.deepEqual(bridge.time(observation({ now: 2400, position: 80 })), {
+    action: 'seek',
+    position: 80,
+  });
+  assert.equal(bridge.time(observation({ now: 2500, position: 80.1 })), null);
+});

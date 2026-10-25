@@ -57,3 +57,17 @@ the local built Worker with a fictional room, reduced motion and all external
 requests blocked. No provider audio or account was connected. The same walkthrough
 checked Music, Open rooms, Concerts, DJ tools and Games at 4K, QHD, 1080p and
 mobile; these images establish layout only. See [UI review](../UI_REVIEW.md).
+
+### Continuous playback and full-tab theater, 25 October 2026
+
+`v3-continuous-stage-desktop-20261025.png` (1920×1080 viewport, full page) and
+`v3-continuous-stage-mobile-20261025.png` (390×1000 viewport, full page) show the
+larger DJ scene, complete equipment and integrated song-selection action in a
+synthetic empty room. The same walkthrough checked 2560×1440 and 3840×2160.
+Reduced motion was enabled and external requests were blocked.
+
+`v3-tab-theater-desktop-20261025.png` shows the exact 1920×1080 theater surface
+with a clearly synthetic iframe containing test buttons, plus the real exit
+control. The dark surface is a test boundary, not real YouTube media or missing
+production content. Browser assertions also verify QHD, 4K and mobile coverage,
+iframe continuity, focus and the retained search draft. See [UI review](../UI_REVIEW.md).

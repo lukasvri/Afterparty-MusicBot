@@ -193,8 +193,9 @@ async function fixture(
               window as unknown as { __nativeVideo: (action: string, position?: number) => void }
             ).__nativeVideo = (action, position) => {
               if (manualSampling) calls.push({ action: `native-${action}`, at: performance.now() });
-              if (action === 'seek-event') {
+              if (action === 'seek-event' || action === 'seek-paused-event') {
                 this.position = position ?? 42;
+                if (action === 'seek-paused-event') this.emit(2);
                 this.emit(3);
                 queueMicrotask(() => this.emit(1));
               } else if (action === 'seek') this.position = position ?? 42;
@@ -999,7 +1000,7 @@ for (const width of [1440, 390])
     }
   });
 
-test('native pause remains local while a queue addition is awaiting its response', async (t) => {
+test('native pause stays inaudible and reaches the room after a pending queue addition', async (t) => {
   const f = await fixture(t, 1440, true, true);
   let release = () => {};
   try {
@@ -1020,10 +1021,10 @@ test('native pause remains local while a queue addition is awaiting its response
     await page.waitForFunction(
       () => !(document.querySelector('.search-results button') as HTMLButtonElement)?.disabled,
     );
-    assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    await page.locator('.player-status').filter({ hasText: 'Shared playback is paused' }).waitFor();
     assert.deepEqual(
       f.writes.map((write) => write.action),
-      ['add'],
+      ['add', 'pause'],
     );
     await native.getByRole('button', { name: 'Play video', exact: true }).click();
     await page
@@ -1032,8 +1033,8 @@ test('native pause remains local while a queue addition is awaiting its response
       .waitFor();
     assert.deepEqual(
       f.writes.map((write) => write.action),
-      ['add'],
-      'a busy mutation never replays a shared pause',
+      ['add', 'pause', 'play'],
+      'explicit native gestures are serialized behind the queue write',
     );
     assert.deepEqual(f.errors, []);
   } finally {
@@ -1075,84 +1076,89 @@ for (const [scheduled, wasPlaying] of [
   [false, true],
   [true, true],
   [true, false],
-]) {
-  test(`native scrub preserves ${wasPlaying ? 'playing' : 'paused'} video without reloading (new timeline: ${scheduled})`, async (t) => {
-    const f = await fixture(t, 390, true, true, false, scheduled);
-    let release = () => {};
-    try {
-      const { page } = f;
-      await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
-      const native = page.frameLocator('.audio-stage iframe');
-      await native.getByRole('button', { name: 'Pause video', exact: true }).waitFor();
-      if (!wasPlaying) {
-        await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+])
+  for (const seekEvent of ['seek-event', 'seek-paused-event']) {
+    test(`native scrub preserves ${wasPlaying ? 'playing' : 'paused'} video without reloading (new timeline: ${scheduled}, event: ${seekEvent})`, async (t) => {
+      const f = await fixture(t, 390, true, true, false, scheduled);
+      let release = () => {};
+      try {
+        const { page } = f;
+        await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+        const native = page.frameLocator('.audio-stage iframe');
+        await native.getByRole('button', { name: 'Pause video', exact: true }).waitFor();
+        if (!wasPlaying) {
+          await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Shared playback is paused' })
+            .waitFor();
+        }
+        // Acknowledge the initial source and establish a real position sample.
+        await page.waitForTimeout(1100);
+        const before = f.writes.length;
+        release = f.holdNextMutation();
+        await native
+          .getByRole('button', { name: 'Seek video', exact: true })
+          .evaluate((button, event) => {
+            button.setAttribute(
+              'onclick',
+              `parent.postMessage({type:'synthetic-native',action:'${event}',position:42},'*')`,
+            );
+          }, seekEvent);
+        await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+        await page.waitForFunction(() =>
+          document
+            .querySelector('.player-status')
+            ?.textContent?.includes('Updating shared playback'),
+        );
+        assert.equal(
+          await page.evaluate(() =>
+            (window as unknown as { __playerState: () => number }).__playerState(),
+          ),
+          wasPlaying ? 1 : 2,
+          'a playing scrub continues while its receipt is pending; paused rooms stay inaudible',
+        );
+        release();
+        await page.waitForFunction(
+          (expected) =>
+            (window as unknown as { __playerState: () => number }).__playerState() === expected,
+          wasPlaying ? 1 : 2,
+          { timeout: 6000 },
+        );
         await page
           .locator('.player-status')
-          .filter({ hasText: 'Shared playback is paused' })
+          .filter({
+            hasText: wasPlaying ? 'Following the shared clock' : 'Shared playback is paused',
+          })
           .waitFor();
-      }
-      // Acknowledge the initial source and establish a real position sample.
-      await page.waitForTimeout(1100);
-      const before = f.writes.length;
-      release = f.holdNextMutation();
-      await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((button) => {
-        button.setAttribute(
-          'onclick',
-          "parent.postMessage({type:'synthetic-native',action:'seek-event',position:42},'*')",
+        await page.waitForTimeout(300);
+        assert.equal(
+          await page.evaluate(() =>
+            (window as unknown as { __playerState: () => number }).__playerState(),
+          ),
+          wasPlaying ? 1 : 2,
         );
-      });
-      await native.getByRole('button', { name: 'Seek video', exact: true }).click();
-      await page.waitForFunction(() =>
-        document.querySelector('.player-status')?.textContent?.includes('Updating shared playback'),
-      );
-      assert.equal(
-        await page.evaluate(() =>
-          (window as unknown as { __playerState: () => number }).__playerState(),
-        ),
-        2,
-        'scrubbing waits paused for authority confirmation',
-      );
-      release();
-      await page.waitForFunction(
-        (expected) =>
-          (window as unknown as { __playerState: () => number }).__playerState() === expected,
-        wasPlaying ? 1 : 2,
-        { timeout: 6000 },
-      );
-      await page
-        .locator('.player-status')
-        .filter({
-          hasText: wasPlaying ? 'Following the shared clock' : 'Shared playback is paused',
-        })
-        .waitFor();
-      await page.waitForTimeout(300);
-      assert.equal(
-        await page.evaluate(() =>
-          (window as unknown as { __playerState: () => number }).__playerState(),
-        ),
-        wasPlaying ? 1 : 2,
-      );
-      assert.deepEqual(
-        f.writes.slice(before).map((write) => write.action),
-        ['seek'],
-      );
-      const sourceWrites = await page.evaluate(() =>
-        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
-          .filter((call) => ['construct', 'load', 'cue'].includes(call.action))
-          .map((call) => call.action),
-      );
-      assert.deepEqual(
-        sourceWrites,
-        ['construct', 'load'],
-        'a new timeline for the same video never loads its poster again',
-      );
-      assert.deepEqual(f.errors, []);
-    } finally {
-      release();
-      await f.close();
-    }
-  });
-}
+        assert.deepEqual(
+          f.writes.slice(before).map((write) => write.action),
+          ['seek'],
+        );
+        const sourceWrites = await page.evaluate(() =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
+            .filter((call) => ['construct', 'load', 'cue'].includes(call.action))
+            .map((call) => call.action),
+        );
+        assert.deepEqual(
+          sourceWrites,
+          ['construct', 'load'],
+          'a new timeline for the same video never loads its poster again',
+        );
+        assert.deepEqual(f.errors, []);
+      } finally {
+        release();
+        await f.close();
+      }
+    });
+  }
 
 test('native pause, seek and queue-next dispatch without position polling or an acknowledgement delay', async (t) => {
   const f = await fixture(t, 390, true, true, true);
@@ -1519,7 +1525,7 @@ test('music tabs restore their own scroll position with a single workspace scrol
   }
 });
 
-test('theater mode widens video, keeps the iframe and search draft, and stays local', async (t) => {
+test('theater mode fills the browser tab, keeps the iframe and search draft, and stays local', async (t) => {
   const f = await fixture(t, 1920, true, true);
   try {
     const { page } = f;
@@ -1538,23 +1544,33 @@ test('theater mode widens video, keeps the iframe and search draft, and stays lo
       [390, 844],
     ]) {
       await page.setViewportSize({ width, height });
-      const before = await page.locator('.now-playing').boundingBox();
       await page.getByRole('button', { name: 'Theater mode', exact: true }).click();
-      const player = await page.locator('.now-playing').boundingBox();
-      const workspace = await page.locator('.room-side').boundingBox();
-      assert(before && player && workspace);
-      if (width >= 1000)
-        assert(player.width > before.width * 1.2, 'the video area uses the page width');
-      assert(workspace.y >= player.y + player.height - 1, 'music tools move below the video');
-      if (width >= 1000) {
-        const next = await page
-          .getByRole('button', { name: 'Next track', exact: true })
-          .boundingBox();
-        assert(
-          next && next.y >= 0 && next.y + next.height <= height,
-          'next-track control stays visible in theater mode',
-        );
-      }
+      const player = await page.locator('.audio-stage').boundingBox();
+      assert(player && Math.abs(player.x) <= 1 && Math.abs(player.y) <= 1);
+      assert(
+        player && Math.abs(player.width - width) <= 1 && Math.abs(player.height - height) <= 1,
+        'the video surface fills the entire browser tab',
+      );
+      const exit = page.getByRole('button', { name: 'Exit theater mode', exact: true });
+      const exitBox = await exit.boundingBox();
+      assert(
+        exitBox &&
+          exitBox.x >= 0 &&
+          exitBox.y >= 0 &&
+          exitBox.x + exitBox.width <= width &&
+          exitBox.y + exitBox.height <= height,
+      );
+      assert.equal(
+        await page.evaluate(() => getComputedStyle(document.documentElement).overflow),
+        'hidden',
+      );
+      await page
+        .getByRole('button', { name: 'Leave room', exact: true })
+        .evaluate((node) => node.focus());
+      assert(
+        await exit.evaluate((node) => node === document.activeElement),
+        'background controls cannot take keyboard focus',
+      );
       assert.equal(
         await page.getByRole('textbox', { name: 'Search songs or artists' }).inputValue(),
         'night',
@@ -1633,6 +1649,64 @@ test('saved motion preference and system reduced motion remain independent of au
     );
     assert.deepEqual(f.errors, []);
   } finally {
+    await f.close();
+  }
+});
+
+test('two rapid native scrubs retain the last target through a delayed receipt without replacing the iframe', async (t) => {
+  const f = await fixture(t, 390, true, true, true);
+  let release = () => {};
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Seek video', exact: true }).waitFor();
+    await page.waitForTimeout(1100);
+    await page.evaluate(() =>
+      (window as typeof window & { samplePlayer: () => void }).samplePlayer(),
+    );
+    release = f.holdNextMutation();
+    const seek = native.getByRole('button', { name: 'Seek video', exact: true });
+    for (const position of [42, 80]) {
+      await seek.evaluate(
+        (node, target) =>
+          node.setAttribute(
+            'onclick',
+            `parent.postMessage({type:'synthetic-native',action:'seek-event',position:${target}},'*')`,
+          ),
+        position,
+      );
+      await seek.click();
+    }
+    assert.equal(f.writes.length, 1, 'only one write is in flight');
+    release();
+    await page.waitForFunction(() =>
+      document.querySelector('.player-status')?.textContent?.includes('Following the shared clock'),
+    );
+    assert.deepEqual(
+      f.writes.map((write) => [write.action, write.position]),
+      [
+        ['seek', 42],
+        ['seek', 80],
+      ],
+    );
+    assert.deepEqual(
+      await page.evaluate(() =>
+        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
+          .filter((call) => ['construct', 'load', 'cue', 'destroy'].includes(call.action))
+          .map((call) => call.action),
+      ),
+      ['construct', 'load'],
+    );
+    assert.equal(
+      await page.evaluate(() =>
+        (window as unknown as { __playerState: () => number }).__playerState(),
+      ),
+      1,
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    release();
     await f.close();
   }
 });

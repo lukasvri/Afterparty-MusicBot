@@ -635,6 +635,16 @@ for (const canManage of [false, true])
       assert(started !== undefined && started >= 25 && started < 27);
       await page.getByRole('button', { name: 'Theater mode', exact: true }).click();
       await page.locator('.concert-shell.theater-mode').waitFor();
+      const surface = await page.locator('.audio-stage').boundingBox();
+      const viewport = page.viewportSize()!;
+      assert(
+        surface &&
+          Math.abs(surface.x) <= 1 &&
+          Math.abs(surface.y) <= 1 &&
+          Math.abs(surface.width - viewport.width) <= 1 &&
+          Math.abs(surface.height - viewport.height) <= 1,
+        'concert theater fills the browser tab',
+      );
       assert.equal(
         await page.evaluate(
           () =>

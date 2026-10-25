@@ -1,5 +1,58 @@
 # Afterparty interface review
 
+## Continuous native playback and full-tab theater, 2026-10-25
+
+This follow-up supersedes the earlier page-width theater layout and fixed-height
+empty-room stage below. The existing iframe now fills the browser tab in theater
+mode, with a fixed Exit theater mode button, Escape outside native fullscreen,
+background focus exclusion and restored document scrolling on exit. One shared
+style owner and `TheaterToggle.svelte` implement this for rooms and concerts;
+layout changes do not construct a second player or send transport commands.
+
+The DJ scene fills the available player width at the priority desktop sizes,
+with viewport-bounded height and its complete original aspect ratio. Mobile fits
+the complete scene directly. The song action stays on the booth. The separate
+record/headline/action panel remains removed.
+
+Room playback corrections address three independently reproducible failures:
+
+- Playing seeks previously scheduled another 1500ms future start in the shared
+  Core/Worker state reducer. They now re-anchor immediately. Starts/resumes retain
+  their barrier; paused seeks remain inaudible.
+- Native scrub callbacks can include PAUSED/BUFFERING/PLAYING. Position changes
+  take precedence over these temporary states. Native receipt handling keeps the
+  existing video running, retains the newest scrub and transport intent behind
+  the in-flight write, and avoids forcing another correction on acknowledgement.
+- An authenticated poll failure previously stopped playback even with a healthy
+  public SSE lease. Transient read failures now disable commands while the fresh,
+  calibrated stream continues; access failures, expired leases and real stream
+  loss still stop playback. Successful authenticated reads restore controls.
+  Fresh SSE frames renew their lease and apply newer pauses while a command is
+  pending. The exact acknowledged revision is retained separately from newer
+  stream state, so a delayed receipt cannot replay queued gestures over a newer
+  pause.
+
+An explicit 409 rejection may refresh/retry play, pause or seek once, only when
+identity, epoch, permission and the advancing playback timeline remain unchanged.
+Next, queue edits and uncertain/network receipts are not automatically replayed.
+A concurrent song, pause, seek, room switch or revoked access prevents retry.
+
+Regression coverage includes synthetic native callbacks, delayed receipts, real
+loopback EventSource failure/recovery, authorization/lease failures and matching
+Core/D1 clocks. Regression checks failed before the fixes for rapid scrubs,
+queue-only conflicts and fresh stream pauses during pending commands. The
+built browser walkthrough checks tab coverage, stable iframe construction and
+retained search drafts at 4K, QHD, 1080p and mobile. These checks do not establish
+real YouTube buffering/latency, production network health or audible Discord output.
+
+[Larger desktop stage](assets/v3-continuous-stage-desktop-20261025.png),
+[mobile stage](assets/v3-continuous-stage-mobile-20261025.png) and
+[full-tab theater](assets/v3-tab-theater-desktop-20261025.png) are synthetic
+local captures. An authorized host acceptance pass should repeat real native
+play/pause/scrubs, several rapid scrubs, a temporary status-read outage and
+reconnection with host and guest browsers. Confirm the deployed source identities
+of both website and Core before drawing conclusions about these source fixes.
+
 ## Unified section frame and compact empty room, 2026-10-25
 
 Music, Open rooms, Concerts, DJ tools and Games now compose the same

@@ -202,6 +202,23 @@
         --control-height: 56px;
       }
     }
+    body .theater-mode .audio-stage:not(.fullscreen),
+    body .theater-mode .concert-art {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      width: 100%;
+      height: 100dvh;
+      max-height: none;
+      aspect-ratio: auto;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: black;
+    }
+    .theater-mode .concert-art img {
+      object-fit: contain;
+    }
     .context-bar {
       background: var(--surface);
       border: 1px solid var(--line);

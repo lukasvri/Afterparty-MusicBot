@@ -18,7 +18,13 @@
   import type { Room } from '../../../../../lib/types.ts';
   import Icon from '../ui/Icon.svelte';
   import { browserStorage } from '../../../../../lib/browser-storage.ts';
-  import { confirmsPlayerIntent, createPlayerIntent, type PlayerIntent } from './player-intent.ts';
+  import {
+    confirmsPlayerIntent,
+    createPlayerIntent,
+    POSITION_ACK_TOLERANCE,
+    type PlayerIntent,
+    type PlayerIntentReceipt,
+  } from './player-intent.ts';
   export type SharedPlayerIntent = PlayerIntent & {
     code: string;
     videoId: string;
@@ -172,7 +178,7 @@
     canControl?: boolean;
     canSeek?: boolean;
     controlBusy?: boolean;
-    onIntent?: (intent: SharedPlayerIntent) => Promise<boolean>;
+    onIntent?: (intent: SharedPlayerIntent) => Promise<boolean | PlayerIntentReceipt>;
     settings?: Snippet;
     settingsLabel?: string;
     footer?: Snippet;
@@ -195,6 +201,7 @@
   const native = createPlayerIntent();
   const correction = createPlaybackCorrection();
   let localPaused = $state(false);
+  let queuedNative = $state<Array<{ identity: string; intent: PlayerIntent }>>([]);
   let nativePending = $state<{
     identity: string;
     source: string;
@@ -205,6 +212,7 @@
     issuedAt: number;
     pausePinned: boolean;
     sharedPosition?: number;
+    receiptVersion?: number;
   } | null>(null);
   const sourceIdentity = () => `${room.code}:${room.current?.id ?? ''}`;
   const identity = () => `${sourceIdentity()}:${room.playbackKey ?? ''}`;
@@ -244,12 +252,28 @@
     };
   }
   async function nativeIntent(intent: PlayerIntent) {
-    if (!ready || !player || !room.current || loaded !== identity()) return;
+    if (!ready || !player || failedSource || !room.current || loaded !== identity()) return;
     if (intent.action === 'pause') {
       localPaused = true;
       if (nativePending) nativePending = { ...nativePending, pausePinned: true };
     }
-    if (nativePending || controlBusy) return;
+    if (intent.action === 'play') {
+      localPaused = false;
+      if (nativePending) nativePending = { ...nativePending, pausePinned: false };
+    }
+    if (nativePending || controlBusy) {
+      if (!intent.local && onIntent && (intent.action === 'seek' ? canSeek : canControl)) {
+        // Keep the latest scrub and latest transport intent, in gesture order.
+        // A slow receipt must not swallow a newer pause, resume or scrub.
+        queuedNative = [
+          ...queuedNative.filter(
+            (item) => (item.intent.action === 'seek') !== (intent.action === 'seek'),
+          ),
+          { identity: identity(), intent },
+        ];
+      }
+      return;
+    }
     if (
       intent.action === 'seek' &&
       (room.current.live ||
@@ -285,34 +309,40 @@
       sharedPosition,
     };
     nativePending = pending;
-    if (intent.action === 'seek' && player.getPlayerState() === 1) {
-      pausePlayer();
-    }
     const epoch = generation;
     message = '';
     let accepted = false;
+    let receiptVersion: number | undefined;
     try {
-      accepted = await onIntent!({
+      const result = await onIntent!({
         ...intent,
         ...(intent.action === 'seek' ? { position: sharedPosition } : {}),
         code: room.code,
         videoId: room.current.id,
         playbackKey: room.playbackKey,
       });
+      accepted = typeof result === 'boolean' ? result : result.accepted;
+      receiptVersion = typeof result === 'boolean' ? undefined : result.version;
     } catch {
       /* The existing client reports the scoped command failure. */
     }
     if (disposed || generation !== epoch || nativePending?.identity !== pending.identity) return;
     if (!accepted) {
       nativePending = null;
-      message = 'Shared playback could not be updated. Reconnect before trying again.';
-    } else nativePending = { ...pending, ...nativePending, settled: true };
+      queuedNative = [];
+      message = 'The video is following the latest room state. Try the control again.';
+    } else nativePending = { ...pending, ...nativePending, settled: true, receiptVersion };
     await afterRender();
     if (!disposed && generation === epoch) sync(true);
   }
+  function flushNative() {
+    if (!ready || !player || nativePending || controlBusy || !queuedNative.length) return;
+    const [next, ...rest] = queuedNative;
+    queuedNative = rest;
+    if (next.identity === identity()) void nativeIntent(next.intent);
+  }
   function readNativePosition() {
-    if (!ready || !player || failedSource || nativePending || controlBusy || loaded !== identity())
-      return;
+    if (!ready || !player || failedSource || loaded !== identity()) return;
     try {
       const intent = native.time(observation());
       if (intent) void nativeIntent(intent);
@@ -326,6 +356,10 @@
     const localPosition = calibratedPlaybackPosition(room, position, syncOffset);
     const key = identity();
     const source = sourceIdentity();
+    // Even an in-flight optimistic scrub must stop when the live lease expires
+    // or a newer shared pause arrives. Never let receipt waiting bypass safety.
+    if (nativePending && (!playing || localPaused) && player.getPlayerState() === 1) pausePlayer();
+    if (!canControl && !canSeek && queuedNative.length) queuedNative = [];
     if (failedSource === key) return;
     if (failedSource) {
       failedSource = '';
@@ -334,6 +368,7 @@
       onPlaybackError?.(false);
     }
     let confirmed = false;
+    let confirmedSeek = false;
     if (nativePending) {
       const expected =
         nativePending.intent.action === 'seek'
@@ -354,22 +389,38 @@
       if (
         nativePending.identity !== key &&
         !(nativePending.intent.action === 'seek' && nativePending.source === source && confirmed)
-      )
+      ) {
         nativePending = null;
+        queuedNative = [];
+      }
     }
     if (nativePending) {
       if (!nativePending.settled || controlBusy) {
         correction.reset();
         return;
       }
-      if (!confirmed && performance.now() < nativePending.deadline) return;
+      const superseded =
+        nativePending.receiptVersion !== undefined
+          ? room.version > nativePending.receiptVersion
+          : !confirmed && room.mode !== 'discord' && room.version > nativePending.version;
+      if (!confirmed && !superseded && performance.now() < nativePending.deadline) return;
       if (confirmed && nativePending.intent.action !== 'seek' && !nativePending.pausePinned)
         localPaused = false;
-      if (!confirmed) {
+      if (superseded) {
+        queuedNative = [];
+        message = 'Another playback change arrived. Following the latest room state.';
+      } else if (!confirmed) {
         if (nativePending.intent.action === 'seek') localPaused = true;
-        message = 'Shared playback has not caught up. Reconnect before trying again.';
+        message = 'Shared playback has not caught up. Try Sync now in playback settings.';
       }
+      confirmedSeek = confirmed && nativePending.intent.action === 'seek';
       nativePending = null;
+      if (confirmedSeek) {
+        correction.reset();
+        correctedAt = performance.now();
+        settleUntil = correctedAt + syncRecoveryMs(syncMode);
+        force = false;
+      }
     }
     const audible = playing && !localPaused;
     if (loaded !== key) {
@@ -387,8 +438,13 @@
         else player.cueVideoById(video);
       } else {
         // Seeking the existing recording must not replace its native video view.
-        command('seek', localPosition);
-        player.seekTo(localPosition, true);
+        if (
+          !confirmedSeek ||
+          Math.abs(player.getCurrentTime() - localPosition) > POSITION_ACK_TOLERANCE
+        ) {
+          command('seek', localPosition);
+          player.seekTo(localPosition, true);
+        }
         if (!audible) pausePlayer();
         else if (player.getPlayerState() !== 1) {
           command('play');
@@ -488,6 +544,7 @@
             loading = false;
             failedSource = identity();
             nativePending = null;
+            queuedNative = [];
             onPlaybackError?.(true);
             notePlayerError(Number(event.data));
             message = 'This source cannot play here. Try the next track or add another song.';
@@ -504,6 +561,7 @@
           onStateChange: (event: PlayerEvent) => {
             if (disposed || current !== generation || failedSource === identity()) return;
             if (typeof event.data !== 'number' || !Number.isFinite(event.data)) return;
+            const recoveredFromBuffer = bufferingAt !== null && event.data === 1;
             if (event.data === 3 && bufferingAt === null) {
               bufferingAt = performance.now();
               notePlayerEvent('buffer-start');
@@ -518,13 +576,21 @@
               // Native scrubbing usually emits BUFFERING/PLAYING before the next
               // position sample. Use that event immediately; periodic sampling
               // remains the fallback for seeks without a state transition.
-              const intent =
-                native.state(value) ?? (!nativePending && !controlBusy ? native.time(value) : null);
-              if (intent) {
+              const positionIntent = native.time(value);
+              const intent = positionIntent ?? native.state(value);
+              if (positionIntent) native.state(value);
+              if (
+                intent &&
+                !(
+                  intent.action === 'play' &&
+                  recoveredFromBuffer &&
+                  nativePending?.intent.action === 'seek'
+                )
+              ) {
                 void nativeIntent(intent);
                 if (
                   event.data === 1 &&
-                  (!playing || localPaused || nativePending?.intent.action === 'seek') &&
+                  (!playing || localPaused) &&
                   player?.getPlayerState() === 1
                 ) {
                   pausePlayer();
@@ -532,11 +598,7 @@
                 return;
               }
             }
-            if (
-              event.data === 1 &&
-              (!playing || localPaused || nativePending?.intent.action === 'seek') &&
-              player?.getPlayerState() === 1
-            ) {
+            if (event.data === 1 && (!playing || localPaused) && player?.getPlayerState() === 1) {
               pausePlayer();
             }
           },
@@ -572,6 +634,7 @@
     failedSource = '';
     onPlaybackError?.(false);
     nativePending = null;
+    queuedNative = [];
     native.reset('');
     correction.reset();
     correctedAt = -Infinity;
@@ -588,7 +651,10 @@
     void room;
     void syncMode;
     void controlBusy;
+    void queuedNative;
+    void nativePending;
     if (ready) sync();
+    flushNative();
   });
   $effect(() => {
     void audio;

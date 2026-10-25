@@ -531,32 +531,6 @@
 </div>
 
 <style>
-  .concert-shell.theater-mode {
-    max-width: 3200px;
-  }
-  .theater-mode .concert-content {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .theater-mode .current-track {
-    position: static;
-  }
-  .theater-mode .concert-workspace {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    width: min(100%, 1440px);
-    margin-inline: auto;
-  }
-  @media (min-width: 1000px) {
-    .theater-mode :global(.audio-stage:not(.fullscreen)),
-    .theater-mode .concert-art {
-      aspect-ratio: auto;
-      height: min(70svh, calc((100vw - 96px) * 9 / 16));
-    }
-    .theater-mode .concert-art img {
-      object-fit: contain;
-    }
-  }
   .concert-recovery {
     margin-top: 16px;
     padding: 16px;

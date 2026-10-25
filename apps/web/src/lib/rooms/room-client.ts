@@ -13,8 +13,10 @@ import {
   isOlderSnapshot,
   playbackTarget,
   roomPollUpdate,
+  transportChanged,
 } from '../../../../../lib/playback-sync.ts';
 import type { Room, Video } from '../../../../../lib/types.ts';
+import type { PlayerIntent, PlayerIntentReceipt } from './player-intent.ts';
 
 export type RoomAction =
   | 'add'
@@ -83,6 +85,7 @@ type Session = {
   serial: number;
   realtime: Realtime | null;
   authority: { room: Room; receivedAt: number } | null;
+  pollRecovering: boolean;
 };
 
 /** Browser rooms only. The existing website owns authorization, persistence and progression. */
@@ -168,6 +171,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       serial: 0,
       realtime: null,
       authority: null,
+      pollRecovering: false,
     };
     session = target;
     publish({
@@ -196,6 +200,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       throw new Error('This view supports browser rooms only.');
     const next = compensateDelivery(room, now() - sent);
     target.authority = { room: next, receivedAt: now() };
+    target.pollRecovering = false;
     const live = target.realtime;
     if (live && live.epoch !== next.syncEpoch) {
       live.epoch = next.syncEpoch ?? '';
@@ -217,6 +222,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
   const loseStream = (target: Session, live: Realtime) => {
     if (!current(target) || target.realtime !== live) return;
     live.freshUntil = 0;
+    target.pollRecovering = false;
     const authority = target.authority,
       previous = state.room;
     if (
@@ -282,7 +288,12 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         if (active()) void sampleClock(target, live);
       });
       source.addEventListener('message', (event) => {
-        if (!active() || !live.calibrated || state.busy || state.connection !== 'connected') return;
+        if (
+          !active() ||
+          !live.calibrated ||
+          (state.connection !== 'connected' && !target.pollRecovering)
+        )
+          return;
         try {
           const message = JSON.parse((event as MessageEvent<string>).data);
           const timeline = message.type === 'room' ? readRoomTimeline(message.room) : null;
@@ -358,8 +369,8 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     connect();
     live.measure = schedule(measure, 10000);
   };
-  const read = async (target: Session, clearError = false) => {
-    if (!current(target) || state.busy) return;
+  const read = async (target: Session, clearError = false, duringMutation = false) => {
+    if (!current(target) || (state.busy && !duringMutation)) return;
     const recovering = state.connection === 'reconnecting';
     const serial = ++target.serial,
       sent = now();
@@ -373,8 +384,11 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       accept(target, room, sent);
       if (clearError || recovering) publish({ error: '' });
     } catch (error) {
-      if (current(target) && target.serial === serial)
+      if (current(target) && target.serial === serial) {
+        const status = (error as { status?: number })?.status;
+        target.pollRecovering = !status || status >= 500;
         publish({ connection: 'reconnecting', error: message(error) });
+      }
     }
   };
   const poll = (target: Session) => {
@@ -394,7 +408,11 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       else void read(target).finally(() => poll(target));
     }, options.pollMs ?? 1000);
   };
-  const mutate = async (action: RoomAction, fields: RoomActionFields = {}) => {
+  const mutate = async (
+    action: RoomAction,
+    fields: RoomActionFields = {},
+    onAccepted?: (room: Room) => void,
+  ) => {
     const target = session,
       room = state.room;
     if (!target || !room || !current(target) || state.busy || state.connection !== 'connected')
@@ -411,33 +429,61 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     publish({ busy: true, error: '' });
     let refreshAfterConflict = false;
     try {
-      const sent = now();
-      const result = await request<{ room: Room }>(`/api/rooms/${target.code}`, {
-        method: 'POST',
-        headers: headers(target.code),
-        signal: signal(
-          target.controller,
-          ['next', 'radio', 'skip-vote'].includes(action) ? 35000 : 12000,
-        ),
-        body: JSON.stringify({
-          ...fields,
-          ...(action === 'add' || action === 'play-video'
-            ? {
-                displayName:
-                  (storage.get('afterparty-display-name') ?? '').trim().slice(0, 32) || 'Guest',
-              }
-            : {}),
-          action,
-          version: room.version,
-        }),
-      });
-      if (!current(target)) return false;
-      accept(target, result.room, sent);
-      return true;
-    } catch (error) {
-      if (current(target)) {
-        publish({ error: message(error) });
-        refreshAfterConflict = (error as { status?: number })?.status === 409;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const before = state.room!;
+        try {
+          const sent = now();
+          const result = await request<{ room: Room }>(`/api/rooms/${target.code}`, {
+            method: 'POST',
+            headers: headers(target.code),
+            signal: signal(
+              target.controller,
+              ['next', 'radio', 'skip-vote'].includes(action) ? 35000 : 12000,
+            ),
+            body: JSON.stringify({
+              ...fields,
+              ...(action === 'add' || action === 'play-video'
+                ? {
+                    displayName:
+                      (storage.get('afterparty-display-name') ?? '').trim().slice(0, 32) || 'Guest',
+                  }
+                : {}),
+              action,
+              version: before.version,
+            }),
+          });
+          if (!current(target)) return false;
+          accept(target, result.room, sent);
+          onAccepted?.(result.room);
+          return true;
+        } catch (error) {
+          if (!current(target)) return false;
+          const conflict = (error as { status?: number })?.status === 409;
+          if (conflict && attempt === 0 && ['play', 'pause', 'seek'].includes(action)) {
+            // Only a rejected command can be retried, never an uncertain receipt.
+            // Refresh under the mutation lock and keep all server revision checks.
+            await read(target, false, true);
+            if (!current(target) || state.connection !== 'connected') return false;
+            const fresh = state.room;
+            if (
+              current(target) &&
+              state.connection === 'connected' &&
+              fresh?.isHost &&
+              fresh.version > before.version &&
+              fresh.code === before.code &&
+              fresh.current?.id === before.current?.id &&
+              fresh.playbackKey === before.playbackKey &&
+              fresh.syncSource === before.syncSource &&
+              fresh.syncEpoch === before.syncEpoch &&
+              fresh.startsAt === before.startsAt &&
+              fresh.buffering === before.buffering &&
+              !transportChanged(before, fresh)
+            )
+              continue;
+          } else refreshAfterConflict = conflict;
+          publish({ error: message(error) });
+          return false;
+        }
       }
       return false;
     } finally {
@@ -661,10 +707,31 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     control(action: 'play' | 'pause' | 'seek' | 'next', position?: number) {
       return mutate(action, action === 'seek' ? { position } : {});
     },
+    async controlNative(
+      action: PlayerIntent['action'],
+      position?: number,
+    ): Promise<PlayerIntentReceipt> {
+      let version: number | undefined;
+      const accepted = await mutate(action, action === 'seek' ? { position } : {}, (room) => {
+        version = room.version;
+      });
+      return { accepted, version };
+    },
     playback() {
       if (!state.room) return null;
       const target = playbackTarget(state.room, state.receivedAt, now());
-      return state.connection === 'connected' ? target : { ...target, playing: false, stale: true };
+      const live = session?.realtime;
+      // A temporary authenticated-read failure disables commands, but does not
+      // invalidate an independently calibrated, unexpired public timeline.
+      // Stream loss/lease expiry and access failures still stop playback.
+      const sustained =
+        session?.pollRecovering &&
+        live?.calibrated &&
+        live.source?.readyState === 1 &&
+        live.freshUntil > now();
+      return state.connection === 'connected' || sustained
+        ? target
+        : { ...target, playing: false, stale: true };
     },
     leave() {
       if (destroyed) return;

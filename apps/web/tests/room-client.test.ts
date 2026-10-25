@@ -720,6 +720,7 @@ class SyntheticStream extends EventTarget {
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 function streamFixture() {
   let monotonic = 100;
+  let failedReadStatus = 0;
   let snapshot: Room = {
     ...room(),
     serverTime: 1000,
@@ -733,16 +734,22 @@ function streamFixture() {
   };
   const sources: SyntheticStream[] = [];
   const streamUrls: string[] = [];
-  const f = fixture(async () => json(snapshot), {
-    now: () => monotonic,
-    eventSource: (url) => {
-      streamUrls.push(url);
-      const source = new SyntheticStream();
-      sources.push(source);
-      return source as unknown as EventSource;
+  const f = fixture(
+    async () =>
+      failedReadStatus
+        ? json({ error: 'Synthetic read failure' }, failedReadStatus)
+        : json(snapshot),
+    {
+      now: () => monotonic,
+      eventSource: (url) => {
+        streamUrls.push(url);
+        const source = new SyntheticStream();
+        sources.push(source);
+        return source as unknown as EventSource;
+      },
+      clockRequest: async () => json({ serverTime: 1000 + monotonic - 100 }),
     },
-    clockRequest: async () => json({ serverTime: 1000 + monotonic - 100 }),
-  });
+  );
   return {
     ...f,
     get state() {
@@ -750,6 +757,9 @@ function streamFixture() {
     },
     sources,
     streamUrls,
+    failReads(status: number) {
+      failedReadStatus = status;
+    },
     get snapshot() {
       return snapshot;
     },
@@ -874,7 +884,7 @@ test('a live lease expires locally even without a browser error or a responsive 
   f.client.destroy();
 });
 
-test('stream frames cannot cross a pending command or restore a superseded playback revision', async () => {
+test('fresh stream pauses cross pending commands and older receipts cannot restore playback', async () => {
   const pending = deferred<Response>();
   const source = new SyntheticStream();
   const snapshot: Room = {
@@ -894,11 +904,14 @@ test('stream frames cannot cross a pending command or restore a superseded playb
   await f.client.join('ROOM0001');
   source.open();
   await flush();
-  const command = f.client.control('pause');
-  source.send({ ...snapshot, version: 99, serverTime: 1200 });
-  assert.equal(f.state.room?.version, 1);
-  pending.resolve(json({ room: { ...snapshot, version: 3, playing: false, serverTime: 1300 } }));
-  assert.equal(await command, true);
+  const command = f.client.controlNative('seek', 42);
+  source.send({ ...snapshot, version: 3, playing: false, serverTime: 1200 });
+  assert.equal(f.state.room?.version, 3);
+  assert.equal(f.client.playback()?.playing, false);
+  pending.resolve(
+    json({ room: { ...snapshot, version: 2, playing: true, position: 42, serverTime: 1300 } }),
+  );
+  assert.deepEqual(await command, { accepted: true, version: 2 });
   source.send({ ...snapshot, version: 2, serverTime: 1400 });
   assert.equal(f.state.room?.version, 3);
   assert.equal(f.client.playback()?.playing, false);
@@ -1116,4 +1129,152 @@ test('an expired live lease does not suppress an authenticated room read', async
   await flush();
   assert.equal(f.calls.length, 2, 'a healthy transport alone cannot replace an expired timeline');
   f.client.destroy();
+});
+
+test('transport refreshes and retries one queue-only revision conflict without rejoining', async () => {
+  let reads = 0;
+  const sent: { action: string; version: number }[] = [];
+  const f = fixture(async (_path, init) => {
+    if (init.method !== 'POST') return json({ ...room('ROOM0001', ++reads), playing: true });
+    const input = JSON.parse(String(init.body));
+    sent.push(input);
+    if (sent.length === 1) return json({ error: 'The room changed.' }, 409);
+    return json({ room: { ...room('ROOM0001', 3), playing: false } });
+  });
+  try {
+    await f.client.join('ROOM0001');
+    assert.equal(await f.client.control('pause'), true);
+    assert.deepEqual(sent, [
+      { action: 'pause', version: 1 },
+      { action: 'pause', version: 2 },
+    ]);
+    assert.equal(f.state.room?.playing, false);
+    assert.equal(f.state.error, '');
+    assert.equal(f.state.connection, 'connected');
+  } finally {
+    f.client.destroy();
+  }
+});
+
+for (const [name, change] of Object.entries({
+  pause: { playing: false },
+  seek: { position: 90 },
+  source: { current: { ...room().current!, id: 'another0001' } },
+  instance: { playbackKey: 'another-playback' },
+  authority: { isHost: false },
+  epoch: { syncEpoch: 'another-epoch' },
+}))
+  test(`transport never retries over a concurrent ${name} change`, async () => {
+    let reads = 0,
+      posts = 0;
+    const f = fixture(async (_path, init) => {
+      if (init.method === 'POST') {
+        posts++;
+        return json({ error: 'The room changed.' }, 409);
+      }
+      return json({ ...room('ROOM0001', ++reads), playing: true, ...(reads > 1 ? change : {}) });
+    });
+    try {
+      await f.client.join('ROOM0001');
+      assert.equal(await f.client.control('seek', 42), false);
+      assert.equal(posts, 1);
+      assert.equal(f.state.room?.version, 2);
+    } finally {
+      f.client.destroy();
+    }
+  });
+
+test('a transient poll failure retains the fresh SSE player while controls await authenticated recovery', async () => {
+  const f = streamFixture();
+  try {
+    await f.client.join('ROOM0001');
+    f.sources[0].open();
+    await flush();
+    f.now = 200;
+    f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100 });
+    f.failReads(503);
+    await f.client.refresh();
+    assert.equal(f.state.connection, 'reconnecting');
+    assert.equal(f.client.playback()?.playing, true);
+    assert.equal(await f.client.control('pause'), false, 'old roles cannot dispatch controls');
+    f.now = 300;
+    f.sources[0].send({ ...f.snapshot, version: 3, playing: false, serverTime: 1200 });
+    assert.equal(f.state.room?.version, 3);
+    assert.equal(f.client.playback()?.playing, false, 'fresh shared pause is still applied');
+    assert.equal(
+      f.state.connection,
+      'reconnecting',
+      'public data cannot restore authenticated access',
+    );
+    f.failReads(0);
+    f.snapshot = { ...f.snapshot, version: 3, playing: false, serverTime: 1200 };
+    await f.client.refresh();
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.state.error, '');
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+for (const status of [401, 403, 404])
+  test(`a ${status} poll failure cannot be sustained or recovered by public frames`, async () => {
+    const f = streamFixture();
+    try {
+      await f.client.join('ROOM0001');
+      f.sources[0].open();
+      await flush();
+      f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100 });
+      f.failReads(status);
+      await f.client.refresh();
+      assert.equal(f.client.playback()?.playing, false);
+      f.sources[0].send({ ...f.snapshot, version: 3, serverTime: 1200 });
+      assert.equal(f.state.room?.version, 2);
+      assert.equal(f.state.connection, 'reconnecting');
+    } finally {
+      f.client.destroy();
+    }
+  });
+
+test('transport retries at most one explicit conflict and never retries an uncertain receipt', async () => {
+  for (const status of [409, 503]) {
+    let reads = 0,
+      posts = 0;
+    const f = fixture(async (_path, init) => {
+      if (init.method !== 'POST') return json({ ...room('ROOM0001', ++reads), playing: true });
+      posts++;
+      return json({ error: 'Synthetic command failure' }, status);
+    });
+    try {
+      await f.client.join('ROOM0001');
+      assert.equal(await f.client.control('seek', 42), false);
+      assert.equal(posts, status === 409 ? 2 : 1);
+    } finally {
+      f.client.destroy();
+    }
+  }
+});
+
+test('leaving during conflict reconciliation cannot replay a control or change the replacement room', async () => {
+  const pending = deferred<Response>();
+  let reads = 0;
+  const f = fixture(async (path, init) => {
+    if (init.method === 'POST') return json({ error: 'Old room conflict' }, 409);
+    if (path.endsWith('ROOM0002')) return json(room('ROOM0002'));
+    return ++reads === 1 ? json(room()) : pending.promise;
+  });
+  try {
+    await f.client.join('ROOM0001');
+    const changing = f.client.control('seek', 42);
+    await flush();
+    await f.client.join('ROOM0002');
+    pending.resolve(json(room('ROOM0001', 2)));
+    assert.equal(await changing, false);
+    assert.equal(f.state.room?.code, 'ROOM0002');
+    assert.equal(f.state.error, '');
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
+  } finally {
+    pending.resolve(json(room()));
+    f.client.destroy();
+  }
 });

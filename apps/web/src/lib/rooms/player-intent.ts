@@ -1,4 +1,5 @@
 export type PlayerIntent = { action: 'play' | 'pause' | 'seek'; position?: number; local?: true };
+export type PlayerIntentReceipt = { accepted: boolean; version?: number };
 type Observation = {
   identity: string;
   state: number;
@@ -6,7 +7,7 @@ type Observation = {
   now: number;
   gesture: boolean;
 };
-const POSITION_ACK_TOLERANCE = 2.25;
+export const POSITION_ACK_TOLERANCE = 2.25;
 
 /** A receipt alone is not a fresh shared timeline. Allow playback progress
  * between the seek and the next authoritative sample, including a delayed start. */
@@ -168,7 +169,6 @@ export function createPlayerIntent() {
         return null;
       const elapsed = previous.state === 1 ? Math.max(0, value.now - previous.at) / 1000 : 0;
       if (Math.abs(value.position - previous.position - elapsed) < 1.5) return null;
-      positionUntil = value.now + 1000;
       return { action: 'seek', position: value.position };
     },
   };

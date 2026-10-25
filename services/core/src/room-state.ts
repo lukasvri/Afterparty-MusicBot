@@ -321,6 +321,8 @@ export function changeRoom(
   if (!state.playing) delete state.startsAt;
   else if (typeof input.now === 'number' && Number.isFinite(input.now) &&
     (state.playbackKey !== previous.playbackKey || !previous.playing || action === 'seek'))
-    state.startsAt = input.now + ROOM_START_LEAD_MS;
+    // A native scrub is already in progress. Re-anchor its clock immediately;
+    // reserving another start barrier would pause every device for 1.5 seconds.
+    state.startsAt = action === 'seek' && previous.playing ? input.now : input.now + ROOM_START_LEAD_MS;
   return state;
 }
