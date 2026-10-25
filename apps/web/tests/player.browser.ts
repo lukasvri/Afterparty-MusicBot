@@ -85,6 +85,7 @@ async function fixture(
   host = true,
   initial = false,
   manualSampling = false,
+  scheduledSeek = false,
 ) {
   const browser = await fixtureBrowser((cleanup) => t.after(cleanup));
   const page = await browser.newPage({
@@ -102,6 +103,8 @@ async function fixture(
     version = 1,
     playing = true,
     position = 12;
+  let playbackKey = 'initial-instance';
+  let startsAt: number | undefined;
   let nowPlaying = current;
   let queue = [
     video('queued00001', 'Stay a little longer', 'Common Ground'),
@@ -117,6 +120,7 @@ async function fixture(
     playing,
     position,
     serverTime: Date.now(),
+    ...(scheduledSeek ? { playbackKey, startsAt } : {}),
     viewers: 4,
     isHost,
     isOwner: isHost,
@@ -168,6 +172,8 @@ async function fixture(
           emit: (state: number) => void;
           constructor(container: HTMLElement, options: Record<string, unknown>) {
             calls.push({ action: 'construct' });
+            (window as unknown as { __playerState: () => number }).__playerState = () => this.state;
+
             const events = options.events as {
               onReady: () => void;
               onStateChange?: (event: { data: number }) => void;
@@ -327,8 +333,13 @@ async function fixture(
         queue = [...queue, selected];
       } else if (input.action === 'pause') playing = false;
       else if (input.action === 'play') playing = true;
-      else if (input.action === 'seek') position = input.position;
-      else if (input.action === 'next') {
+      else if (input.action === 'seek') {
+        position = input.position;
+        if (scheduledSeek) {
+          playbackKey = `seek-instance-${version}`;
+          startsAt = playing ? Date.now() + 1500 : undefined;
+        }
+      } else if (input.action === 'next') {
         const selected = queue.shift();
         assert(selected);
         nowPlaying = selected;
@@ -1059,6 +1070,89 @@ test('a completed queue action preserves focus when the host has moved to search
     await f.close();
   }
 });
+
+for (const [scheduled, wasPlaying] of [
+  [false, true],
+  [true, true],
+  [true, false],
+]) {
+  test(`native scrub preserves ${wasPlaying ? 'playing' : 'paused'} video without reloading (new timeline: ${scheduled})`, async (t) => {
+    const f = await fixture(t, 390, true, true, false, scheduled);
+    let release = () => {};
+    try {
+      const { page } = f;
+      await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+      const native = page.frameLocator('.audio-stage iframe');
+      await native.getByRole('button', { name: 'Pause video', exact: true }).waitFor();
+      if (!wasPlaying) {
+        await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+        await page
+          .locator('.player-status')
+          .filter({ hasText: 'Shared playback is paused' })
+          .waitFor();
+      }
+      // Acknowledge the initial source and establish a real position sample.
+      await page.waitForTimeout(1100);
+      const before = f.writes.length;
+      release = f.holdNextMutation();
+      await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((button) => {
+        button.setAttribute(
+          'onclick',
+          "parent.postMessage({type:'synthetic-native',action:'seek-event',position:42},'*')",
+        );
+      });
+      await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+      await page.waitForFunction(() =>
+        document.querySelector('.player-status')?.textContent?.includes('Updating shared playback'),
+      );
+      assert.equal(
+        await page.evaluate(() =>
+          (window as unknown as { __playerState: () => number }).__playerState(),
+        ),
+        2,
+        'scrubbing waits paused for authority confirmation',
+      );
+      release();
+      await page.waitForFunction(
+        (expected) =>
+          (window as unknown as { __playerState: () => number }).__playerState() === expected,
+        wasPlaying ? 1 : 2,
+        { timeout: 6000 },
+      );
+      await page
+        .locator('.player-status')
+        .filter({
+          hasText: wasPlaying ? 'Following the shared clock' : 'Shared playback is paused',
+        })
+        .waitFor();
+      await page.waitForTimeout(300);
+      assert.equal(
+        await page.evaluate(() =>
+          (window as unknown as { __playerState: () => number }).__playerState(),
+        ),
+        wasPlaying ? 1 : 2,
+      );
+      assert.deepEqual(
+        f.writes.slice(before).map((write) => write.action),
+        ['seek'],
+      );
+      const sourceWrites = await page.evaluate(() =>
+        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
+          .filter((call) => ['construct', 'load', 'cue'].includes(call.action))
+          .map((call) => call.action),
+      );
+      assert.deepEqual(
+        sourceWrites,
+        ['construct', 'load'],
+        'a new timeline for the same video never loads its poster again',
+      );
+      assert.deepEqual(f.errors, []);
+    } finally {
+      release();
+      await f.close();
+    }
+  });
+}
 
 test('native pause, seek and queue-next dispatch without position polling or an acknowledgement delay', async (t) => {
   const f = await fixture(t, 390, true, true, true);

@@ -89,6 +89,12 @@ target converted back to the current device calibration, including authority
 bounds near the start and end. `roomSeekPosition` owns private-room seek bounds
 for both Core and browser commands. Failed videos remain suppressed until reload
 or a different source arrives; the ready iframe can load that next source.
+A seek can replace the clock instance while keeping the same recording. The
+player retains its video view and seeks that instance rather than loading the
+same recording again. A matching fresh timeline does not discard the pending
+HTTP receipt. Every programmatic pause updates the local playing-state cache,
+including a BUFFERING/PLAYING callback held during seek confirmation, so accepted
+playing seeks resume automatically. Explicit local/shared pause remains in force.
 Pending state cannot survive a source replacement or
 player disposal. Browsers never advance the queue from an ENDED callback. Core or
 the D1 fallback owns progression.

@@ -187,6 +187,7 @@
     failedSource = $state('');
   let disposed = false,
     loaded = '',
+    loadedSource = '',
     lastPlaying = false,
     correctedAt = -Infinity,
     settleUntil = 0,
@@ -196,6 +197,7 @@
   let localPaused = $state(false);
   let nativePending = $state<{
     identity: string;
+    source: string;
     intent: PlayerIntent;
     settled: boolean;
     deadline: number;
@@ -204,9 +206,16 @@
     pausePinned: boolean;
     sharedPosition?: number;
   } | null>(null);
-  const identity = () => `${room.code}:${room.current?.id ?? ''}:${room.playbackKey ?? ''}`;
+  const sourceIdentity = () => `${room.code}:${room.current?.id ?? ''}`;
+  const identity = () => `${sourceIdentity()}:${room.playbackKey ?? ''}`;
   function command(action: 'load' | 'cue' | 'play' | 'pause' | 'seek', position?: number) {
     native.command(identity(), action, performance.now(), position);
+  }
+  function pausePlayer() {
+    if (!player) return;
+    command('pause');
+    player.pauseVideo();
+    lastPlaying = false;
   }
   function observation(state = player?.getPlayerState() ?? -1) {
     let sourceMatches = false;
@@ -266,6 +275,7 @@
     const issuedAt = performance.now();
     const pending = {
       identity: identity(),
+      source: sourceIdentity(),
       intent,
       settled: false,
       deadline: issuedAt + 40000,
@@ -276,9 +286,7 @@
     };
     nativePending = pending;
     if (intent.action === 'seek' && player.getPlayerState() === 1) {
-      command('pause');
-      player.pauseVideo();
-      lastPlaying = false;
+      pausePlayer();
     }
     const epoch = generation;
     message = '';
@@ -316,7 +324,8 @@
   function sync(force = false) {
     if (!ready || !player || !room.current) return;
     const localPosition = calibratedPlaybackPosition(room, position, syncOffset);
-    const key = `${room.code}:${room.current.id}:${room.playbackKey ?? ''}`;
+    const key = identity();
+    const source = sourceIdentity();
     if (failedSource === key) return;
     if (failedSource) {
       failedSource = '';
@@ -324,12 +333,8 @@
       resetPlayerError();
       onPlaybackError?.(false);
     }
-    if (nativePending && nativePending.identity !== key) nativePending = null;
+    let confirmed = false;
     if (nativePending) {
-      if (!nativePending.settled || controlBusy) {
-        correction.reset();
-        return;
-      }
       const expected =
         nativePending.intent.action === 'seek'
           ? {
@@ -337,13 +342,26 @@
               position: calibratedPlaybackPosition(room, nativePending.sharedPosition!, syncOffset),
             }
           : nativePending.intent;
-      const confirmed = confirmsPlayerIntent(expected, {
+      confirmed = confirmsPlayerIntent(expected, {
         version: room.version,
         previousVersion: nativePending.version,
         playing: room.playing,
         position: localPosition,
         elapsed: room.buffering ? 0 : performance.now() - nativePending.issuedAt,
       });
+      // A successful seek may create a new clock instance for this same video.
+      // Keep its pending receipt until both it and the matching timeline arrive.
+      if (
+        nativePending.identity !== key &&
+        !(nativePending.intent.action === 'seek' && nativePending.source === source && confirmed)
+      )
+        nativePending = null;
+    }
+    if (nativePending) {
+      if (!nativePending.settled || controlBusy) {
+        correction.reset();
+        return;
+      }
       if (!confirmed && performance.now() < nativePending.deadline) return;
       if (confirmed && nativePending.intent.action !== 'seek' && !nativePending.pausePinned)
         localPaused = false;
@@ -357,12 +375,26 @@
     if (loaded !== key) {
       correction.reset();
       correctedAt = -Infinity;
+      const replaced = loadedSource !== source;
       loaded = key;
+      loadedSource = source;
       writePlayerAudio(true);
       const video = { videoId: room.current.id, startSeconds: localPosition };
-      command(audible ? 'load' : 'cue', localPosition);
-      if (audible) player.loadVideoById(video);
-      else player.cueVideoById(video);
+      if (replaced || (!audible && player.getPlayerState() === 5)) {
+        // A cued, never-started video needs cueVideoById to remain inaudible.
+        command(audible ? 'load' : 'cue', localPosition);
+        if (audible) player.loadVideoById(video);
+        else player.cueVideoById(video);
+      } else {
+        // Seeking the existing recording must not replace its native video view.
+        command('seek', localPosition);
+        player.seekTo(localPosition, true);
+        if (!audible) pausePlayer();
+        else if (player.getPlayerState() !== 1) {
+          command('play');
+          player.playVideo();
+        }
+      }
       lastPlaying = audible;
       settleUntil = performance.now() + syncRecoveryMs(syncMode);
       return;
@@ -373,8 +405,7 @@
         command('play');
         player.playVideo();
       } else if (!audible && state !== 2) {
-        command('pause');
-        player.pauseVideo();
+        pausePlayer();
       }
       lastPlaying = audible;
       force = true;
@@ -496,8 +527,7 @@
                   (!playing || localPaused || nativePending?.intent.action === 'seek') &&
                   player?.getPlayerState() === 1
                 ) {
-                  command('pause');
-                  player?.pauseVideo();
+                  pausePlayer();
                 }
                 return;
               }
@@ -507,8 +537,7 @@
               (!playing || localPaused || nativePending?.intent.action === 'seek') &&
               player?.getPlayerState() === 1
             ) {
-              command('pause');
-              player?.pauseVideo();
+              pausePlayer();
             }
           },
           // Core, or the D1 room handler, advances the shared queue. A delayed
@@ -539,6 +568,7 @@
       /* The keyed mount also removes the previous iframe. */
     }
     loaded = '';
+    loadedSource = '';
     failedSource = '';
     onPlaybackError?.(false);
     nativePending = null;
