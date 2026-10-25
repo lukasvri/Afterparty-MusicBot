@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 
-// Share local service discovery with the existing API, without using global tool state.
+// Keep local Wrangler state inside the project without using global tool state.
 const runtime = fileURLToPath(new URL('../../../.sites-runtime/', import.meta.url));
 process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= 'false';
 process.env.WRANGLER_SEND_METRICS ??= 'false';

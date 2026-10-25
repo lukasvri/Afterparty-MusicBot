@@ -122,15 +122,23 @@ async function fixture(width: number, host = true, initial = false) {
           destroy() {
             calls.push({ action: 'destroy' });
           }
-          setVolume() {}
-          mute() {}
-          unMute() {}
+          level = 100;
+          muted = false;
+          setVolume(level: number) {
+            this.level = level;
+          }
+          mute() {
+            this.muted = true;
+          }
+          unMute() {
+            this.muted = false;
+          }
           setPlaybackRate() {}
           getVolume() {
-            return 100;
+            return this.level;
           }
           isMuted() {
-            return false;
+            return this.muted;
           }
         },
       };
@@ -472,3 +480,143 @@ for (const width of [1440, 390]) {
     }
   });
 }
+
+for (const [width, height] of [
+  [1920, 1080],
+  [1280, 720],
+  [390, 844],
+])
+  test(
+    `native TV invitations and fullscreen preserve the player at ${width}x${height}`,
+    { timeout: 20000 },
+    async () => {
+      const f = await fixture(width, true, true);
+      try {
+        await f.page.setViewportSize({ width, height });
+        await f.page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+        await f.page.waitForFunction(() =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+            (call) => call.action === 'load',
+          ),
+        );
+        await f.page.getByRole('button', { name: 'Show QR invitation', exact: true }).click();
+        await f.page.getByAltText('QR code to join this listening room').waitFor();
+        assert.equal(
+          await f.page.getByRole('textbox', { name: 'Public room invitation link' }).inputValue(),
+          `${origin}/?room=${code}`,
+        );
+        await f.page.getByRole('button', { name: 'TV mode', exact: true }).click();
+        await f.page.getByRole('button', { name: 'Exit TV mode', exact: true }).waitFor();
+        await f.page.evaluate(() => document.fonts.ready);
+        assert.equal(new URL(f.page.url()).searchParams.get('tv'), '1');
+        assert(await f.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await f.page.screenshot({ path: `/tmp/afterparty-native-tv-${width}.png`, fullPage: true });
+        if (width > 700)
+          assert(
+            await f.page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1),
+            'TV fits without page scrolling: ' +
+              JSON.stringify(
+                await f.page.evaluate(() => ({
+                  height: innerHeight,
+                  scroll: document.documentElement.scrollHeight,
+                  rects: Array.from(
+                    document.querySelectorAll(
+                      'main, .room-heading, .listening-grid, .now-playing, .audio-stage, .room-share, .transport',
+                    ),
+                  ).map((e) => ({
+                    class: e.className,
+                    y: e.getBoundingClientRect().y,
+                    height: e.getBoundingClientRect().height,
+                  })),
+                })),
+              ),
+          );
+        await f.page.screenshot({ path: `/tmp/afterparty-native-tv-${width}.png`, fullPage: true });
+        await f.page.evaluate(() => {
+          const stage = document.querySelector('.audio-stage')!;
+          for (const api of ['requestFullscreen', 'webkitRequestFullscreen'])
+            Object.defineProperty(stage, api, { configurable: true, value: undefined });
+        });
+        await f.page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+        await f.page.keyboard.press('f');
+        await f.page.locator('.fullscreen-fallback').waitFor();
+        await f.page.keyboard.press('Escape');
+        await f.page.locator('.fullscreen-fallback').waitFor({ state: 'hidden' });
+        await f.page.keyboard.press('m');
+        await f.page.getByRole('button', { name: 'Unmute', exact: true }).waitFor();
+        await f.page.getByRole('button', { name: 'Exit TV mode', exact: true }).click();
+        await f.page.getByText('Playback diagnostics', { exact: true }).click();
+        const diagnostics = await f.page.locator('.playback-diagnostics pre').innerText();
+        assert(!diagnostics.includes(code) && !diagnostics.includes(current.id));
+        assert.equal(
+          await f.page.evaluate(
+            () =>
+              (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+                (call) => call.action === 'construct',
+              ).length,
+          ),
+          1,
+        );
+        assert.deepEqual(
+          f.writes,
+          [],
+          'viewing and local audio controls never mutate shared playback',
+        );
+        assert.deepEqual(f.errors, []);
+      } finally {
+        await f.close();
+      }
+    },
+  );
+
+test('saved motion preference and system reduced motion remain independent of audio and room control', async () => {
+  const f = await fixture(390, true, true);
+  try {
+    await f.page.evaluate(() => localStorage.setItem('afterparty-motion', 'off'));
+    await f.page.reload();
+    await f.page.waitForFunction(() => document.documentElement.dataset.motion === 'off');
+    assert.equal(
+      await f.page
+        .getByRole('button', { name: 'Page animations', exact: true })
+        .getAttribute('aria-pressed'),
+      'false',
+    );
+    await f.page.evaluate(() => {
+      const style = document.createElement('style');
+      style.textContent =
+        '@keyframes nativeMotionFixture{from{opacity:.1}to{opacity:.9}}#native-motion-fixture{animation:nativeMotionFixture 1s linear infinite}';
+      document.head.appendChild(style);
+      const probe = document.createElement('span');
+      probe.id = 'native-motion-fixture';
+      document.body.appendChild(probe);
+    });
+    const animation = () =>
+      f.page.evaluate(
+        () => getComputedStyle(document.getElementById('native-motion-fixture')!).animationName,
+      );
+    assert.equal(await animation(), 'none');
+    await f.page.getByRole('button', { name: 'Page animations', exact: true }).click();
+    await f.page.waitForFunction(() => document.documentElement.dataset.motion === 'on');
+    assert.equal(
+      await animation(),
+      'none',
+      'system reduced-motion still wins over the saved on setting',
+    );
+    await f.page.emulateMedia({ reducedMotion: 'no-preference' });
+    assert.equal(await animation(), 'nativeMotionFixture');
+    await f.page.getByRole('button', { name: 'Page animations', exact: true }).click();
+    await f.page.waitForFunction(() => document.documentElement.dataset.motion === 'off');
+    assert.equal(await animation(), 'none');
+    assert.equal(await f.page.evaluate(() => localStorage.getItem('afterparty-motion')), 'off');
+    assert.deepEqual(f.writes, []);
+    assert.equal(
+      await f.page.evaluate(
+        () => (window as unknown as { __audioCalls: unknown[] }).__audioCalls.length,
+      ),
+      0,
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});

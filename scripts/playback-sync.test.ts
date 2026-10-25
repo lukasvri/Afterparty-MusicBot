@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
+import {canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,calibratedPlaybackPosition,readSyncOffset,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
 import {acceptsLiveState,DISCORD_LIVE_LEASE_MS,liveRoom,readLiveState,type LiveState} from '../lib/live-room.ts';
 import type {Room} from '../lib/types.ts';
 const room: Room={version:1,viewers:1,isHost:true,expiresAt:999999,code:'DISCORD1',mode:'discord',name:'Discord',current:{id:'abcdefghijk',title:'Test',artist:'Test',image:'',embeddable:true,duration:200,live:false},queue:[],playing:true,position:50,serverTime:100000,syncValidForMs:10000};
@@ -9,6 +9,15 @@ test('paused snapshots never advance even after transport delay',()=>{const next
 test('stale bot state freezes the video instead of inventing minutes of playback',()=>{const target=playbackTarget(room,1000,40000);assert.equal(target.position,60);assert.equal(target.playing,false);assert.equal(target.stale,true);});
 test('normal rooms keep advancing and positions stay within the video',()=>{assert.equal(playbackTarget({...room,mode:undefined},1000,210000).position,199.9);});
 test('local offset affects only Discord video and clamps below zero',()=>{assert.equal(playbackTarget(room,1000,1000,-1.3).position,48.7);assert.equal(playbackTarget({...room,mode:undefined},1000,1000,-1.3).position,50);assert.equal(playbackTarget({...room,position:1},1000,1000,-5).position,0);});
+test('saved local calibration retains finite values, bounds and legacy defaults',()=>{
+ for(const [saved,expected] of [[null,0],['',0],['1.2',1.2],['-2.5',-2.5],['20',5],['-20',-5],['Infinity',0],['invalid',0]] as const)assert.equal(readSyncOffset(saved),expected);
+ const original=structuredClone(room);
+ assert.equal(calibratedPlaybackPosition(room,50,1.2),51.2);
+ assert.equal(calibratedPlaybackPosition({...room,mode:undefined},50,5),50);
+ assert.equal(calibratedPlaybackPosition(room,1,-5),0);
+ assert.equal(calibratedPlaybackPosition(room,199,5),199.9);
+ assert.deepEqual(room,original,'local calibration never updates the shared snapshot');
+});
 test('stable mode tolerates jitter and spaces automatic corrections',()=>{const correct=(a: number,b: number,c: number,d: number)=>shouldCorrect(a,b,c,d,false,'stable');assert.equal(correct(50,49.7,9000,0),false);assert.equal(correct(50,48.6,9000,0),false);assert.equal(correct(50,48,5000,0),false);assert.equal(correct(50,48,6000,0),true);});
 test('precise mode remains available without changing manual correction',()=>{assert.equal(shouldCorrect(50,49,3000,0,false,'precise'),true);assert.equal(shouldCorrect(50,49,2999,0,false,'precise'),false);assert.equal(shouldCorrect(50,49.7,200,0,true),true);assert.equal(shouldCorrect(50,NaN,200,0,true),false);});
 test('buffering never triggers seeks, including manual synchronization',()=>{assert.equal(canCorrectPlayback(3,true,10000,0),false);assert.equal(canCorrectPlayback(3,true,10000,0,true),false);});

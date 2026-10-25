@@ -2,7 +2,7 @@
 
 [Documentation](README.md) · [AI workflow](AI_WORKFLOW.md) · [Architecture](ARCHITECTURE.md) · [Branding](BRANDING.md)
 
-This is a **small, durable decision record** for assistants working on Afterparty. It was checked against the repository on **18 October 2026**. Refresh `main`, related PRs and the specific source files before making claims about current implementation. This is not a live deployment dashboard or an exhaustive description of the code.
+This is a **small, durable decision record** for assistants working on Afterparty. It was checked against the repository on **25 October 2026**. Refresh `main`, related PRs and the specific source files before making claims about current implementation. This is not a live deployment dashboard or an exhaustive description of the code.
 
 ## Product and identity
 
@@ -20,6 +20,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 - `main` remains the stable bot/web line. `beta` retains the v3 and Discord Activity experiments; extract independently tested shared fixes without promoting the Activity SDK, routes, session model or test configuration. See [release channels](RELEASE_CHANNELS.md).
 - `dev` is reserved for isolated Rust testing, initially based on the latest `main`. It is not the staging branch for normal features. Existing `nightly` and Rust branches remain separate from `main`; future Rust adoption requires a separate owner decision and review. Follow the [branch strategy](../CONTRIBUTING.md#branch-strategy).
 - Rust evaluation is paused at the owner's request on 18 October 2026; [research task #51](https://github.com/lukasvri/Afterparty-MusicBot/issues/51) and [PR #66](https://github.com/lukasvri/Afterparty-MusicBot/pull/66) are closed. Prioritize TypeScript/Node.js and FFmpeg performance and stability. Preserve Rust source, measurements and branch history, and resume Rust work only on an explicit owner request.
+- On 25 October 2026, the owner explicitly retired Classic and requested migration to the new systems. The sole website source is SvelteKit 3/Svelte 5 in `apps/web/`, with shared API handlers in `lib/api/` and TypeScript 6 across the website and Core. Preserve data, authorization and playback contracts. See [native migration](SVELTEKIT_MIGRATION.md); source changes do not establish deployment.
 - On 21 October 2026, the owner authorized substantial alpha-stage UI improvements and evaluation of SvelteKit/Svelte 5 under [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114). On 22 October, the owner additionally granted broad creative and implementation discretion for authorized private-alpha website work. Existing layout, component structure and visual patterns may change substantially, without pixel parity, when the resulting product is more usable, polished and maintainable. The proposed stack is not evidence of implementation, merge or deployment. Evaluate stable, compatible language/framework options for actual requirements rather than choosing JavaScript or the newest tool by default; protect Core and data contracts. The approval to redesign does not authorize merging or production operations.
 - Website: `app/`, `components/`, `hooks/`, `lib/`; hosted separately from Core.
 - Discord audio and room Core: `services/core/src/`. Core drives Discord playback and owns the shared playback clock.
@@ -42,7 +43,7 @@ This is a **small, durable decision record** for assistants working on Afterpart
 
 - [AGENTS.md](../AGENTS.md): repository-wide instructions, safe cloud tasks, test commands and production boundary.
 - [Architecture](ARCHITECTURE.md): service/data boundary, transport and playback responsibilities.
-- [Approved toolchain](TOOLCHAIN.md): the owner's chosen current tools, proposed SvelteKit frontend stack, validation gates and alternatives for new projects.
+- [Approved toolchain](TOOLCHAIN.md): the owner's chosen current tools, sole native frontend stack, validation gates and alternatives for new projects.
 - [Branding](BRANDING.md): logo, design direction, compatibility rules and Discord application settings.
 - [Cloud development](CLOUD_DEVELOPMENT.md): fresh checkout, setup, checks and safe local release process.
 - [Contributing](../CONTRIBUTING.md): module map and review standards.

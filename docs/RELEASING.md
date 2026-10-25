@@ -57,7 +57,7 @@ behavior, affected components, checks run, compatibility/operator actions and
 limitations. Proposed or unverified work is not an implemented change.
 
 **The public website has a deliberately narrower audience.** Currently
-`app/patch-notes/page.tsx` renders every `lib/releases.json` entry, and
+`apps/web/src/routes/patch-notes/+page.svelte` renders every `lib/releases.json` entry, and
 `CHANGELOG.md` and GitHub Release bodies are generated from that same product
 source. There is no separate per-item website visibility filter. Therefore:
 
@@ -85,8 +85,8 @@ source. There is no separate per-item website visibility filter. Therefore:
   the target branch and reconcile competing version candidates without
   discarding other work. Validate the resulting release history.
 - Verify that `/patch-notes` shows exactly the relevant product entries and
-  the homepage points to the right version (`app/patch-notes/page.tsx` and
-  `app/afterparty.tsx`). Review a local desktop/mobile preview for layout or
+  the homepage points to the right version (`apps/web/src/routes/patch-notes/+page.svelte` and
+  `apps/web/src/routes/+page.svelte`). Review a local desktop/mobile preview for layout or
   public note changes. A data/import check alone is not a visual check.
   The website displays source-build notes only after that build is deployed.
   Neither a branch, passing CI nor a release draft proves a production rollout;

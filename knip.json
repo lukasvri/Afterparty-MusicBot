@@ -3,21 +3,15 @@
   "workspaces": {
     ".": {
       "entry": [
-        "app/**/{page,layout,route}.{ts,tsx}",
+        "lib/api/**/route.ts",
         "scripts/**/*.{ts,mjs}",
-        "build/*.ts",
         "operations/update-panel/*.{js,mjs}"
       ],
       "project": [
-        "app/**/*.{ts,tsx}",
-        "components/**/*.{ts,tsx}",
-        "hooks/**/*.ts",
         "lib/**/*.ts",
         "db/**/*.ts",
         "scripts/**/*.{ts,mjs}",
-        "build/*.ts",
-        "operations/update-panel/*.{js,mjs}",
-        "app/**/*.css"
+        "operations/update-panel/*.{js,mjs}"
       ]
     },
     "apps/web": {

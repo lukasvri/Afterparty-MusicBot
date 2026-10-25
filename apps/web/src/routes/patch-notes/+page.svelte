@@ -13,7 +13,7 @@
   </p>
   <div class="timeline">
     {#each updates as update, index (update.version)}
-      <article>
+      <article id={`v${update.version}`}>
         <div class="stamp">
           <span>v{update.version}</span>
           <time

@@ -71,7 +71,7 @@ try {
         return route.fulfill({ json: snapshot });
       });
       await page.goto(
-        scenario === 'games' ? `${origin}/games` : `${origin}/v3${joined ? '?room=PERFROOM' : ''}`,
+        scenario === 'games' ? `${origin}/games` : `${origin}/${joined ? '?room=PERFROOM' : ''}`,
       );
       if (scenario === 'games') {
         await page.getByRole('button', { name: 'Host a game', exact: true }).waitFor();

@@ -109,12 +109,14 @@ export class Social extends EventEmitter {
       switch (input.action) {
         case 'highlight': {
           this.budget(key + ':' + actor + ':highlight', 3);
+          // eslint-disable-next-line no-control-regex -- Reject or strip control characters at the input boundary.
           if (typeof input.text !== 'string' || !input.text.trim() || input.text.length > 160 || /[\u0000-\u001f\u007f]/.test(input.text) || !playback.videoId || !/^[\w-]{11}$/.test(playback.videoId)) throw new UserError('Use a short highlight caption.');
           state.highlights = [...state.highlights, { id: input.eventId, text: input.text.trim(), position: Math.max(0, Math.floor(playback.position)), videoId: playback.videoId, at: now }].slice(-30); break;
         }
         case 'remove-highlight': state.highlights = state.highlights.filter(h => h.id !== input.highlightId); break;
         case 'configure': if (typeof input.enabled !== 'boolean') throw new UserError('Invalid social setting.'); state.enabled = input.enabled; if (!state.enabled) { state.reactions = []; this.reactions.delete(reactionKey); } break;
         case 'bingo-start':
+          // eslint-disable-next-line no-control-regex -- Reject or strip control characters at the input boundary.
           if (!Array.isArray(input.cells) || input.cells.length !== 9 || !input.cells.every(c => typeof c === 'string' && c.trim().length > 0 && c.length <= 60 && !/[\u0000-\u001f\u007f]/.test(c)) || new Set(input.cells.map(c => c.trim().toLowerCase())).size !== 9) throw new UserError('Enter nine distinct short bingo prompts.');
           state.bingo = { cells: input.cells.map(c => String(c).trim()), marked: [], active: true }; break;
         case 'bingo-mark':

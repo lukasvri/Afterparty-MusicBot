@@ -142,6 +142,81 @@ test('an expired anonymous grant rejoins and a failed mutation is never replayed
     f.client.destroy();
   }
 });
+
+test(
+  'explicit rejoin recovers missing membership without replaying a game command',
+  { timeout: 2000 },
+  async (context) => {
+    const actions: string[] = [];
+    let lost = false;
+    const freshSession = '22222222-2222-4222-8222-222222222222';
+    const f = fixture(async (init) => {
+      const input = JSON.parse(String(init.body));
+      actions.push(input.action);
+      if (input.action === 'read' && lost)
+        return Response.json({ error: 'Join this game first.' }, { status: 403 });
+      const data = response();
+      if (input.action === 'join' && lost) {
+        assert.equal(input.token, 'scoped-synthetic-token');
+        assert.equal(input.nickname, 'Synthetic player');
+        assert.equal(input.scopeId, 'ROOM0001');
+        data.game.sessionId = freshSession;
+      }
+      return Response.json(data);
+    });
+    context.after(() => f.client.destroy());
+    await f.client.refresh();
+    lost = true;
+    await f.client.refresh();
+    assert.equal(f.state().ready, false);
+    const recovered = new Promise<GameView>((resolve) => {
+      f.client.subscribe((state) => {
+        if (state.ready && state.data?.game.sessionId === freshSession) resolve(state);
+      });
+    });
+    f.client.rejoin();
+    const state = await recovered;
+    assert.deepEqual(actions, ['join', 'read', 'join']);
+    assert.equal(state.data?.game.phase, 'lobby');
+    assert.equal(state.data?.game.round, null);
+    assert.equal(state.error, '');
+  },
+);
+
+test(
+  'explicit rejoin preserves a surviving session and connectivity reconnect only reads',
+  { timeout: 2000 },
+  async (context) => {
+    const actions: string[] = [];
+    let completeRead!: () => void;
+    const read = new Promise<void>((resolve) => {
+      completeRead = resolve;
+    });
+    const f = fixture(async (init) => {
+      const input = JSON.parse(String(init.body));
+      actions.push(input.action);
+      const data = response(5);
+      data.game.scoreboard[0].total = 950;
+      if (input.action === 'read') completeRead();
+      return Response.json(data);
+    });
+    context.after(() => f.client.destroy());
+    await f.client.refresh();
+    f.client.reconnect();
+    await read;
+    assert.deepEqual(actions, ['join', 'read']);
+    const recovered = new Promise<GameView>((resolve) => {
+      f.client.subscribe((state) => {
+        if (state.ready && actions.at(-1) === 'join' && actions.length === 3) resolve(state);
+      });
+    });
+    f.client.rejoin();
+    const state = await recovered;
+    assert.deepEqual(actions, ['join', 'read', 'join']);
+    assert.equal(state.data?.game.sessionId, response().game.sessionId);
+    assert.equal(state.data?.game.scoreboard[0].total, 950);
+  },
+);
 test('destroy aborts in-flight requests and late responses do not publish', async () => {
   let complete!: (value: Response) => void, signal: AbortSignal | undefined;
   const f = fixture((init) => {

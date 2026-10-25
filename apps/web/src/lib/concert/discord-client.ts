@@ -28,6 +28,11 @@ export type ConcertView = {
   audioRoom: Room | null;
   audioLive: boolean;
   audioPhase: string;
+  adding: boolean;
+  searching: boolean;
+  query: string;
+  results: Video[];
+  history: Video[];
 };
 type Session = {
   guildId?: string;
@@ -41,6 +46,7 @@ type Options = {
   now?: () => number;
   audio?: ConcertAudioOptions;
   storage?: Pick<typeof browserStorage, 'get' | 'set'>;
+  delay?: (signal: AbortSignal) => Promise<void>;
 };
 
 /** Concert-only public state. Every operation remains scoped and authorized by the API/Core. */
@@ -61,6 +67,11 @@ export function createDiscordClient(options: Options = {}) {
     audioRoom: null,
     audioLive: false,
     audioPhase: 'Connecting shared clock…',
+    adding: false,
+    searching: false,
+    query: '',
+    results: [],
+    history: [],
   });
   let view = empty();
   let session: Session | null = null;
@@ -68,6 +79,9 @@ export function createDiscordClient(options: Options = {}) {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let pending: { id: string; expires: number } | null = null;
+  let additions: AbortController | null = null;
+  let searchController: AbortController | null = null;
+  let searchSerial = 0;
   const current = (target: Session) =>
     !stopped && session === target && !target.controller.signal.aborted;
   const publish = (change: Partial<ConcertView>) => {
@@ -83,8 +97,27 @@ export function createDiscordClient(options: Options = {}) {
     }
     return { 'Content-Type': 'application/json', 'X-Afterparty-Visitor': visitor };
   };
-  const signal = (target: Session) =>
-    AbortSignal.any([target.controller.signal, AbortSignal.timeout(12000)]);
+  const signal = (target: Session, extra?: AbortSignal, timeout = 12000) =>
+    AbortSignal.any([
+      target.controller.signal,
+      ...(extra ? [extra] : []),
+      AbortSignal.timeout(timeout),
+    ]);
+  const delay =
+    options.delay ??
+    ((abort: AbortSignal) =>
+      new Promise<void>((resolve, reject) => {
+        abort.throwIfAborted();
+        const cancelled = () => {
+          clearTimeout(timer);
+          reject(abort.reason);
+        };
+        const timer = setTimeout(() => {
+          abort.removeEventListener('abort', cancelled);
+          resolve();
+        }, 500);
+        abort.addEventListener('abort', cancelled, { once: true });
+      }));
   const errorText = (error: unknown) =>
     error instanceof Error ? error.message : 'The concert is unavailable. Try again.';
   const publicState = (state: ConcertState): ConcertState => ({
@@ -95,6 +128,74 @@ export function createDiscordClient(options: Options = {}) {
     position: state.current?.concert === true ? state.position : 0,
     playbackKey: state.current?.concert === true ? state.playbackKey : null,
   });
+  const publicHistory = (next: ConcertState | null) => {
+    const previous = view.state?.current;
+    return previous?.concert === true && view.state?.playbackKey !== next?.playbackKey
+      ? [...view.history.filter((video) => video.id !== previous.id), previous].slice(-100)
+      : view.history;
+  };
+  const freshState = async (target: Session, abort: AbortSignal) => {
+    const result = await request<{ state: ConcertState | null }>(
+      `/api/discord?guildId=${target.guildId}`,
+      {
+        headers: headers(),
+        cache: 'no-store',
+        signal: signal(target, abort),
+      },
+    );
+    abort.throwIfAborted();
+    if (
+      !current(target) ||
+      !result.state ||
+      result.state.guildId !== target.guildId ||
+      !result.state.online ||
+      !result.state.ready ||
+      !result.state.connected ||
+      typeof result.state.queueRevision !== 'string' ||
+      !result.state.queueRevision ||
+      !Array.isArray(result.state.queue)
+    )
+      throw Error('The selected concert changed or is unavailable. Refresh before trying again.');
+    return publicState(result.state);
+  };
+  // Reads only the exact receipt. Failed/uncertain writes are never replayed.
+  const confirmation = async (
+    target: Session,
+    id: string,
+    initial: string,
+    abort: AbortSignal,
+    admin = false,
+  ) => {
+    let status = initial;
+    while (current(target)) {
+      abort.throwIfAborted();
+      if (status === 'done') return;
+      if (!['pending', 'processing'].includes(status))
+        throw Error('Core did not confirm the command. Check the queue before retrying.');
+      await delay(abort);
+      abort.throwIfAborted();
+      const path = admin
+        ? `/api/admin/control?guildId=${target.guildId}`
+        : `/api/discord?${new URLSearchParams({ guildId: target.guildId!, command: id })}`;
+      const result = await request<{
+        guildId?: string;
+        state?: ConcertState | null;
+        command?: { id: string; status: string } | null;
+        commands?: Array<{ id: string; status: string }>;
+      }>(path, { headers: headers(), cache: 'no-store', signal: signal(target, abort) });
+      abort.throwIfAborted();
+      if (!current(target)) break;
+      if (
+        (result.guildId && result.guildId !== target.guildId) ||
+        (result.state?.guildId && result.state.guildId !== target.guildId)
+      )
+        throw Error('The command response belongs to a different Discord server.');
+      // Private admin snapshots are deliberately never stored in the public view.
+      const job = admin ? result.commands?.find((job) => job.id === id) : result.command;
+      if (job?.id === id) status = job.status;
+    }
+    throw Error('The selected concert changed. Adding was stopped.');
+  };
   const read = async (target: Session, clearError = false) => {
     if (!current(target) || (view.busy && !pending)) return;
     const serial = ++target.serial;
@@ -140,9 +241,15 @@ export function createDiscordClient(options: Options = {}) {
           },
         };
       }
+      const visibleState = view.audioLive
+        ? view.state
+        : result.state
+          ? publicState(result.state)
+          : null;
       publish({
         guildId: resolvedGuild,
-        state: view.audioLive ? view.state : result.state ? publicState(result.state) : null,
+        state: visibleState,
+        history: publicHistory(visibleState),
         queue,
         connected: true,
         loading: false,
@@ -156,7 +263,12 @@ export function createDiscordClient(options: Options = {}) {
               audioRoom: value.room,
               audioLive: value.live,
               audioPhase: value.phase,
-              ...(value.state ? { state: publicState(value.state) } : {}),
+              ...(value.state
+                ? {
+                    state: publicState(value.state),
+                    history: publicHistory(publicState(value.state)),
+                  }
+                : {}),
             });
         });
       }
@@ -210,6 +322,11 @@ export function createDiscordClient(options: Options = {}) {
     }, options.pollMs ?? 3000);
   };
   const retire = () => {
+    additions?.abort();
+    additions = null;
+    searchSerial++;
+    searchController?.abort();
+    searchController = null;
     audio?.destroy();
     audio = null;
     session?.controller.abort();
@@ -252,6 +369,168 @@ export function createDiscordClient(options: Options = {}) {
     playback() {
       const target = audio?.playback() ?? { position: 0, playing: false, stale: true };
       return view.connected ? target : { ...target, playing: false, stale: true };
+    },
+    async search(value: string) {
+      const target = session,
+        query = value.trim(),
+        serial = ++searchSerial;
+      searchController?.abort();
+      if (!target || !current(target)) return;
+      const controller = new AbortController();
+      searchController = controller;
+      publish({ query, results: [], searching: false, error: '' });
+      if (query.length < 2 || query.length > 120) {
+        publish({ error: 'Enter between 2 and 120 characters.' });
+        return;
+      }
+      publish({ searching: true });
+      try {
+        const result = await request<{ videos: Video[] }>(
+          `/api/search?q=${encodeURIComponent(query)}`,
+          {
+            headers: headers(),
+            signal: signal(target, controller.signal, 35000),
+          },
+        );
+        if (current(target) && serial === searchSerial)
+          publish({ results: result.videos, searching: false });
+      } catch (error) {
+        if (current(target) && serial === searchSerial)
+          publish({ searching: false, error: errorText(error) });
+      }
+    },
+    cancelSearch() {
+      searchSerial++;
+      searchController?.abort();
+      searchController = null;
+      publish({ searching: false, query: '', results: [] });
+    },
+    cancelAdditions() {
+      additions?.abort();
+    },
+    async append(input: readonly string[]) {
+      const target = session;
+      const ids = [...new Set(input)];
+      if (!target?.guildId || !current(target) || view.busy || !view.connected)
+        throw Error('Connect to the selected concert before adding music.');
+      if (!ids.length || ids.length > 50 || ids.some((id) => !/^[\w-]{11}$/.test(id)))
+        throw Error('Choose between one and fifty YouTube tracks.');
+      ++target.serial;
+      const operation = new AbortController();
+      additions = operation;
+      const lifetime = AbortSignal.any([
+        target.controller.signal,
+        operation.signal,
+        AbortSignal.timeout(300000),
+      ]);
+      let added = 0;
+      publish({ busy: true, adding: true, error: '', notice: '' });
+      try {
+        for (const videoId of ids) {
+          lifetime.throwIfAborted();
+          const latest = await freshState(target, lifetime);
+          if (latest.current?.id === videoId || latest.queue.some((video) => video.id === videoId))
+            continue;
+          const commandId = crypto.randomUUID();
+          const bounded = AbortSignal.any([lifetime, AbortSignal.timeout(35000)]);
+          const receipt = await request<{ id: string; status: string }>('/api/discord', {
+            method: 'POST',
+            headers: headers(),
+            signal: signal(target, bounded),
+            body: JSON.stringify({
+              action: 'enqueue',
+              guildId: target.guildId,
+              videoId,
+              commandId,
+              queueRevision: latest.queueRevision,
+            }),
+          });
+          bounded.throwIfAborted();
+          if (!current(target)) throw Error('The selected concert changed.');
+          if (receipt.id !== `public:${commandId}`)
+            throw Error('Unexpected command receipt. Check the queue before retrying.');
+          await confirmation(target, receipt.id, receipt.status, bounded);
+          lifetime.throwIfAborted();
+          added++;
+          publish({ notice: `${added} track${added === 1 ? '' : 's'} confirmed by Core.` });
+        }
+      } catch (error) {
+        const reason = operation.signal.aborted
+          ? 'Adding was cancelled; a requested track may still arrive.'
+          : errorText(error);
+        if (current(target))
+          publish({
+            error: `${added} tracks confirmed. ${reason} Check the queue before retrying.`,
+          });
+        throw Error(reason);
+      } finally {
+        if (additions === operation) additions = null;
+        if (current(target)) {
+          publish({ busy: false, adding: false });
+          await read(target);
+        }
+      }
+    },
+    async seek(seconds: number) {
+      const target = session,
+        state = view.state,
+        playbackKey = state?.playbackKey;
+      if (
+        !target?.guildId ||
+        !current(target) ||
+        !view.connected ||
+        view.busy ||
+        !view.queue?.canManage ||
+        !state?.current ||
+        state.current.live ||
+        !playbackKey ||
+        !Number.isFinite(seconds) ||
+        seconds < 0 ||
+        seconds >= state.current.duration
+      )
+        return false;
+      ++target.serial;
+      publish({ busy: true, error: '', notice: '' });
+      const abort = AbortSignal.any([target.controller.signal, AbortSignal.timeout(35000)]);
+      try {
+        const latest = await freshState(target, abort);
+        if (
+          latest.playbackKey !== playbackKey ||
+          view.state?.playbackKey !== playbackKey ||
+          !latest.current ||
+          latest.current.live ||
+          seconds >= latest.current.duration
+        )
+          throw Error('The concert track changed. Refresh before seeking.');
+        const commandId = crypto.randomUUID();
+        const receipt = await request<{ id: string; status: string }>('/api/admin/control', {
+          method: 'POST',
+          headers: headers(),
+          signal: signal(target, abort, 35000),
+          body: JSON.stringify({
+            guildId: target.guildId,
+            operation: 'command',
+            commandId,
+            command: { action: 'seek', seconds, queueRevision: latest.queueRevision, playbackKey },
+          }),
+        });
+        abort.throwIfAborted();
+        if (!current(target)) return false;
+        if (receipt.id !== commandId)
+          throw Error('Unexpected seek receipt. Refresh before trying again.');
+        await confirmation(target, receipt.id, receipt.status, abort, true);
+        if (!current(target) || view.state?.playbackKey !== playbackKey) return false;
+        publish({ notice: 'Seek confirmed by Core.' });
+        return true;
+      } catch (error) {
+        if (current(target)) publish({ error: errorText(error) });
+        return false;
+      } finally {
+        if (current(target)) {
+          publish({ busy: false });
+          await read(target);
+        }
+      }
     },
     async queueAction(
       action:

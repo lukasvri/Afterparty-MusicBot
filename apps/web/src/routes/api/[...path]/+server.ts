@@ -1,13 +1,7 @@
-import { env } from 'cloudflare:workers';
-import { bridge, type ApiBinding } from '#lib/server/api-bridge.ts';
 import { nativeApi } from '#lib/server/native-api.ts';
 import type { RequestHandler } from './$types';
 
-// Keep the API binding as an explicit rollback path until native mode is selected.
-const dispatch: RequestHandler = ({ request }) =>
-  env.AFTERPARTY_NATIVE_API === '1'
-    ? nativeApi(request)
-    : bridge(request, env.AFTERPARTY_API as ApiBinding | undefined);
+const dispatch: RequestHandler = ({ request }) => nativeApi(request);
 
 export {
   dispatch as GET,

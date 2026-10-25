@@ -39,7 +39,7 @@ for (const width of [390, 1440]) {
         );
         assert.equal(
           await page.getByRole('link', { name: 'Afterparty home' }).getAttribute('href'),
-          '/v3',
+          '/',
         );
       }
       const writes: string[] = [];

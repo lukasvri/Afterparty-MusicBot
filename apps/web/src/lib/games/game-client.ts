@@ -268,6 +268,11 @@ export function createGameClient(
     },
     act: send,
     reconnect,
+    rejoin() {
+      if (!alive) return;
+      wantJoin = true;
+      reconnect();
+    },
     clock: () => clock.serverTime + Math.max(0, now() - clock.at),
     async media(signal: AbortSignal) {
       const snapshot = view.data?.game,

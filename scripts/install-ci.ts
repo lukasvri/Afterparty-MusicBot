@@ -1,49 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { accessSync, constants } from "node:fs";
-import path from "node:path";
-import { projectRoot } from "./sites-env.ts";
-import { readExecutionProfile } from "./execution-profile.ts";
-import { runNpmInstall } from "./npm-install.ts";
+import { fileURLToPath } from "node:url";
 
-if (!process.env.npm_execpath) {
-  throw new Error("Run this installer with npm run install:ci.");
-}
-
-if (![
-  "SHARP_IGNORE_GLOBAL_LIBVIPS",
-  "SHARP_FORCE_GLOBAL_LIBVIPS",
-  "npm_config_build_from_source",
-  "NPM_CONFIG_BUILD_FROM_SOURCE",
-].some((key) => key in process.env)) {
-  process.env.SHARP_IGNORE_GLOBAL_LIBVIPS = "1";
-}
-
-if (readExecutionProfile() === "managed-linux") {
-  const result = spawnSync("bash", [path.join(projectRoot, "scripts/install-ci.sh")], {
-    stdio: "inherit",
-  });
+if (!process.env.npm_execpath) throw new Error("Run this installer with npm run install:ci.");
+const root = fileURLToPath(new URL("../", import.meta.url));
+// Install the tooling, sole native website and independent Core from their locks.
+for (const [directory, extra] of [[root, []], [`${root}/apps/web`, []], [`${root}/services/core`, ["--omit=peer", "--ignore-scripts"]]] as const) {
+  const result = spawnSync(process.execPath, [process.env.npm_execpath, "ci", "--prefix", directory,
+    "--include=dev", "--include=optional", "--no-audit", "--no-fund", ...extra],
+    { cwd: root, stdio: "inherit", timeout: 8 * 60_000, killSignal: "SIGTERM" });
   if (result.error) throw result.error;
-  process.exit(result.status ?? 1);
-}
-
-// Invoke npm's JavaScript entrypoint, avoiding platform-specific shell shims.
-const installed = await runNpmInstall([
-  process.execPath,
-    process.env.npm_execpath, "ci", "--prefix", projectRoot, "--workspaces=false",
-    "--include=dev", "--include=optional", "--prefer-offline", "--no-audit", "--no-fund",
-]);
-if (installed.signal) process.kill(process.pid, installed.signal);
-if (installed.code !== 0 || installed.signal) process.exit(installed.code || 1);
-
-try {
-  accessSync(
-    path.join(
-      projectRoot, "node_modules", ".bin",
-      process.platform === "win32" ? "vinext.cmd" : "vinext",
-    ),
-    process.platform === "win32" ? constants.F_OK : constants.X_OK,
-  );
-} catch {
-  console.error("npm ci exited successfully but the local vinext executable is unavailable.");
-  process.exitCode = 69;
+  if (result.status !== 0) process.exit(result.status ?? 1);
 }

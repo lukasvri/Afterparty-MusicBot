@@ -252,15 +252,23 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
             destroy() {
               calls.push('destroy');
             }
-            setVolume() {}
-            mute() {}
-            unMute() {}
+            level = 100;
+            muted = false;
+            setVolume(level: number) {
+              this.level = level;
+            }
+            mute() {
+              this.muted = true;
+            }
+            unMute() {
+              this.muted = false;
+            }
             setPlaybackRate() {}
             getVolume() {
-              return 100;
+              return this.level;
             }
             isMuted() {
-              return false;
+              return this.muted;
             }
           },
         },

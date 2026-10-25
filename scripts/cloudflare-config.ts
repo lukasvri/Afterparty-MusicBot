@@ -3,18 +3,13 @@ import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const cloudflareConfigPath = "wrangler.cloudflare.local.json";
-export function deploymentTarget(value = process.env.AFTERPARTY_DEPLOY_TARGET) {
-  if (value === undefined || value === "sites") return "sites";
-  if (value === "cloudflare") return "cloudflare";
-  throw new Error("AFTERPARTY_DEPLOY_TARGET must be sites or cloudflare.");
-}
 export function cloudflareConfig(env: Record<string, string | undefined>, root: string) {
   const name = env.CF_WORKER_NAME;
   const databaseName = env.CF_D1_DATABASE_NAME;
   const databaseId = env.CF_D1_DATABASE_ID;
-  const validName = (value: string | undefined) =>
-    value && /^[a-z][a-z0-9-]{0,61}[a-z0-9]$/.test(value) &&
-    !/replace|placeholder/.test(value);
+  const validName = (value: string | undefined): value is string =>
+    Boolean(value && /^[a-z][a-z0-9-]{0,61}[a-z0-9]$/.test(value) &&
+    !/replace|placeholder/.test(value));
   if (!validName(name)) throw new Error("Set a valid CF_WORKER_NAME.");
   if (!validName(databaseName)) throw new Error("Set a valid CF_D1_DATABASE_NAME.");
   if (

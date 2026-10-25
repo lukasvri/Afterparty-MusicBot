@@ -18,6 +18,7 @@ for (const width of [1440, 390])
         const errors: string[] = [],
           actions: string[] = [];
         page.on('pageerror', (error) => errors.push(error.message));
+        let lostMembership = false;
         const data: GameResponse = {
           canManage: host,
           token: 'synthetic-game-grant',
@@ -60,6 +61,24 @@ for (const width of [1440, 390])
           );
           const input = route.request().postDataJSON();
           actions.push(input.action);
+          if (lostMembership && input.action !== 'join') {
+            await route.fulfill({ status: 403, json: { error: 'Join this game first.' } });
+            return;
+          }
+          if (lostMembership && input.action === 'join') {
+            data.game.sessionId = '22222222-2222-4222-8222-222222222222';
+            data.game.revision = 1;
+            data.game.phase = 'lobby';
+            data.game.round = null;
+            data.game.roundNumber = 0;
+            data.game.scoreboard.forEach((player) => {
+              player.total = 0;
+              player.hasAnswered = false;
+            });
+            data.self.result = null;
+            lostMembership = false;
+          }
+
           assert.equal(input.scope, 'room');
           assert.equal(input.scopeId, 'TESTROOM');
           if (!['join', 'read'].includes(input.action)) {
@@ -154,6 +173,23 @@ for (const width of [1440, 390])
         assert.equal(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
           true,
+        );
+
+        const beforeRecovery = actions.length;
+        lostMembership = true;
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await page.getByRole('button', { name: 'Reconnect game', exact: true }).waitFor();
+        await page.getByRole('button', { name: 'Reconnect game', exact: true }).click();
+        await page
+          .getByRole('button', { name: 'Reconnect game', exact: true })
+          .waitFor({ state: 'hidden' });
+        await page
+          .getByRole('heading', { name: host ? 'Set the mood.' : 'Get comfortable.', exact: true })
+          .waitFor();
+        assert(actions.slice(beforeRecovery).includes('join'));
+        assert.deepEqual(
+          actions.slice(beforeRecovery).filter((action) => !['join', 'read'].includes(action)),
+          [],
         );
         await page.getByRole('button', { name: 'Leave game', exact: true }).click();
         await page.getByRole('button', { name: 'Join lobby', exact: true }).waitFor();
