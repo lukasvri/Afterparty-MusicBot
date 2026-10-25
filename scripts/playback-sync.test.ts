@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,calibratedPlaybackPosition,readSyncOffset,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
+import {createPlaybackCorrection,canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,calibratedPlaybackPosition,readSyncOffset,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
 import {acceptsLiveState,DISCORD_LIVE_LEASE_MS,liveRoom,readLiveState,type LiveState} from '../lib/live-room.ts';
 import type {Room} from '../lib/types.ts';
 const room: Room={version:1,viewers:1,isHost:true,expiresAt:999999,code:'DISCORD1',mode:'discord',name:'Discord',current:{id:'abcdefghijk',title:'Test',artist:'Test',image:'',embeddable:true,duration:200,live:false},queue:[],playing:true,position:50,serverTime:100000,syncValidForMs:10000};
@@ -141,4 +141,45 @@ test('scheduled starts remain stationary during transit before the agreed time',
  assert.equal(playbackTarget(scheduled,1000,1500).position,50);
  assert.equal(playbackTarget(scheduled,1000,1500).playing,false);
  assert.equal(playbackTarget(scheduled,1000,2500).position,50.5);
+});
+
+
+test('isolated and alternating iframe jitter does not cause automatic hard seeks',()=>{
+ const correction=createPlaybackCorrection();
+ let previous=-Infinity,oldPrevious=-Infinity,filtered=0,old=0;
+ for(let now=0;now<=30000;now+=250){
+  const target=10+now/1000,drift=now%3000===0?.8:0;
+  if(shouldCorrect(target,target-drift,now,oldPrevious)){old++;oldPrevious=now;}
+  if(correction.shouldCorrect(target,target-drift,now,previous)){filtered++;previous=now;}
+ }
+ assert.equal(old,11,'single stale readings repeatedly interrupt the old policy');
+ assert.equal(filtered,0,'healthy readings between spikes retain the player buffer');
+ for(let now=0;now<5000;now+=250)
+  assert.equal(correction.shouldCorrect(50,now%500===0?49.2:50.8,now,-Infinity),false);
+});
+test('persistent drift aligns after a bounded observation window in both modes',()=>{
+ for(const [mode,drift,window] of [['precise',.8,750],['stable',2,1500]] as const){
+  const correction=createPlaybackCorrection();
+  for(let now=0;now<window;now+=250)assert.equal(correction.shouldCorrect(50,50-drift,now,-Infinity,false,mode),false);
+  assert.equal(correction.shouldCorrect(50,50-drift,window,-Infinity,false,mode),true);
+ }
+});
+test('manual alignment and large desynchronization keep their fast path',()=>{
+ const correction=createPlaybackCorrection();
+ assert.equal(correction.shouldCorrect(50,49.7,1,0,true),true);
+ assert.equal(correction.shouldCorrect(50,47,3000,0),true);
+ assert.equal(correction.shouldCorrect(50,45,6000,0,false,'stable'),true);
+ assert.equal(correction.shouldCorrect(50,47,2999,0),false,'automatic cooldown remains enforced');
+});
+test('stale samples, invalid readings, source resets and preference changes retire drift evidence',()=>{
+ const correction=createPlaybackCorrection();
+ assert.equal(correction.shouldCorrect(50,49,0,-Infinity),false);
+ assert.equal(correction.shouldCorrect(50,49,1500,-Infinity),false,'a background gap starts a fresh window');
+ assert.equal(correction.shouldCorrect(50,NaN,2000,-Infinity),false);
+ assert.equal(correction.shouldCorrect(50,49,2250,-Infinity),false);
+ correction.reset();
+ assert.equal(correction.shouldCorrect(50,49,3000,-Infinity),false);
+ assert.equal(correction.shouldCorrect(50,48,3500,-Infinity,false,'stable'),false);
+ assert.equal(correction.shouldCorrect(50,48,4500,-Infinity,false,'stable'),false);
+ assert.equal(correction.shouldCorrect(50,48,5000,-Infinity,false,'stable'),true);
 });

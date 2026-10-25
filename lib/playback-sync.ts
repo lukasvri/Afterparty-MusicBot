@@ -34,6 +34,38 @@ export function shouldCorrect(position:number,current:number,now:number,lastCorr
  const tolerance=mode==='precise'?.5:1.5;
  return Number.isFinite(current)&&(force||now-lastCorrection>=interval)&&Math.abs(position-current)>(force ? .15 : tolerance);
 }
+/** One delayed iframe reading must not discard a healthy video buffer.
+ * Manual transport stays immediate; smaller automatic drift must persist. */
+export function createPlaybackCorrection() {
+  let candidate: {direction: number; since: number; last: number; mode: SyncMode} | null = null;
+  const reset = () => { candidate = null; };
+  return {
+    reset,
+    shouldCorrect(position: number, current: number, now: number, lastCorrection: number, force = false, mode: SyncMode = 'precise') {
+      if (!Number.isFinite(position) || !Number.isFinite(now) ||
+          !shouldCorrect(position, current, now, lastCorrection, force, mode)) {
+        reset();
+        return false;
+      }
+      const drift = position - current;
+      if (force || Math.abs(drift) >= (mode === 'precise' ? 2.5 : 4)) {
+        reset();
+        return true;
+      }
+      const direction = Math.sign(drift);
+      if (!candidate || candidate.direction !== direction || candidate.mode !== mode ||
+          now < candidate.last || now - candidate.last > 1000) {
+        candidate = {direction, since: now, last: now, mode};
+      } else {
+        candidate.last = now;
+      }
+      if (now - candidate.since < (mode === 'precise' ? 750 : 1500)) return false;
+      reset();
+      return true;
+    },
+  };
+}
+
 export function canCorrectPlayback(state:number,playing:boolean,now:number,settleUntil:number,force=false){
  // Seeking during buffering or immediately after recovery discards useful buffered data.
  return state!==3&&(force||!playing||now>=settleUntil);

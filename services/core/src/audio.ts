@@ -231,14 +231,24 @@ export class Mixer extends Readable {
         this.preparing = null;
       });
   }
+  private fadeSeconds() {
+    return this.main.track.live
+      ? 0
+      : Math.min(
+          this.options.crossfade(),
+          Math.max(0, (this.main.track.duration - this.offset) / 4),
+        );
+  }
   bufferNext() {
     if (!this.nextPrepared || this.nextRead || this.nextFailed) return;
     const prepared = this.nextPrepared,
       generation = this.preparationGeneration;
+    // Prefetch exactly the fade this source can use. Short tracks and seeked
+    // tails must not wait for unused configured fade data before becoming ready.
     // At most 12 seconds of stereo PCM, 2.3 MiB. A fade never waits for I/O.
     const frames = Math.min(
       600,
-      Math.max(1, Math.round(this.options.crossfade() * 50)),
+      Math.max(1, Math.round(this.fadeSeconds() * 50)),
     );
     this.nextRead = (async () => {
       try {
@@ -286,12 +296,7 @@ export class Mixer extends Readable {
   async produce(): Promise<Buffer | null> {
     const remaining =
       this.main.track.duration - this.offset - this.trackFrame / 50;
-    const fadeSeconds = this.main.track.live
-      ? 0
-      : Math.min(
-          this.options.crossfade(),
-          Math.max(0, (this.main.track.duration - this.offset) / 4),
-        );
+    const fadeSeconds = this.fadeSeconds();
     if (remaining < fadeSeconds + 20 && !this.main.track.live) this.prepare();
     let a = this.mainFrames.shift() ?? (await this.main.decoder.frame());
     if (!a) {

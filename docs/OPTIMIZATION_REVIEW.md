@@ -515,11 +515,11 @@ are identical at 1440px and 390px:
 
 | Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
 | --- | ---: | ---: |
-| Welcome / empty browser room, including the scene | 264,948 B | 97,726 B |
-| Active browser room, before audio consent | 248,882 B | 92,928 B |
-| Game entry | 148,186 B | 56,001 B |
+| Welcome / empty browser room, including the scene | 265,986 B | 98,106 B |
+| Active browser room, before audio consent | 249,920 B | 93,308 B |
+| Game entry | 148,186 B | 55,999 B |
 
-The active-room response total is 7,661 decoded bytes / 2,512 recomputed gzip bytes
+The active-room response total is 8,699 decoded bytes / 2,892 recomputed gzip bytes
 above the previous `b192b1e` candidate. The library still loads only after an
 explicit visit, and active rooms still exclude the optional scene. These bounded
 feature additions are not a bundle-size reduction or a field-performance claim.
@@ -533,3 +533,25 @@ after the synthetic response. The player was reused. These observations exclude
 iframe-provider event delivery, network, decoding and audible Discord output.
 They establish no zero-latency provider guarantee. Authorized seeks still wait for
 confirmation and a fresh shared timeline before synchronized playback continues.
+
+
+### Stable alignment and effective Discord fade buffering
+
+`createPlaybackCorrection` in the existing shared sync module filters moderate
+one-off/alternating video readings before a hard seek. In a settled 30-second
+synthetic trace with one stale 0.8-second reading every 3 seconds, the previous
+threshold/cooldown predicate requests 11 seeks and the sustained policy requests 0.
+Persistent drift still corrects within 750 ms precise / 1500 ms stable once eligible;
+manual alignment, large drift and pause paths retain their fast behavior. This is
+a deterministic correction-decision trace, not measured real YouTube playback.
+
+The Discord mixer now derives prefetch size and transition size from the same
+effective fade duration. A real FFmpeg 4-second source followed by an 8-second
+source with configured 12-second fade buffers 50 rather than 400 PCM frames
+(192,000 rather than 1,536,000 bytes). Output remains 550 PCM frames / 11 seconds,
+with the same source identities and transition at frame 150. A separate five-run
+synthetic provider stall after the required 50 frames measured median readiness
+250.582 ms before / 0.028 ms after (maximum 252.626 / 0.188 ms). That controlled
+fixture injects 250 ms delay into excess provider reads; it does not measure
+Discord network, initial extraction, provider delivery or human listening latency.
+The twelve-second/600-frame bound and no-fade warm frame remain tested.

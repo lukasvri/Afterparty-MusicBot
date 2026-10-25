@@ -7,6 +7,7 @@
     MAX_SYNC_OFFSET_SECONDS,
     readSyncMode,
     readSyncOffset,
+    createPlaybackCorrection,
     shouldCorrect,
     syncRecoveryMs,
     SYNC_MODE_KEY,
@@ -187,6 +188,7 @@
     settleUntil = 0,
     generation = 0;
   const native = createPlayerIntent();
+  const correction = createPlaybackCorrection();
   let localPaused = $state(false);
   let nativePending = $state<{
     identity: string;
@@ -310,7 +312,10 @@
     const key = `${room.code}:${room.current.id}:${room.playbackKey ?? ''}`;
     if (nativePending && nativePending.identity !== key) nativePending = null;
     if (nativePending) {
-      if (!nativePending.settled || controlBusy) return;
+      if (!nativePending.settled || controlBusy) {
+        correction.reset();
+        return;
+      }
       const confirmed = confirmsPlayerIntent(nativePending.intent, {
         version: room.version,
         previousVersion: nativePending.version,
@@ -329,6 +334,8 @@
     }
     const audible = playing && !localPaused;
     if (loaded !== key) {
+      correction.reset();
+      correctedAt = -Infinity;
       loaded = key;
       writePlayerAudio(true);
       const video = { videoId: room.current.id, startSeconds: localPosition };
@@ -352,11 +359,22 @@
       force = true;
     }
     const now = performance.now();
+    const correctable =
+      !localPaused && canCorrectPlayback(player.getPlayerState(), audible, now, settleUntil, force);
+    if (!correctable || !audible || room.current.live) correction.reset();
     if (
       !room.current.live &&
-      !localPaused &&
-      canCorrectPlayback(player.getPlayerState(), audible, now, settleUntil, force) &&
-      shouldCorrect(localPosition, player.getCurrentTime(), now, correctedAt, force, syncMode)
+      correctable &&
+      (audible
+        ? correction.shouldCorrect(
+            localPosition,
+            player.getCurrentTime(),
+            now,
+            correctedAt,
+            force,
+            syncMode,
+          )
+        : shouldCorrect(localPosition, player.getCurrentTime(), now, correctedAt, force, syncMode))
     ) {
       // seekTo starts playback from a cued state. Re-cue a paused target so a
       // clock correction never masquerades as a deliberate native Play action.
@@ -498,6 +516,7 @@
     loaded = '';
     nativePending = null;
     native.reset('');
+    correction.reset();
     correctedAt = -Infinity;
     settleUntil = 0;
     bufferingAt = null;

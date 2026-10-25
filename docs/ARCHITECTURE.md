@@ -48,7 +48,7 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Native YouTube user intent | `apps/web/src/lib/rooms/player-intent.ts` | Current iframe focus/activation, programmatic echo suppression and fresh-timeline confirmation; `RoomAudio.svelte` owns player lifecycle and permission callbacks |
 | Shared room position and future start | `services/core/src/room-state.ts` | `roomPlaybackPosition` and `changeRoom`, reused by Core and Worker |
-| Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
+| Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` (canonical drift thresholds and sustained-correction evidence; `RoomAudio.svelte` resets evidence with its player lifecycle) |
 | Optional browser error privacy and initialization | `lib/error-reporting.ts` | Native root layout; [policy](OBSERVABILITY.md) |
 | Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core and the native website |
 | Concert links and legacy room resolution | `services/core/src/concert-links.ts`, `apps/web/src/lib/server/legacy-concert.ts` | Explicit guild URLs and bounded, exact-room compatibility redirects |
@@ -96,7 +96,7 @@ Shared contracts belong in browser-safe modules; authorization and persistence r
 
 `services/core/src/main.ts` connects the Discord bot, creates the guild registry, starts the HTTP services and runs the website bridge. Each guild has an engine, commands and store. The initial owner server uses `/data/core.sqlite`; additional servers use `/data/guilds/<server-id>/core.sqlite`.
 
-Providers resolve playable sources and metadata. FFmpeg decodes, mixes and encodes audio for Discord. The engine owns the playback timeline, queue revisions, recovery and radio decisions. A shared extraction gate bounds concurrent media processes and prioritizes audio startup.
+Providers resolve playable sources and metadata. FFmpeg decodes, mixes and encodes audio for Discord. The engine owns the playback timeline, queue revisions, recovery and radio decisions. A shared extraction gate bounds concurrent media processes and prioritizes audio startup. The mixer owns one effective fade calculation for both next-source PCM readiness and the actual transition; short/seeked tails do not prefetch unused configured fade data.
 
 [Radio 2.0](RADIO.md) uses one platform-neutral selection pipeline for Discord providers, browser rooms and the website fallback. Optional catalog and bounded search adapters supply candidates; shared policy checks content, recording identity, style, exclusions and playback capabilities before ranking them. The engine and room handlers retain final generation/revision checks and own all playback and persistence changes.
 

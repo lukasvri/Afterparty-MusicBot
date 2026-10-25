@@ -94,6 +94,24 @@ its intended offset frozen until an audible segment exists. Core pause intent
 survives radio discovery and source failure; crossfade recovery checkpoints the
 recording actually consumed by the audio sink.
 
+## Correction stability and Discord transitions
+
+Automatic video corrections keep the existing precise/stable tolerances and
+cooldowns. Moderate drift must stay outside tolerance in the same direction for
+750 ms (precise) or 1500 ms (stable). One stale reading or alternating jitter no
+longer triggers a hard seek that discards healthy video buffering. Large drift
+retains its existing fast path after cooldown; explicit alignment and native
+transport are immediate. Pause behavior is unchanged. Evidence is retired on
+buffering, local pause, source replacement, reload, mode changes and sample gaps.
+The current source does not inherit the previous source's correction cooldown.
+
+Core's mixer uses one effective fade duration for PCM prefetch and actual mixing.
+Short songs and seeked tails prepare only the fade they can use, while preserving
+the twelve-second bound, one warm frame without fade, consumed segment identity,
+backpressure and existing transition timing. Unused provider data no longer holds
+an already prepared short transition. These are local buffering improvements;
+real Discord voice and provider availability remain separate listening gates.
+
 ## Radio and discovery
 
 Music search requests a bounded candidate pool and ranks title, artist and recording
