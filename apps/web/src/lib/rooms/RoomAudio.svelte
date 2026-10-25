@@ -431,6 +431,7 @@
     loading = true;
     const current = ++generation;
     resetPlayerError();
+    onPlaybackError?.(false);
     try {
       await loadYoutube();
       if (disposed || current !== generation || !container || !window.YT) return;
@@ -516,6 +517,7 @@
       });
     } catch {
       if (!disposed && current === generation) {
+        onPlaybackError?.(true);
         message = 'The audio source could not load. Check your connection and try again.';
         loading = false;
       }

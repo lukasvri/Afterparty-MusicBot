@@ -379,6 +379,7 @@ for (const canManage of [false, true])
           __streamPath?: string;
           __closedStreams: number;
           __playerError?: () => void;
+          __failPlayerSetup?: boolean;
         };
         scope.__calls = [];
         scope.__closedStreams = 0;
@@ -419,6 +420,7 @@ for (const canManage of [false, true])
                   };
                 },
               ) {
+                if (scope.__failPlayerSetup) throw new Error('Synthetic player setup failure');
                 scope.__playerError = () => options.events.onError?.({ data: 150 });
                 this.iframe = document.createElement('iframe');
                 this.iframe.title = 'Synthetic YouTube player';
@@ -780,6 +782,16 @@ for (const canManage of [false, true])
         await page.getByRole('link', { name: 'Open DJ controls', exact: true }).count(),
         canManage ? 1 : 0,
       );
+      await page.evaluate(() => {
+        (window as unknown as { __failPlayerSetup: boolean }).__failPlayerSetup = true;
+      });
+      await page.getByText('Playback settings', { exact: true }).click();
+      await page.getByRole('button', { name: 'Reload video', exact: true }).click();
+      await page
+        .locator('.audio-message')
+        .filter({ hasText: 'The audio source could not load' })
+        .waitFor();
+      await page.getByText('Discord playback controls', { exact: true }).waitFor();
       assert.deepEqual(errors, []);
       assert.deepEqual(external, []);
     } finally {
