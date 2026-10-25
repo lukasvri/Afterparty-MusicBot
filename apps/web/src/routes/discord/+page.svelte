@@ -37,6 +37,7 @@
   const resultPages = $derived(Math.max(1, Math.ceil(view.results.length / 10)));
   let tick = $state(0);
   let tv = $state(false);
+  let playerFailed = $state(false);
   function toggleTV() {
     tv = !tv;
     const url = new URL(location.href);
@@ -55,6 +56,14 @@
   const concert = $derived(view.state);
   const queue = $derived(view.queue?.state.queue ?? concert?.queue ?? []);
   const canManage = $derived(view.queue?.canManage === true);
+  const browserPlayerAvailable = $derived(
+    Boolean(
+      view.audioRoom?.current &&
+      view.audioLive &&
+      view.audioRoom.current.embeddable !== false &&
+      view.audioRoom.current.source !== 'soundcloud',
+    ),
+  );
   const controlsDisabled = $derived(
     view.busy ||
       !view.connected ||
@@ -70,6 +79,7 @@
     client = createDiscordClient();
     const unsubscribe = client.subscribe((value) => {
       if (value.loading || value.guildId !== view.guildId) {
+        playerFailed = false;
         panel = 'queue';
         query = '';
         resultPage = 0;
@@ -197,7 +207,7 @@
             >
           </div>
           {#if concert?.current}
-            {#if view.audioRoom?.current && view.audioLive && view.audioRoom.current.embeddable !== false && view.audioRoom.current.source !== 'soundcloud'}
+            {#if browserPlayerAvailable && view.audioRoom}
               {#key view.guildId}<RoomAudio
                   room={view.audioRoom}
                   position={target.position}
@@ -205,6 +215,7 @@
                   canControl={!controlsDisabled}
                   canSeek={!controlsDisabled && canManage}
                   controlBusy={view.busy}
+                  onPlaybackError={(failed) => (playerFailed = failed)}
                   onIntent={async (intent) => {
                     if (
                       !client ||
@@ -254,6 +265,24 @@
                   : `${time(view.audioLive ? target.position : concert.position)} / ${time(concert.current.duration)}`}</span
               >
             </div>
+            {#if !browserPlayerAvailable || playerFailed}
+              <details class="concert-recovery">
+                <summary>Discord playback controls</summary>
+                <p>
+                  Browser playback is unavailable. These controls manage the shared Discord concert.
+                </p>
+                <button
+                  class="button secondary"
+                  disabled={controlsDisabled}
+                  onclick={() => void client?.control(concert?.playing ? 'pause' : 'resume')}
+                  >{concert.playing ? 'Pause Discord concert' : 'Resume Discord concert'}</button
+                >
+                {#if canManage && view.guildId}<a
+                    class="button secondary"
+                    href={`/admin?guildId=${encodeURIComponent(view.guildId)}`}>Open DJ controls</a
+                  >{/if}
+              </details>
+            {/if}
             <p class="permission-note">
               Controls update the shared Discord concert. The bot must already be connected to a
               voice channel.
@@ -498,6 +527,23 @@
 </div>
 
 <style>
+  .concert-recovery {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .concert-recovery summary {
+    cursor: pointer;
+    font-weight: 650;
+  }
+  .concert-recovery p {
+    margin: 12px 0;
+    color: var(--muted);
+  }
+  .concert-recovery .button {
+    margin: 4px 8px 4px 0;
+  }
   .concert-share {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -558,9 +604,18 @@
     grid-column: 2;
     grid-row: 1;
   }
+  .tv-mode .current-track:has(.concert-recovery) {
+    --concert-recovery-space: 80px;
+  }
+  .tv-mode .current-track:has(.concert-recovery[open]) {
+    --concert-recovery-space: 200px;
+  }
   .tv-mode .concert-art,
   .tv-mode :global(.audio-stage:not(.fullscreen)) {
-    width: min(100%, calc((100dvh - var(--tv-control-space) - 90px) * 16 / 9));
+    width: min(
+      100%,
+      calc((100dvh - var(--tv-control-space) - 90px - var(--concert-recovery-space, 0px)) * 16 / 9)
+    );
     margin-inline: auto;
   }
   .tv-mode .track-meta {

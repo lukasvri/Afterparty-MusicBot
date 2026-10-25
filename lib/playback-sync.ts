@@ -1,4 +1,4 @@
-import {elapsedPlayingMs} from '../services/core/src/protocol.ts';
+import {elapsedPlayingMs,roomSeekPosition} from '../services/core/src/protocol.ts';
 import type {Room} from './types.ts';
 export function compensateDelivery(room:Room,roundTripMs:number):Room {
  const transit=Number.isFinite(roundTripMs)?Math.min(1500,Math.max(0,roundTripMs/2)):0;
@@ -24,6 +24,11 @@ export function readSyncOffset(saved:string|null){
 export function calibratedPlaybackPosition(room:Pick<Room,'current'|'mode'>,position:number,offset=0){
  const raw=position+(room.mode==='discord'?offset:0);
  return Math.max(0,room.current&&!room.current.live?Math.min(Math.max(0,room.current.duration-.1),raw):raw);
+}
+/** Convert a local scrub to an achievable shared target before confirmation. */
+export function sharedSeekPosition(room:Pick<Room,'current'|'mode'>,position:number,offset=0){
+ const shared=calibratedPlaybackPosition(room,position,-offset);
+ return room.mode==='discord'||!room.current?shared:roomSeekPosition(shared,room.current.duration);
 }
 export type SyncMode='stable'|'precise';
 export function readSyncMode(saved:string|null):SyncMode{return saved==='stable'?'stable':'precise';}

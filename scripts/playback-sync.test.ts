@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createPlaybackCorrection,canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,calibratedPlaybackPosition,readSyncOffset,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
+import {sharedSeekPosition,createPlaybackCorrection,canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,calibratedPlaybackPosition,readSyncOffset,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
 import {acceptsLiveState,DISCORD_LIVE_LEASE_MS,liveRoom,readLiveState,type LiveState} from '../lib/live-room.ts';
 import type {Room} from '../lib/types.ts';
 const room: Room={version:1,viewers:1,isHost:true,expiresAt:999999,code:'DISCORD1',mode:'discord',name:'Discord',current:{id:'abcdefghijk',title:'Test',artist:'Test',image:'',embeddable:true,duration:200,live:false},queue:[],playing:true,position:50,serverTime:100000,syncValidForMs:10000};
@@ -182,4 +182,15 @@ test('stale samples, invalid readings, source resets and preference changes reti
  assert.equal(correction.shouldCorrect(50,48,3500,-Infinity,false,'stable'),false);
  assert.equal(correction.shouldCorrect(50,48,4500,-Infinity,false,'stable'),false);
  assert.equal(correction.shouldCorrect(50,48,5000,-Infinity,false,'stable'),true);
+});
+
+test('shared seek conversion matches achievable calibration and browser-room authority bounds',()=>{
+ const discord={...room,current:{...room.current!,duration:180}};
+ assert.equal(sharedSeekPosition(discord,0,5),0);
+ assert.equal(calibratedPlaybackPosition(discord,sharedSeekPosition(discord,0,5),5),5);
+ assert.equal(sharedSeekPosition(discord,179,-5),179.9);
+ assert.equal(calibratedPlaybackPosition(discord,sharedSeekPosition(discord,179,-5),-5),174.9);
+ const browser={...discord,mode:undefined};
+ assert.equal(sharedSeekPosition(browser,179.9),179);
+ assert.equal(sharedSeekPosition({...browser,current:{...browser.current!,duration:.5}},.4),0);
 });

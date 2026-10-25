@@ -3,6 +3,7 @@
   import { loadYoutube, type Player, type PlayerEvent } from '../../../../../lib/youtube-player.ts';
   import {
     calibratedPlaybackPosition,
+    sharedSeekPosition,
     canCorrectPlayback,
     MAX_SYNC_OFFSET_SECONDS,
     readSyncMode,
@@ -163,6 +164,7 @@
     settings,
     settingsLabel = 'Playback settings',
     footer,
+    onPlaybackError,
   }: {
     room: Room;
     position: number;
@@ -174,13 +176,15 @@
     settings?: Snippet;
     settingsLabel?: string;
     footer?: Snippet;
+    onPlaybackError?: (failed: boolean) => void;
   } = $props();
   let container = $state<HTMLDivElement>();
   let player: Player | null = null;
   let ready = $state(false),
     loading = $state(false),
     enabled = $state(false),
-    message = $state('');
+    message = $state(''),
+    failedSource = $state('');
   let disposed = false,
     loaded = '',
     lastPlaying = false,
@@ -198,6 +202,7 @@
     version: number;
     issuedAt: number;
     pausePinned: boolean;
+    sharedPosition?: number;
   } | null>(null);
   const identity = () => `${room.code}:${room.current?.id ?? ''}:${room.playbackKey ?? ''}`;
   function command(action: 'load' | 'cue' | 'play' | 'pause' | 'seek', position?: number) {
@@ -256,6 +261,8 @@
       sync(true);
       return;
     }
+    const sharedPosition =
+      intent.action === 'seek' ? sharedSeekPosition(room, intent.position!, syncOffset) : undefined;
     const issuedAt = performance.now();
     const pending = {
       identity: identity(),
@@ -265,6 +272,7 @@
       version: room.version,
       issuedAt,
       pausePinned: false,
+      sharedPosition,
     };
     nativePending = pending;
     if (intent.action === 'seek' && player.getPlayerState() === 1) {
@@ -278,9 +286,7 @@
     try {
       accepted = await onIntent!({
         ...intent,
-        ...(intent.action === 'seek'
-          ? { position: calibratedPlaybackPosition(room, intent.position!, -syncOffset) }
-          : {}),
+        ...(intent.action === 'seek' ? { position: sharedPosition } : {}),
         code: room.code,
         videoId: room.current.id,
         playbackKey: room.playbackKey,
@@ -297,7 +303,8 @@
     if (!disposed && generation === epoch) sync(true);
   }
   function readNativePosition() {
-    if (!ready || !player || nativePending || controlBusy || loaded !== identity()) return;
+    if (!ready || !player || failedSource || nativePending || controlBusy || loaded !== identity())
+      return;
     try {
       const intent = native.time(observation());
       if (intent) void nativeIntent(intent);
@@ -310,13 +317,27 @@
     if (!ready || !player || !room.current) return;
     const localPosition = calibratedPlaybackPosition(room, position, syncOffset);
     const key = `${room.code}:${room.current.id}:${room.playbackKey ?? ''}`;
+    if (failedSource === key) return;
+    if (failedSource) {
+      failedSource = '';
+      message = '';
+      resetPlayerError();
+      onPlaybackError?.(false);
+    }
     if (nativePending && nativePending.identity !== key) nativePending = null;
     if (nativePending) {
       if (!nativePending.settled || controlBusy) {
         correction.reset();
         return;
       }
-      const confirmed = confirmsPlayerIntent(nativePending.intent, {
+      const expected =
+        nativePending.intent.action === 'seek'
+          ? {
+              ...nativePending.intent,
+              position: calibratedPlaybackPosition(room, nativePending.sharedPosition!, syncOffset),
+            }
+          : nativePending.intent;
+      const confirmed = confirmsPlayerIntent(expected, {
         version: room.version,
         previousVersion: nativePending.version,
         playing: room.playing,
@@ -433,7 +454,9 @@
           onError: (event: PlayerEvent) => {
             if (disposed || current !== generation) return;
             loading = false;
-            ready = false;
+            failedSource = identity();
+            nativePending = null;
+            onPlaybackError?.(true);
             notePlayerError(Number(event.data));
             message = 'This source cannot play here. Try the next track or add another song.';
           },
@@ -447,7 +470,7 @@
               player?.setPlaybackRate(1);
           },
           onStateChange: (event: PlayerEvent) => {
-            if (disposed || current !== generation) return;
+            if (disposed || current !== generation || failedSource === identity()) return;
             if (typeof event.data !== 'number' || !Number.isFinite(event.data)) return;
             if (event.data === 3 && bufferingAt === null) {
               bufferingAt = performance.now();
@@ -514,6 +537,8 @@
       /* The keyed mount also removes the previous iframe. */
     }
     loaded = '';
+    failedSource = '';
+    onPlaybackError?.(false);
     nativePending = null;
     native.reset('');
     correction.reset();
@@ -547,6 +572,7 @@
   });
   onDestroy(() => {
     disposed = true;
+    onPlaybackError?.(false);
     generation++;
     try {
       player?.destroy();
@@ -582,21 +608,26 @@
   {/if}
 </div>
 <div class="player-status" role="status">
-  <span class="status-dot" class:online={enabled && ready && playing && !localPaused}></span>
+  <span
+    class="status-dot"
+    class:online={enabled && ready && !failedSource && playing && !localPaused}
+  ></span>
   <span
     >{!enabled
       ? 'Audio is off on this device'
-      : !ready
-        ? 'The video player is unavailable'
-        : nativePending
-          ? 'Updating shared playback…'
-          : localPaused
-            ? 'Paused on this device'
-            : playing
-              ? 'Following the shared clock'
-              : room.playing
-                ? 'Waiting for the shared clock'
-                : 'Shared playback is paused'}</span
+      : failedSource
+        ? 'This video is unavailable on this device'
+        : !ready
+          ? 'The video player is unavailable'
+          : nativePending
+            ? 'Updating shared playback…'
+            : localPaused
+              ? 'Paused on this device'
+              : playing
+                ? 'Following the shared clock'
+                : room.playing
+                  ? 'Waiting for the shared clock'
+                  : 'Shared playback is paused'}</span
   >
   <span class="control-scope"
     >{!enabled

@@ -9,6 +9,8 @@ Queue, Search and Library share a persistent tabbed panel beside the player on
 wide screens and below it on narrow screens. A mobile dock returns directly to
 these music surfaces. The official YouTube player owns playback, seek, volume and
 fullscreen controls; app duplicates are removed even before audio activation.
+When public-concert browser playback is unavailable or fails, a collapsed recovery
+panel exposes authorized Discord pause/resume and a manager link to the DJ desk.
 
 Tab changes retain search results, unfinished library fields, playlist jobs and
 preview selections. Inactive panels are hidden and inert; the library remains

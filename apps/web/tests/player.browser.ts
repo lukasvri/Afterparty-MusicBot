@@ -168,7 +168,11 @@ async function fixture(
             const events = options.events as {
               onReady: () => void;
               onStateChange?: (event: { data: number }) => void;
+              onError?: (event: { data: number }) => void;
             };
+            (
+              window as typeof window & { emitPlayerError: (code: number) => void }
+            ).emitPlayerError = (code) => events.onError?.({ data: code });
             this.emit = (state) => {
               this.state = state;
               events.onStateChange?.({ data: state });
@@ -676,7 +680,7 @@ for (const width of [1440, 390]) {
         .click();
       await page.getByRole('button', { name: /^Queue/ }).click();
       await page.locator('.queue-list').getByText(results[1].title, { exact: true }).waitFor();
-      assert.equal(await page.getByRole('alert').count(), 0);
+      assert.equal(await page.locator('.audio-message').count(), 0);
       assert.deepEqual(
         f.writes.map((write) => write.action),
         ['add'],
@@ -1159,6 +1163,59 @@ test('native pause, seek and queue-next dispatch without position polling or an 
       calls.filter((call) => call.action === 'construct').length,
       1,
       'queue-next reuses the current player',
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('a failed YouTube source does not lock the next valid recording or retry the failed video', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page
+      .frameLocator('.audio-stage iframe')
+      .getByRole('button', { name: 'Pause video' })
+      .waitFor();
+    await page.evaluate(() =>
+      (window as typeof window & { emitPlayerError: (code: number) => void }).emitPlayerError(150),
+    );
+    await page
+      .locator('.audio-message')
+      .filter({ hasText: 'This source cannot play here' })
+      .waitFor();
+    await page.waitForTimeout(400);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (
+            window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+          ).__audioCalls.filter((call) => call.action === 'load' && call.videoId === 'current0001')
+            .length,
+      ),
+      1,
+    );
+    await page.getByRole('button', { name: 'Next track', exact: true }).click();
+    await page.waitForFunction(() =>
+      (
+        window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+      ).__audioCalls.some((call) => call.action === 'load' && call.videoId === 'queued00001'),
+    );
+    assert.equal(await page.locator('.audio-message').count(), 0);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'construct',
+          ).length,
+      ),
+      1,
+    );
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['next'],
     );
     assert.deepEqual(f.errors, []);
   } finally {

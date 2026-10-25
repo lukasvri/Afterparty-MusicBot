@@ -40,6 +40,10 @@ export type RoomTimeline = {
   voteCounts?: Record<string, number>;
   skipVotes?: number;
 };
+/** Browser-room seeks leave the same final second available on every authority. */
+export function roomSeekPosition(position: number, duration: number): number {
+  return Math.max(0, Math.min(Math.max(0, duration - 1), position));
+}
 export const ROOM_START_LEAD_MS = 1500;
 export const ROOM_LEASE_MS = 5000;
 export const ROOM_QUEUE_LIMIT = 50;

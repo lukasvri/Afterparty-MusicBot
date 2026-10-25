@@ -128,6 +128,14 @@ for (const [width, height] of [
       assert.equal(await page.getByRole('slider', { name: 'Shared concert position' }).count(), 0);
       assert.equal(await page.getByRole('button', { name: 'Resume', exact: true }).count(), 0);
       assert.equal(await page.getByRole('button', { name: 'Pause', exact: true }).count(), 0);
+      await page.getByText('Discord playback controls', { exact: true }).click();
+      await page.getByRole('button', { name: 'Resume Discord concert', exact: true }).click();
+      await page.getByRole('button', { name: 'Pause Discord concert', exact: true }).click();
+      await page.getByRole('button', { name: 'Resume Discord concert', exact: true }).waitFor();
+      await page.screenshot({
+        path: `/tmp/afterparty-concert-recovery-${width}.png`,
+        fullPage: true,
+      });
       await page.getByRole('button', { name: 'Next track', exact: true }).click();
       await page.getByRole('button', { name: /^Vote for An especially/ }).click();
       await page
@@ -138,6 +146,8 @@ for (const [width, height] of [
           !(document.querySelector('button[aria-label^="Vote for"]') as HTMLButtonElement)
             ?.disabled,
       );
+      assert.equal(writes.filter((write) => write.action === 'resume').length, 1);
+      assert.equal(writes.filter((write) => write.action === 'pause').length, 1);
       assert.equal(writes.filter((write) => write.action === 'skip').length, 1);
       assert.equal(writes.filter((write) => write.action === 'vote').length, 1);
       assert.equal(
@@ -368,6 +378,7 @@ for (const canManage of [false, true])
           __disconnect?: () => void;
           __streamPath?: string;
           __closedStreams: number;
+          __playerError?: () => void;
         };
         scope.__calls = [];
         scope.__closedStreams = 0;
@@ -404,9 +415,11 @@ for (const canManage of [false, true])
                   events: {
                     onReady: () => void;
                     onStateChange?: (event: { data: number }) => void;
+                    onError?: (event: { data: number }) => void;
                   };
                 },
               ) {
+                scope.__playerError = () => options.events.onError?.({ data: 150 });
                 this.iframe = document.createElement('iframe');
                 this.iframe.title = 'Synthetic YouTube player';
                 this.iframe.sandbox.add('allow-scripts');
@@ -416,7 +429,7 @@ for (const canManage of [false, true])
                     event.data?.type !== 'native-concert'
                   )
                     return;
-                  if (event.data.action === 'seek') this.position = 60;
+                  if (event.data.action === 'seek') this.position = event.data.position ?? 60;
                   else {
                     this.state = event.data.action === 'play' ? 1 : 2;
                     options.events.onStateChange?.({ data: this.state });
@@ -687,11 +700,86 @@ for (const canManage of [false, true])
           .locator('.player-status')
           .filter({ hasText: 'Shared playback is paused' })
           .waitFor();
+        let sequence = 8;
+        for (const [offset, local, shared] of [
+          [5, 0, 0],
+          [-5, 179, 179.9],
+        ]) {
+          await page.evaluate((offset) => {
+            localStorage.setItem('afterparty-sync-offset', String(offset));
+            window.dispatchEvent(
+              new StorageEvent('storage', {
+                key: 'afterparty-sync-offset',
+                storageArea: localStorage,
+              }),
+            );
+          }, offset);
+          await emit(sequence++, false, snapshot.position);
+          await page.waitForTimeout(1100);
+          await native
+            .getByRole('button', { name: 'Seek video', exact: true })
+            .evaluate(
+              (button, position) =>
+                button.setAttribute(
+                  'onclick',
+                  `parent.postMessage({type:'native-concert',action:'seek',position:${position}},'*')`,
+                ),
+              local,
+            );
+          const confirmed = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              new URL(response.url()).pathname === '/api/admin/control',
+          );
+          await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+          await confirmed;
+          assert.equal((writes.at(-1)!.command as { seconds: number }).seconds, shared);
+          await emit(sequence++, false, shared);
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Shared playback is paused' })
+            .waitFor({ timeout: 5000 });
+          const resumedAfterSeek = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              response.request().postDataJSON()?.action === 'resume',
+          );
+          await native.getByRole('button', { name: 'Play video', exact: true }).click();
+          await resumedAfterSeek;
+          await emit(sequence++, true, shared);
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Following the shared clock' })
+            .waitFor();
+          const pausedAgain = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              response.request().postDataJSON()?.action === 'pause',
+          );
+          await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+          await pausedAgain;
+          await emit(sequence++, false, shared);
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Shared playback is paused' })
+            .waitFor();
+        }
       } else {
         await native.getByRole('button', { name: 'Seek video', exact: true }).click();
         await page.waitForTimeout(500);
         assert.equal(writes.length, 2, 'listeners cannot send administrator seeks');
       }
+      assert.equal(await page.getByText('Discord playback controls', { exact: true }).count(), 0);
+      await page.evaluate(() =>
+        (window as unknown as { __playerError: () => void }).__playerError(),
+      );
+      await page.getByText('Discord playback controls', { exact: true }).waitFor();
+      await page.getByText('Discord playback controls', { exact: true }).click();
+      await page.getByRole('button', { name: 'Resume Discord concert', exact: true }).waitFor();
+      assert.equal(
+        await page.getByRole('link', { name: 'Open DJ controls', exact: true }).count(),
+        canManage ? 1 : 0,
+      );
       assert.deepEqual(errors, []);
       assert.deepEqual(external, []);
     } finally {

@@ -57,10 +57,11 @@ private recovery-link download; reloading still requires that recovery link.
 
 The official YouTube iframe owns visible playback, volume, captions, quality and
 fullscreen controls after explicit audio activation. The app retains one queue-next
-action. The app does not add its own play/pause, seek, volume or fullscreen controls,
-including before activation or after a source error. Reload and explicit audio
-activation recover the official player; the server DJ desk remains the separate
-advanced administration surface. Device calibration, resync, reload and diagnostics
+action. Healthy players have no duplicate play/pause, seek, volume or fullscreen
+controls, including before activation. Public concerts expose a collapsed Discord
+pause/resume recovery control only when browser playback is missing or has failed.
+It uses the existing server permissions and links managers to the DJ desk for
+advanced controls. Reload and explicit audio activation recover the official player. Device calibration, resync, reload and diagnostics
 live under Room settings (Playback settings for public concerts).
 
 `rooms/player-intent.ts` observes state changes and bounded position discontinuities.
@@ -83,7 +84,12 @@ room cannot be resumed globally by a guest.
 Command receipts do not optimistically replace the shared clock. A pending native
 seek stops local playback until confirmation and a fresh matching timeline; delayed
 playing seeks allow elapsed progress. Pending state is bounded and belongs to one
-room, source and playback instance. It cannot survive a source replacement or
+room, source and playback instance. Seek confirmation uses the submitted shared
+target converted back to the current device calibration, including authority
+bounds near the start and end. `roomSeekPosition` owns private-room seek bounds
+for both Core and browser commands. Failed videos remain suppressed until reload
+or a different source arrives; the ready iframe can load that next source.
+Pending state cannot survive a source replacement or
 player disposal. Browsers never advance the queue from an ENDED callback. Core or
 the D1 fallback owns progression.
 

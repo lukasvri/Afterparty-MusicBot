@@ -1,5 +1,5 @@
 import { UserError } from "./types.ts";
-import { ROOM_QUEUE_LIMIT, ROOM_START_LEAD_MS, roomQueueCapacity, type RoomVideo } from "./protocol.ts";
+import { ROOM_QUEUE_LIMIT, ROOM_START_LEAD_MS, roomQueueCapacity, roomSeekPosition, type RoomVideo } from "./protocol.ts";
 import { roomRadioSeed, playableRoomQueue, hasPlayableRoomQueue, roomRadioHistory } from "./room-radio.ts";
 import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
 
@@ -208,10 +208,7 @@ export function changeRoom(
       !Number.isFinite(input.position)
     )
       throw new UserError("This video does not support seeking.");
-    state.position = Math.max(
-      0,
-      Math.min(Math.max(0, state.current.duration - 1), input.position),
-    );
+    state.position = roomSeekPosition(input.position, state.current.duration);
   } else if (action === "radio-prefetch") {
     if (!state.queue.length && state.radio !== false && recommended) state.queue.push({ ...recommended, radio: true });
     state.radioRetryAt = Number(input.now ?? 0) + 15000;
