@@ -2,8 +2,14 @@
   {
     "version": "3.0.0-alpha.2",
     "date": "2026-10-25",
-    "title": "Better radio, festival browsing and game nights",
+    "title": "A clearer music workspace, native controls and DJ tools",
     "items": [
+      "Listening rooms, library, games, server administration and public pages share a refreshed dark interface with clearer grouping, larger controls and fluid layouts for mobile, 1080p, QHD and 4K.",
+      "Search stays available while library, playlist import and room settings are open. Wide screens place the tools beside search, and bounded result lists keep other controls reachable. Music tools come before optional social extras.",
+      "After enabling audio, use the official YouTube controls for playback, volume, quality, captions and fullscreen. Authorized native playback changes follow the shared room clock; guest pause and device volume remain local. Duplicate app transport controls give way to the video, with one queue-next action and fallback controls after player failure.",
+      "The DJ character and concert scene return as scalable native artwork, with a detailed stage, decks and restrained animation that respects saved and system motion preferences.",
+      "The server player includes a DJ desk for crossfade and radio, explicit repeat controls, previous song, fractional cue points, 15-second jumps and a recording-scoped marked cue. Transition changes require Apply and preserve other server settings.",
+      "Playback recovery keeps a requested seek position while its source loads, preserves pause choices across radio discovery and source failures, and checkpoints the recording actually consumed during a crossfade. Browser rooms and their website fallback use the same agreed start clock.",
       "Music searches use title, artist and recording-format relevance to order the existing results. Exact songs take priority over incidental matches, while explicit remix, cover and live-set searches remain available.",
       "Radio gives less recently exposed artists a turn among equally suitable candidates, reducing repeated loops through the first artists returned by a source. The original station anchor, style checks and independent room histories remain in place.",
       "Automatic radio catches more declared AI production and song-recreation labels, including Norwegian KI and vlogg wording. Matching music videos remain preferred without replacing the chosen song with another recording.",

@@ -216,6 +216,15 @@ save confirmation requires the Core settings acknowledgment. Manage Server,
 Administrator or server ownership is required; owner-password access stays
 limited to the configured server.
 
+The **Player and queue** view includes a **DJ desk**. Prepare a 0–12-second
+crossfade and radio choice, then explicitly apply only changed values. Repeat
+controls, previous song, start/quarter/half/three-quarter cues, ±15-second jumps
+and a view-local marked cue use the existing Core commands. Cues require a
+recording with a known duration and clear when the server or recording changes.
+Playback tools require a voice connection; transition defaults can be prepared
+while Core is ready. Unconfirmed actions are reported without automatic replay.
+The desk controls Discord audio; the decorative DJ scene is independent artwork.
+
 `/config`, `/crossfade`, duplicate play commands and legacy aliases are omitted
 from new registration. Cached `/config` and `/crossfade` calls privately link
 to the selected server's admin page without changing settings. Other legacy

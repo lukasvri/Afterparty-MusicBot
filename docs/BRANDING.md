@@ -17,21 +17,20 @@ The website and Discord music bot share the display name **Afterparty**. The vis
 
 The application wordmark uses Inter 900. The monogram uses vector glyph outlines, so it does not need a remote font request. Keep the SIL Open Font License in [`public/fonts/Inter.LICENSE`](../public/fonts/Inter.LICENSE).
 
-Use the `Logo` component in `components/afterparty-navigation.tsx` for shared website branding. It is reused by the service pages. Keep the dot round and red, retain generous spacing around the mark, and use accessible labels for standalone icons. The application accent is `#ff263e`; the documentation banner uses the same black, white and red direction.
+Native routes and `apps/web/src/lib/ui/PublicPage.svelte` use the canonical vector mark for website branding. Keep the dot round and red, retain generous spacing around the mark, and use accessible labels for standalone icons. The application accent is `#ff263e`; the documentation banner uses the same black, white and red direction.
 
 The AI-generated banner is documentation artwork. It is separate from the canonical vector UI mark. Screenshots show an isolated local preview; see [asset notes](assets/README.md) for provenance.
 
 ## Shared interface language
 
-Use the shared variables in `app/globals.css` for neutral dark surfaces, light
+Use the shared variables in `apps/web/src/lib/ui/AppTheme.svelte` for neutral dark surfaces, light
 text, the red accent, control/panel radii and the visible keyboard focus ring.
 Body and display typography use the existing self-hosted Inter font. Service
 pages and administration use the same navigation proportions and action
 hierarchy as music and rooms; keep mobile links and primary actions usable
 without wrapping the navigation or shrinking touch targets.
 
-Shared application chrome lives in `app/interface.css`, loaded after the feature
-styles. Discovery and library styles stay scoped to their own surfaces. Use the
+Shared application chrome and fluid TV tokens live in that root-rendered theme. Discovery and library styles stay scoped to their own surfaces. Use the
 shared neutral surface, border and muted-text tokens for everyday fields,
 secondary buttons and selected tabs. Selected controls keep a restrained red
 indicator. Reserve the red accent for active controls, primary actions,
@@ -88,4 +87,4 @@ Review installation, OAuth and support/privacy links after saving. Existing invi
 
 Keep existing URLs working. If a domain changes, coordinate DNS, hosting, HTTPS and redirects, then update Core's `PUBLIC_SITE_URL`, the website's `GUTTA_CORE_SITE_ORIGIN` and the exact Discord OAuth redirect at `/api/auth/discord/callback`. Change `GUTTA_CORE_PUBLIC_URL` only if Core's own origin moves.
 
-Follow [installation](INSTALLATION.md), [configuration](CONFIGURATION.md) and [operations](../services/core/PUBLIC_RELEASE.md) for an approved rollout. Back up production data and check active playback before updating Core. Verify desktop/mobile branding, both website languages, bot help and Discord sign-in after deployment.
+Follow [installation](INSTALLATION.md), [configuration](CONFIGURATION.md) and [operations](../services/core/PUBLIC_RELEASE.md) for an approved rollout. Back up production data and check active playback before updating Core. Verify desktop/mobile branding, public website journeys, bot help and Discord sign-in after deployment.

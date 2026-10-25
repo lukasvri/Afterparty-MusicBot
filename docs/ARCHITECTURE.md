@@ -43,6 +43,8 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
 | Website visitor counts, heartbeat and directory SQL | `lib/room-visitors.ts` | `server.ts` owns access; `db/schema.ts` and `drizzle/` own the index; `scripts/measure-room-visitors.ts` measures isolated read/write/space cost |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
+| Native YouTube user intent | `apps/web/src/lib/rooms/player-intent.ts` | Current iframe focus/activation, programmatic echo suppression and fresh-timeline confirmation; `RoomAudio.svelte` owns player lifecycle and permission callbacks |
+| Shared room position and future start | `services/core/src/room-state.ts` | `roomPlaybackPosition` and `changeRoom`, reused by Core and Worker |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
 | Optional browser error privacy and initialization | `lib/error-reporting.ts` | Native root layout; [policy](OBSERVABILITY.md) |
 | Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core and the native website |
@@ -70,13 +72,13 @@ The v3 feature folders keep each component beside its client and behavior helper
 | `games/` | Guess the Song client, presets, ranking and game audio |
 | `library/` | Favorites/evenings, playlist import and festival catalog |
 | `social/` | Reactions, moments and host bingo |
-| `admin/` | Server-scoped administration client |
+| `admin/` | Server-scoped administration client, DJ desk and pure cue/transition rules |
 | `server/` | Native API dispatch and host-transition guard |
-| `ui/` | Root-rendered global theme, shared icons, public-page frame, saved motion preference and copyright form |
+| `ui/` | Root-rendered global theme, shared icons, public-page frame, saved motion preference, decorative concert scenery and copyright form |
 
-Shared fluid TV sizing lives in `apps/web/src/lib/ui/AppTheme.svelte`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
+Shared surfaces, focus styles and fluid TV sizing live in `apps/web/src/lib/ui/AppTheme.svelte`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 
-Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
+Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Decorative concert scenery loads only for the welcome and empty-room views; active rooms do not download its SVG component. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
 
 The room client owns sequential library additions, capacity preflight and session
 retirement. Library tools exclude current, queued and pending tracks before an

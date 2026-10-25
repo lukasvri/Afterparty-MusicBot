@@ -470,3 +470,34 @@ or migration history. [Issue #135](https://github.com/lukasvri/Afterparty-MusicB
 tracks directory-query parity, insert/renewal/delete overhead, index space and a
 reviewable migration if justified. Expiry cleanup has an `until`-only predicate,
 so this composite index must not be claimed to solve that separate query.
+
+
+## Native workspace candidate, 25 October 2026
+
+The alpha.2 workspace adds native YouTube intent handling and shared controls,
+consolidates search with library/settings, and restores the decorative DJ stage.
+These product additions increase startup code relative to the earlier alpha.2
+candidate; this is not a claim that the complete redesign is smaller.
+
+The scene is an optional Svelte chunk and has no JavaScript animation loop.
+Active rooms skip it. The expanded built-Worker measurement verifies this against
+the actual manifest, and still checks that the larger music library stays lazy.
+Measurements were identical at 1440px and 390px:
+
+| Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
+| --- | ---: | ---: |
+| Welcome / empty browser room, including the scene | 256,842 B | 95,122 B |
+| Active browser room, before audio consent | 240,776 B | 90,324 B |
+| Game entry | 148,149 B | 55,982 B |
+
+The optional scene accounts for 16,066 decoded bytes / 4,798 recomputed gzip bytes
+between the first two scenarios. The benchmark makes no provider request or queue
+mutation; opening the library is an explicit separate step. These are local script
+response sizes, not measured wire transfer, field performance or audible quality.
+Run `npm --prefix apps/web run measure:startup` against the built local preview.
+
+Search result regions and saved collections have bounded scrolling; festival lists
+retain 20-set pages. The shared theme owns surfaces, typography and TV sizing. New
+player intent, DJ rules and decorative scenery remain with their feature owners in
+the [source map](ARCHITECTURE.md#source-map). No new runtime dependency, application
+language, remote font or second audio player was introduced.

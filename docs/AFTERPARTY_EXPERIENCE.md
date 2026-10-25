@@ -18,73 +18,107 @@ Invitation and recovery credentials use URL fragments, are consumed locally, and
 
 ## Client responsibilities
 
-- `components/party/room-dialog.tsx`: accessible room setup and joining.
-- `components/party/start-evening.tsx`: explicit Discord versus browser playback choice.
-- `components/party/social-queue.tsx`: requests, moderation, votes, ordering and approximate wait times.
-- `components/party/room-sharing.tsx`: local QR generation, TV controls and authority management.
-- `components/party/evening-library.tsx`: editable saved sets, favorites and import/export.
-- `components/party/admin-seek.tsx`: live position with protected pointer/keyboard editing.
-- `lib/browser-api.ts` and `lib/youtube-player.ts`: browser transport and player bootstrap.
+The [source map](ARCHITECTURE.md#source-map) identifies the canonical native Svelte
+owners. Classic is retired; there is no second frontend.
 
-The welcome page gives `components/concert-scenery.tsx` its own centred composition, with a larger DJ and console and responsive framing. Room scenery retains space for empty-state controls. Decorative SVG layers remain noninteractive, with lights behind the performer and hands above the decks. Both system reduced-motion preferences and the manual animation switch stop the scene's movement.
+- `apps/web/src/routes/+page.svelte` composes browser rooms and their music workspace.
+- `apps/web/src/lib/rooms/` owns room discovery, lifecycle, shared-clock audio, queue
+  commands, QR invitations and native player intent.
+- `apps/web/src/lib/concert/` owns the public Discord concert, scoped command
+  confirmation and the fresh Core audio stream.
+- `apps/web/src/lib/library/` owns saved evenings, favorites, playlist preview and
+  festival browsing. This feature is loaded only after an explicit library action.
+- `apps/web/src/lib/admin/` owns server administration and the DJ desk.
+- `apps/web/src/lib/ui/` owns the shared theme, public-page frame, icons, decorative
+  concert scenery and local motion preference.
+- `lib/browser-api.ts`, `lib/playback-sync.ts` and `lib/youtube-player.ts` retain
+  shared transport, clock rules and official player bootstrap.
 
-The evening library is device-local, with validated JSON import/export. It is not an account-synchronized cloud library. Room playback history is shared and bounded. Local storage failures retain host credentials and preferences for the current page and offer a private recovery-link download. Reloading a page with blocked storage still requires that recovery link.
+Search remains available while library, import or room settings are open. Wide
+screens place search beside those tools; narrow screens use one column with a
+bounded result list. Searching does not unmount a playlist preview or discard
+unfinished fields. Optional games and social extras follow the music workspace.
+The library groups collection, import and festival sections under local jump links.
 
-Mobile controls keep player, search, queue and saved evenings reachable. Search moves focus into the visible input. Navigation uses browser history, and TV mode is a shareable URL state. TV mode keeps guest QR sharing visible while hiding editing panels. YouTube consent and autoplay restrictions still apply; the app does not bypass them.
+The evening library is device-local, with validated JSON import/export. It is not
+an account-synchronized cloud library. Room playback history is shared and bounded.
+Local storage failures retain host credentials for the current page and offer a
+private recovery-link download; reloading still requires that recovery link.
 
-Music search requests up to 30 results in one bounded lookup. The panel reveals ten at a time locally and preserves keyboard focus when more appear. Up to four suggestions use the already loaded current artist and listening history; they start a search only when selected. Known AI declarations are excluded from automatic suggestions. Cold searches have a 35-second browser deadline so responses within the Core bridge's 25-second window can arrive. Editing the input cancels and retires the previous request immediately, so old results or errors cannot replace the new query.
+## Native player and the shared clock
 
-The website fallback separates radio music searches (20 candidates) from user searches (30), and radio does not spend the user's search allowance. Empty search results expire after one minute; global provider quota limits still apply.
+The official YouTube iframe owns visible playback, volume, captions, quality and
+fullscreen controls after explicit audio activation. The app retains one queue-next
+action. Before activation or after a source error, the app's transport remains
+available. Device calibration, resync, reload and diagnostics live under Playback
+settings instead of duplicating the primary player controls.
 
-## Validation
+`rooms/player-intent.ts` observes state changes and bounded position discontinuities.
+YouTube supplies no explicit user-intent flag or seek event. Shared commands require
+a recent browser activation, focus in the current iframe, an identified current
+video, current transport permission and the existing command revision/receipt checks.
+Programmatic load/play/pause/seek writes are tracked and consumed rather than echoed.
+A native pause without provable activation can pause this device but cannot control
+the room. An unproven play event cannot resume deliberately paused audio.
 
-Run `npm run check:all` with Node.js 24.17+, Python and FFmpeg. Tests include isolated SQLite room clocks, radio races, moderation, vote privacy, single-use and cross-room invitations, ownership transfer, revoked cohosts and blocked browser storage.
+Hosts can use native play/pause/seek for browser rooms. Public concert play/pause
+uses its existing permissions; concert seeking requires administrator access.
+Guest pause remains local and survives incoming clock samples. Guest resume returns
+to the shared timeline. Volume, mute and calibration remain device-local. A paused
+room cannot be resumed globally by a guest.
 
-The browser workflow uses synthetic API responses and a local preview only:
+Command receipts do not optimistically replace the shared clock. A pending native
+seek stops local playback until confirmation and a fresh matching timeline; delayed
+playing seeks allow elapsed progress. Pending state is bounded and belongs to one
+room, source and playback instance. It cannot survive a source replacement or
+player disposal. Browsers never advance the queue from an ENDED callback. Core or
+the D1 fallback owns progression.
+
+Core and the fallback share `roomPlaybackPosition` and start scheduling. Resume,
+new-track and playing seek commands establish the agreed future start; duplicate
+play commands preserve progress and the original deadline. Seek extraction keeps
+its intended offset frozen until an audible segment exists. Core pause intent
+survives radio discovery and source failure; crossfade recovery checkpoints the
+recording actually consumed by the audio sink.
+
+## Radio and discovery
+
+Music search requests a bounded candidate pool and ranks title, artist and recording
+format without extra provider searches. Explicit remix, cover and live-set searches
+remain available. Editing the input cancels and retires the previous request, so
+old results or errors cannot replace a newer query. Cold searches have a 35-second
+browser deadline. Concert results page locally; browser-room results use a bounded
+scroll region.
+
+Radio retains its stricter independent admission policy, original manual seed and
+room history. Related candidates rotate through less recently exposed artists.
+Declared AI production, vlogs, instructional uploads and song recreations are
+filtered; matching music videos are preferred within the selected recording.
+Metadata is not proof of human authorship or provider availability. See [radio
+selection](RADIO.md) and [festival coverage](FESTIVAL_PLAYLISTS.md).
+
+Prefetch and early skip share an in-flight lookup. Failed lookups preserve a song
+that has not finished. Empty results use bounded cooldowns. Async results recheck
+revisions, so newer user intent wins. No unrelated result is inserted merely to
+fill a queue.
+
+## Verification
+
+Run `npm run check:all` with the supported Node toolchain, Python and FFmpeg.
+Use the built local Worker preview for browser checks:
 
 ```bash
-PREVIEW_URL=http://127.0.0.1:8787 \
-CHROMIUM_PATH=/path/to/chromium \
-node scripts/party.browser.ts
+PREVIEW_URL=http://127.0.0.1:5438 \
+CHROMIUM_PATH=/usr/bin/chromium npm run test:browser
 ```
 
-Run `PREVIEW_URL=http://127.0.0.1:8787 CHROMIUM_PATH=/usr/bin/chromium npm run test:search` against a local preview for the focused search, keyboard, pagination, cancellation and mobile scenarios. It uses synthetic APIs without provider requests.
+`npm run test:stack` creates isolated Worker/D1/Core fixtures; give it a different
+preview port if another preview is running. Playback/browser fixtures use synthetic
+credentials, APIs and media. Native control tests use a local sandboxed iframe,
+real clicks and message delivery to exercise cross-origin focus and activation.
 
-The party workflow uses the locked Playwright dependency and exercises private setup, first-song search, focus and scrolling, adding tracks, moderation, saved evenings, favorites, QR generation, TV mode and browser back navigation. Welcome checks span 360, 390, 768, 1440 and 2560 pixel widths, including centring, performer visibility, overflow, motion preferences and dialog hit-testing above scenery. Automated audio and browser tests do not establish what people hear on a production Discord voice connection.
-
-## Playback recovery and radio (2.0.1)
-
-Tight synchronization remains the default. The player tolerates up to 0.5 seconds
-of iframe reporting jitter and requires sustained drift before an automatic seek.
-Room transport changes apply promptly; buffering never publishes a host seek.
-YouTube is the only seek bar in browser rooms. A confirmed discontinuity updates
-the shared room for hosts. Buffering and pending programmatic seeks are excluded.
-
-Native seeks from room hosts and authorized Discord managers retain the latest
-confirmed scrub while an earlier shared seek is awaiting acknowledgment. Commands
-remain serialized and use the current permissions and revision when submitted,
-without reloading the iframe. Deferred intent belongs to one navigation, guild
-and playback instance. Leaving that scope, requesting an explicit resync or
-receiving a failed command drops the deferred target; an older completion cannot
-clear a newer operation.
-
-Radio searches explicit genre labels across artists, favouring artists not heard
-recently. It retries empty or failed searches. If the title has no reliable genre
-label, artist matching remains a conservative fallback. Publisher channels alone
-do not establish similarity.
-If no eligible track is available, the room retains its listening history and
-shows Retry radio. It does not fill the queue with unrelated search results.
-
-Radio prepares one visible suggestion as soon as a track begins playing.
-Manual queue additions replace that suggestion, and turning radio off removes it.
-Live performances, remakes, recreations and covers are excluded by title as well
-as provider flags. Search latency can still delay a suggestion when providers
-are unavailable.
-
-## Early skip handling (2.0.2)
-
-Prefetch and skip share a provider lookup. Skip takes priority over inserting a
-suggestion. Failed lookups preserve a song that has not finished yet. The browser
-retries a stale skip once only if the track, playback instance and play state are
-unchanged. Genre labels can come from explicit provider tags or genre fields in
-descriptions; no audio classifier is implied.
+Review screenshots at 3840×2160, 2560×1440 and 1920×1080 plus mobile. Confirm
+readability, overflow, invitations, fullscreen and retained player identity.
+Automated fixtures do not establish regional provider availability, browser-specific
+YouTube behavior or what people hear on a real Discord voice connection. These
+remain live acceptance checks before stable release.
