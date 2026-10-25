@@ -164,7 +164,10 @@ export function createGameClient(
           action,
           ...(token ? { token } : {}),
           ...(action === 'join'
-            ? { nickname: scope.nickname.trim(), eventId: crypto.randomUUID() }
+            ? {
+                ...(scope.nickname.trim() ? { nickname: scope.nickname.trim() } : {}),
+                eventId: crypto.randomUUID(),
+              }
             : {}),
           ...(mutation && snapshot
             ? {

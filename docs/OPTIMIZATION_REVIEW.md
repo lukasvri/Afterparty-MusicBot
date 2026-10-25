@@ -470,3 +470,101 @@ or migration history. [Issue #135](https://github.com/lukasvri/Afterparty-MusicB
 tracks directory-query parity, insert/renewal/delete overhead, index space and a
 reviewable migration if justified. Expiry cleanup has an `until`-only predicate,
 so this composite index must not be claimed to solve that separate query.
+
+
+## Native workspace candidate, 25 October 2026
+
+The alpha.2 workspace adds native YouTube intent handling and shared controls,
+consolidates search with library/settings, and restores the decorative DJ stage.
+These product additions increase startup code relative to the earlier alpha.2
+candidate; this is not a claim that the complete redesign is smaller.
+
+The scene is an optional Svelte chunk and has no JavaScript animation loop.
+Active rooms skip it. The expanded built-Worker measurement verifies this against
+the actual manifest, and still checks that the larger music library stays lazy.
+Measurements were identical at 1440px and 390px:
+
+| Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
+| --- | ---: | ---: |
+| Welcome / empty browser room, including the scene | 256,842 B | 95,122 B |
+| Active browser room, before audio consent | 240,776 B | 90,324 B |
+| Game entry | 148,149 B | 55,982 B |
+
+The optional scene accounts for 16,066 decoded bytes / 4,798 recomputed gzip bytes
+between the first two scenarios. The benchmark makes no provider request or queue
+mutation; opening the library is an explicit separate step. These are local script
+response sizes, not measured wire transfer, field performance or audible quality.
+Run `npm --prefix apps/web run measure:startup` against the built local preview.
+
+Search result regions and saved collections have bounded scrolling; festival lists
+retain 20-set pages. The shared theme owns surfaces, typography and TV sizing. New
+player intent, DJ rules and decorative scenery remain with their feature owners in
+the [source map](ARCHITECTURE.md#source-map). No new runtime dependency, application
+language, remote font or second audio player was introduced.
+
+
+### Familiar layout and YouTube-only controls follow-up
+
+The follow-up restores horizontal navigation and one persistent tabbed workspace,
+adds room-directory filtering/recovery, and removes the app's duplicate transport,
+volume and seek controls. Dead sidebar, queue-action and removed-control styles
+are deleted. No runtime dependency or application language is added.
+
+[Built-Worker response measurements](assets/v3-familiar-startup-20261025.json)
+are identical at 1440px and 390px:
+
+| Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
+| --- | ---: | ---: |
+| Welcome / empty browser room, including the scene | 266,366 B | 98,248 B |
+| Active browser room, before audio consent | 250,300 B | 93,450 B |
+| Game entry | 148,186 B | 56,001 B |
+
+The active-room response total is 9,079 decoded bytes / 3,034 recomputed gzip bytes
+above the previous `b192b1e` candidate. The library still loads only after an
+explicit visit, and active rooms still exclude the optional scene. These bounded
+feature additions are not a bundle-size reduction or a field-performance claim.
+
+The native-control follow-up also inspects position discontinuities directly in
+player state callbacks. A synthetic Chromium fixture withholds every 250 ms
+sampling timer and holds pause/seek responses. In one controlled local run,
+callback-to-fetch dispatch measured 0.60 ms for pause and 0.20 ms for seek; the
+queue-next click dispatched in 0.20 ms, with the new player source loaded 1.90 ms
+after the synthetic response. The player was reused. These observations exclude
+iframe-provider event delivery, network, decoding and audible Discord output.
+They establish no zero-latency provider guarantee. Authorized seeks still wait for
+confirmation and a fresh shared timeline before synchronized playback continues.
+
+
+### Stable alignment and effective Discord fade buffering
+
+`createPlaybackCorrection` in the existing shared sync module filters moderate
+one-off/alternating video readings before a hard seek. In a settled 30-second
+synthetic trace with one stale 0.8-second reading every 3 seconds, the previous
+threshold/cooldown predicate requests 11 seeks and the sustained policy requests 0.
+Persistent drift still corrects within 750 ms precise / 1500 ms stable once eligible;
+manual alignment, large drift and pause paths retain their fast behavior. This is
+a deterministic correction-decision trace, not measured real YouTube playback.
+
+The Discord mixer separates overlap readiness from its original bounded PCM
+reservoir. A controlled held-read fixture can start the ready 50-frame overlap
+while the next provider read remains pending. Background prefetch continues;
+the previous 12-second/600-frame reservoir and no-fade warm frame remain bounded.
+Tests retain 550 cached post-fade frames through provider delay and deliver ten
+individually paced handoff reads with maximum decoder-read concurrency 1. The
+promoted main source waits only for its single retiring read, not for 600 frames
+or EOF. Late invalidation, failures and disposal cannot lose/announce stale audio.
+An outgoing EOF during a partial fade retains consumed incoming frames and its
+original clock segment instead of resetting/announcing the same source again.
+
+The original reservoir is retained to protect playback after the handoff.
+
+Configured fades are now honored when the remaining tail can cover them, while
+shorter tails keep the prior quarter-tail fallback. With saved 6-second fade,
+real FFmpeg 24-second + 24-second sources decode to exactly 42 seconds; the new
+segment starts at frame 900 (18 seconds). An 8-second seeked tail uses the full
+300-frame/6-second overlap. An existing 1-second seek transition now decodes to
+exactly 260 PCM frames (5.2 seconds), matching 2.8+3.4-1 instead of the former
+quarter-capped overlap. Track IDs and extraction offsets remain protected.
+
+These are synthetic/locally decoded regression measurements, not proof of human
+Discord listening quality, provider delivery speed or zero network latency.

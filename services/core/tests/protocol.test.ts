@@ -29,3 +29,15 @@ test("room clock metadata rejects malformed expiry, viewer counts and host flags
     assert.equal(readRoomTimeline({ ...room, isHost }), null);
   assert(readRoomTimeline({ ...room, serverTime: 100000, startsAt: 101500, isHost: true }));
 });
+
+test("room capacity reserves pending requests and fails closed for invalid counts", async () => {
+  const { ROOM_QUEUE_LIMIT, roomQueueCapacity } = await import("../src/protocol.ts");
+  assert.equal(roomQueueCapacity(0), ROOM_QUEUE_LIMIT);
+  assert.equal(roomQueueCapacity(48, 1), 1);
+  assert.equal(roomQueueCapacity(49, 1), 0);
+  assert.equal(roomQueueCapacity(50, 1), 0);
+  for (const count of [-1, 0.5, NaN, Infinity]) {
+    assert.equal(roomQueueCapacity(count), 0);
+    assert.equal(roomQueueCapacity(0, count), 0);
+  }
+});

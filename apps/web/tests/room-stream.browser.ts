@@ -209,6 +209,7 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
   );
   await page.addInitScript(
     ({ code, token, visitor, owner }) => {
+      if (window !== window.top) return;
       localStorage.setItem('afterparty-visitor', visitor);
       if (owner) localStorage.setItem(`afterparty-host:${code}`, token);
       const calls: string[] = [];
@@ -218,27 +219,59 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
           Player: class {
             position = 0;
             state = 2;
-            constructor(_element: HTMLElement, options: { events: { onReady: () => void } }) {
+            videoId = '';
+            iframe: HTMLIFrameElement;
+            changed: (state: number) => void;
+            receive: (event: MessageEvent) => void;
+            constructor(
+              element: HTMLElement,
+              options: {
+                events: { onReady: () => void; onStateChange?: (event: { data: number }) => void };
+              },
+            ) {
+              this.changed = (state) => {
+                this.state = state;
+                options.events.onStateChange?.({ data: state });
+              };
+              this.iframe = document.createElement('iframe');
+              this.iframe.sandbox.add('allow-scripts');
+              this.iframe.title = 'Synthetic YouTube player';
+              this.receive = (event) => {
+                if (
+                  event.source === this.iframe.contentWindow &&
+                  event.data?.type === 'stream-native'
+                )
+                  this.changed(event.data.action === 'play' ? 1 : 2);
+              };
+              window.addEventListener('message', this.receive);
+              this.iframe.srcdoc = `<button onclick="parent.postMessage({type:'stream-native',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'stream-native',action:'pause'},'*')">Pause video</button>`;
+              element.replaceWith(this.iframe);
               Object.assign(window, { __streamPlayer: this });
               setTimeout(() => options.events.onReady(), 0);
             }
             loadVideoById(value: { videoId: string; startSeconds: number }) {
+              this.videoId = value.videoId;
               this.position = value.startSeconds;
               this.state = 1;
               calls.push(`load:${value.videoId}`);
+              queueMicrotask(() => this.changed(1));
             }
             cueVideoById(value: { videoId: string; startSeconds: number }) {
+              this.videoId = value.videoId;
               this.position = value.startSeconds;
               this.state = 2;
               calls.push(`cue:${value.videoId}`);
+              queueMicrotask(() => this.changed(5));
             }
             playVideo() {
               this.state = 1;
               calls.push('play');
+              queueMicrotask(() => this.changed(1));
             }
             pauseVideo() {
               this.state = 2;
               calls.push('pause');
+              queueMicrotask(() => this.changed(2));
             }
             seekTo(position: number) {
               this.position = position;
@@ -246,10 +279,18 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
             getCurrentTime() {
               return this.position;
             }
+            getIframe() {
+              return this.iframe;
+            }
+            getVideoUrl() {
+              return `https://www.youtube.com/watch?v=${this.videoId}`;
+            }
             getPlayerState() {
               return this.state;
             }
             destroy() {
+              window.removeEventListener('message', this.receive);
+              this.iframe.remove();
               calls.push('destroy');
             }
             level = 100;
@@ -349,16 +390,10 @@ test(
         readsBeforeStream,
         'new playback reached both clients exclusively through the real SSE response',
       );
-      assert.equal(
-        await host.page.getByRole('button', { name: 'Pause playback' }).isEnabled(),
-        true,
-      );
-      assert.equal(
-        await guest.page.getByRole('button', { name: 'Pause playback' }).isDisabled(),
-        true,
-      );
-      await host.page.getByRole('button', { name: 'Room settings', exact: true }).click();
-      await guest.page.getByRole('button', { name: 'Room settings', exact: true }).click();
+      assert.equal(await host.page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
+      assert.equal(await guest.page.getByRole('button', { name: 'Next track' }).isDisabled(), true);
+      await host.page.getByText('Room settings', { exact: true }).click();
+      await guest.page.getByText('Room settings', { exact: true }).click();
       assert.equal(
         await host.page.getByRole('button', { name: 'Invite a co-host', exact: true }).isVisible(),
         true,
@@ -368,11 +403,22 @@ test(
         0,
         'public stream fields cannot grant owner access',
       );
-      await host.page.getByRole('button', { name: 'Pause playback' }).click();
-      await host.page.getByRole('button', { name: 'Resume playback' }).waitFor();
-      await guest.page.getByRole('button', { name: 'Resume playback' }).waitFor();
-      await host.page.getByRole('button', { name: 'Resume playback' }).click();
-      await guest.page.getByRole('button', { name: 'Pause playback' }).waitFor();
+      await host.page.bringToFront();
+      const native = host.page.frameLocator('.audio-stage iframe');
+      await native.getByRole('button', { name: 'Pause video' }).click();
+      await host.page
+        .locator('.player-status')
+        .filter({ hasText: 'Shared playback is paused' })
+        .waitFor();
+      await guest.page
+        .locator('.player-status')
+        .filter({ hasText: 'Shared playback is paused' })
+        .waitFor();
+      await native.getByRole('button', { name: 'Play video' }).click();
+      await guest.page
+        .locator('.player-status')
+        .filter({ hasText: 'Following the shared clock' })
+        .waitFor();
       assert.deepEqual(
         fixture.writes.map((write) => [write.action, write.version]),
         [
@@ -413,14 +459,17 @@ test(
       fixture.release();
       for (const { page } of [host, guest]) {
         await page.getByText('Connected', { exact: true }).waitFor();
-        await page.getByRole('button', { name: 'Resume playback' }).waitFor();
+        await page
+          .locator('.player-status')
+          .filter({ hasText: 'Shared playback is paused' })
+          .waitFor();
       }
       fixture.revokeOwner();
       await host.page
         .getByRole('button', { name: 'Invite a co-host', exact: true })
         .waitFor({ state: 'detached' });
       assert.equal(
-        await host.page.getByRole('button', { name: 'Resume playback' }).isDisabled(),
+        await host.page.getByRole('button', { name: 'Next track' }).isDisabled(),
         true,
         'polling independently refreshes revoked owner and host permissions',
       );

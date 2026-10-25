@@ -1,5 +1,35 @@
 [
   {
+    "version": "3.0.0-alpha.2",
+    "date": "2026-10-25",
+    "title": "A clearer music workspace, native controls and DJ tools",
+    "items": [
+      "Listening rooms, library, games, server administration and public pages share a refreshed dark interface with clearer grouping, larger controls and fluid layouts for mobile, 1080p, QHD and 4K.",
+      "The familiar horizontal navigation and single player surface return in Svelte. Queue, search and library share one tabbed panel beside the player on wide screens. Switching tabs keeps searches, playlist previews and unfinished library fields; room and device settings stay together below the player. Mobile shortcuts return directly to player, search, queue and library, and one invitation panel groups QR and link copying.",
+      "Open rooms can be filtered by name or code, show matching counts and retain their last good list through a refresh error. Queue track options support keyboard reorder, removal and Escape without interrupting a new search.",
+      "Use the official YouTube controls for playback, volume, quality, captions and fullscreen after enabling audio. The app no longer adds its own play/pause buttons, volume slider or seek bar around the video, including before audio activation. Authorized native playback follows the shared clock; guest pause and device volume remain local. The app retains one action for the shared queue’s next track. Native seeks can use player state events immediately instead of waiting for the periodic position check.",
+      "The DJ character and concert scene return as scalable native artwork, with a detailed stage, decks and restrained animation that respects saved and system motion preferences.",
+      "The server player includes a DJ desk for crossfade and radio, explicit repeat controls, previous song, fractional cue points, 15-second jumps and a recording-scoped marked cue. Transition changes require Apply and preserve other server settings.",
+      "Automatic video alignment ignores isolated short-lived timing errors before seeking, while persistent drift, larger desynchronization and explicit synchronization remain corrected. New tracks start with their own correction state.",
+      "Discord crossfades can begin once the required overlap has enough decoded audio, while bounded background buffering preserves the following track’s audio reserve. This avoids waiting for the entire reserve before a ready transition and protects playback after the handoff. An outgoing recording that ends early no longer resets incoming progress or announces the same transition twice.",
+      "Eligible transitions honor the configured crossfade, including the 6-second default, when enough audio remains after seeking. Shorter tails retain an adapted overlap, and saved settings remain separate for each server.",
+      "Playback recovery keeps a requested seek position while its source loads, preserves pause choices across radio discovery and source failures, and checkpoints the recording actually consumed during a crossfade. Browser rooms and their website fallback use the same agreed start clock.",
+      "An unavailable YouTube recording no longer locks the following track. Native seeks near the start or end confirm against the achievable shared position, including device timing calibration. Public concerts offer a collapsed Discord pause/resume recovery control when browser playback is unavailable.",
+      "Music searches use title, artist and recording-format relevance to order the existing results. Exact songs take priority over incidental matches, while explicit remix, cover and live-set searches remain available.",
+      "Radio gives less recently exposed artists a turn among equally suitable candidates, reducing repeated loops through the first artists returned by a source. The original station anchor, style checks and independent room histories remain in place.",
+      "Automatic radio catches more declared AI production and song-recreation labels, including Norwegian KI and vlogg wording. Matching music videos remain preferred without replacing the chosen song with another recording.",
+      "Festival browsing expands from 49 to 290 source-backed sets, including every linked recording in the checked EDC 2023, 2025 and 2026 indexes and all matching-year links in the checked Creamfields 2024 index. Artist and stage search, pages of 20 and explicit capacity-sized batches keep larger years usable.",
+      "Each existing Tomorrowland year can open its source playlist in the metadata preview before you choose tracks. Other festival archives remain partial where their complete source inventory could not be verified.",
+      "Join or host Guess the Song without entering a nickname. A default player name is supplied, while incorrect guesses remain selected for quick correction.",
+      "Unsaved game settings survive guests arriving and song preparation updates. Changes made by another host still require you to review the latest settings before saving.",
+      "Playlist previews retry temporary connection failures with a bounded delay. Starting an import and adding music are never automatically repeated.",
+      "Library and festival tools show remaining queue capacity and account for tracks already queued or awaiting approval. Explicitly retrying a partial addition skips tracks already present and retains the original room or concert.",
+      "Concert controls check their own command confirmation and report failed commands without claiming success. Temporary concert disconnections clear after a successful read without replaying music commands.",
+      "A newly created room keeps its address after a temporary connection failure, so reloading can return to it with saved host access.",
+      "This alpha source candidate still requires live provider, real-device audio and Discord listening acceptance before a stable release."
+    ]
+  },
+  {
     "version": "3.0.0-alpha.1",
     "date": "2026-10-24",
     "title": "Afterparty 3 website preview",

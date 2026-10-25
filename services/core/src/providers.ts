@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
 import { normalizePlaylistUrl } from "./playlist-url.ts";
 import { metadataAiGenerated } from "./music-content.ts";
+import { rankMusicSearch } from "./music-search.ts";
 import { deezerRef, deezerShareUrl, expandDeezerLink, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
@@ -152,7 +153,7 @@ export class Providers {
       missing: string[] = [];
     for (const id of ids) {
       const cached = this.store.get<{ at: number; track: Track } | null>(
-        "metadata:v5:" + id,
+        "metadata:v6:" + id,
         null,
       );
       if (cached && Date.now() - cached.at < 86400000)
@@ -173,7 +174,7 @@ export class Providers {
         // Another caller or earlier batch may have populated this cache while
         // we waited. Reserve only this <=50-ID batch, never a whole playlist.
         if (index > 0) {
-          const cached = this.store.get<{ at: number; track: Track } | null>("metadata:v5:" + id, null);
+          const cached = this.store.get<{ at: number; track: Track } | null>("metadata:v6:" + id, null);
           if (cached && Date.now() - cached.at < 86400000) { found.set(id, cached.track); continue; }
         }
         let lookup = this.videoLookups.get(id);
@@ -207,7 +208,7 @@ export class Providers {
   private async hydrateVideoBatch(batch: string[], complete: (id: string, value: Track | Error | undefined) => void): Promise<void> {
     const found = new Map<string, Track>();
     const remember = (track: Track) => {
-      this.store.set("metadata:v5:" + track.id, { at: Date.now(), track });
+      this.store.set("metadata:v6:" + track.id, { at: Date.now(), track });
       found.set(track.id, track);
     };
     try {
@@ -255,7 +256,7 @@ export class Providers {
     if (!query || query.length > 2000 || !Number.isInteger(count) || count < 1 || count > 50 || typeof musicOnly !== "boolean")
       throw new UserError("Invalid music search.");
     const key =
-        "search:v6:" +
+        "search:v7:" +
         JSON.stringify([
           query.trim().normalize("NFKC").toLowerCase(),
           count,
@@ -315,7 +316,8 @@ export class Providers {
         .filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id));
     }
     const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
-    return this.video(unique, true);
+    const tracks = await this.video(unique, true);
+    return musicOnly ? tracks : rankMusicSearch(query, tracks);
   }
   /** Metadata-only import. Its 500-entry budget is independent of ordinary queue settings. */
   async importPlaylist(input: string, signal: AbortSignal): Promise<PlaylistImportResult> {

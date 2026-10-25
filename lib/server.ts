@@ -2,6 +2,7 @@ import {readLiveState,liveRoom} from "./live-room.ts";
 import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
 import { metadataAiGenerated } from "../services/core/src/music-content.ts";
+import { rankMusicSearch } from "../services/core/src/music-search.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { visitorSQL } from "./room-visitors.ts";
 import { env as cloudEnv } from "cloudflare:workers";
@@ -16,6 +17,7 @@ import {
   prefetchDue,
   publicPlayback,
   guestActions,
+  roomPlaybackPosition,
 } from "../services/core/src/room-state.ts";
 import {
   roomRecommendation,
@@ -291,7 +293,7 @@ export async function videos(
   ids: string[],
 ): Promise<Video[]> {
   if (!ids.length) return [];
-  return cached(`videos:v4:${ids.join(",")}`, async () => {
+  return cached(`videos:v5:${ids.join(",")}`, async () => {
     if (coreUrl()) {
       try {
         return (
@@ -334,14 +336,15 @@ async function searchVideos(request: Request, query: string, radio: boolean) {
   if (/^https?:\/\//.test(query))
     return { videos: await videos(request, [videoId(query)]) };
   const count = radio ? 20 : 30;
-  const result = await cached(`search:v5:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async () => {
+  const result = await cached(`search:v6:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async () => {
     if (coreUrl()) {
       try {
-        return (
+        const result = (
           await coreRequest<{ videos: Video[] }>(
             "/v1/catalog?q=" + encodeURIComponent(query) + (radio ? "&mode=radio" : ""),
           )
         ).videos.slice(0, count);
+        return radio ? result : rankMusicSearch(query, result);
       } catch {
         /* retain the direct metadata API */
       }
@@ -356,10 +359,11 @@ async function searchVideos(request: Request, query: string, radio: boolean) {
       safeSearch: "moderate",
       ...(radio ? { videoCategoryId: "10" } : {}),
     });
-    return videos(
+    const result = await videos(
       request,
       [...new Set(data.items.map((v) => v.id.videoId).filter(id => /^[\w-]{11}$/.test(id)))].slice(0, count),
     );
+    return radio ? result : rankMusicSearch(query, result);
   }, videos => videos.length ? 3600000 : 60000);
   return { videos: result };
 }
@@ -488,7 +492,7 @@ export async function publicRoom(
       state,
       { action, now: Date.now() },
       true,
-      state.position + (state.playing ? Math.max(0, Date.now() - Math.max(value.updated_at, state.startsAt ?? value.updated_at)) / 1000 : 0),
+      roomPlaybackPosition(state, value.updated_at, Date.now()),
       recommended,
     );
     const saved = next;
@@ -500,13 +504,9 @@ export async function publicRoom(
       .run();
     return publicRoom(request, await row(value.code), false);
   }
-  const position =
-    state.position +
-    (state.playing && !state.buffering
-      ? (discord
-          ? Math.min(12000, now - positionAt)
-          : now - value.updated_at) / 1000
-      : 0);
+  const position = discord
+    ? state.position + (state.playing && !state.buffering ? Math.min(12000, Math.max(0, now - positionAt)) / 1000 : 0)
+    : roomPlaybackPosition(state, value.updated_at, now);
   return {
     code: value.code,
     name: value.name,
@@ -751,15 +751,7 @@ export async function mutate(
       async (query) => (await searchVideos(request, query, true)).videos,
     );
   const now = Date.now(),
-    position =
-      state.position +
-      (state.playing
-        ? Math.max(
-            0,
-            now -
-              Math.max(value.updated_at, state.startsAt ?? value.updated_at),
-          ) / 1000
-        : 0);
+    position = roomPlaybackPosition(state, value.updated_at, now);
   const emptyEarlyNext = action === "next" && state.current && state.radio !== false &&
     !playableRoomQueue(state).length && !recommended && !finished(state, value.updated_at, now);
   // Match Core: save the normal prefetch cooldown before rejecting an empty

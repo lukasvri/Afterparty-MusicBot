@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { roomQueueCapacity } from '../../../../../services/core/src/protocol.ts';
   import { onMount } from 'svelte';
   import { createDiscordClient, type ConcertView } from '#lib/concert/discord-client.ts';
   import { request } from '../../../../../lib/browser-api.ts';
@@ -8,6 +9,7 @@
   import RoomSocial from '#lib/social/RoomSocial.svelte';
   import RoomSharing from '#lib/rooms/RoomSharing.svelte';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
+  import MusicWorkspace from '#lib/ui/MusicWorkspace.svelte';
 
   let client: ReturnType<typeof createDiscordClient> | undefined;
   let view = $state<ConcertView>({
@@ -28,14 +30,14 @@
     results: [],
     history: [],
   });
-  let panel = $state<'search' | 'library'>('search');
+  let panel = $state<'queue' | 'discover' | 'library'>('queue');
   let query = $state(''),
-    resultPage = $state(0),
-    seekSeconds = $state<number | null>(null);
+    resultPage = $state(0);
   const shownResults = $derived(view.results.slice(resultPage * 10, (resultPage + 1) * 10));
   const resultPages = $derived(Math.max(1, Math.ceil(view.results.length / 10)));
   let tick = $state(0);
   let tv = $state(false);
+  let playerFailed = $state(false);
   function toggleTV() {
     tv = !tv;
     const url = new URL(location.href);
@@ -54,6 +56,14 @@
   const concert = $derived(view.state);
   const queue = $derived(view.queue?.state.queue ?? concert?.queue ?? []);
   const canManage = $derived(view.queue?.canManage === true);
+  const browserPlayerAvailable = $derived(
+    Boolean(
+      view.audioRoom?.current &&
+      view.audioLive &&
+      view.audioRoom.current.embeddable !== false &&
+      view.audioRoom.current.source !== 'soundcloud',
+    ),
+  );
   const controlsDisabled = $derived(
     view.busy ||
       !view.connected ||
@@ -69,12 +79,11 @@
     client = createDiscordClient();
     const unsubscribe = client.subscribe((value) => {
       if (value.loading || value.guildId !== view.guildId) {
-        panel = 'search';
+        playerFailed = false;
+        panel = 'queue';
         query = '';
         resultPage = 0;
-        seekSeconds = null;
       }
-      if (value.state?.playbackKey !== view.state?.playbackKey) seekSeconds = null;
       view = value;
     });
     const controller = new AbortController();
@@ -135,7 +144,10 @@
       {#if view.guildId}<button class="button secondary" aria-pressed={tv} onclick={toggleTV}
           >{tv ? 'Exit TV mode' : 'TV mode'}</button
         >{/if}
-      <a href="/">Listening rooms</a><a href="/admin" data-sveltekit-reload>Server settings</a>
+      <a href="/">Listening rooms</a><a
+        href={view.guildId ? `/admin?guildId=${encodeURIComponent(view.guildId)}` : '/admin'}
+        data-sveltekit-reload>DJ & server tools</a
+      >
     </nav>
   </header>
   <main id="concert">
@@ -195,11 +207,30 @@
             >
           </div>
           {#if concert?.current}
-            {#if view.audioRoom?.current && view.audioLive && view.audioRoom.current.embeddable !== false && view.audioRoom.current.source !== 'soundcloud'}
+            {#if browserPlayerAvailable && view.audioRoom}
               {#key view.guildId}<RoomAudio
                   room={view.audioRoom}
                   position={target.position}
                   playing={target.playing}
+                  canControl={!controlsDisabled}
+                  canSeek={!controlsDisabled && canManage}
+                  controlBusy={view.busy}
+                  onPlaybackError={(failed) => (playerFailed = failed)}
+                  onIntent={async (intent) => {
+                    if (
+                      !client ||
+                      view.audioRoom?.code !== intent.code ||
+                      concert?.current?.id !== intent.videoId ||
+                      concert.playbackKey !== intent.playbackKey ||
+                      controlsDisabled
+                    )
+                      return false;
+                    return intent.action === 'seek'
+                      ? canManage
+                        ? client.seek(intent.position!)
+                        : false
+                      : client.control(intent.action === 'play' ? 'resume' : 'pause');
+                  }}
                 />{/key}
             {:else}
               <div class="concert-art">
@@ -223,15 +254,6 @@
             </div>
             <div class="concert-controls">
               <button
-                class="button primary"
-                disabled={controlsDisabled}
-                onclick={() => {
-                  void client?.control(concert?.playing ? 'pause' : 'resume');
-                }}
-                ><Icon name={concert.playing ? 'pause' : 'play'} />{concert.playing
-                  ? 'Pause'
-                  : 'Resume'}</button
-              ><button
                 class="button secondary"
                 disabled={controlsDisabled}
                 onclick={() => {
@@ -243,50 +265,28 @@
                   : `${time(view.audioLive ? target.position : concert.position)} / ${time(concert.current.duration)}`}</span
               >
             </div>
+            {#if !browserPlayerAvailable || playerFailed}
+              <details class="concert-recovery">
+                <summary>Discord playback controls</summary>
+                <p>
+                  Browser playback is unavailable. These controls manage the shared Discord concert.
+                </p>
+                <button
+                  class="button secondary"
+                  disabled={controlsDisabled}
+                  onclick={() => void client?.control(concert?.playing ? 'pause' : 'resume')}
+                  >{concert.playing ? 'Pause Discord concert' : 'Resume Discord concert'}</button
+                >
+                {#if canManage && view.guildId}<a
+                    class="button secondary"
+                    href={`/admin?guildId=${encodeURIComponent(view.guildId)}`}>Open DJ controls</a
+                  >{/if}
+              </details>
+            {/if}
             <p class="permission-note">
               Controls update the shared Discord concert. The bot must already be connected to a
               voice channel.
             </p>
-            {#if canManage && !concert.current.live}
-              <form
-                class="shared-seek"
-                onsubmit={(event) => {
-                  event.preventDefault();
-                  if (seekSeconds !== null)
-                    void client?.seek(seekSeconds).then((confirmed) => {
-                      if (confirmed) seekSeconds = null;
-                    });
-                }}
-              >
-                <label for="concert-seek">Shared concert position</label>
-                <input
-                  id="concert-seek"
-                  type="range"
-                  min="0"
-                  max={Math.max(0, concert.current.duration - 0.1)}
-                  step="1"
-                  value={seekSeconds ??
-                    Math.min(
-                      concert.current.duration - 0.1,
-                      target.stale ? concert.position : target.position,
-                    )}
-                  disabled={controlsDisabled}
-                  oninput={(event) => (seekSeconds = Number(event.currentTarget.value))}
-                />
-                <output
-                  >{time(
-                    seekSeconds ?? (target.stale ? concert.position : target.position),
-                  )}</output
-                >
-                <button class="button secondary" disabled={controlsDisabled || seekSeconds === null}
-                  >Seek concert</button
-                >
-                <p>
-                  Administrator action for everyone in this concert. Moving the video’s own controls
-                  only affects your browser.
-                </p>
-              </form>
-            {/if}
             {#if view.audioRoom?.current && view.audioLive}
               {#key `${view.audioRoom.guildId ?? ''}:${view.audioRoom.code}`}<RoomSocial
                   room={view.audioRoom}
@@ -311,206 +311,203 @@
                 {tv}
               />{/key}
           </div>{/if}
-        <section class="concert-queue" aria-labelledby="concert-queue-heading">
-          <div class="section-heading">
-            <h2 id="concert-queue-heading">Up next</h2>
-            <span class="count">{queue.length}</span>
-          </div>
-          {#if queue.length}
-            <ol class="queue-list">
-              {#each queue as video, index (video.entryId ?? video.id)}
-                <li>
-                  <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
-                  <div class="track-info">
-                    <strong>{video.title}</strong><span>{video.artist}</span>
-                  </div>
-                  <button
-                    class="button secondary small"
-                    aria-label={`Vote for ${video.title}`}
-                    disabled={view.busy || !view.connected || !view.queue || !video.entryId}
-                    onclick={() => {
-                      void client?.queueAction('vote', { videoId: video.entryId });
-                    }}>+{view.queue?.state.voteCounts?.[video.entryId ?? ''] ?? 0}</button
-                  >
-                  {#if canManage}<button
-                      class="icon-button"
-                      aria-label={`Remove ${video.title}`}
-                      disabled={view.busy || !view.connected}
-                      onclick={() => {
-                        void client?.queueAction('remove', { videoId: video.entryId });
-                      }}>×</button
-                    >{/if}
-                </li>
-              {/each}
-            </ol>
-          {:else}<div class="empty-queue">
-              <Icon name="music" size={30} />
-              <h3>Room for the next favourite</h3>
-              <p>Add concert music using the bot in Discord.</p>
-            </div>{/if}
-          {#if concert?.current && view.queue}<button
+        <section class="concert-workspace" aria-label="Concert music tools">
+          {#if view.adding}<button
               class="button secondary"
-              disabled={controlsDisabled}
-              onclick={() => {
-                void client?.queueAction('skip-vote');
-              }}>Vote to skip · {view.queue.state.skipVotes ?? 0}</button
+              onclick={() => client?.cancelAdditions()}>Cancel additions</button
             >{/if}
-          {#if canManage}
-            <div class="moderation">
-              <h3>Queue moderation</h3>
-              <button
-                class="button secondary"
-                disabled={view.busy || !view.connected}
-                onclick={() => {
-                  void client?.queueAction('approval', {
-                    enabled: !view.queue?.state.approvalRequired,
-                  });
-                }}
-                >{view.queue?.state.approvalRequired
-                  ? 'Disable approval'
-                  : 'Require approval'}</button
-              ><button
-                class="button secondary"
-                disabled={view.busy || !view.connected}
-                onclick={() => {
-                  void client?.queueAction('undo');
-                }}>Undo queue edit</button
-              >
-            </div>
-            {#if view.queue?.state.requests?.length}<h3 class="requests-heading">
-                Waiting for approval
-              </h3>
-              <ul class="queue-list">
-                {#each view.queue.state.requests as video (video.entryId ?? video.id)}<li>
-                    <div class="track-info">
-                      <strong>{video.title}</strong><span>{video.artist}</span>
-                    </div>
-                    <button
-                      class="button secondary small"
-                      disabled={view.busy || !view.connected}
+          {#key view.guildId}<MusicWorkspace
+              bind:active={panel}
+              searchInputId="concert-search"
+              queueCount={queue.length}
+            >
+              {#snippet search()}
+                <div class="concert-search">
+                  <form
+                    class="search-form"
+                    role="search"
+                    onsubmit={(event) => {
+                      event.preventDefault();
+                      resultPage = 0;
+                      void client?.search(query);
+                    }}
+                  >
+                    <label class="sr-only" for="concert-search">Search songs or artists</label>
+                    <Icon name="search" />
+                    <input
+                      id="concert-search"
+                      bind:value={query}
+                      oninput={() => {
+                        resultPage = 0;
+                        client?.cancelSearch();
+                      }}
+                      minlength="2"
+                      maxlength="120"
+                      required
+                      autocomplete="off"
+                      placeholder="A song, an artist, a whole mood…"
+                    />
+                    <button class="button primary" disabled={view.searching}
+                      >{view.searching ? 'Searching…' : 'Search music'}</button
+                    >
+                  </form>
+                  <p class="search-summary" role="status">
+                    {view.searching
+                      ? 'Looking for your next concert track…'
+                      : view.query
+                        ? `${view.results.length} results for “${view.query}”`
+                        : 'Search YouTube and add music to this server’s concert queue.'}
+                  </p>
+                  {#if shownResults.length}<ul class="search-results">
+                      {#each shownResults as video, index (`${video.id}:${index}`)}<li>
+                          <span class="track-number"
+                            >{String(resultPage * 10 + index + 1).padStart(2, '0')}</span
+                          >
+                          <div class="track-info">
+                            <strong>{video.title}</strong><span>{video.artist}</span>
+                          </div>
+                          <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span>
+                          <button
+                            class="icon-button"
+                            aria-label={`Add ${video.title} to queue`}
+                            disabled={view.busy ||
+                              !view.connected ||
+                              !concert?.online ||
+                              !concert?.connected ||
+                              video.embeddable === false ||
+                              video.source === 'soundcloud'}
+                            onclick={() => void addTracks([video.id])}><Icon name="add" /></button
+                          >
+                        </li>{/each}
+                    </ul>{/if}
+                  {#if resultPages > 1}<nav class="result-pages" aria-label="Concert search pages">
+                      <button
+                        class="button secondary"
+                        disabled={resultPage === 0}
+                        onclick={() => resultPage--}>Previous results</button
+                      >
+                      <span>Page {resultPage + 1} of {resultPages}</span>
+                      <button
+                        class="button secondary"
+                        disabled={resultPage >= resultPages - 1}
+                        onclick={() => resultPage++}>Next results</button
+                      >
+                    </nav>{/if}
+                </div>
+              {/snippet}
+              {#snippet upNext()}
+                <section class="concert-queue" aria-labelledby="concert-queue-heading">
+                  <div class="section-heading">
+                    <h2 id="concert-queue-heading">Up next</h2>
+                    <span class="count">{queue.length}</span>
+                  </div>
+                  {#if queue.length}
+                    <ol class="queue-list">
+                      {#each queue as video, index (video.entryId ?? video.id)}
+                        <li>
+                          <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
+                          <div class="track-info">
+                            <strong>{video.title}</strong><span>{video.artist}</span>
+                          </div>
+                          <button
+                            class="button secondary small"
+                            aria-label={`Vote for ${video.title}`}
+                            disabled={view.busy || !view.connected || !view.queue || !video.entryId}
+                            onclick={() => {
+                              void client?.queueAction('vote', { videoId: video.entryId });
+                            }}>+{view.queue?.state.voteCounts?.[video.entryId ?? ''] ?? 0}</button
+                          >
+                          {#if canManage}<button
+                              class="icon-button"
+                              aria-label={`Remove ${video.title}`}
+                              disabled={view.busy || !view.connected}
+                              onclick={() => {
+                                void client?.queueAction('remove', { videoId: video.entryId });
+                              }}>×</button
+                            >{/if}
+                        </li>
+                      {/each}
+                    </ol>
+                  {:else}<div class="empty-queue">
+                      <Icon name="music" size={30} />
+                      <h3>Room for the next favourite</h3>
+                      <p>Add concert music using the bot in Discord.</p>
+                    </div>{/if}
+                  {#if concert?.current && view.queue}<button
+                      class="button secondary"
+                      disabled={controlsDisabled}
                       onclick={() => {
-                        void client?.queueAction('approve', { videoId: video.entryId });
-                      }}>Approve</button
-                    ><button
-                      class="icon-button"
-                      aria-label={`Reject ${video.title}`}
-                      disabled={view.busy || !view.connected}
-                      onclick={() => {
-                        void client?.queueAction('reject', { videoId: video.entryId });
-                      }}>×</button
-                    >
-                  </li>{/each}
-              </ul>{/if}
-          {/if}
-        </section>
-        <section class="concert-discovery" aria-label="Concert music tools">
-          <nav class="music-tabs" aria-label="Concert music tools">
-            <button
-              class="button"
-              class:primary={panel === 'search'}
-              class:secondary={panel !== 'search'}
-              aria-pressed={panel === 'search'}
-              onclick={() => (panel = 'search')}>Find music</button
-            >
-            <button
-              class="button"
-              class:primary={panel === 'library'}
-              class:secondary={panel !== 'library'}
-              aria-pressed={panel === 'library'}
-              onclick={() => (panel = 'library')}>Library & playlists</button
-            >
-            {#if view.adding}<button
-                class="button secondary"
-                onclick={() => client?.cancelAdditions()}>Cancel additions</button
-              >{/if}
-          </nav>
-          {#if panel === 'library'}
-            {#key view.guildId}
-              {#await import('#lib/library/MusicLibrary.svelte')}
-                <p role="status">Opening your library…</p>
-              {:then { default: MusicLibrary }}
-                <MusicLibrary
-                  tracks={[...(concert?.current ? [concert.current] : []), ...queue]}
-                  history={view.history}
-                  busy={view.busy || !view.connected || !concert?.online || !concert?.connected}
-                  onAdd={(ids) => addTracks(ids, true)}
-                />
-              {:catch}<p class="error-message" role="alert">
-                  The library could not load. Check your connection and open it again.
-                </p>{/await}
-            {/key}
-          {:else}
-            <form
-              class="search-form"
-              role="search"
-              onsubmit={(event) => {
-                event.preventDefault();
-                resultPage = 0;
-                void client?.search(query);
-              }}
-            >
-              <label class="sr-only" for="concert-search">Search songs or artists</label>
-              <Icon name="search" />
-              <input
-                id="concert-search"
-                bind:value={query}
-                oninput={() => {
-                  resultPage = 0;
-                  client?.cancelSearch();
-                }}
-                minlength="2"
-                maxlength="120"
-                required
-                autocomplete="off"
-                placeholder="A song, an artist, a whole mood…"
-              />
-              <button class="button primary" disabled={view.searching}
-                >{view.searching ? 'Searching…' : 'Search music'}</button
-              >
-            </form>
-            <p class="search-summary" role="status">
-              {view.searching
-                ? 'Looking for your next concert track…'
-                : view.query
-                  ? `${view.results.length} results for “${view.query}”`
-                  : 'Search YouTube and add music to this server’s concert queue.'}
-            </p>
-            {#if shownResults.length}<ul class="search-results">
-                {#each shownResults as video, index (`${video.id}:${index}`)}<li>
-                    <span class="track-number"
-                      >{String(resultPage * 10 + index + 1).padStart(2, '0')}</span
-                    >
-                    <div class="track-info">
-                      <strong>{video.title}</strong><span>{video.artist}</span>
+                        void client?.queueAction('skip-vote');
+                      }}>Vote to skip · {view.queue.state.skipVotes ?? 0}</button
+                    >{/if}
+                  {#if canManage}
+                    <div class="moderation">
+                      <h3>Queue moderation</h3>
+                      <button
+                        class="button secondary"
+                        disabled={view.busy || !view.connected}
+                        onclick={() => {
+                          void client?.queueAction('approval', {
+                            enabled: !view.queue?.state.approvalRequired,
+                          });
+                        }}
+                        >{view.queue?.state.approvalRequired
+                          ? 'Disable approval'
+                          : 'Require approval'}</button
+                      ><button
+                        class="button secondary"
+                        disabled={view.busy || !view.connected}
+                        onclick={() => {
+                          void client?.queueAction('undo');
+                        }}>Undo queue edit</button
+                      >
                     </div>
-                    <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span>
-                    <button
-                      class="icon-button"
-                      aria-label={`Add ${video.title} to queue`}
-                      disabled={view.busy ||
-                        !view.connected ||
-                        !concert?.online ||
-                        !concert?.connected ||
-                        video.embeddable === false ||
-                        video.source === 'soundcloud'}
-                      onclick={() => void addTracks([video.id])}><Icon name="add" /></button
-                    >
-                  </li>{/each}
-              </ul>{/if}
-            {#if resultPages > 1}<nav class="result-pages" aria-label="Concert search pages">
-                <button
-                  class="button secondary"
-                  disabled={resultPage === 0}
-                  onclick={() => resultPage--}>Previous results</button
-                >
-                <span>Page {resultPage + 1} of {resultPages}</span>
-                <button
-                  class="button secondary"
-                  disabled={resultPage >= resultPages - 1}
-                  onclick={() => resultPage++}>Next results</button
-                >
-              </nav>{/if}
-          {/if}
+                    {#if view.queue?.state.requests?.length}<h3 class="requests-heading">
+                        Waiting for approval
+                      </h3>
+                      <ul class="queue-list">
+                        {#each view.queue.state.requests as video (video.entryId ?? video.id)}<li>
+                            <div class="track-info">
+                              <strong>{video.title}</strong><span>{video.artist}</span>
+                            </div>
+                            <button
+                              class="button secondary small"
+                              disabled={view.busy || !view.connected}
+                              onclick={() => {
+                                void client?.queueAction('approve', { videoId: video.entryId });
+                              }}>Approve</button
+                            ><button
+                              class="icon-button"
+                              aria-label={`Reject ${video.title}`}
+                              disabled={view.busy || !view.connected}
+                              onclick={() => {
+                                void client?.queueAction('reject', { videoId: video.entryId });
+                              }}>×</button
+                            >
+                          </li>{/each}
+                      </ul>{/if}
+                  {/if}
+                </section>
+              {/snippet}
+              {#snippet library()}
+                {#key view.guildId}
+                  {#await import('#lib/library/MusicLibrary.svelte')}
+                    <p role="status">Opening your library…</p>
+                  {:then { default: MusicLibrary }}
+                    <MusicLibrary
+                      tracks={[...(concert?.current ? [concert.current] : []), ...queue]}
+                      capacity={roomQueueCapacity(queue.length, view.queue?.state.requests?.length)}
+                      pendingIds={view.queue?.state.requests?.map((video) => video.id) ?? []}
+                      history={view.history}
+                      busy={view.busy || !view.connected || !concert?.online || !concert?.connected}
+                      onAdd={(ids) => addTracks(ids, true)}
+                    />
+                  {:catch}<p class="error-message" role="alert">
+                      The library could not load. Check your connection and open it again.
+                    </p>{/await}
+                {/key}
+              {/snippet}
+            </MusicWorkspace>{/key}
         </section>
       </section>
     {/if}
@@ -530,6 +527,23 @@
 </div>
 
 <style>
+  .concert-recovery {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .concert-recovery summary {
+    cursor: pointer;
+    font-weight: 650;
+  }
+  .concert-recovery p {
+    margin: 12px 0;
+    color: var(--muted);
+  }
+  .concert-recovery .button {
+    margin: 4px 8px 4px 0;
+  }
   .concert-share {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -540,17 +554,26 @@
   .tv-mode .concert-queue {
     display: none;
   }
-  .tv-mode .concert-discovery,
-  .tv-mode .shared-seek {
+  .tv-mode .concert-workspace {
     display: none;
   }
-  .concert-discovery {
-    grid-column: 1 / -1;
+  .concert-workspace {
     min-width: 0;
-    border-top: 1px solid var(--line);
-    padding-top: 26px;
+    max-height: calc(100dvh - 48px);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    position: sticky;
+    top: 24px;
+    padding: 6px;
+    margin: -6px;
   }
-  .music-tabs,
+  .concert-search {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: clamp(18px, 1.5vw, 26px);
+    background: var(--surface);
+  }
   .result-pages {
     display: flex;
     flex-wrap: wrap;
@@ -562,31 +585,6 @@
     justify-content: space-between;
     font-size: 12px;
     margin-top: 18px;
-  }
-  .shared-seek {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-    margin-top: 16px;
-    padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-  }
-  .shared-seek label,
-  .shared-seek p {
-    grid-column: 1 / -1;
-    font-size: 11px;
-  }
-  .shared-seek input {
-    min-width: 0;
-    padding: 0;
-  }
-  .shared-seek button {
-    grid-column: 1 / -1;
-  }
-  .shared-seek output {
-    align-self: center;
-    font-size: 12px;
   }
   .tv-mode :global(.playback-diagnostics),
   .tv-mode .permission-note {
@@ -606,9 +604,18 @@
     grid-column: 2;
     grid-row: 1;
   }
+  .tv-mode .current-track:has(.concert-recovery) {
+    --concert-recovery-space: 80px;
+  }
+  .tv-mode .current-track:has(.concert-recovery[open]) {
+    --concert-recovery-space: 200px;
+  }
   .tv-mode .concert-art,
   .tv-mode :global(.audio-stage:not(.fullscreen)) {
-    width: min(100%, calc((100dvh - var(--tv-control-space) - 90px) * 16 / 9));
+    width: min(
+      100%,
+      calc((100dvh - var(--tv-control-space) - 90px - var(--concert-recovery-space, 0px)) * 16 / 9)
+    );
     margin-inline: auto;
   }
   .tv-mode .track-meta {
@@ -837,6 +844,47 @@
     }
     .concert-queue .queue-list {
       max-height: none;
+    }
+  }
+  .concert-content {
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 28vw, 520px);
+    align-items: start;
+  }
+  .current-track {
+    position: sticky;
+    top: 24px;
+  }
+  .current-track:has(:global(.fullscreen-fallback)) {
+    z-index: 1000;
+  }
+  .tv-mode .current-track {
+    position: static;
+  }
+  .concert-workspace .concert-queue {
+    border: 0;
+    padding: 18px;
+    border-radius: 0;
+    background: transparent;
+  }
+  .tv-mode .concert-content {
+    grid-template-columns: minmax(0, 1fr) var(--tv-sidebar);
+  }
+  @media (max-width: 900px) {
+    .concert-content {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .concert-workspace {
+      position: static;
+      max-height: none;
+      overflow: visible;
+    }
+    .current-track {
+      position: static;
+    }
+  }
+  @media (max-width: 700px) {
+    .tv-mode .concert-content {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>

@@ -79,6 +79,34 @@ test("foreign-origin JSON is fully discarded and remains forbidden", async () =>
   assert.equal(request.bodyUsed, true);
   assert.equal(request.body?.locked, false);
 });
+
+test('D1 fallback shares the future-start clock and duplicate-play behavior with Core', async () => {
+  const previousNow = Date.now;
+  let now = 1000000;
+  Date.now = () => now;
+  const f = fixture();
+  try {
+    await f.save('TESTROOM', { current: seed, queue: [], playing: false, position: 20, radio: false, playbackKey: 'same-track' });
+    let state = (await mutate(f.request, 'TESTROOM', { action: 'play', version: 1 })).room;
+    assert.equal(state.playing, true); assert.equal(state.position, 20); assert.equal(state.startsAt, now + 1500);
+    const startsAt = state.startsAt;
+    now += 1000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 20);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'play', version: state.version })).room;
+    assert.equal(state.startsAt, startsAt); assert.equal(state.position, 20);
+    now += 1000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 20.5);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 50, version: state.version })).room;
+    assert.equal(state.playing, true); assert.equal(state.position, 50); assert.equal(state.startsAt, now + 1500);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'pause', version: state.version })).room;
+    assert.equal(state.playing, false); assert.equal(state.startsAt, undefined);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 100, version: state.version })).room;
+    assert.equal(state.position, 100); assert.equal(state.playing, false); assert.equal(state.playbackKey, 'same-track');
+    now += 5000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 100);
+    assert.equal(f.calls(), 0, 'clock controls do not search for music');
+  } finally { f.close(); Date.now = previousNow; }
+});
 test("discarding an untrusted origin stops at the body limit and cancels the stream", async () => {
   let chunks = 0;
   let cancelled = false;
@@ -1096,4 +1124,50 @@ test('negotiated room reads require bounded authenticated Core and immediately s
   assert.equal((await publicRoom(f.request,original,false)).discordOnline,false,'the room also persists authority mode if its heartbeat is missing');
   assert.deepEqual(f.roomRow(code),original,'presence reads do not update the checkpoint');
  }finally{delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
+});
+
+test('D1 user search shares title and artist ranking without extra provider requests', async () => {
+  const f = fixture();
+  try {
+    const ids = ['remix000001', 'original001', 'unrelated01'];
+    let calls = 0;
+    globalThis.fetch = async target => {
+      calls++;
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      if (url.pathname.endsWith('/search'))
+        return Response.json({ items: ids.map(videoId => ({ id: { videoId } })) });
+      return Response.json({ items: ids.map((id, i) => ({ id,
+        snippet: { title: ['Janji - Heroes Tonight (Remix)', 'Janji - Heroes Tonight (Official Audio)', 'Unrelated'][i], channelTitle: 'Janji', categoryId: '10' },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true },
+      })) });
+    };
+    assert.deepEqual((await searchHandler(f.request, 'Janji Heroes Tonight')).videos.map(video => video.id), [ids[1], ids[0], ids[2]]);
+    await searchHandler(f.request, 'Janji Heroes Tonight');
+    assert.equal(calls, 2, 'one discovery and one metadata batch, reused on subsequent reads');
+  } finally { f.close(); }
+});
+
+test('D1 bypasses old metadata when newer declared-AI evidence is only in the description', async () => {
+  const f = fixture();
+  try {
+    const id = 'declared001';
+    const previous = { ...next, id, title: 'Artist - Original', artist: 'Artist', aiGenerated: undefined };
+    f.sqlite.prepare('INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)')
+      .run(`videos:v4:${id}`, JSON.stringify([previous]), Date.now() + 3600000);
+    let metadataReads = 0;
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      if (url.pathname.endsWith('/search')) return Response.json({ items: [{ id: { videoId: id } }] });
+      metadataReads++;
+      return Response.json({ items: [{ id,
+        snippet: { title: previous.title, channelTitle: previous.artist, categoryId: '10', description: 'AI-produced music' },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true },
+      }] });
+    };
+    const result = await searchHandler(f.request, 'new classification');
+    assert.equal(metadataReads, 1);
+    assert.equal(result.videos[0].aiGenerated, true);
+  } finally { f.close(); }
 });

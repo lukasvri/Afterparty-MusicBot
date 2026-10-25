@@ -48,9 +48,12 @@ export function isRadioTitle(title: string) {
   const text = normalize(title);
   return (
     metadataAiGenerated(title, undefined) !== true &&
-    !/\b(reactions?|reacts|interviews?|tutorials?|howto|podcasts?|compilations?|playlist|full album|full set|dj set|live set|concert|hours?|best of|top \d+|karaoke|remake|recreation|recreated|bootleg|fanmade|sped up|slowed|lessons?|masterclass|walkthrough|walk through|step by step|sound design|production tips|production lesson|fl studio|ableton|logic pro|garageband|behind the scenes|making of|breakdown|explained|vlogs?|gameplay|unboxing|documentary|documentaries|studio tour|room tour|music news|album review|song review|track review|pranks?|challenge video|funny moments|memes?|trailer|teaser|shorts)\b/i.test(
+    !/\b(reactions?|reacts|interviews?|tutorials?|howto|podcasts?|compilations?|playlist|full album|full set|dj set|live set|concert|hours?|best of|top \d+|karaoke|remake|re\s?creat(?:ion|ed)|bootleg|fanmade|sped up|slowed|lessons?|masterclass|walkthrough|walk through|step by step|sound design|production tips|production lesson|fl studio|ableton|logic pro|garageband|behind the scenes|making of|breakdown|explained|vlogs?|vlogg(?:en|er)?|gameplay|unboxing|documentary|documentaries|studio tour|room tour|music news|album review|song review|track review|pranks?|challenge video|funny moments|memes?|trailer|teaser|shorts)\b/i.test(
       text,
     ) &&
+    // Explicit reconstruction labels describe another recording. Do not
+    // classify an ordinary title such as "Recreate Me" by its verb alone.
+    !/[[(][^\])]*\bre[\s-]?creat(?:e|ing)\b/i.test(title) &&
     // These words also occur inside ordinary studio song names. Reject
     // explicit upload-format positions and qualifiers, not every occurrence.
     !/[[(][^\])]*\b(?:live|covers?|demo)\b/i.test(title) &&
@@ -64,10 +67,10 @@ export function isRadioTitle(title: string) {
     !/\blive\s+(?:wembley(?:\s+stadium)?|glastonbury(?:\s+festival)?|bbc\s+radio\s*1)\b(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|[(]|$)/i.test(title) &&
     !/\blive(?:\s+[\p{L}\p{N}]+){0,4}\s+(?:19|20)\d{2}\b/iu.test(title) &&
     !/^how to\s*:/i.test(title) &&
-    !/\bhow to$|\bhow (?:i|we) (?:made|make|produced|produce|remade|recreated|built)\b/i.test(
+    !/\bhow to$|\bhow (?:i|we) (?:made|make|produced|produce|remade|re\s?creat(?:e|ed|ing)|built)\b/i.test(
       text,
     ) &&
-    !/\bhow (?:to|do (?:i|you)) (?:make|play|create|produce|mix|master|remake|recreate|learn|write|use|get|sound|build|reproduce|sing|compose)\b/i.test(
+    !/\bhow (?:to|do (?:i|you)) (?:make|play|create|produce|mix|master|remake|re\s?create|learn|write|use|get|sound|build|reproduce|sing|compose)\b/i.test(
       text,
     )
   );

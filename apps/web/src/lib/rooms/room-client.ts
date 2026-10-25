@@ -1,7 +1,12 @@
 import { request as browserRequest } from '../../../../../lib/browser-api.ts';
 import { browserStorage } from '../../../../../lib/browser-storage.ts';
 import { LiveClock } from '../../../../../lib/live-clock.ts';
-import { elapsedPlayingMs, readRoomTimeline } from '../../../../../services/core/src/protocol.ts';
+import {
+  ROOM_QUEUE_LIMIT,
+  roomQueueCapacity,
+  elapsedPlayingMs,
+  readRoomTimeline,
+} from '../../../../../services/core/src/protocol.ts';
 import {
   compensateDelivery,
   isDuplicateSnapshot,
@@ -607,6 +612,38 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     },
     add(videoId: string) {
       return mutate('add', { videoId });
+    },
+    async append(input: readonly string[]) {
+      const target = session;
+      if (!target || !current(target) || state.busy || state.connection !== 'connected')
+        throw new Error('Connect to the room before adding music.');
+      const ids = [...new Set(input)];
+      if (!ids.length || ids.length > ROOM_QUEUE_LIMIT || ids.some((id) => !/^[\w-]{11}$/.test(id)))
+        throw new Error('Choose between one and fifty YouTube tracks.');
+      await read(target);
+      const active = () => current(target) && state.connection === 'connected' && state.room;
+      const present = (room: Room, id: string) =>
+        room.current?.id === id ||
+        [...room.queue, ...(room.requests ?? [])].some((video) => video.id === id);
+      const initial = active();
+      if (!initial) throw new Error('The room changed or disconnected. Check the queue.');
+      const missing = ids.filter((id) => !present(initial, id));
+      const capacity = roomQueueCapacity(initial.queue.length, initial.requests?.length);
+      if (missing.length > capacity)
+        throw new Error(
+          `The queue has room for ${Math.max(0, capacity)} more tracks. Select fewer tracks.`,
+        );
+      let added = 0;
+      for (const videoId of missing) {
+        const room = active();
+        if (!room) throw new Error('The room changed or disconnected. Adding was stopped.');
+        if (present(room, videoId)) continue;
+        if (!(await mutate('add', { videoId })))
+          throw new Error(
+            `${added} tracks added. ${current(target) ? state.error || 'Adding was interrupted.' : 'The room changed.'} Check the queue before retrying.`,
+          );
+        added++;
+      }
     },
     action: mutate,
     playVideo(videoId: string) {

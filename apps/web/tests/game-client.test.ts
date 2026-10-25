@@ -41,11 +41,11 @@ const response = (revision = 1): GameResponse => ({
     round: null,
   },
 });
-function fixture(request: (init: RequestInit) => Promise<Response>) {
+function fixture(request: (init: RequestInit) => Promise<Response>, nickname = 'Synthetic player') {
   let state!: GameView;
   const storage = new Map<string, string>();
   const client = createGameClient(
-    { scope: 'room', scopeId: 'ROOM0001', nickname: 'Synthetic player' },
+    { scope: 'room', scopeId: 'ROOM0001', nickname },
     {
       fetch: (async (_url, init) => request(init!)) as typeof fetch,
       headers: () => ({
@@ -70,6 +70,30 @@ function fixture(request: (init: RequestInit) => Promise<Response>) {
   });
   return { client, storage, state: () => state };
 }
+test('an optional blank nickname joins the real game authority with its default player name', async () => {
+  const { GuessGame } = await import('../../../services/core/src/guess-game.ts');
+  for (const nickname of ['', '   ']) {
+    const authority = new GuessGame();
+    const f = fixture(async (init) => {
+      const body = JSON.parse(String(init.body));
+      assert.equal(Object.hasOwn(body, 'nickname'), false);
+      // The trusted HTTP handler strips scope and grant fields before applying the game command.
+      const data = authority.apply(
+        { scope: 'room', scopeId: 'ROOM0001', host: true, actor: 'synthetic-player' },
+        { action: body.action, eventId: body.eventId },
+      );
+      return Response.json({ ...data, canManage: true });
+    }, nickname);
+    try {
+      await f.client.refresh();
+      assert.equal(f.state().ready, true);
+      assert.equal(f.state().data?.game.scoreboard[0].nickname, 'Player 1');
+      assert.equal(f.state().error, '');
+    } finally {
+      f.client.destroy();
+    }
+  }
+});
 test('scoped grants are reused and every mutation carries current session, round, revision and unique id', async () => {
   const bodies: Record<string, unknown>[] = [];
   const f = fixture(async (init) => {

@@ -52,6 +52,7 @@ export class Engine extends EventEmitter {
   mixer: Mixer | null = null;
   abort: AbortController | null = null;
   loading = false;
+  private loadingOffset = 0;
   paused = false;
   epoch = randomUUID();
   sequence = 0;
@@ -88,19 +89,20 @@ export class Engine extends EventEmitter {
       paused: boolean;
     } | null>("recovery", null);
     this.restoringEntry = recovery?.track?.entryId ?? null;
-    if (
-      recovery?.track &&
-      !this.queue.some((t) => t.entryId === recovery.track.entryId)
-    )
+    if (recovery?.track) {
+      // A crossfade's consumed entry can still be in the persisted queue.
+      // Recovery owns its exact offset and must precede ordinary queued music.
+      this.queue = this.queue.filter((t) => t.entryId !== recovery.track.entryId);
       this.queue.unshift({
         ...recovery.track,
         offset: recovery.track.live
           ? 0
           : Math.min(
-              recovery.position,
+              Number.isFinite(recovery.position) ? Math.max(0, recovery.position) : 0,
               Math.max(0, recovery.track.duration - 1),
             ),
       });
+    }
     sink.onIdle = (id) => {
       if (id === this.runId) {
         this.runId = null;
@@ -143,7 +145,7 @@ export class Engine extends EventEmitter {
         Boolean(this.current) &&
         (this.loading || this.sink.buffering()),
     );
-    const { track, position } = positionFromSegments(this.segments, duration);
+    const { track, position } = this.playbackClock(duration);
     if (track) this.adoptTrack(track);
     if (
       track &&
@@ -183,7 +185,7 @@ export class Engine extends EventEmitter {
     this.changed();
   }
   snapshot(): PublicState {
-    const clock = positionFromSegments(this.segments, this.sink.duration());
+    const clock = this.playbackClock();
     const current = clock.track ?? this.current;
     const now = Date.now();
     return {
@@ -241,17 +243,24 @@ export class Engine extends EventEmitter {
     this.emit("state", this.snapshot());
   }
   checkpoint() {
+    const clock = this.playbackClock(), track = clock.track ?? this.current;
     this.store.set(
       "recovery",
-      this.current
+      track
         ? {
-            track: this.current,
-            position: positionFromSegments(this.segments, this.sink.duration())
-              .position,
+            track,
+            position: clock.position,
             paused: this.paused,
           }
         : null,
     );
+  }
+  private playbackClock(duration?: number) {
+    // Extraction can take seconds after a seek. Its intended offset is already
+    // authoritative, but must not advance until an audible segment exists.
+    return this.loading && !this.segments.length
+      ? { track: this.current, position: this.loadingOffset }
+      : positionFromSegments(this.segments, duration ?? this.sink.duration());
   }
   persist() {
     this.store.setMany({
@@ -422,7 +431,7 @@ export class Engine extends EventEmitter {
     return result;
   }
   async recoverAudio() {
-    const clock = positionFromSegments(this.segments, this.sink.duration()),
+    const clock = this.playbackClock(),
       track = clock.track ?? this.current;
     if (!track || !this.connected) return;
     this.adoptTrack(track);
@@ -459,8 +468,10 @@ export class Engine extends EventEmitter {
     this.anchorRadio(track);
     this.segments = [];
     this.loading = true;
+    this.loadingOffset = offset;
     this.paused = paused;
     this.persist();
+    this.checkpoint();
     this.changed();
     try {
       const prepared = await this.prepare(track, offset, signal);
@@ -502,11 +513,12 @@ export class Engine extends EventEmitter {
         error instanceof Error ? error.message : "Could not start the song.";
       this.emit("playbackFailure", this.lastError);
       this.persist();
+      this.checkpoint();
       this.changed();
-      if (this.queue.length) void this.startNext();
+      if (generation === this.generation && this.queue.length) void this.startNext(this.paused);
     }
   }
-  async startNext() {
+  async startNext(paused = false) {
     if (!this.connected) return;
     this.dropUnsafeRadio(this.radioSeed ?? this.current);
     const next = this.queue.shift();
@@ -515,7 +527,7 @@ export class Engine extends EventEmitter {
       return;
     }
     this.restoringEntry = null;
-    await this.startTrack(next, next.offset ?? 0);
+    await this.startTrack(next, next.offset ?? 0, paused);
   }
   private dropUnsafeRadio(seed: Track | null) {
     if (!this.queue.some((track) => track.radio)) return;
@@ -592,6 +604,7 @@ export class Engine extends EventEmitter {
       return this.startTrack(
         { ...this.current, entryId: randomUUID() },
         this.current.offset ?? 0,
+        this.paused,
       );
     if (this.loopQueue && this.current)
       this.queue.push({ ...this.current, entryId: randomUUID(), radio: false, radioRelatedTo: undefined });
@@ -599,7 +612,7 @@ export class Engine extends EventEmitter {
     const generation = this.generation;
     if (!this.queue.length) await this.ensureRadio();
     if (generation !== this.generation || !this.connected) return;
-    await this.startNext();
+    await this.startNext(this.paused);
   }
   pause() {
     if (!this.current) throw new UserError("No song is playing.");
@@ -621,8 +634,11 @@ export class Engine extends EventEmitter {
     else throw new UserError("There is no song to resume.");
   }
   async skip(count = 1) {
-    if (!Number.isInteger(count) || count < 1 || count > this.queue.length + 1)
+    const audible = this.playbackClock().track;
+    const queued = audible ? this.queue.filter(track => track.entryId !== audible.entryId).length : this.queue.length;
+    if (!Number.isInteger(count) || count < 1 || count > queued + 1)
       throw new UserError("Invalid number of songs.");
+    if (audible) this.adoptTrack(audible);
     // Capture the user's requested target before removing old unsafe entries.
     // Filtering must never shift a numbered skip onto a later manual song.
     const requested = this.queue.slice(0, count);
@@ -667,15 +683,17 @@ export class Engine extends EventEmitter {
     this.changed();
   }
   async seek(seconds: number) {
+    const track = this.playbackClock().track ?? this.current;
     if (
-      !this.current ||
-      this.current.live ||
+      !track ||
+      track.live ||
       !Number.isFinite(seconds) ||
       seconds < 0 ||
-      seconds >= this.current.duration
+      seconds >= track.duration
     )
       throw new UserError("Invalid position.");
-    await this.startTrack(this.current, seconds, this.paused);
+    this.adoptTrack(track);
+    await this.startTrack(track, seconds, this.paused);
   }
   clear() {
     this.rejectRadio(this.queue);

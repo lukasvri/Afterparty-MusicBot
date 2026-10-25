@@ -28,7 +28,7 @@ const results = [
     'An equally long synthetic artist credit',
   ),
 ];
-type Write = { action: string; version: number; videoId?: string; position?: number };
+type Write = { action: string; version: number; videoId?: string; position?: number; to?: number };
 
 async function fixtureBrowser(registerCleanup: (cleanup: () => Promise<void>) => void) {
   const browser = await chromium.launch({
@@ -76,30 +76,40 @@ test('fixture teardown closes its real browser after navigation setup fails', as
   }
 });
 
-async function fixture(t: TestContext, width: number, host = true, initial = false) {
+async function fixture(
+  t: TestContext,
+  width: number,
+  host = true,
+  initial = false,
+  manualSampling = false,
+) {
   const browser = await fixtureBrowser((cleanup) => t.after(cleanup));
   const page = await browser.newPage({
     viewport: { width, height: 1000 },
     reducedMotion: 'reduce',
   });
+  page.setDefaultTimeout(8000);
   const errors: string[] = [],
     external: string[] = [],
     writes: Write[] = [];
   let creates = 0,
     authorizedReads = 0,
     roomReads = 0,
+    failedReads = 0,
     version = 1,
     playing = true,
     position = 12;
+  let nowPlaying = current;
   let queue = [
     video('queued00001', 'Stay a little longer', 'Common Ground'),
     video('queued00002', 'City after dark', 'Night Bus'),
   ];
+  let heldMutation: Promise<void> | null = null;
   const snapshot = (isHost: boolean): Room => ({
     code,
     version,
     name: 'Friday, after hours',
-    current,
+    current: nowPlaying,
     queue,
     playing,
     position,
@@ -112,44 +122,121 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
   });
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(
-    ({ code, token, visitor, initial, host }) => {
+    ({ code, token, visitor, initial, host, manualSampling }) => {
+      if (window !== window.top) return;
       localStorage.setItem('afterparty-visitor', visitor);
       if (initial && host) localStorage.setItem(`afterparty-host:${code}`, token);
-      // Deterministic official-player boundary. No iframe, provider request or media.
-      const calls: { action: string; position?: number; videoId?: string }[] = [];
+      // Synthetic official-player boundary with a local iframe for real focus/activation.
+      // No provider requests or media are used.
+      const calls: { action: string; position?: number; videoId?: string; at?: number }[] = [];
       (window as unknown as { __audioCalls: typeof calls }).__audioCalls = calls;
+      if (manualSampling) {
+        const interval = window.setInterval.bind(window),
+          ticks: (() => void)[] = [];
+        window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+          if (timeout !== 250 || typeof handler !== 'function')
+            return interval(handler, timeout, ...args);
+          ticks.push(() => handler(...args));
+          return interval(() => {}, timeout);
+        }) as typeof window.setInterval;
+        (window as typeof window & { samplePlayer: () => void }).samplePlayer = () =>
+          ticks.forEach((tick) => tick());
+        const fetch = window.fetch.bind(window);
+        window.fetch = (input, init) => {
+          let action: string | undefined;
+          if (init?.method === 'POST' && typeof init.body === 'string') {
+            const body = JSON.parse(init.body);
+            action = body.action;
+            calls.push({ action: `post-${body.action}`, at: performance.now() });
+          }
+          return fetch(input, init).then((response) => {
+            if (action === 'next') calls.push({ action: 'ack-next', at: performance.now() });
+            return response;
+          });
+        };
+      }
       window.YT = {
         Player: class {
           position = 0;
           state = 2;
-          constructor(_container: HTMLElement, options: Record<string, unknown>) {
+          videoId = '';
+          iframe: HTMLIFrameElement;
+          receive: (event: MessageEvent) => void;
+          emit: (state: number) => void;
+          constructor(container: HTMLElement, options: Record<string, unknown>) {
             calls.push({ action: 'construct' });
             const events = options.events as {
               onReady: () => void;
               onStateChange?: (event: { data: number }) => void;
+              onError?: (event: { data: number }) => void;
             };
+            (
+              window as typeof window & { emitPlayerError: (code: number) => void }
+            ).emitPlayerError = (code) => events.onError?.({ data: code });
+            this.emit = (state) => {
+              this.state = state;
+              events.onStateChange?.({ data: state });
+            };
+            this.iframe = document.createElement('iframe');
+            this.iframe.title = 'YouTube video player';
+            this.iframe.sandbox.add('allow-scripts');
+            (
+              window as unknown as { __nativeVideo: (action: string, position?: number) => void }
+            ).__nativeVideo = (action, position) => {
+              if (manualSampling) calls.push({ action: `native-${action}`, at: performance.now() });
+              if (action === 'seek-event') {
+                this.position = position ?? 42;
+                this.emit(3);
+                queueMicrotask(() => this.emit(1));
+              } else if (action === 'seek') this.position = position ?? 42;
+              else this.emit(action === 'play' ? 1 : 2);
+            };
+            this.receive = (event) => {
+              if (
+                event.source !== this.iframe.contentWindow ||
+                event.data?.type !== 'synthetic-native'
+              )
+                return;
+              (
+                window as unknown as { __nativeVideo: (action: string, position?: number) => void }
+              ).__nativeVideo(event.data.action, event.data.position);
+            };
+            window.addEventListener('message', this.receive);
+            this.iframe.srcdoc = `<style>body{margin:0;background:#101216;color:white;display:flex;align-items:end;gap:12px;height:100vh}button{padding:10px;background:#242832;color:white;border:0}</style><button onclick="parent.postMessage({type:'synthetic-native',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'synthetic-native',action:'pause'},'*')">Pause video</button><button onclick="parent.postMessage({type:'synthetic-native',action:'seek',position:42},'*')">Seek video</button>`;
+            container.replaceWith(this.iframe);
             // Retain the callback after destroy to model a delayed iframe event.
             (window as unknown as { __emitLastPlayerEnded: () => void }).__emitLastPlayerEnded =
               () => events.onStateChange?.({ data: 0 });
             setTimeout(() => events.onReady(), 0);
           }
           loadVideoById(value: { videoId: string; startSeconds: number }) {
+            this.videoId = value.videoId;
             this.position = value.startSeconds;
             this.state = 1;
-            calls.push({ action: 'load', videoId: value.videoId, position: value.startSeconds });
+            calls.push({
+              action: 'load',
+              videoId: value.videoId,
+              position: value.startSeconds,
+              ...(manualSampling ? { at: performance.now() } : {}),
+            });
+            queueMicrotask(() => this.emit(1));
           }
           cueVideoById(value: { videoId: string; startSeconds: number }) {
+            this.videoId = value.videoId;
             this.position = value.startSeconds;
             this.state = 2;
             calls.push({ action: 'cue', videoId: value.videoId, position: value.startSeconds });
+            queueMicrotask(() => this.emit(5));
           }
           playVideo() {
             this.state = 1;
             calls.push({ action: 'play' });
+            queueMicrotask(() => this.emit(1));
           }
           pauseVideo() {
             this.state = 2;
             calls.push({ action: 'pause' });
+            queueMicrotask(() => this.emit(2));
           }
           seekTo(position: number) {
             this.position = position;
@@ -161,7 +248,14 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
           getPlayerState() {
             return this.state;
           }
+          getIframe() {
+            return this.iframe;
+          }
+          getVideoUrl() {
+            return `https://www.youtube.com/watch?v=${this.videoId}`;
+          }
           destroy() {
+            window.removeEventListener('message', this.receive);
             calls.push({ action: 'destroy' });
           }
           level = 100;
@@ -185,7 +279,7 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
         },
       };
     },
-    { code, token, visitor, initial, host },
+    { code, token, visitor, initial, host, manualSampling },
   );
   await page.route('**/*', async (route) => {
     const request = route.request(),
@@ -195,6 +289,8 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       return route.abort();
     }
     if (!url.pathname.startsWith('/api/')) return route.continue();
+    if (url.pathname === '/api/rooms' && request.method() === 'GET')
+      return route.fulfill({ json: { rooms: [] } });
     const headers = request.headers();
     assert.equal(headers['x-afterparty-visitor'], visitor);
     const input = request.method() === 'POST' ? request.postDataJSON() : null;
@@ -208,11 +304,20 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       if (!input) {
         roomReads++;
         if (authorized) authorizedReads++;
+        if (failedReads > 0) {
+          failedReads--;
+          return route.fulfill({ status: 503, json: { error: 'Temporary room outage.' } });
+        }
         return route.fulfill({ json: snapshot(authorized) });
       }
       assert.equal(input.version, version, 'mutations carry the current server revision');
       if (input.action !== 'add') assert(authorized, 'transport requires the host token');
       writes.push(input);
+      if (heldMutation) {
+        const held = heldMutation;
+        heldMutation = null;
+        await held;
+      }
       if (input.action === 'add') {
         const selected = results.find((item) => item.id === input.videoId);
         assert(selected);
@@ -220,6 +325,19 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       } else if (input.action === 'pause') playing = false;
       else if (input.action === 'play') playing = true;
       else if (input.action === 'seek') position = input.position;
+      else if (input.action === 'next') {
+        const selected = queue.shift();
+        assert(selected);
+        nowPlaying = selected;
+        position = 0;
+        playing = true;
+      } else if (input.action === 'move') {
+        const index = queue.findIndex((item) => item.id === input.videoId);
+        assert(index >= 0);
+        const [selected] = queue.splice(index, 1);
+        queue.splice(input.to, 0, selected);
+      } else if (input.action === 'remove')
+        queue = queue.filter((item) => item.id !== input.videoId);
       else assert.fail(`Unexpected synthetic command: ${input.action}`);
       version++;
       return route.fulfill({ json: { room: snapshot(authorized) } });
@@ -251,6 +369,16 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
     get roomReads() {
       return roomReads;
     },
+    failNextReads(count: number) {
+      failedReads = count;
+    },
+    holdNextMutation() {
+      let release = () => {};
+      heldMutation = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return release;
+    },
     async close() {
       await closeFixture(page, browser);
     },
@@ -279,10 +407,56 @@ test(
 );
 
 async function find(page: Page, query: string) {
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   const input = page.getByRole('textbox', { name: 'Search songs or artists' });
   await input.fill(query);
   await input.press('Enter');
 }
+
+test('an explicit open-rooms bookmark stays in the directory after its saved room reconnects', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const reconnected = f.page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/rooms/${code}` &&
+        response.request().method() === 'GET',
+    );
+    await f.page.goto(`${origin}/?room=${code}&view=rooms`);
+    await reconnected;
+    assert.equal(
+      await f.page.getByRole('heading', { name: 'Find your people.', exact: true }).isVisible(),
+      true,
+    );
+    assert.equal(new URL(f.page.url()).searchParams.get('view'), 'rooms');
+    assert.deepEqual(f.writes, []);
+    assert.equal(f.creates, 0);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('a created room remains bookmarked after its first ownership read fails and polling recovers', async (t) => {
+  const f = await fixture(t, 390);
+  try {
+    f.failNextReads(1);
+    await f.page
+      .getByRole('textbox', { name: 'Room name', exact: true })
+      .fill('Friday, after hours');
+    await f.page.getByRole('button', { name: 'Create private room' }).click();
+    await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
+    assert.equal(f.creates, 1);
+    assert.equal(new URL(f.page.url()).searchParams.get('room'), code);
+    assert.equal(await f.page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
+    await f.page.reload();
+    await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
+    assert.equal(f.creates, 1);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
 async function noOverflow(page: Page) {
   assert(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -326,7 +500,7 @@ for (const width of [1440, 390]) {
         token,
       );
       assert.equal(new URL(page.url()).searchParams.get('room'), code);
-      assert.equal(await page.getByRole('button', { name: 'Pause playback' }).isEnabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
       await find(page, 'night');
       await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
       const input = page.getByRole('textbox', { name: 'Search songs or artists' });
@@ -345,6 +519,7 @@ for (const width of [1440, 390]) {
       });
       assert.equal(await add.evaluate((element) => element === document.activeElement), true);
       await page.keyboard.press('Enter');
+      await page.getByRole('button', { name: /^Queue/ }).click();
       await page.locator('.queue-list').getByText(results[0].title, { exact: true }).waitFor();
       assert.deepEqual(f.writes[0], {
         action: 'add',
@@ -374,29 +549,32 @@ for (const width of [1440, 390]) {
           (call) => call.action === 'load',
         ),
       );
-      await page.getByRole('button', { name: 'Pause playback' }).click();
-      await page.getByRole('button', { name: 'Resume playback' }).waitFor();
-      await page.waitForFunction(() =>
-        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
-          (call) => call.action === 'pause',
-        ),
+      assert.equal(
+        await page.getByRole('button', { name: 'Pause playback', exact: true }).count(),
+        0,
+        'Native video replaces the duplicate transport',
       );
-      await page.getByRole('button', { name: 'Resume playback' }).click();
-      await page.getByRole('button', { name: 'Pause playback' }).waitFor();
+      const native = page.frameLocator('.audio-stage iframe');
+      await native.getByRole('button', { name: 'Pause video', exact: true }).click();
       await page.waitForFunction(() =>
-        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
-          (call) => call.action === 'play',
-        ),
+        document
+          .querySelector('.player-status')
+          ?.textContent?.includes('Shared playback is paused'),
       );
-      await page.getByRole('slider', { name: 'Playback position' }).evaluate((element) => {
-        (element as HTMLInputElement).value = '42';
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-      });
+      await native.getByRole('button', { name: 'Play video', exact: true }).click();
       await page.waitForFunction(() =>
-        (
-          window as unknown as { __audioCalls: { action: string; position?: number }[] }
-        ).__audioCalls.some((call) => call.action === 'seek' && call.position! >= 42),
+        document
+          .querySelector('.player-status')
+          ?.textContent?.includes('Following the shared clock'),
       );
+      await page.waitForTimeout(1100);
+      const seeking = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.request().postDataJSON()?.action === 'seek',
+      );
+      await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+      await seeking;
       assert.deepEqual(
         f.writes.map((write) => write.action),
         ['add', 'pause', 'play', 'seek'],
@@ -446,7 +624,7 @@ for (const width of [1440, 390]) {
       await page.getByRole('button', { name: 'Join room', exact: true }).click();
       await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
       assert.equal(
-        await page.getByRole('button', { name: 'Pause playback' }).isEnabled(),
+        await page.getByRole('button', { name: 'Next track' }).isEnabled(),
         true,
         'joining again restores saved host permissions',
       );
@@ -482,12 +660,9 @@ for (const width of [1440, 390]) {
     try {
       const { page } = f;
       await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
-      for (const control of [
-        page.getByRole('button', { name: 'Pause playback' }),
-        page.getByRole('button', { name: 'Next track' }),
-        page.getByRole('slider', { name: 'Playback position' }),
-      ])
-        assert.equal(await control.isDisabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Next track' }).isDisabled(), true);
+      assert.equal(await page.getByRole('button', { name: 'Pause playback' }).count(), 0);
+      assert.equal(await page.getByRole('slider', { name: 'Playback position' }).count(), 0);
       await page
         .getByText('The host controls playback. Everyone can add to the queue.', { exact: true })
         .waitFor();
@@ -503,8 +678,9 @@ for (const width of [1440, 390]) {
       await page
         .getByRole('button', { name: `Add ${results[1].title} to queue`, exact: true })
         .click();
+      await page.getByRole('button', { name: /^Queue/ }).click();
       await page.locator('.queue-list').getByText(results[1].title, { exact: true }).waitFor();
-      assert.equal(await page.getByRole('alert').count(), 0);
+      assert.equal(await page.locator('.audio-message').count(), 0);
       assert.deepEqual(
         f.writes.map((write) => write.action),
         ['add'],
@@ -521,6 +697,584 @@ for (const width of [1440, 390]) {
     }
   });
 }
+
+test('music tabs preserve searches and unfinished library inputs beside the player', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    await page.getByText('Room settings', { exact: true }).click();
+    await page.getByLabel('Your display name', { exact: true }).fill('Night host');
+    await find(page, 'night');
+    await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
+    assert.equal(
+      await page.getByLabel('Your display name', { exact: true }).inputValue(),
+      'Night host',
+    );
+    await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    const link = page.getByLabel('Playlist link', { exact: true });
+    await link.fill('https://www.youtube.com/playlist?list=PL1234567890123456789');
+    await find(page, 'another artist');
+    await page.getByRole('status').filter({ hasText: '3 results for “another artist”' }).waitFor();
+    assert.equal(
+      await link.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
+    );
+    const searchBox = await page.locator('.discovery').boundingBox();
+    const playerBox = await page.locator('.now-playing').boundingBox();
+    assert(
+      searchBox && playerBox && searchBox.x > playerBox.x + playerBox.width,
+      'wide screens keep the music workspace beside the player',
+    );
+    assert.equal(
+      await page.getByLabel('Your display name', { exact: true }).inputValue(),
+      'Night host',
+    );
+    await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    assert.equal(
+      await link.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
+      'changing tools preserves the import draft',
+    );
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    assert.equal(
+      await page.getByRole('region', { name: 'Your music library', exact: true }).count(),
+      0,
+      'inactive tools are hidden from accessibility navigation',
+    );
+    await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    assert.equal(
+      await link.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
+    );
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+    await noOverflow(page);
+  } finally {
+    await f.close();
+  }
+});
+
+test('familiar navigation and player workspace fit 4K, QHD, 1080p and mobile with quick access', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    for (const [width, height] of [
+      [3840, 2160],
+      [2560, 1440],
+      [1920, 1080],
+      [390, 844],
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate(() => document.fonts.ready);
+      const rows = await page
+        .locator('.app-header nav .nav-link')
+        .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
+      assert(Math.max(...rows) - Math.min(...rows) <= 1, 'main navigation stays in one row');
+      assert.equal(await page.getByRole('slider', { name: 'Playback position' }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Pause playback' }).count(), 0);
+      await noOverflow(page);
+      const player = await page.locator('.now-playing').boundingBox();
+      const workspace = await page.locator('.music-workspace').boundingBox();
+      assert(player && workspace);
+      if (width >= 1920)
+        assert(
+          workspace.x >= player.x + player.width && player.width > workspace.width,
+          'one compact workspace sits beside the larger player',
+        );
+      else
+        assert(
+          workspace.y >= player.y + player.height,
+          'mobile stacks the workspace beneath the player',
+        );
+      await page.screenshot({
+        path: `/tmp/afterparty-familiar-room-${width}.png`,
+        fullPage: width >= 900,
+      });
+    }
+    await page.getByRole('button', { name: 'Open search', exact: true }).click();
+    const search = page.getByRole('textbox', { name: 'Search songs or artists' });
+    assert.equal(await search.evaluate((node) => node === document.activeElement), true);
+    await search.fill('late night draft');
+    await page.getByRole('button', { name: 'Open library', exact: true }).click();
+    const playlist = page.getByLabel('Playlist link', { exact: true });
+    await playlist.fill('https://www.youtube.com/playlist?list=PL1234567890123456789');
+    await page.getByRole('button', { name: 'Go to player', exact: true }).click();
+    assert.equal(
+      await page.locator('#room-player').evaluate((node) => node === document.activeElement),
+      true,
+    );
+    await page.getByRole('button', { name: 'Open queue', exact: true }).click();
+    assert.equal(
+      await page.getByRole('heading', { name: 'Up next', exact: true }).isVisible(),
+      true,
+    );
+    await page.getByRole('button', { name: 'Open library', exact: true }).click();
+    assert.equal(
+      await playlist.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
+    );
+    await page.getByRole('button', { name: 'Open search', exact: true }).click();
+    assert.equal(await search.inputValue(), 'late night draft');
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('one invitation panel copies only the public link and offers selection after clipboard failure', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async () => {
+            throw new Error('Synthetic clipboard failure');
+          },
+        },
+      }),
+    );
+    const invite = page.getByRole('button', { name: /^Invite friends/ });
+    await invite.click();
+    const link = page.getByRole('textbox', { name: 'Public room invitation link' });
+    assert.equal(await link.inputValue(), `${origin}/?room=${code}`);
+    await page.getByRole('button', { name: 'Copy room link', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Copy the selected link above.' }).waitFor();
+    assert.equal(
+      await link.evaluate(
+        (node) =>
+          node === document.activeElement &&
+          (node as HTMLInputElement).selectionEnd === (node as HTMLInputElement).value.length,
+      ),
+      true,
+    );
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (value: string) => {
+            (window as typeof window & { copiedRoomLink: string }).copiedRoomLink = value;
+          },
+        },
+      }),
+    );
+    await page.getByRole('button', { name: 'Copy room link', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Room link copied.' }).waitFor();
+    assert.equal(
+      await page.evaluate(
+        () => (window as typeof window & { copiedRoomLink: string }).copiedRoomLink,
+      ),
+      `${origin}/?room=${code}`,
+    );
+    await invite.click();
+    assert.equal(await link.isVisible(), false);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('room browsing returns to the existing host room without issuing commands or restarting audio', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'load',
+      ),
+    );
+    await page.getByRole('button', { name: 'Open rooms', exact: true }).click();
+    await page.getByRole('heading', { name: 'Find your people.', exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('view'), 'rooms');
+    assert.equal(
+      await page.locator('nav[aria-label="Main navigation"] [aria-current="page"]').count(),
+      1,
+    );
+    await page.getByRole('link', { name: 'Music', exact: true }).click();
+    await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('room'), code);
+    assert.equal(new URL(page.url()).searchParams.has('view'), false);
+    assert.equal(
+      await page.getByRole('button', { name: 'Next track', exact: true }).isEnabled(),
+      true,
+    );
+    assert.equal(
+      await page.getByRole('button', { name: 'Enable room audio', exact: true }).isVisible(),
+      true,
+    );
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'construct',
+          ).length,
+      ),
+      1,
+      'navigation does not automatically grant audio consent',
+    );
+    await page.getByRole('link', { name: 'Music', exact: true }).click();
+    assert.equal(
+      await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).count(),
+      1,
+    );
+    assert.deepEqual(f.writes, []);
+    assert.equal(f.creates, 0);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+for (const width of [1440, 390])
+  test(`queue options support keyboard reorder and removal at ${width}px`, async (t) => {
+    const f = await fixture(t, width, true, true);
+    try {
+      const { page } = f;
+      const second = page.locator('summary[aria-label="Track options for City after dark"]');
+      await second.focus();
+      await page.keyboard.press('Enter');
+      const menu = page.getByRole('group', { name: 'Actions for City after dark', exact: true });
+      await menu.getByRole('button', { name: 'Move up', exact: true }).focus();
+      await page.keyboard.press('Escape');
+      assert.equal(await second.evaluate((node) => node === document.activeElement), true);
+      await page.keyboard.press('Enter');
+      await menu.getByRole('button', { name: 'Move up', exact: true }).click();
+      await page.waitForFunction(
+        () => document.querySelector('.queue-list li strong')?.textContent === 'City after dark',
+      );
+      assert.equal(
+        await second.evaluate((node) => node === document.activeElement),
+        true,
+        'focus follows the reordered recording',
+      );
+      await page.keyboard.press('Enter');
+      await menu.getByRole('button', { name: 'Remove', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('.count')?.textContent === '1');
+      const next = page.locator('summary[aria-label="Track options for Stay a little longer"]');
+      assert.equal(
+        await next.evaluate((node) => node === document.activeElement),
+        true,
+        'removing a row keeps keyboard focus in the queue',
+      );
+      assert.deepEqual(
+        f.writes.map((write) => [write.action, write.version]),
+        [
+          ['move', 1],
+          ['remove', 2],
+        ],
+      );
+      assert.equal(f.writes[0].to, 0);
+      assert.deepEqual(f.errors, []);
+      await noOverflow(page);
+    } finally {
+      await f.close();
+    }
+  });
+
+test('native pause remains local while a queue addition is awaiting its response', async (t) => {
+  const f = await fixture(t, 1440, true, true);
+  let release = () => {};
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await find(page, 'night');
+    await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
+    release = f.holdNextMutation();
+    await page
+      .getByRole('button', { name: `Add ${results[0].title} to queue`, exact: true })
+      .click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+    await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    release();
+    await page.getByRole('button', { name: /^Queue/ }).click();
+    await page.locator('.queue-list').getByText(results[0].title, { exact: true }).waitFor();
+    await page.waitForFunction(
+      () => !(document.querySelector('.search-results button') as HTMLButtonElement)?.disabled,
+    );
+    assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['add'],
+    );
+    await native.getByRole('button', { name: 'Play video', exact: true }).click();
+    await page
+      .locator('.player-status')
+      .filter({ hasText: 'Following the shared clock' })
+      .waitFor();
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['add'],
+      'a busy mutation never replays a shared pause',
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    release();
+    await f.close();
+  }
+});
+
+test('a completed queue action preserves focus when the host has moved to search', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    const release = f.holdNextMutation();
+    await page.locator('summary[aria-label="Track options for City after dark"]').click();
+    await page
+      .getByRole('group', { name: 'Actions for City after dark', exact: true })
+      .getByRole('button', { name: 'Move up', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    const input = page.getByRole('textbox', { name: 'Search songs or artists' });
+    await input.fill('keep typing');
+    release();
+    await page.waitForFunction(
+      () => document.querySelector('.queue-list li strong')?.textContent === 'City after dark',
+    );
+    assert.equal(await input.evaluate((node) => node === document.activeElement), true);
+    assert.equal(await input.inputValue(), 'keep typing');
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['move'],
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('native pause, seek and queue-next dispatch without position polling or an acknowledgement delay', async (t) => {
+  const f = await fixture(t, 390, true, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Pause video', exact: true }).waitFor();
+    const releasePause = f.holdNextMutation();
+    await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'post-pause',
+      ),
+    );
+    assert.equal(
+      f.writes.at(-1)?.action,
+      'pause',
+      'pause is already submitted while its response is held',
+    );
+    const beforePauseRelease = await page.evaluate(
+      () =>
+        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+          (call) => call.action === 'play',
+        ).length,
+    );
+    await page.waitForTimeout(300);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'play',
+          ).length,
+      ),
+      beforePauseRelease,
+      'pending acknowledgement cannot undo a local pause',
+    );
+    releasePause();
+    await page.locator('.player-status').filter({ hasText: 'Shared playback is paused' }).waitFor();
+    await native.getByRole('button', { name: 'Play video', exact: true }).click();
+    await page
+      .locator('.player-status')
+      .filter({ hasText: 'Following the shared clock' })
+      .waitFor();
+    await page.evaluate(() =>
+      (window as typeof window & { samplePlayer: () => void }).samplePlayer(),
+    );
+    const releaseSeek = f.holdNextMutation();
+    await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((button) => {
+      button.setAttribute(
+        'onclick',
+        "parent.postMessage({type:'synthetic-native',action:'seek-event',position:42},'*')",
+      );
+    });
+    await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'post-seek',
+      ),
+    );
+    assert.equal(
+      f.writes.at(-1)?.position,
+      42,
+      'the native state event submits the seek before any later position poll',
+    );
+    releaseSeek();
+    await page
+      .getByRole('button', { name: 'Next track', exact: true })
+      .waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () =>
+        !(document.querySelector('button[aria-label="Next track"]') as HTMLButtonElement)?.disabled,
+    );
+    const next = page.getByRole('button', { name: 'Next track', exact: true });
+    await next.evaluate((button) =>
+      button.addEventListener(
+        'click',
+        () => {
+          (
+            window as unknown as { __audioCalls: { action: string; at: number }[] }
+          ).__audioCalls.push({ action: 'queue-next-click', at: performance.now() });
+        },
+        { capture: true, once: true },
+      ),
+    );
+    await next.click();
+    await page.waitForFunction(() =>
+      (
+        window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+      ).__audioCalls.some((call) => call.action === 'load' && call.videoId === 'queued00001'),
+    );
+    const calls = await page.evaluate(
+      () =>
+        (window as unknown as { __audioCalls: { action: string; at?: number; videoId?: string }[] })
+          .__audioCalls,
+    );
+    const delay = (action: string) =>
+      calls.find((call) => call.action === `post-${action}`)!.at! -
+      calls.find((call) => call.action === `native-${action === 'seek' ? 'seek-event' : action}`)!
+        .at!;
+    const nextDispatch =
+      calls.find((call) => call.action === 'post-next')!.at! -
+      calls.find((call) => call.action === 'queue-next-click')!.at!;
+    const sourceSwitch =
+      calls.find((call) => call.action === 'load' && call.videoId === 'queued00001')!.at! -
+      calls.find((call) => call.action === 'ack-next')!.at!;
+    t.diagnostic(
+      `Synthetic iframe event to fetch dispatch: pause=${delay('pause').toFixed(2)}ms, seek=${delay('seek').toFixed(2)}ms; queue-next click to dispatch=${nextDispatch.toFixed(2)}ms, acknowledgement to player source switch=${sourceSwitch.toFixed(2)}ms. All 250ms sampling timers were withheld; no provider/network latency is included.`,
+    );
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['pause', 'play', 'seek', 'next'],
+    );
+    assert.equal(
+      calls.filter((call) => call.action === 'construct').length,
+      1,
+      'queue-next reuses the current player',
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('a failed YouTube source does not lock the next valid recording or retry the failed video', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page
+      .frameLocator('.audio-stage iframe')
+      .getByRole('button', { name: 'Pause video' })
+      .waitFor();
+    await page.evaluate(() =>
+      (window as typeof window & { emitPlayerError: (code: number) => void }).emitPlayerError(150),
+    );
+    await page
+      .locator('.audio-message')
+      .filter({ hasText: 'This source cannot play here' })
+      .waitFor();
+    await page.waitForTimeout(400);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (
+            window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+          ).__audioCalls.filter((call) => call.action === 'load' && call.videoId === 'current0001')
+            .length,
+      ),
+      1,
+    );
+    await page.getByRole('button', { name: 'Next track', exact: true }).click();
+    await page.waitForFunction(() =>
+      (
+        window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+      ).__audioCalls.some((call) => call.action === 'load' && call.videoId === 'queued00001'),
+    );
+    assert.equal(await page.locator('.audio-message').count(), 0);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'construct',
+          ).length,
+      ),
+      1,
+    );
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['next'],
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('native guest pause stays local through room polls and resumes at the shared position', async (t) => {
+  const f = await fixture(t, 1920, false, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+    await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    const reads = f.roomReads;
+    await page.waitForFunction(() =>
+      document.querySelector('.player-status')?.textContent?.includes('Paused on this device'),
+    );
+    await page.waitForTimeout(1800);
+    assert(f.roomReads > reads, 'the paused device receives a newer room snapshot');
+    assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    assert.deepEqual(f.writes, [], 'a guest cannot send shared transport commands');
+    await native.getByRole('button', { name: 'Play video', exact: true }).click();
+    await page
+      .locator('.player-status')
+      .filter({ hasText: 'Following the shared clock' })
+      .waitFor();
+    await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+    await page.waitForTimeout(500);
+    assert.deepEqual(f.writes, [], 'guest scrubbing cannot change the shared position');
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('unactivated iframe state changes cannot send host commands', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'load',
+      ),
+    );
+    // Focus stays outside the iframe, even though enabling audio activated the page.
+    await page.evaluate(() =>
+      (window as unknown as { __nativeVideo: (action: string) => void }).__nativeVideo('pause'),
+    );
+    await page.waitForTimeout(500);
+    assert.deepEqual(f.writes, []);
+    assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
 
 for (const [width, height] of [
   [3840, 2160],
@@ -542,7 +1296,7 @@ for (const [width, height] of [
             (call) => call.action === 'load',
           ),
         );
-        await f.page.getByRole('button', { name: 'Show QR invitation', exact: true }).click();
+        await f.page.getByRole('button', { name: /^Invite friends/ }).click();
         await f.page.getByAltText('QR code to join this listening room').waitFor();
         assert.equal(
           await f.page.getByRole('textbox', { name: 'Public room invitation link' }).inputValue(),
@@ -590,8 +1344,18 @@ for (const [width, height] of [
         await f.page.locator('.fullscreen-fallback').waitFor();
         await f.page.keyboard.press('Escape');
         await f.page.locator('.fullscreen-fallback').waitFor({ state: 'hidden' });
+        const settings = f.page.getByText('Room settings', { exact: true });
+        await settings.focus();
         await f.page.keyboard.press('m');
-        await f.page.getByRole('button', { name: 'Unmute', exact: true }).waitFor();
+        await settings.click();
+        assert.equal(
+          await f.page.evaluate(() => JSON.parse(localStorage.getItem('afterparty-audio')!).muted),
+          true,
+        );
+        assert.equal(
+          await f.page.getByRole('slider', { name: 'Volume on this device' }).count(),
+          0,
+        );
         await f.page.getByRole('button', { name: 'Exit TV mode', exact: true }).click();
         await f.page.getByText('Playback diagnostics', { exact: true }).click();
         const diagnostics = await f.page.locator('.playback-diagnostics pre').innerText();

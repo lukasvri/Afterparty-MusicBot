@@ -213,6 +213,7 @@ test(
     assert.equal(new URL(invite).searchParams.get('room'), code);
     assert.equal(new URL(invite).hash, '');
     assert(!invite.includes(owner));
+    await host.getByRole('button', { name: /Quickfire/ }).click();
     await guest.goto(invite);
     await guest.getByLabel('Nickname', { exact: true }).fill('Blair');
     await guest.getByRole('button', { name: 'Join lobby', exact: true }).click();
@@ -220,7 +221,11 @@ test(
     assert.equal(await guest.getByRole('group', { name: 'Game pace' }).count(), 0);
     await refresh(host);
     await host.getByText('Blair', { exact: true }).waitFor();
-    await host.getByRole('button', { name: /Quickfire/ }).click();
+    assert.equal(
+      await host.getByText('The lobby changed while you edited.', { exact: false }).count(),
+      0,
+      'A new guest does not discard the host’s unsaved pace',
+    );
     assert.equal(
       await host.getByLabel('Round seconds', { exact: true }).isVisible(),
       false,
@@ -240,6 +245,8 @@ test(
     await guest.getByLabel('Song title', { exact: true }).fill('Wrong track');
     await guest.getByRole('button', { name: 'Submit answer', exact: true }).click();
     await guest.getByText('Not quite. Take another shot.', { exact: true }).waitFor();
+    assert.equal(await guest.getByLabel('Song title', { exact: true }).inputValue(), 'Wrong track');
+    await guest.waitForFunction(() => document.activeElement?.id === 'answer');
     assert.equal(
       await host.getByText('Not quite. Take another shot.', { exact: true }).count(),
       0,

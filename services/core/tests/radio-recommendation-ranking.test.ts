@@ -5,7 +5,9 @@ import { roomRecommendation } from '../src/room-radio.ts';
 import { Recommendations } from '../src/recommendations.ts';
 import { Store } from '../src/store.ts';
 import { Providers } from '../src/providers.ts';
-import { favoriteRecording } from '../src/recommendation-ranking.ts';
+import { createRecommendationRanking, favoriteRecording } from '../src/recommendation-ranking.ts';
+import { normalized } from '../src/matching.ts';
+import { radioArtist } from '../src/radio.ts';
 import type { CatalogSong } from '../src/matching.ts';
 import type { Track } from '../src/types.ts';
 
@@ -60,6 +62,61 @@ test('Core policy and room adapter prefer an older equal-frequency artist over t
   assert.deepEqual(state, before);
   const onlySafeFallback = await selectRadio(input({ recent: [...history, current], search: async () => [repeated] }));
   assert.equal(onlySafeFallback.track?.id, repeated.id, 'cooldown is a preference, never a new dead-end gate');
+});
+
+test('a longer exposure tie-breaker prevents stable provider order from starving eligible artists', () => {
+  const artists = Array.from({ length: 8 }, (_, index) => `Artist ${String.fromCharCode(65 + index)}`);
+  const simulate = (extended: boolean) => {
+    const history: Track[] = [];
+    for (let round = 0; round < 24; round++) {
+      const pool = artists.map((artist, index) => ({
+        track: track(`next${String(round * artists.length + index).padStart(7, '0')}`, artist, `Song ${round}`),
+        related: false, index,
+      }));
+      if (extended) pool.sort(createRecommendationRanking(seed, history).compare);
+      else {
+        // Previous policy: last-five frequency, two-song cooldown, then stable provider order.
+        const recent = history.slice(-5).map(item => normalized(radioArtist(item)));
+        const frequency = (artist: string) => recent.filter(item => item === normalized(artist)).length * 2;
+        const cooldown = (artist: string) => Number(recent.at(-1) === normalized(artist)) * 2 +
+          Number(recent.at(-2) === normalized(artist));
+        pool.sort((a, b) => frequency(radioArtist(a.track)) - frequency(radioArtist(b.track)) ||
+          cooldown(radioArtist(a.track)) - cooldown(radioArtist(b.track)) || a.index - b.index);
+      }
+      history.push(pool[0].track);
+    }
+    return history.map(item => radioArtist(item));
+  };
+  const previous = simulate(false), current = simulate(true);
+  assert.equal(new Set(previous).size, 6, 'the unchanged first two artists outside the six-track loop never played');
+  assert.equal(new Set(current).size, 8, 'all equally eligible artists get a turn');
+  assert.equal(new Set(current.slice(0, artists.length)).size, 8, 'each artist plays in the first rotation');
+  for (const artist of artists) {
+    const plays = current.filter(item => item === artist).length;
+    assert(plays >= 2 && plays <= 4, 'bounded exposure balances turns without promising exact quotas');
+  }
+  assert.deepEqual(simulate(true), current, 'selection remains deterministic without random exploration');
+});
+
+test('radio explores a less exposed safe artist with the same bounded discovery budget and original seed', async () => {
+  const recent = Array.from({ length: 6 }, (_, index) =>
+    track(`heard${String(index).padStart(6, '0')}`, `Artist ${String.fromCharCode(65 + index)}`, 'Earlier'));
+  const before = structuredClone(recent), original = structuredClone(seed);
+  const repeated = track('repeat00001', 'Artist A', 'New Song');
+  const fresh = track('newart00001', 'Artist G', 'New Song');
+  const queries: string[] = [];
+  const result = await selectRadio(input({ recent, favorites: ['Artist A - New Song'], search: async query => {
+    queries.push(query);
+    return query.endsWith('official music video') ? [] : [repeated, fresh];
+  } }));
+  assert.equal(result.track?.id, fresh.id, 'a fully cooled-down favorite cannot hide an equally safe unheard artist');
+  assert.equal(result.track?.radioRelatedTo, seed.id);
+  assert.equal(result.diagnostic.searches, RADIO_LIMITS.discoverySearches);
+  assert.equal(result.diagnostic.catalogMatches, 0);
+  assert.equal(queries.length, RADIO_LIMITS.discoverySearches + 1, 'only the existing optional format lookup is added');
+  assert.deepEqual(recent, before); assert.deepEqual(seed, original);
+  const otherRoom = await selectRadio(input({ search: async () => [repeated, fresh] }));
+  assert.equal(otherRoom.track?.id, repeated.id, 'another room without this exposure history keeps its own ranking');
 });
 
 test('favorites match complete artist/title identity and cannot buy incompatible genre or recording proof', async () => {

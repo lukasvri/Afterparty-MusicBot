@@ -138,6 +138,20 @@ for (const width of [1440, 390])
         if (host) {
           await page.getByText('Fine-tune the game', { exact: false }).click();
           await page.getByLabel('Rounds', { exact: true }).fill('2');
+          data.game.settings.maxPoints = 1500;
+          data.game.revision++;
+          await page.evaluate(() => window.dispatchEvent(new Event('online')));
+          await page.getByRole('button', { name: 'Use latest settings', exact: true }).waitFor();
+          assert.equal(await page.getByLabel('Rounds', { exact: true }).inputValue(), '2');
+          assert(
+            await page.getByRole('button', { name: 'Save settings', exact: true }).isDisabled(),
+          );
+          await page.getByRole('button', { name: 'Use latest settings', exact: true }).click();
+          assert.equal(
+            await page.getByLabel('Starting points', { exact: true }).inputValue(),
+            '1500',
+          );
+          await page.getByLabel('Rounds', { exact: true }).fill('2');
           await page.getByRole('button', { name: 'Save settings', exact: true }).click();
           await page.getByRole('button', { name: 'Start game', exact: true }).click();
           await page.getByLabel('Song title', { exact: true }).fill('Test Tone One');

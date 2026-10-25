@@ -311,44 +311,45 @@
 
 <style>
   .room-social {
-    margin-top: 30px;
+    margin-top: 28px;
     border: 1px solid var(--line);
-    border-radius: 8px;
-    background: #111114;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
     overflow: hidden;
   }
   .social-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 22px;
-    padding: 24px;
+    gap: 24px;
+    padding: 28px;
   }
   .social-heading h2 {
-    font-size: 20px;
-    margin: 9px 0;
-    letter-spacing: -0.035em;
+    font-size: 25px;
+    line-height: 1.25;
+    margin: 10px 0;
+    letter-spacing: -0.04em;
   }
   p {
     color: var(--muted);
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.8;
   }
   .social-heading .eyebrow {
-    font-size: 8px;
+    font-size: 10px;
   }
   .social-heading .button {
     flex-shrink: 0;
   }
   .social-body {
-    padding: 0 24px 24px;
+    padding: 0 28px 28px;
   }
   nav {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     border-top: 1px solid var(--line);
-    padding: 22px 0 16px;
+    padding: 22px 0 18px;
   }
   nav button,
   .social-meta button,
@@ -356,24 +357,24 @@
   .remove-moment {
     min-height: 44px;
     border: 1px solid var(--line);
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 10px 13px;
     background: #1d1c22;
     color: #cfccd6;
     font: inherit;
-    font-size: 12px;
+    font-size: 14px;
   }
   nav button[aria-pressed='true'] {
-    border-color: var(--red);
-    color: white;
-    background: #29171d;
+    border-color: #ff6578;
+    color: #fff;
+    background: #2b1b24;
   }
   .social-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    font-size: 11px;
+    font-size: 13px;
     color: var(--muted);
     margin-bottom: 24px;
   }
@@ -399,13 +400,21 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    min-height: 95px;
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    padding: 18px 10px;
-    background: #1a191e;
-    color: white;
+    justify-content: center;
+    gap: 14px;
+    min-height: 112px;
+    border: 1px solid #3a3f4a;
+    border-radius: 14px;
+    padding: 20px 12px;
+    background: #101216;
+    color: #fff;
+    transition:
+      border-color 150ms var(--ease),
+      background 150ms var(--ease);
+  }
+  .reactions button:hover:not(:disabled) {
+    border-color: #96606f;
+    background: #251b23;
   }
   .reactions button > span {
     font-size: 29px;
@@ -413,13 +422,13 @@
   }
   small {
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
   }
   .social-footnote {
     border-top: 1px solid var(--line);
     margin-top: 24px;
     padding-top: 18px;
-    font-size: 11px;
+    font-size: 13px;
   }
   h3 {
     font-size: 18px;
@@ -431,7 +440,7 @@
   }
   label {
     display: block;
-    font-size: 12px;
+    font-size: 14px;
     color: #d9d6df;
   }
   .moment-form > div {
@@ -442,12 +451,12 @@
   input {
     min-width: 0;
     min-height: 44px;
-    border: 1px solid #3c3a43;
-    border-radius: 6px;
+    border: 1px solid #424753;
+    border-radius: 10px;
     padding: 10px 13px;
-    background: #1a191e;
+    background: #101216;
     color: white;
-    font-size: 12px;
+    font-size: 14px;
   }
   .moment-form input {
     flex: 1;
@@ -464,7 +473,7 @@
     gap: 12px;
     border-top: 1px solid var(--line);
     padding: 13px 0;
-    font-size: 12px;
+    font-size: 14px;
   }
   .moments a {
     display: flex;
@@ -485,6 +494,10 @@
   }
   .empty-moments {
     color: var(--muted);
+    padding: 22px;
+    border: 1px dashed #3a3f4a;
+    border-radius: 12px;
+    background: #101216;
   }
   .bingo-title {
     display: flex;
@@ -492,7 +505,7 @@
     gap: 15px;
   }
   .bingo-title > span {
-    font-size: 12px;
+    font-size: 14px;
     color: var(--muted);
   }
   .bingo-grid {
@@ -506,19 +519,20 @@
     flex-direction: column;
     text-align: left;
     gap: 12px;
-    min-height: 100px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: #1b1a20;
-    color: #e3dfe9;
-    padding: 15px;
-    font-size: 12px;
+    min-height: 120px;
+    border: 1px solid #3a3f4a;
+    border-radius: 14px;
+    background: #101216;
+    color: #e5e5ed;
+    padding: 18px;
+    font-size: 14px;
     line-height: 1.6;
     overflow-wrap: anywhere;
   }
   .bingo-grid button[aria-pressed='true'] {
-    border-color: var(--red);
-    background: #29171d;
+    border-color: #ff6578;
+    background: #2b1b24;
+    color: #fff;
     opacity: 1;
   }
   .bingo-status {
@@ -554,7 +568,7 @@
       font-size: 18px;
     }
     .social-heading .eyebrow {
-      font-size: 7px;
+      font-size: 10px;
     }
     .social-body {
       padding: 0 18px 20px;
@@ -564,7 +578,7 @@
     }
     nav button {
       padding: 10px;
-      font-size: 11px;
+      font-size: 13px;
       flex: 1;
     }
     .reactions {
@@ -585,7 +599,7 @@
     .bingo-grid button {
       padding: 10px;
       min-height: 110px;
-      font-size: 10px;
+      font-size: 13px;
     }
     .moments li {
       flex-wrap: wrap;

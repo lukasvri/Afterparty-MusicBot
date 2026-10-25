@@ -18,7 +18,7 @@ const defaults = {
   playlistLimit: 100,
   defaultQueuePageSize: 10,
 };
-for (const width of [1440, 390])
+for (const width of [3840, 2560, 1920, 1440, 390])
   test(`native admin scopes settings and command confirmation at ${width}px`, async () => {
     const browser = await chromium.launch({
       headless: true,
@@ -81,6 +81,7 @@ for (const width of [1440, 390])
             },
             queue: [],
             queueRevision: `revision-${revision}`,
+            playbackKey: `synthetic-${id}`,
             lastSeen: Date.now(),
           },
           settings: saved[id],
@@ -99,7 +100,10 @@ for (const width of [1440, 390])
         writes.push(input);
         assert([first, second].includes(String(input.guildId)));
         if (input.operation === 'settings') {
-          saved[String(input.guildId)] = input.settings as Record<string, number | boolean>;
+          saved[String(input.guildId)] = {
+            ...saved[String(input.guildId)],
+            ...(input.settings as Record<string, number | boolean>),
+          };
           body = { settings: saved[String(input.guildId)] };
         } else if (input.operation === 'command') {
           const command = input.command as { action: string; queueRevision: string };
@@ -141,6 +145,44 @@ for (const width of [1440, 390])
       assert.equal(writes.filter((write) => write.operation === 'command').length, 1);
       assert.equal(writes.at(-1)?.guildId, second);
       assert.equal((writes.at(-1)?.command as Record<string, unknown>).action, 'resume');
+      const dj = page.getByRole('region', { name: 'DJ desk', exact: true });
+      await dj.getByRole('slider', { name: 'Crossfade', exact: true }).fill('9');
+      if (width === 390) {
+        await page.waitForTimeout(5200);
+        assert.equal(
+          await dj.getByRole('slider', { name: 'Crossfade', exact: true }).inputValue(),
+          '9',
+          'server polling preserves a DJ draft',
+        );
+      }
+      const settingsCount = writes.filter((write) => write.operation === 'settings').length;
+      assert.equal(settingsCount, 1, 'editing the DJ transition does not write until Apply');
+      await dj.getByRole('button', { name: 'Apply DJ settings', exact: true }).click();
+      await page
+        .getByRole('status')
+        .filter({ hasText: 'Settings saved for this server.' })
+        .waitFor();
+      const djWrite = writes.filter((write) => write.operation === 'settings').at(-1)!;
+      assert.deepEqual(djWrite.settings, { crossfade: 9 });
+      assert.equal(djWrite.guildId, second);
+      assert.equal(saved[second].defaultVolume, 60, 'DJ changes preserve unrelated settings');
+      assert.equal(saved[first].crossfade, 0, 'the other server is unchanged');
+      await dj.getByRole('button', { name: 'Mark cue here', exact: true }).click();
+      assert.equal(
+        await dj.getByRole('button', { name: 'Return to cue · 0:15', exact: true }).isEnabled(),
+        true,
+      );
+      await dj.getByRole('button', { name: /^50%/ }).click();
+      await page.getByRole('status').filter({ hasText: 'Action confirmed.' }).waitFor();
+      assert.equal((writes.at(-1)?.command as Record<string, unknown>).action, 'seek');
+      assert.equal((writes.at(-1)?.command as Record<string, unknown>).seconds, 90);
+      await page.getByLabel('Discord server', { exact: true }).selectOption(first);
+      await page.getByRole('heading', { name: 'First server soundtrack', exact: true }).waitFor();
+      assert.equal(
+        await dj.getByRole('button', { name: 'Return to cue', exact: true }).isDisabled(),
+        true,
+        'changing server clears the marked cue',
+      );
       assert.equal(await page.getByRole('button', { name: 'Browser rooms' }).count(), 0);
       assert.equal(await page.getByRole('link', { name: 'Update bot and website' }).count(), 0);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));

@@ -18,6 +18,9 @@ const manifest = JSON.parse(
 const library = Object.values(manifest).find(
   (entry) => entry.src === 'src/lib/library/MusicLibrary.svelte',
 );
+const scenery = Object.values(manifest).find(
+  (entry) => entry.src === 'src/lib/ui/ConcertScenery.svelte',
+);
 if (verify) assert(library, 'Build must keep the optional library in its own chunk');
 const browser = await chromium.launch({
   headless: true,
@@ -27,8 +30,8 @@ const browser = await chromium.launch({
 const results: object[] = [];
 try {
   for (const width of [1440, 390]) {
-    for (const scenario of ['welcome', 'joined-room', 'games']) {
-      const joined = scenario === 'joined-room';
+    for (const scenario of ['welcome', 'joined-room', 'playing-room', 'games']) {
+      const joined = scenario === 'joined-room' || scenario === 'playing-room';
       const page = await browser.newPage({
         viewport: { width, height: 1000 },
         reducedMotion: 'reduce',
@@ -56,9 +59,20 @@ try {
         const snapshot: Room = {
           code: 'PERFROOM',
           name: 'Synthetic measurement room',
-          current: null,
+          current:
+            scenario === 'playing-room'
+              ? {
+                  id: 'measure0001',
+                  title: 'Synthetic playing track',
+                  artist: 'Fixture',
+                  duration: 180,
+                  image: '',
+                  live: false,
+                  embeddable: true,
+                }
+              : null,
           queue: [],
-          playing: false,
+          playing: scenario === 'playing-room',
           position: 0,
           version: 1,
           serverTime: Date.now(),
@@ -105,6 +119,13 @@ try {
           !initial.some((item) => item.url === `/${library!.file}`),
           'Library must not be downloaded on startup',
         );
+      if (verify && scenario === 'playing-room') {
+        assert(scenery, 'Decorative scenery must stay in its own optional chunk');
+        assert(
+          !initial.some((item) => item.url === `/${scenery.file}`),
+          'Active rooms must not load decorative stage code',
+        );
+      }
       const unique = [...new Map(initial.map((item) => [item.url, item])).values()];
       results.push({
         viewport: width,
