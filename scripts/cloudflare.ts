@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { cloudflareConfig, projectRoot, verifyCloudflareOutput, writeCloudflareConfig } from "./cloudflare-config.ts";
 
-import { writeWebsiteOutput } from "./website-output.ts";
+import { writeWebsiteConfig } from "./website-output.ts";
 
 const command = process.argv[2];
 if (!["build", "deploy", "verify"].includes(command) || process.argv.length !== 3) throw new Error("Expected build, verify or deploy without extra arguments.");
@@ -21,7 +21,7 @@ function run(script: string, args: string[]) {
 }
 if (command === "build") {
   run("scripts/build-website.ts", []);
-  writeWebsiteOutput(projectRoot, { config });
+  writeWebsiteConfig(projectRoot, config);
 }
 verifyCloudflareOutput(projectRoot, config);
 if (command === "deploy") run("apps/web/node_modules/wrangler/bin/wrangler.js", ["deploy", "--config", "dist/server/wrangler.json"]);

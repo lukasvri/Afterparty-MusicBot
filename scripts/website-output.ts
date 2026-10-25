@@ -32,11 +32,7 @@ export function writeWebsiteOutput(root: string, options: { config?: typeof loca
     if (["README.md", "wrangler.jsonc"].includes(entry)) continue;
     cpSync(resolve(bundle, entry), resolve(server, entry === "_worker.js" ? "index.js" : entry), { recursive: true });
   }
-  const config = options.config ?? localWebsiteConfig;
-  writeFileSync(resolve(server, "wrangler.json"), JSON.stringify({ ...config,
-    main: "index.js", assets: { directory: "../client", binding: "ASSETS" },
-    d1_databases: config.d1_databases.map(database => ({ ...database, migrations_dir: "../.openai/drizzle" })),
-  }, null, 2) + "\n");
+  writeWebsiteConfig(root, options.config);
   mkdirSync(resolve(output, ".openai"), { recursive: true });
   writeFileSync(resolve(output, ".openai/hosting.json"), hostingBytes);
   if (options.updatePanelAssets) {
@@ -47,4 +43,16 @@ export function writeWebsiteOutput(root: string, options: { config?: typeof loca
     }
   }
   cpSync(resolve(root, "drizzle"), resolve(output, ".openai/drizzle"), { recursive: true });
+}
+
+/** Bind the existing compiled artifact without rebuilding or dropping private metadata. */
+export function writeWebsiteConfig(root: string, config = localWebsiteConfig) {
+  const server = resolve(root, "dist/server");
+  if (!existsSync(resolve(server, "index.js")) || !existsSync(resolve(root, "dist/client")))
+    throw new Error("Package the native website before applying its deployment configuration.");
+  writeFileSync(resolve(server, "wrangler.json"), JSON.stringify({ ...config,
+    main: "index.js", assets: { directory: "../client", binding: "ASSETS" },
+    d1_databases: config.d1_databases.map(database => ({ ...database, migrations_dir: "../.openai/drizzle" })),
+  }, null, 2) + "\n");
+
 }

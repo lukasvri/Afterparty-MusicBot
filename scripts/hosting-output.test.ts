@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeWebsiteOutput } from "./website-output.ts";
+import { writeWebsiteOutput, writeWebsiteConfig, localWebsiteConfig } from "./website-output.ts";
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "afterparty-native-output-"));
@@ -52,5 +52,20 @@ test("an incomplete native bundle leaves existing deployment output intact", () 
     rmSync(join(root, "apps/web/.svelte-kit/v3-artifact/_worker.js"));
     assert.throws(() => writeWebsiteOutput(root));
     assert.equal(readFileSync(join(root, "dist/client/stale.js"), "utf8"), "retired UI");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("binding Cloudflare configuration preserves compiled panel, Worker, identity and migrations", () => {
+  const root = fixture();
+  try {
+    const panel = {"manifest.json": '{"version":1}', "update-channel.0123456789ab.js": "private panel fixture"};
+    writeWebsiteOutput(root, { hostingConfigFile: "private/hosting.local.json", updatePanelAssets: panel });
+    const paths = ["server/index.js", "client/app.js", ".openai/hosting.json", ".openai/drizzle/0000.sql", ...Object.keys(panel).map(name => ".openai/update-panel/" + name)];
+    const before = paths.map(path => readFileSync(join(root, "dist", path), "utf8"));
+    writeWebsiteConfig(root, {...localWebsiteConfig, name: "synthetic-cloudflare-target"});
+    assert.deepEqual(paths.map(path => readFileSync(join(root, "dist", path), "utf8")), before);
+    const config = JSON.parse(readFileSync(join(root, "dist/server/wrangler.json"), "utf8"));
+    assert.equal(config.name, "synthetic-cloudflare-target");
+    assert.equal(config.assets.directory, "../client");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
