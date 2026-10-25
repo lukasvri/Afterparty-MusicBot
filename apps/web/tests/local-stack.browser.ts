@@ -82,6 +82,12 @@ for (const authority of [false, true])
           name: 'afterparty-native-test',
           main: authority ? apiEntry : `${root}dist/server/index.js`,
           no_bundle: true,
+          ...(authority
+            ? {
+                find_additional_modules: true,
+                rules: [{ type: 'ESModule', globs: ['**/*.js'] }],
+              }
+            : {}),
           compatibility_date: '2026-05-15',
           compatibility_flags: ['nodejs_compat'],
           assets: { directory: `${root}dist/client`, binding: 'ASSETS' },
