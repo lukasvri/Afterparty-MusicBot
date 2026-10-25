@@ -41,6 +41,7 @@ test("native packaging preserves selected host identity, migrations and compiled
     const config = JSON.parse(readFileSync(join(root, "dist/server/wrangler.json"), "utf8"));
     assert.equal(config.main, "index.js");
     assert.equal(config.assets.directory, "../client");
+    assert.equal(config.assets.run_worker_first, false);
     assert.equal(config.d1_databases[0].migrations_dir, "../.openai/drizzle");
     assert.equal(config.keep_vars, true);
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -67,5 +68,6 @@ test("binding Cloudflare configuration preserves compiled panel, Worker, identit
     const config = JSON.parse(readFileSync(join(root, "dist/server/wrangler.json"), "utf8"));
     assert.equal(config.name, "synthetic-cloudflare-target");
     assert.equal(config.assets.directory, "../client");
+    assert.equal(config.assets.run_worker_first, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

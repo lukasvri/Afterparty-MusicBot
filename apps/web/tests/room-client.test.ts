@@ -976,3 +976,61 @@ test('two clients follow a shared live revision while independently retaining th
   host.client.destroy();
   guest.client.destroy();
 });
+
+test('healthy calibrated SSE reduces redundant reads but refreshes authenticated roles within five seconds', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  source.send({ ...f.snapshot, version: 2, serverTime: 1100 });
+  const runPoll = async () => {
+    f.scheduled[f.delays.findLastIndex((delay) => delay === 1000)]();
+    await flush();
+  };
+  for (const time of [1100, 2100, 3100, 4100]) {
+    f.now = time;
+    source.send({ ...f.snapshot, version: 2, serverTime: time + 900 });
+    await runPoll();
+  }
+  assert.equal(f.calls.length, 1, 'fresh SSE frames replace four redundant network snapshots');
+  f.snapshot = { ...f.snapshot, isHost: false, isOwner: false, viewers: 7 };
+  f.now = 5100;
+  source.send({ ...f.snapshot, version: 2, serverTime: 6000 });
+  await runPoll();
+  assert.equal(
+    f.calls.length,
+    2,
+    'authenticated state still refreshes at the five-second boundary',
+  );
+  assert.equal(f.state.room?.isHost, false);
+  assert.equal(f.state.room?.viewers, 7);
+  f.client.destroy();
+});
+
+test('a broken stream immediately restores the existing one-second authority poll', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  f.sources[0].open();
+  await flush();
+  f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100 });
+  f.now = 1100;
+  f.sources[0].fail();
+  f.scheduled[f.delays.findLastIndex((delay) => delay === 1000)]();
+  await flush();
+  assert.equal(f.calls.length, 2, 'stream failure does not wait for the five-second refresh');
+  f.client.destroy();
+});
+
+test('an expired live lease does not suppress an authenticated room read', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  f.sources[0].open();
+  await flush();
+  f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100, syncValidForMs: 500 });
+  f.now = 1100;
+  f.scheduled[f.delays.findLastIndex((delay) => delay === 1000)]();
+  await flush();
+  assert.equal(f.calls.length, 2, 'a healthy transport alone cannot replace an expired timeline');
+  f.client.destroy();
+});

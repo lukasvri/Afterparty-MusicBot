@@ -375,7 +375,18 @@ export function createRoomClient(options: RoomClientOptions = {}) {
   const poll = (target: Session) => {
     if (!current(target)) return;
     timer = schedule(() => {
-      void read(target).finally(() => poll(target));
+      const live = target.realtime;
+      // SSE supplies the live timeline. Keep authenticated roles and presence
+      // bounded to five seconds without repeating the same snapshot each second.
+      // The local one-second timer restores reads as soon as the live lease fails.
+      const liveFresh =
+        live?.calibrated &&
+        live.source?.readyState === 1 &&
+        live.freshUntil > now() &&
+        state.connection === 'connected';
+      const authorityFresh = target.authority && now() - target.authority.receivedAt < 5000;
+      if (liveFresh && authorityFresh) poll(target);
+      else void read(target).finally(() => poll(target));
     }, options.pollMs ?? 1000);
   };
   const mutate = async (action: RoomAction, fields: RoomActionFields = {}) => {
