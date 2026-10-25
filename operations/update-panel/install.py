@@ -49,6 +49,25 @@ def patch_runner(text):
     return text
 
 
+def patch_admin_retry(text):
+    """Update the known private multi-project UI without changing server gates."""
+    edits = (
+        ('import { projectProgress } from "./model.mjs";',
+         'import { projectProgress, canRetryProduction } from "./model.mjs";'),
+        ('  const failed =\n    !busy &&',
+         '  const recovered = production && canRetryProduction(state, now);\n  const failed =\n    !busy && !recovered &&'),
+        ('    message: upToDate\n',
+         '    message: recovered && state.failed\n      ? "Forrige forsøk feilet. En ny serverkontroll er godkjent, og du kan bekrefte et nytt forsøk. Tidligere fremdrift er bevart."\n      : upToDate\n'),
+    )
+    for old, new in edits:
+        if text.count(new) == 1:
+            continue
+        if text.count(old) != 1:
+            raise ValueError('Unsupported admin retry model. No changes were installed.')
+        text = text.replace(old, new)
+    return text
+
+
 def patch_features(text):
     fallback = "                    build = {'ready': False, 'message': 'Det testede GitHub-bygget er ikke klart eller kunne ikke verifiseres. Oppdatering er blokkert til bygget er godkjent.'}"
     replacement = "                    from build_status import blocked_build\n                    build = blocked_build(self.release_client(), commit)"

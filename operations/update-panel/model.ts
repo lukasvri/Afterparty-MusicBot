@@ -161,6 +161,21 @@ export function frozenRequest(
   return Object.freeze({ commit, confirmation_id, confirm: true });
 }
 
+/** A historical production failure cannot veto a newly approved server check. */
+export function canRetryProduction(value: unknown, now = Date.now() / 1000): boolean {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Record<string, unknown>;
+  const info = state.update as Record<string, unknown> | undefined;
+  const readiness = state.readiness as Record<string, unknown> | undefined;
+  const build = info?.build as Record<string, unknown> | undefined;
+  return !!info && !state.running && !state.busy && !state.checking &&
+    !info.checking && !info.error && readiness?.can_start === true &&
+    info.fresh === true && info.available === true && build?.ready === true &&
+    typeof info.commit === "string" && /^[a-f0-9]{40}$/.test(info.commit) &&
+    typeof info.checked_at === "number" && now >= info.checked_at &&
+    now - info.checked_at < 1800;
+}
+
 /** The same lifecycle rules are used by every project in OpenWorks Admin. */
 export function projectProgress(
   project: "production" | "beta" | "openworks",
