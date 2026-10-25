@@ -14,6 +14,8 @@ export type Player = {
   setPlaybackRate: (rate: number) => void;
   getVolume: () => number;
   isMuted: () => boolean;
+  getIframe?: () => HTMLIFrameElement;
+  getVideoUrl?: () => string;
 };
 declare global {
   interface Window {

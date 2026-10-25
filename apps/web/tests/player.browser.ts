@@ -114,43 +114,81 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(
     ({ code, token, visitor, initial, host }) => {
+      if (window !== window.top) return;
       localStorage.setItem('afterparty-visitor', visitor);
       if (initial && host) localStorage.setItem(`afterparty-host:${code}`, token);
-      // Deterministic official-player boundary. No iframe, provider request or media.
+      // Synthetic official-player boundary with a local iframe for real focus/activation.
+      // No provider requests or media are used.
       const calls: { action: string; position?: number; videoId?: string }[] = [];
       (window as unknown as { __audioCalls: typeof calls }).__audioCalls = calls;
       window.YT = {
         Player: class {
           position = 0;
           state = 2;
-          constructor(_container: HTMLElement, options: Record<string, unknown>) {
+          videoId = '';
+          iframe: HTMLIFrameElement;
+          receive: (event: MessageEvent) => void;
+          emit: (state: number) => void;
+          constructor(container: HTMLElement, options: Record<string, unknown>) {
             calls.push({ action: 'construct' });
             const events = options.events as {
               onReady: () => void;
               onStateChange?: (event: { data: number }) => void;
             };
+            this.emit = (state) => {
+              this.state = state;
+              events.onStateChange?.({ data: state });
+            };
+            this.iframe = document.createElement('iframe');
+            this.iframe.title = 'YouTube video player';
+            this.iframe.sandbox.add('allow-scripts');
+            (
+              window as unknown as { __nativeVideo: (action: string, position?: number) => void }
+            ).__nativeVideo = (action, position) => {
+              if (action === 'seek') this.position = position ?? 42;
+              else this.emit(action === 'play' ? 1 : 2);
+            };
+            this.receive = (event) => {
+              if (
+                event.source !== this.iframe.contentWindow ||
+                event.data?.type !== 'synthetic-native'
+              )
+                return;
+              (
+                window as unknown as { __nativeVideo: (action: string, position?: number) => void }
+              ).__nativeVideo(event.data.action, event.data.position);
+            };
+            window.addEventListener('message', this.receive);
+            this.iframe.srcdoc = `<style>body{margin:0;background:#101216;color:white;display:flex;align-items:end;gap:12px;height:100vh}button{padding:10px;background:#242832;color:white;border:0}</style><button onclick="parent.postMessage({type:'synthetic-native',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'synthetic-native',action:'pause'},'*')">Pause video</button><button onclick="parent.postMessage({type:'synthetic-native',action:'seek',position:42},'*')">Seek video</button>`;
+            container.replaceWith(this.iframe);
             // Retain the callback after destroy to model a delayed iframe event.
             (window as unknown as { __emitLastPlayerEnded: () => void }).__emitLastPlayerEnded =
               () => events.onStateChange?.({ data: 0 });
             setTimeout(() => events.onReady(), 0);
           }
           loadVideoById(value: { videoId: string; startSeconds: number }) {
+            this.videoId = value.videoId;
             this.position = value.startSeconds;
             this.state = 1;
             calls.push({ action: 'load', videoId: value.videoId, position: value.startSeconds });
+            queueMicrotask(() => this.emit(1));
           }
           cueVideoById(value: { videoId: string; startSeconds: number }) {
+            this.videoId = value.videoId;
             this.position = value.startSeconds;
             this.state = 2;
             calls.push({ action: 'cue', videoId: value.videoId, position: value.startSeconds });
+            queueMicrotask(() => this.emit(5));
           }
           playVideo() {
             this.state = 1;
             calls.push({ action: 'play' });
+            queueMicrotask(() => this.emit(1));
           }
           pauseVideo() {
             this.state = 2;
             calls.push({ action: 'pause' });
+            queueMicrotask(() => this.emit(2));
           }
           seekTo(position: number) {
             this.position = position;
@@ -162,7 +200,14 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
           getPlayerState() {
             return this.state;
           }
+          getIframe() {
+            return this.iframe;
+          }
+          getVideoUrl() {
+            return `https://www.youtube.com/watch?v=${this.videoId}`;
+          }
           destroy() {
+            window.removeEventListener('message', this.receive);
             calls.push({ action: 'destroy' });
           }
           level = 100;
@@ -426,29 +471,32 @@ for (const width of [1440, 390]) {
           (call) => call.action === 'load',
         ),
       );
-      await page.getByRole('button', { name: 'Pause playback' }).click();
-      await page.getByRole('button', { name: 'Resume playback' }).waitFor();
-      await page.waitForFunction(() =>
-        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
-          (call) => call.action === 'pause',
-        ),
+      assert.equal(
+        await page.getByRole('button', { name: 'Pause playback', exact: true }).count(),
+        0,
+        'Native video replaces the duplicate transport',
       );
-      await page.getByRole('button', { name: 'Resume playback' }).click();
-      await page.getByRole('button', { name: 'Pause playback' }).waitFor();
+      const native = page.frameLocator('.audio-stage iframe');
+      await native.getByRole('button', { name: 'Pause video', exact: true }).click();
       await page.waitForFunction(() =>
-        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
-          (call) => call.action === 'play',
-        ),
+        document
+          .querySelector('.player-status')
+          ?.textContent?.includes('Shared playback is paused'),
       );
-      await page.getByRole('slider', { name: 'Playback position' }).evaluate((element) => {
-        (element as HTMLInputElement).value = '42';
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-      });
+      await native.getByRole('button', { name: 'Play video', exact: true }).click();
       await page.waitForFunction(() =>
-        (
-          window as unknown as { __audioCalls: { action: string; position?: number }[] }
-        ).__audioCalls.some((call) => call.action === 'seek' && call.position! >= 42),
+        document
+          .querySelector('.player-status')
+          ?.textContent?.includes('Following the shared clock'),
       );
+      await page.waitForTimeout(1100);
+      const seeking = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.request().postDataJSON()?.action === 'seek',
+      );
+      await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+      await seeking;
       assert.deepEqual(
         f.writes.map((write) => write.action),
         ['add', 'pause', 'play', 'seek'],
@@ -574,6 +622,96 @@ for (const width of [1440, 390]) {
   });
 }
 
+test('search stays available beside library and settings without discarding unfinished inputs', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Room settings', exact: true }).click();
+    await page.getByLabel('Your display name', { exact: true }).fill('Night host');
+    await find(page, 'night');
+    await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
+    assert.equal(
+      await page.getByLabel('Your display name', { exact: true }).inputValue(),
+      'Night host',
+    );
+    await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    const link = page.getByLabel('Playlist link', { exact: true });
+    await link.fill('https://www.youtube.com/playlist?list=PL1234567890123456789');
+    await find(page, 'another artist');
+    await page.getByRole('status').filter({ hasText: '3 results for “another artist”' }).waitFor();
+    assert.equal(
+      await link.inputValue(),
+      'https://www.youtube.com/playlist?list=PL1234567890123456789',
+    );
+    const searchBox = await page.locator('.discovery').boundingBox();
+    const libraryBox = await page
+      .getByRole('region', { name: 'Your music library', exact: true })
+      .boundingBox();
+    assert(
+      searchBox && libraryBox && libraryBox.x > searchBox.x + searchBox.width,
+      'wide screens keep search and tools side by side',
+    );
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+    await noOverflow(page);
+  } finally {
+    await f.close();
+  }
+});
+
+test('native guest pause stays local through room polls and resumes at the shared position', async (t) => {
+  const f = await fixture(t, 1920, false, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+    await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    const reads = f.roomReads;
+    await page.waitForFunction(() =>
+      document.querySelector('.player-status')?.textContent?.includes('Paused on this device'),
+    );
+    await page.waitForTimeout(1800);
+    assert(f.roomReads > reads, 'the paused device receives a newer room snapshot');
+    assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    assert.deepEqual(f.writes, [], 'a guest cannot send shared transport commands');
+    await native.getByRole('button', { name: 'Play video', exact: true }).click();
+    await page
+      .locator('.player-status')
+      .filter({ hasText: 'Following the shared clock' })
+      .waitFor();
+    await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+    await page.waitForTimeout(500);
+    assert.deepEqual(f.writes, [], 'guest scrubbing cannot change the shared position');
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('unactivated iframe state changes cannot send host commands', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'load',
+      ),
+    );
+    // Focus stays outside the iframe, even though enabling audio activated the page.
+    await page.evaluate(() =>
+      (window as unknown as { __nativeVideo: (action: string) => void }).__nativeVideo('pause'),
+    );
+    await page.waitForTimeout(500);
+    assert.deepEqual(f.writes, []);
+    assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
 for (const [width, height] of [
   [3840, 2160],
   [2560, 1440],
@@ -643,6 +781,7 @@ for (const [width, height] of [
         await f.page.keyboard.press('Escape');
         await f.page.locator('.fullscreen-fallback').waitFor({ state: 'hidden' });
         await f.page.keyboard.press('m');
+        await f.page.getByText('Playback settings', { exact: true }).click();
         await f.page.getByRole('button', { name: 'Unmute', exact: true }).waitFor();
         await f.page.getByRole('button', { name: 'Exit TV mode', exact: true }).click();
         await f.page.getByText('Playback diagnostics', { exact: true }).click();

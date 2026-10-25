@@ -2,7 +2,7 @@
   import { roomQueueCapacity } from '../../../../services/core/src/protocol.ts';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
 
-  import { onMount } from 'svelte';
+  import { onMount, tick as afterRender } from 'svelte';
   import { createRoomClient, type RoomClientState } from '#lib/rooms/room-client.ts';
   import Icon from '#lib/ui/Icon.svelte';
   import RoomAudio from '#lib/rooms/RoomAudio.svelte';
@@ -39,9 +39,19 @@
   let seekValue = $state<number | null>(null);
   let tick = $state(0);
   let tv = $state(false);
+  let playerActive = $state(false);
+  let welcomeScene = $state(false);
+  async function findMusic() {
+    panel = 'discover';
+    await afterRender();
+    document.getElementById('search')?.focus();
+  }
   const room = $derived(view.room);
   const target = $derived.by(() => {
     void tick;
+    void view.room;
+    void view.receivedAt;
+    void view.connection;
     return client?.playback() ?? { position: 0, playing: false, stale: false };
   });
   onMount(() => {
@@ -51,6 +61,7 @@
     const unsubscribe = client.subscribe((value) => {
       const changedRoom = value.room && value.room.code !== view.room?.code;
       if (view.room && !value.room) {
+        playerActive = false;
         invitationLink = '';
         invitationError = '';
         copied = false;
@@ -67,6 +78,7 @@
     const initialUrl = new URL(location.href);
     tv = initialUrl.searchParams.get('tv') === '1';
     const initial = initialUrl.searchParams.get('room');
+    welcomeScene = !initial;
     const access = new URLSearchParams(initialUrl.hash.slice(1));
     const invitation = access.get('host') ?? undefined;
     const credential = access.get('access');
@@ -134,6 +146,7 @@
     }
   }
   function leave() {
+    welcomeScene = true;
     tv = false;
     client?.leave();
     panel = 'discover';
@@ -156,6 +169,12 @@
     leave();
   }
 </script>
+
+{#snippet scenery(composition: 'welcome' | 'room')}
+  {#await import('#lib/ui/ConcertScenery.svelte') then { default: ConcertScenery }}
+    <ConcertScenery {composition} />
+  {/await}
+{/snippet}
 
 <svelte:head>
   <title>{room ? `${room.name} · Afterparty` : 'Your music. Your people. · Afterparty'}</title>
@@ -189,7 +208,7 @@
       >
       <a class="nav-link" href="/discord"><Icon name="music" />Discord & concerts</a>
       <a class="nav-link" href="/admin" data-sveltekit-reload
-        ><Icon name="settings" />Server settings</a
+        ><Icon name="settings" />DJ & server tools</a
       >
       <a class="nav-link" href={room ? `/games?room=${encodeURIComponent(room.code)}` : '/games'}
         ><Icon name="users" />Games</a
@@ -230,9 +249,16 @@
         />
       {:else if !room}
         <section class="welcome">
-          <p class="eyebrow red">GOOD MUSIC NEEDS GOOD COMPANY</p>
-          <h1>Your music.<br />Your people<span class="red">.</span></h1>
-          <p class="intro">One room. One shared queue. A soundtrack you make together.</p>
+          <div class="welcome-hero">
+            <div class="welcome-copy">
+              <p class="eyebrow red">GOOD MUSIC NEEDS GOOD COMPANY</p>
+              <h1>Your music.<br />Your people<span class="red">.</span></h1>
+              <p class="intro">One room. One shared queue. A soundtrack you make together.</p>
+            </div>
+            <div class="welcome-stage">
+              {#if welcomeScene}{@render scenery('welcome')}{/if}
+            </div>
+          </div>
           <div class="room-forms">
             <form
               onsubmit={(event) => {
@@ -327,6 +353,20 @@
                   {room}
                   position={target.position}
                   playing={target.playing}
+                  canControl={room.isHost && view.connection === 'connected'}
+                  controlBusy={view.busy}
+                  onActiveChange={(active) => (playerActive = active)}
+                  onIntent={async (intent) => {
+                    if (
+                      !client ||
+                      view.room?.code !== intent.code ||
+                      view.room.current?.id !== intent.videoId ||
+                      view.room.playbackKey !== intent.playbackKey ||
+                      !view.room.isHost
+                    )
+                      return false;
+                    return client.control(intent.action, intent.position);
+                  }}
                 />{/key}
               <div class="track-meta">
                 <span class="eyebrow red"
@@ -336,56 +376,64 @@
                 <p>{room.current.artist}</p>
               </div>
               <div class="transport">
+                {#if !playerActive}
+                  <button
+                    class="play-control"
+                    aria-label={room.playing ? 'Pause playback' : 'Resume playback'}
+                    disabled={!room.isHost || view.busy || view.connection !== 'connected'}
+                    onclick={() => {
+                      void client?.control(room.playing ? 'pause' : 'play');
+                    }}><Icon name={room.playing ? 'pause' : 'play'} size={24} /></button
+                  >
+                {/if}
                 <button
-                  class="play-control"
-                  aria-label={room.playing ? 'Pause playback' : 'Resume playback'}
-                  disabled={!room.isHost || view.busy || view.connection !== 'connected'}
-                  onclick={() => {
-                    void client?.control(room.playing ? 'pause' : 'play');
-                  }}><Icon name={room.playing ? 'pause' : 'play'} size={24} /></button
-                ><button
-                  class="icon-button"
+                  class="button secondary next-track"
                   aria-label="Next track"
                   disabled={!room.isHost || view.busy || view.connection !== 'connected'}
                   onclick={() => {
                     void client?.control('next');
-                  }}><Icon name="next" /></button
+                  }}><Icon name="next" /><span>Next track</span></button
                 >
-                <div class="timeline">
-                  <label class="sr-only" for="seek">Playback position</label><input
-                    id="seek"
-                    type="range"
-                    min="0"
-                    max={Math.max(1, room.current.duration)}
-                    step="1"
-                    value={seekValue ?? Math.min(target.position, room.current.duration)}
-                    disabled={!room.isHost ||
-                      room.current.live ||
-                      view.busy ||
-                      view.connection !== 'connected'}
-                    oninput={(event) => {
-                      seekValue = Number(event.currentTarget.value);
-                    }}
-                    onchange={(event) => {
-                      void client
-                        ?.control('seek', Number(event.currentTarget.value))
-                        .finally(() => {
-                          seekValue = null;
-                        });
-                    }}
-                  />
-                  <div class="timecodes">
-                    <span>{time(target.position)}</span><span
-                      >{room.current.live ? 'LIVE' : time(room.current.duration)}</span
-                    >
-                  </div>
-                </div>
+                {#if !playerActive}<div class="timeline">
+                    <label class="sr-only" for="seek">Playback position</label><input
+                      id="seek"
+                      type="range"
+                      min="0"
+                      max={Math.max(1, room.current.duration)}
+                      step="1"
+                      value={seekValue ?? Math.min(target.position, room.current.duration)}
+                      disabled={!room.isHost ||
+                        room.current.live ||
+                        view.busy ||
+                        view.connection !== 'connected'}
+                      oninput={(event) => {
+                        seekValue = Number(event.currentTarget.value);
+                      }}
+                      onchange={(event) => {
+                        void client
+                          ?.control('seek', Number(event.currentTarget.value))
+                          .finally(() => {
+                            seekValue = null;
+                          });
+                      }}
+                    />
+                    <div class="timecodes">
+                      <span>{time(target.position)}</span><span
+                        >{room.current.live ? 'LIVE' : time(room.current.duration)}</span
+                      >
+                    </div>
+                  </div>{:else}<p class="native-control-note">
+                    Use the video controls to {room.isHost
+                      ? 'play, pause or seek for everyone'
+                      : 'listen on this device'}.
+                  </p>{/if}
               </div>
               {#if !room.isHost}<p class="permission-note">
                   The host controls playback. Everyone can add to the queue.
                 </p>{/if}
             {:else}
               <div class="empty-stage">
+                {@render scenery('room')}
                 <div class="record" aria-hidden="true">
                   <span>ap<span class="red">.</span></span>
                 </div>
@@ -449,21 +497,23 @@
                 <Icon name="music" size={30} />
                 <h3>Room for your next favourite</h3>
                 <p>Add a song below.<br />The best queues are a group effort.</p>
+                <button class="button secondary" onclick={() => void findMusic()}
+                  >Find a song</button
+                >
               </div>{/if}
             <div class="queue-footer">
               <span class="status-dot online"></span>One queue. Everyone in sync.
             </div>
           </section>
         </div>
-        <div class="room-tools">
-          {#key room.code}<RoomSocial {room} />{/key}
+        <div class="room-tools" class:workspace-expanded={panel !== 'discover'} id="room-workspace">
           <nav class="room-tabs" aria-label="Room tools">
             <button
               class="button"
               class:primary={panel === 'discover'}
               class:secondary={panel !== 'discover'}
               onclick={() => {
-                panel = 'discover';
+                void findMusic();
               }}
               aria-pressed={panel === 'discover'}>Discover</button
             >
@@ -486,6 +536,63 @@
               aria-pressed={panel === 'settings'}>Room settings</button
             >
           </nav>
+          <section class="discovery" aria-labelledby="discover-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow red">PASS THE AUX</p>
+                <h2 id="discover-title">What’s the next track?</h2>
+              </div>
+            </div>
+            <form
+              class="search-form"
+              role="search"
+              onsubmit={(event) => {
+                event.preventDefault();
+                void client?.search(query);
+              }}
+            >
+              <label class="sr-only" for="search">Search songs or artists</label><Icon
+                name="search"
+              /><input
+                id="search"
+                bind:value={query}
+                oninput={() => client?.cancelSearch()}
+                placeholder="A song, an artist, a whole mood…"
+                required
+                maxlength="120"
+                autocomplete="off"
+              /><button class="button primary" disabled={view.searching}
+                >{view.searching ? 'Searching…' : 'Find music'}</button
+              >
+            </form>
+            <div role="status" class="search-summary">
+              {#if view.searching}Looking for your soundtrack…{:else if view.query}{view.results
+                  .length
+                  ? `${view.results.length} results for “${view.query}”`
+                  : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
+                YouTube and add a track to the shared queue.{/if}
+            </div>
+            {#if view.results.length}<ul class="search-results">
+                {#each view.results as video, index (`${video.id}:${index}`)}<li>
+                    <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
+                    <div class="track-info">
+                      <strong>{video.title}</strong><span>{video.artist}</span>
+                    </div>
+                    <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span
+                    ><button
+                      class="icon-button add-track"
+                      aria-label={`Add ${video.title} to queue`}
+                      disabled={view.busy ||
+                        view.connection !== 'connected' ||
+                        video.embeddable === false}
+                      onclick={() => {
+                        void client?.add(video.id);
+                      }}><Icon name="add" /></button
+                    >
+                  </li>{/each}
+              </ul>{/if}
+          </section>
+
           {#if panel === 'library'}
             {#key room.code}
               {#await import('#lib/library/MusicLibrary.svelte')}
@@ -652,64 +759,8 @@
                   </p>{/if}
               {/if}
             </section>
-          {:else}
-            <section class="discovery" aria-labelledby="discover-title">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow red">PASS THE AUX</p>
-                  <h2 id="discover-title">What’s the next track?</h2>
-                </div>
-              </div>
-              <form
-                class="search-form"
-                role="search"
-                onsubmit={(event) => {
-                  event.preventDefault();
-                  void client?.search(query);
-                }}
-              >
-                <label class="sr-only" for="search">Search songs or artists</label><Icon
-                  name="search"
-                /><input
-                  id="search"
-                  bind:value={query}
-                  oninput={() => client?.cancelSearch()}
-                  placeholder="A song, an artist, a whole mood…"
-                  required
-                  maxlength="120"
-                  autocomplete="off"
-                /><button class="button primary" disabled={view.searching}
-                  >{view.searching ? 'Searching…' : 'Find music'}</button
-                >
-              </form>
-              <div role="status" class="search-summary">
-                {#if view.searching}Looking for your soundtrack…{:else if view.query}{view.results
-                    .length
-                    ? `${view.results.length} results for “${view.query}”`
-                    : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
-                  YouTube and add a track to the shared queue.{/if}
-              </div>
-              {#if view.results.length}<ul class="search-results">
-                  {#each view.results as video, index (`${video.id}:${index}`)}<li>
-                      <span class="track-number">{String(index + 1).padStart(2, '0')}</span>
-                      <div class="track-info">
-                        <strong>{video.title}</strong><span>{video.artist}</span>
-                      </div>
-                      <span class="duration">{video.live ? 'LIVE' : time(video.duration)}</span
-                      ><button
-                        class="icon-button add-track"
-                        aria-label={`Add ${video.title} to queue`}
-                        disabled={view.busy ||
-                          view.connection !== 'connected' ||
-                          video.embeddable === false}
-                        onclick={() => {
-                          void client?.add(video.id);
-                        }}><Icon name="add" /></button
-                      >
-                    </li>{/each}
-                </ul>{/if}
-            </section>
           {/if}
+          {#key room.code}<RoomSocial {room} />{/key}
           <div class="room-bottom">
             <span>KEEP THE GOOD MUSIC GOING.</span><a
               href={`/games?room=${encodeURIComponent(room.code)}`}
@@ -738,6 +789,81 @@
 </div>
 
 <style>
+  .welcome-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(20px, 3vw, 52px);
+    align-items: center;
+  }
+  .welcome-stage {
+    min-width: 0;
+    aspect-ratio: 16 / 9;
+  }
+  @media (max-width: 1000px) {
+    .welcome-hero {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+    .welcome-stage {
+      max-width: 560px;
+    }
+  }
+  @media (max-width: 600px) {
+    .welcome-stage {
+      width: min(100%, 340px);
+      justify-self: center;
+    }
+  }
+  .native-control-note {
+    color: var(--muted);
+    font-size: var(--tv-body, 14px);
+    line-height: 1.5;
+  }
+  .empty-stage {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .empty-stage :global(.concert-scenery) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.35;
+    z-index: -1;
+  }
+  .next-track {
+    flex-shrink: 0;
+  }
+  .empty-queue .button {
+    margin-top: 20px;
+  }
+  .discovery .search-results {
+    max-height: min(52dvh, 560px);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+  }
+  @media (min-width: 1200px) {
+    .workspace-expanded {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
+      align-items: start;
+      gap: 24px;
+    }
+    .workspace-expanded .room-tabs,
+    .workspace-expanded :global(.room-social),
+    .workspace-expanded .room-bottom {
+      grid-column: 1 / -1;
+    }
+    .workspace-expanded .room-tabs {
+      margin-bottom: 0;
+    }
+    .workspace-expanded .discovery {
+      position: sticky;
+      top: 24px;
+    }
+  }
   .tv-mode {
     grid-template-columns: 1fr;
   }

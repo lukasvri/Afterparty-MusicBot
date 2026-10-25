@@ -1,5 +1,6 @@
 <script lang="ts">
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
+  import DJDesk from '#lib/admin/DJDesk.svelte';
 
   import { onMount } from 'svelte';
   import {
@@ -384,33 +385,17 @@
               <button
                 class="button secondary"
                 disabled={view.busy}
-                aria-pressed={detail.player.loopCurrentSong}
-                onclick={() =>
-                  void command('loop-sang', { value: !detail?.player.loopCurrentSong })}
-                >Repeat song {detail.player.loopCurrentSong ? 'on' : 'off'}</button
-              ><button
-                class="button secondary"
-                disabled={view.busy}
-                aria-pressed={detail.player.loopCurrentQueue}
-                onclick={() =>
-                  void command('loop-queue', { value: !detail?.player.loopCurrentQueue })}
-                >Repeat queue {detail.player.loopCurrentQueue ? 'on' : 'off'}</button
-              ><button
-                class="button secondary"
-                disabled={view.busy}
-                onclick={() => void command('replay')}>Restart song</button
-              ><button
-                class="button secondary"
-                disabled={view.busy}
-                onclick={() => void command('unskip')}>Previous song</button
-              ><button
-                class="button secondary"
-                disabled={view.busy}
                 onclick={() => confirmCommand('Clear the queue on this server?', 'clear')}
                 >Clear queue</button
               >
             </div>
           </section>
+          {#key view.guildId}<DJDesk
+              {detail}
+              busy={view.busy}
+              onCommand={async (action, extra) => command(action, extra)}
+              onSettings={async (settings) => client?.control('settings', { settings })}
+            />{/key}
           {#if detail.audio}<section class="card">
               <h2>Audio health</h2>
               <p>
@@ -649,30 +634,39 @@
 <style>
   .admin-page {
     min-height: 100vh;
-    background: #0b0b0d;
+    background: #0c0d10;
   }
   .admin-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    padding: 24px 5vw;
+    padding: 24px var(--page-space);
     border-bottom: 1px solid var(--line);
+    background: #101115;
   }
   .admin-header nav {
     display: flex;
     flex-wrap: wrap;
-    gap: 22px;
-    font-size: 12px;
-    color: var(--muted);
+    gap: 12px;
+    font-size: 14px;
+    color: #c2c4ce;
+  }
+  .admin-header nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 10px;
   }
   .admin-header nav a:hover {
     color: white;
   }
   main {
-    max-width: 1260px;
+    width: 100%;
+    max-width: 1440px;
     margin: auto;
-    padding: 50px 5vw 80px;
+    padding: clamp(36px, 4vw, 72px) var(--page-space) 80px;
   }
   .heading {
     display: flex;
@@ -688,10 +682,10 @@
     margin: 16px 0 20px;
   }
   h2 {
-    font-size: 23px;
+    font-size: 25px;
     letter-spacing: -0.035em;
-    line-height: 1.3;
-    margin-bottom: 12px;
+    line-height: 1.25;
+    margin-bottom: 14px;
   }
   h3 {
     font-size: 15px;
@@ -699,11 +693,12 @@
   }
   p {
     color: var(--muted);
-    font-size: 13px;
-    line-height: 1.8;
+    font-size: 15px;
+    line-height: 1.75;
+    max-width: 76ch;
   }
   .eyebrow {
-    font-size: 10px;
+    font-size: 12px;
   }
   .heading-actions,
   .actions {
@@ -713,22 +708,23 @@
     gap: 9px;
   }
   .card {
-    padding: 28px;
-    background: #111114;
+    padding: clamp(24px, 2.3vw, 36px);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    margin: 20px 0;
+    border-radius: var(--radius-lg);
+    margin: 24px 0;
     min-width: 0;
   }
   .login {
-    max-width: 600px;
+    max-width: 660px;
+    border-top: 2px solid var(--red);
   }
   .login > .button {
     margin: 24px 8px 18px 0;
   }
   details {
     margin-top: 20px;
-    font-size: 13px;
+    font-size: 15px;
   }
   summary {
     cursor: pointer;
@@ -737,20 +733,20 @@
   form:not(.settings) > label,
   .card > label {
     display: block;
-    font-size: 12px;
+    font-size: 14px;
     margin: 16px 0 9px;
   }
   input:not([type='range']):not([type='checkbox']),
   select {
     min-width: 0;
-    min-height: 44px;
-    border: 1px solid #3c3c43;
-    border-radius: 6px;
-    background: #19191d;
+    min-height: 48px;
+    border: 1px solid #424753;
+    border-radius: 10px;
+    background: #101216;
     color: white;
     padding: 10px 13px;
     font: inherit;
-    font-size: 13px;
+    font-size: 15px;
   }
   .login input {
     display: block;
@@ -759,12 +755,17 @@
   }
   .server-picker {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
     align-items: center;
-    padding: 20px 0;
+    padding: 20px 24px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    margin-bottom: 16px;
   }
   .server-picker label {
-    font-size: 12px;
+    font-size: 14px;
     color: var(--muted);
   }
   .server-picker select {
@@ -773,41 +774,48 @@
   .tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: 8px;
     border-bottom: 1px solid var(--line);
-    padding: 12px 0 20px;
+    padding: 12px 0 18px;
     margin-bottom: 24px;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #0c0d10;
   }
   .tabs button,
   .tabs a {
     min-height: 44px;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 11px 15px;
-    background: #19191d;
+    background: #101216;
     color: #b9b7c0;
     font: inherit;
-    font-size: 12px;
+    font-size: 14px;
   }
   .tabs button.chosen {
-    color: white;
-    border-color: var(--red);
-    background: #26171c;
+    color: #fff;
+    border-color: #ff6578;
+    background: #2b1b24;
   }
   .tabs a {
     margin-left: auto;
   }
   .notice {
     border: 1px solid #45434d;
-    border-radius: 6px;
+    border-radius: 10px;
     background: #1a1a20;
     color: #eceaf0;
     padding: 16px 20px;
     margin: 15px 0;
   }
   .notice.error {
-    border-color: #9e3446;
-    background: #29151b;
+    border-color: #995266;
+    background: #2b1922;
+    position: sticky;
+    top: 12px;
+    z-index: 5;
   }
   .deck-status {
     display: flex;
@@ -815,7 +823,7 @@
     align-items: center;
     gap: 20px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 13px;
     border-bottom: 1px solid var(--line);
     padding-bottom: 20px;
     margin-bottom: 25px;
@@ -831,8 +839,9 @@
     aspect-ratio: 1;
     display: grid;
     place-items: center;
-    background: #1b1a20;
-    border-radius: 6px;
+    background: #101216;
+    border: 1px solid var(--line);
+    border-radius: 16px;
     overflow: hidden;
   }
   .art img {
@@ -854,7 +863,7 @@
   }
   .seek {
     display: block;
-    font-size: 12px;
+    font-size: 14px;
     margin: 25px 0;
     color: var(--muted);
   }
@@ -902,7 +911,7 @@
     gap: 15px;
     border-bottom: 1px solid var(--line);
     padding: 14px 0;
-    font-size: 12px;
+    font-size: 14px;
   }
   .queue li > div:first-of-type {
     min-width: 0;
@@ -918,7 +927,7 @@
   small {
     display: block;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.7;
     margin-top: 5px;
     font-weight: 400;
@@ -939,11 +948,12 @@
     color: var(--muted);
   }
   fieldset {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 18px 22px;
+    border: 1px solid #3a3f4a;
+    border-radius: 16px;
+    padding: 24px;
     margin: 28px 0;
     min-width: 0;
+    background: #101216;
   }
   legend {
     padding: 0 10px;
@@ -954,10 +964,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 22px;
-    padding: 18px 0;
+    gap: 24px;
+    padding: 20px 0;
     border-top: 1px solid var(--line);
-    font-size: 13px;
+    font-size: 15px;
+    line-height: 1.6;
   }
   fieldset > p {
     margin-bottom: 18px;
@@ -992,7 +1003,7 @@
   .snapshot {
     padding: 18px 0;
     border-bottom: 1px solid var(--line);
-    font-size: 13px;
+    font-size: 15px;
   }
   .snapshot .actions {
     margin-top: 14px;
@@ -1015,7 +1026,7 @@
   .jobs {
     list-style: none;
     padding: 0;
-    font-size: 12px;
+    font-size: 14px;
   }
   .jobs li {
     padding: 14px 0;
@@ -1029,10 +1040,10 @@
     display: flex;
     justify-content: space-between;
     gap: 24px;
-    padding: 26px 5vw;
+    padding: 26px var(--page-space);
     border-top: 1px solid var(--line);
     color: var(--muted);
-    font-size: 11px;
+    font-size: 13px;
   }
   @media (max-width: 800px) {
     .admin-header {
@@ -1055,7 +1066,7 @@
       margin-top: 20px;
     }
     .card {
-      padding: 22px 18px;
+      padding: 24px 18px;
     }
     .tools {
       grid-template-columns: 1fr;

@@ -30,12 +30,12 @@
   .motion-preference {
     min-height: 44px;
     padding: 8px 12px;
-    border: 1px solid #34343a;
-    border-radius: 8px;
-    background: #121214;
-    color: #c6c4c9;
+    border: 1px solid #3a3e49;
+    border-radius: 10px;
+    background: var(--surface);
+    color: #c8c9d3;
     font: inherit;
-    font-size: 11px;
+    font-size: 12px;
     cursor: pointer;
   }
   .motion-preference:focus-visible {

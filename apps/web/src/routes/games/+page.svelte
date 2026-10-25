@@ -857,19 +857,6 @@
 </div>
 
 <style>
-  :global(body) {
-    margin: 0;
-    background: #0b0b0d;
-    color: #f2f1ef;
-    font-family: Inter, Arial, sans-serif;
-    color-scheme: dark;
-  }
-  @font-face {
-    font-family: Inter;
-    src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2');
-    font-weight: 100 900;
-    font-display: swap;
-  }
   * {
     box-sizing: border-box;
   }
@@ -898,16 +885,17 @@
     color: #ff3d52;
   }
   .game-shell {
-    min-height: 100vh;
+    min-height: 100dvh;
+    background: #0c0d10;
   }
   .game-header {
-    max-width: 1400px;
+    max-width: clamp(1440px, 80vw, 2400px);
     margin: auto;
-    padding: 26px 44px;
+    padding: 24px var(--page-space);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #29292f;
+    border-bottom: 1px solid var(--line);
     gap: 20px;
   }
   .brand {
@@ -925,68 +913,83 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 12px;
-    color: #b5b2bd;
-    min-height: 44px;
+    font-size: clamp(13px, 0.5vw, 20px);
+    color: #d0d0dc;
+    min-height: 46px;
+    padding: 10px 14px;
+    border: 1px solid #3a3e49;
+    border-radius: 12px;
+    background: var(--surface);
   }
   main {
-    max-width: 1400px;
+    width: 100%;
+    max-width: clamp(1440px, 80vw, 2400px);
     margin: auto;
-    padding: 40px 44px 70px;
+    padding: clamp(32px, 3vw, 60px) var(--page-space) 80px;
+  }
+  .entry-card:first-child {
+    border-top: 2px solid var(--red);
   }
   .eyebrow,
   .step {
-    font-size: 10px;
+    font-size: clamp(12px, 0.48vw, 18px);
     letter-spacing: 1.8px;
     font-weight: 650;
     line-height: 1.7;
   }
   .welcome {
-    padding-top: 32px;
+    padding-top: clamp(16px, 2vw, 36px);
+    max-width: 1300px;
   }
   .welcome h1 {
-    font-size: clamp(48px, 7vw, 90px);
-    line-height: 1.04;
-    letter-spacing: -5px;
+    font-size: clamp(52px, 6.4vw, 100px);
+    line-height: 1.02;
+    letter-spacing: -0.065em;
     margin: 24px 0;
+    font-weight: 750;
   }
   .intro {
-    max-width: 590px;
-    color: #aaa6b2;
-    font-size: 17px;
-    line-height: 1.8;
+    max-width: 640px;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1.75;
   }
   .entry-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    max-width: 1000px;
-    margin-top: 48px;
-    border-top: 1px solid #303036;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    max-width: 1160px;
+    margin-top: 40px;
+    gap: 24px;
   }
   .entry-card {
-    padding: 32px 34px 15px 0;
+    padding: 32px;
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    min-width: 0;
   }
   .entry-card + .entry-card {
-    padding: 32px 0 15px 34px;
-    border-left: 1px solid #303036;
+    padding: 32px;
+    border: 1px solid var(--line);
   }
   .step {
     color: #96919e;
   }
   .entry-card h2 {
-    margin: 15px 0 12px;
-    font-size: 25px;
-    letter-spacing: -0.9px;
+    margin: 16px 0 12px;
+    font-size: 28px;
+    line-height: 1.2;
+    letter-spacing: -0.04em;
   }
   .entry-card p {
-    color: #aaa6b2;
-    font-size: 13px;
-    line-height: 1.8;
-    margin-bottom: 24px;
-    max-width: 370px;
+    color: var(--muted);
+    font-size: clamp(15px, 0.6vw, 24px);
+    line-height: 1.75;
+    margin-bottom: 26px;
+    max-width: 400px;
   }
   .entry-card button {
     margin-top: 14px;
@@ -997,16 +1000,16 @@
   }
   label {
     display: block;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     color: #d7d3dd;
     margin: 0 0 10px;
   }
   input,
   select {
     min-height: 48px;
-    background: #151518;
-    border: 1px solid #3c3942;
-    border-radius: 6px;
+    background: #101216;
+    border: 1px solid #424753;
+    border-radius: 10px;
     color: inherit;
     padding: 11px 14px;
     width: 100%;
@@ -1022,11 +1025,11 @@
     min-height: 46px;
     padding: 12px 18px;
     border: 1px solid #3b3841;
-    border-radius: 6px;
-    background: #202024;
+    border-radius: 10px;
+    background: var(--surface-raised);
     color: #f2eff5;
     font-weight: 600;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     cursor: pointer;
   }
   button:hover {
@@ -1062,8 +1065,8 @@
     display: flex;
     gap: 38px;
     margin-top: 32px;
-    font-size: 11px;
-    color: #aaa6b2;
+    font-size: clamp(13px, 0.5vw, 20px);
+    color: var(--muted);
     flex-wrap: wrap;
   }
   .how-it-works b {
@@ -1079,8 +1082,8 @@
   }
   .room-bar p {
     margin-top: 8px;
-    font-size: 12px;
-    color: #aaa6b2;
+    font-size: clamp(14px, 0.55vw, 20px);
+    color: var(--muted);
   }
   .room-bar strong {
     letter-spacing: 1px;
@@ -1092,13 +1095,13 @@
     align-items: center;
     gap: 6px;
     margin-left: 18px;
-    font-size: 10px;
+    font-size: clamp(12px, 0.48vw, 18px);
   }
   .connection:before {
     content: '';
     width: 5px;
-    height: 5px;
-    background: #aaa6b2;
+    height: 8px;
+    background: var(--muted);
     border-radius: 50%;
   }
   .connection.online:before {
@@ -1117,25 +1120,25 @@
     cursor: pointer;
     min-height: 44px;
     align-content: center;
-    font-size: 12px;
-    color: #aaa6b2;
+    font-size: clamp(14px, 0.55vw, 20px);
+    color: var(--muted);
   }
   .invite input {
     margin-top: 10px;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
   }
   .game-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: 32px;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 18vw, 520px);
+    gap: 28px;
     margin-top: 28px;
     align-items: start;
   }
   .stage {
-    background: #111113;
-    border: 1px solid #2b282f;
-    padding: 34px;
-    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid #333742;
+    padding: clamp(26px, 2.7vw, 44px);
+    border-radius: var(--radius-lg);
     min-width: 0;
   }
   .stage-top {
@@ -1143,25 +1146,25 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    color: #aaa6b2;
-    font-size: 11px;
+    color: var(--muted);
+    font-size: clamp(13px, 0.5vw, 20px);
     margin-bottom: 30px;
   }
   .stage-top .eyebrow {
-    font-size: 9px;
+    font-size: clamp(11px, 0.45vw, 18px);
   }
   .stage h1 {
-    font-size: clamp(32px, 4vw, 50px);
-    line-height: 1.15;
-    letter-spacing: -1.8px;
+    font-size: clamp(34px, 2.3vw, 78px);
+    line-height: 1.12;
+    letter-spacing: -0.045em;
     overflow-wrap: anywhere;
   }
   .stage-intro {
-    color: #aaa6b2;
-    font-size: 13px;
-    line-height: 1.8;
-    margin: 15px 0 28px;
-    max-width: 510px;
+    color: var(--muted);
+    font-size: clamp(15px, 0.6vw, 24px);
+    line-height: 1.75;
+    margin: 16px 0 28px;
+    max-width: 64ch;
   }
   .stage > select {
     margin-bottom: 22px;
@@ -1176,50 +1179,54 @@
     display: block;
     text-align: left;
     min-width: 0;
-    padding: 20px 15px;
-    background: #17161a;
-    border-color: #343039;
+    padding: 22px 18px;
+    background: #101216;
+    border-color: #3c414c;
+    border-radius: 14px;
   }
   .preset.selected {
-    border-color: #ff3d52;
-    background: #24151b;
+    border-color: #ff6376;
+    background: #2b1b24;
+    box-shadow: inset 0 0 0 1px #ff6376;
   }
   .preset > span {
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     font-weight: 650;
   }
   .preset strong {
     display: block;
-    font-size: 29px;
+    font-size: clamp(29px, 1.5vw, 50px);
     letter-spacing: -1px;
     margin: 16px 0 10px;
   }
   .preset small {
-    font-size: 10px;
+    font-size: clamp(12px, 0.48vw, 18px);
     font-weight: 500;
     letter-spacing: 0;
     color: #c0bac9;
   }
   .preset p {
-    color: #aaa6b2;
-    font-size: 10px;
+    color: #b6b7c4;
+    font-size: clamp(12px, 0.48vw, 18px);
     line-height: 1.7;
     font-weight: 400;
   }
   .advanced {
-    border-top: 1px solid #2b282f;
-    border-bottom: 1px solid #2b282f;
+    border: 1px solid #373c47;
+    border-radius: 14px;
+    background: #101216;
+    padding: 0 18px;
     margin-bottom: 24px;
   }
   .advanced summary {
     padding: 16px 0;
     color: #ddd7e4;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
   }
   .advanced summary span {
     margin-left: 18px;
     color: #8d8797;
-    font-size: 10px;
+    font-size: clamp(12px, 0.48vw, 18px);
   }
   .advanced form {
     padding: 15px 0 24px;
@@ -1258,15 +1265,15 @@
     flex-wrap: wrap;
   }
   .start-bar strong {
-    font-size: 13px;
+    font-size: clamp(15px, 0.6vw, 24px);
   }
   .start-bar p {
-    color: #aaa6b2;
-    font-size: 11px;
+    color: var(--muted);
+    font-size: clamp(13px, 0.5vw, 20px);
     margin-top: 8px;
   }
   .waiting {
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     color: #b8b0c1;
     line-height: 1.8;
   }
@@ -1275,8 +1282,8 @@
     padding: 18px;
     background: #21171d;
     border: 1px solid #583444;
-    border-radius: 7px;
-    font-size: 12px;
+    border-radius: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     line-height: 1.8;
     margin: 20px 0;
   }
@@ -1286,10 +1293,10 @@
   }
   .notice.compact {
     padding: 12px 15px;
-    font-size: 11px;
+    font-size: clamp(13px, 0.5vw, 20px);
   }
   .source-status h3 {
-    font-size: 15px;
+    font-size: clamp(15px, 0.6vw, 24px);
   }
   .source-status p {
     color: #c8becc;
@@ -1299,10 +1306,10 @@
     padding: 25px;
     border: 1px solid #353039;
     background: #18151a;
-    border-radius: 8px;
+    border-radius: 16px;
   }
   .guest-summary > span {
-    font-size: 9px;
+    font-size: clamp(11px, 0.45vw, 18px);
     color: #a99cb2;
     letter-spacing: 1.5px;
   }
@@ -1312,7 +1319,7 @@
     letter-spacing: -1px;
   }
   .guest-summary p {
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     color: #bcb2c5;
     line-height: 1.7;
   }
@@ -1365,15 +1372,15 @@
   }
   .countdown strong {
     display: block;
-    font-size: 56px;
-    font-weight: 600;
+    font-size: clamp(56px, 3.8vw, 104px);
+    font-weight: 650;
     line-height: 1;
-    letter-spacing: -3px;
+    letter-spacing: -0.06em;
     font-variant-numeric: tabular-nums;
   }
   .countdown span {
-    font-size: 10px;
-    color: #aaa6b2;
+    font-size: clamp(12px, 0.48vw, 18px);
+    color: var(--muted);
   }
   .countdown.urgent strong {
     color: #ff6274;
@@ -1381,7 +1388,7 @@
   progress {
     appearance: none;
     width: 100%;
-    height: 5px;
+    height: 8px;
     accent-color: #ff263e;
     display: block;
     border: 0;
@@ -1389,7 +1396,7 @@
   .round-stats {
     display: flex;
     justify-content: space-between;
-    font-size: 10px;
+    font-size: clamp(12px, 0.48vw, 18px);
     color: #bcb3c5;
     margin: 12px 0 25px;
     gap: 16px;
@@ -1414,7 +1421,7 @@
   .feedback {
     color: #d8b6c4;
     margin: 12px 0;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
   }
   .correct {
     display: flex;
@@ -1423,7 +1430,7 @@
     padding: 24px;
     background: #211d20;
     border: 1px solid #66515b;
-    border-radius: 8px;
+    border-radius: 16px;
     margin: 28px 0;
   }
   .correct > span {
@@ -1442,7 +1449,7 @@
   }
   .correct p {
     color: #bbb0bc;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     line-height: 1.7;
     margin-top: 8px;
   }
@@ -1456,7 +1463,7 @@
     border: 1px solid #403343;
     padding: 9px 12px;
     border-radius: 5px;
-    font-size: 11px;
+    font-size: clamp(13px, 0.5vw, 20px);
     color: #c2b3ca;
   }
   .round-footer {
@@ -1473,7 +1480,7 @@
     border: 0;
     padding: 10px 0;
     color: #bfb1cb;
-    font-size: 11px;
+    font-size: clamp(13px, 0.5vw, 20px);
     text-align: left;
   }
   .reveal-icon {
@@ -1507,12 +1514,12 @@
     color: #ff6274;
   }
   .reveal-summary > span {
-    font-size: 14px;
+    font-size: clamp(14px, 0.55vw, 20px);
   }
   .reveal-summary small {
     display: block;
     color: #aaa0b3;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     margin-top: 10px;
   }
   .next {
@@ -1537,7 +1544,7 @@
     background: #19161b;
     border: 1px solid #3b303e;
     padding: 22px 14px;
-    border-radius: 8px;
+    border-radius: 16px;
     min-width: 0;
   }
   .podium .champion {
@@ -1546,10 +1553,10 @@
   }
   .podium span {
     color: #b39cbd;
-    font-size: 13px;
+    font-size: clamp(15px, 0.6vw, 24px);
   }
   .podium h2 {
-    font-size: 15px;
+    font-size: clamp(15px, 0.6vw, 24px);
     line-height: 1.5;
     overflow-wrap: anywhere;
     margin: 16px 0 10px;
@@ -1561,12 +1568,18 @@
   }
   .podium p {
     color: #a99caf;
-    font-size: 10px;
+    font-size: clamp(12px, 0.48vw, 18px);
     margin-top: 7px;
   }
   .leaderboard {
-    border-top: 2px solid #ff263e;
-    padding: 25px 0 0;
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--red);
+    border-radius: 20px;
+    background: var(--surface);
+    padding: 24px;
+    position: sticky;
+    top: 24px;
+    min-width: 0;
   }
   .board-heading {
     display: flex;
@@ -1580,11 +1593,11 @@
   }
   .board-heading > span {
     color: #ac9bb5;
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
   }
   .board-intro {
     color: #9f92a8;
-    font-size: 11px;
+    font-size: clamp(13px, 0.5vw, 20px);
     line-height: 1.7;
     margin-top: 10px;
   }
@@ -1592,18 +1605,22 @@
     list-style: none;
     margin: 22px 0 0;
     padding: 0;
+    max-height: min(60vh, 580px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #555a68 transparent;
   }
   .scores li {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 18px 0;
-    border-top: 1px solid #2e2832;
+    border-top: 1px solid var(--line);
     min-width: 0;
   }
   .rank {
-    font-size: 12px;
-    color: #82758c;
+    font-size: clamp(14px, 0.55vw, 20px);
+    color: #a8a4b4;
     min-width: 20px;
   }
   .scores li > div {
@@ -1611,20 +1628,27 @@
     flex: 1;
   }
   .scores strong {
-    font-size: 12px;
+    font-size: clamp(14px, 0.55vw, 20px);
     display: block;
     overflow-wrap: anywhere;
     font-weight: 550;
   }
   .scores small {
     display: block;
-    font-size: 9px;
+    font-size: clamp(11px, 0.45vw, 18px);
     color: #9f8ea9;
     margin-top: 7px;
   }
   .scores b {
-    font-size: 15px;
+    font-size: clamp(15px, 0.6vw, 24px);
     letter-spacing: -0.5px;
+  }
+  .scores .self {
+    border: 1px solid #68404d;
+    border-radius: 12px;
+    padding: 16px 12px;
+    background: #2a1b23;
+    margin: 8px 0;
   }
   .scores .self .rank {
     color: #ff6274;
@@ -1633,14 +1657,14 @@
     color: #fff;
   }
   .answered {
-    font-size: 13px;
+    font-size: clamp(15px, 0.6vw, 24px);
     color: #d5becd;
   }
   .board-note {
-    color: #9987a3;
-    font-size: 10px;
-    line-height: 1.8;
-    border-top: 1px solid #2e2832;
+    color: var(--muted);
+    font-size: clamp(12px, 0.48vw, 18px);
+    line-height: 1.75;
+    border-top: 1px solid var(--line);
     padding-top: 20px;
     margin-top: 12px;
   }
@@ -1656,30 +1680,31 @@
     letter-spacing: -1px;
   }
   .joining p {
-    color: #aaa6b2;
+    color: var(--muted);
     margin-top: 18px;
   }
   footer {
-    max-width: 1400px;
+    max-width: clamp(1440px, 80vw, 2400px);
     margin: auto;
-    border-top: 1px solid #2b282f;
-    padding: 26px 44px;
+    border-top: 1px solid var(--line);
+    padding: 26px var(--page-space);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 20px;
+    flex-wrap: wrap;
   }
-  footer > span:first-child {
+  footer > span:first-of-type {
     font-size: 19px;
     font-weight: 750;
     letter-spacing: -1px;
   }
   footer a {
-    font-size: 11px;
-    color: #aaa6b2;
+    font-size: clamp(13px, 0.5vw, 20px);
+    color: var(--muted);
   }
   footer > span:last-child {
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 1.3px;
     color: #887c90;
   }
@@ -1745,19 +1770,19 @@
     }
     .welcome h1 {
       font-size: clamp(48px, 9vw, 72px);
-      letter-spacing: -3px;
+      letter-spacing: -0.06em;
     }
     .intro {
-      font-size: 14px;
+      font-size: clamp(14px, 0.55vw, 20px);
     }
     .entry-grid {
       margin-top: 35px;
     }
     .entry-card {
-      padding: 25px 22px 10px 0;
+      padding: 26px;
     }
     .entry-card + .entry-card {
-      padding: 25px 0 10px 22px;
+      padding: 26px;
     }
     .entry-card h2 {
       font-size: 21px;
@@ -1766,6 +1791,7 @@
       padding: 25px 22px;
     }
     .leaderboard {
+      position: static;
       max-width: none;
     }
     .presets {
@@ -1783,7 +1809,7 @@
       margin-top: 8px;
     }
     .preset p {
-      font-size: 9px;
+      font-size: clamp(11px, 0.45vw, 18px);
     }
     .stage h1 {
       font-size: 36px;
@@ -1798,14 +1824,14 @@
     }
     .entry-card,
     .entry-card + .entry-card {
-      padding: 28px 0;
+      padding: 26px 20px;
     }
     .entry-card + .entry-card {
-      border-left: 0;
+      border: 1px solid var(--line);
       border-top: 1px solid #303036;
     }
     .stage {
-      padding: 22px 18px;
+      padding: 24px 18px;
     }
     .room-bar .actions {
       width: 100%;
@@ -1830,13 +1856,13 @@
       padding: 15px 10px;
     }
     .preset > span {
-      font-size: 10px;
+      font-size: clamp(12px, 0.48vw, 18px);
     }
     .preset strong {
       font-size: 22px;
     }
     .preset small {
-      font-size: 9px;
+      font-size: clamp(11px, 0.45vw, 18px);
     }
     .preset p {
       display: none;
@@ -1864,7 +1890,7 @@
       font-size: 21px;
     }
     .round-visual .eyebrow {
-      font-size: 8px;
+      font-size: 10px;
     }
     .answer > div {
       flex-wrap: wrap;
@@ -1876,14 +1902,14 @@
       width: 100%;
     }
     .round-stats {
-      font-size: 9px;
+      font-size: clamp(11px, 0.45vw, 18px);
     }
     .correct {
       padding: 18px 14px;
       gap: 12px;
     }
     .correct strong {
-      font-size: 14px;
+      font-size: clamp(14px, 0.55vw, 20px);
     }
     .podium {
       gap: 8px;
@@ -1895,7 +1921,7 @@
       font-size: 24px;
     }
     .podium h2 {
-      font-size: 12px;
+      font-size: clamp(14px, 0.55vw, 20px);
     }
     .next {
       width: 100%;

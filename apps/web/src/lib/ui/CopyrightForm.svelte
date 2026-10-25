@@ -231,8 +231,8 @@
   fieldset {
     margin: 24px 0;
     padding: 24px;
-    border: 1px solid #303036;
-    border-radius: 12px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
     min-width: 0;
   }
   legend {
@@ -261,12 +261,13 @@
     box-sizing: border-box;
     width: 100%;
     min-height: 44px;
-    border: 1px solid #393940;
-    border-radius: 6px;
+    border: 1px solid #424753;
+    border-radius: 10px;
     padding: 12px;
-    background: #161619;
+    background: #101216;
     color: #f2f2f4;
     font: inherit;
+    font-size: 16px;
   }
   textarea {
     resize: vertical;
@@ -284,7 +285,7 @@
     accent-color: #ff263e;
   }
   .help {
-    font-size: 12px;
+    font-size: 13px;
   }
   .actions {
     display: flex;
@@ -300,12 +301,12 @@
     box-sizing: border-box;
     min-height: 46px;
     padding: 10px 16px;
-    border: 1px solid #393940;
-    border-radius: 7px;
-    background: #222227;
+    border: 1px solid #424753;
+    border-radius: 10px;
+    background: var(--surface-raised);
     color: white;
     font:
-      600 13px Inter,
+      600 14px Inter,
       system-ui,
       sans-serif;
     text-decoration: none;
@@ -314,6 +315,7 @@
   .primary {
     background: #ff263e !important;
     border-color: #ff263e !important;
+    color: #100b0e !important;
   }
   button:disabled {
     opacity: 0.5;

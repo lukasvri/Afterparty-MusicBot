@@ -155,20 +155,11 @@
 </script>
 
 <section class="music-library" aria-label="Your music library">
-  <PlaylistImport
-    bind:this={playlistImport}
-    busy={busy || adding}
-    capacity={limit}
-    {queuedIds}
-    onAdd={(ids) => add(ids, true)}
-  />
-  <ConcertCatalog
-    onPreviewPlaylist={(url) => playlistImport?.preview(url)}
-    busy={busy || adding}
-    capacity={limit}
-    {queuedIds}
-    onAdd={(ids) => add(ids, true)}
-  />
+  <nav class="library-nav" aria-label="Library sections">
+    <a href="#library-title">Your collection</a>
+    <a href="#playlist-import-title">Playlist import</a>
+    <a href="#festival-title">Festival sets</a>
+  </nav>
   <section class="local-library" aria-labelledby="library-title">
     <p class="eyebrow red">GOOD NIGHTS, SAVED</p>
     <h2 id="library-title">Your collection</h2>
@@ -338,42 +329,106 @@
           </li>{/each}
       </ul>{/if}
   </section>
+  <PlaylistImport
+    bind:this={playlistImport}
+    busy={busy || adding}
+    capacity={limit}
+    {queuedIds}
+    onAdd={(ids) => add(ids, true)}
+  />
+  <ConcertCatalog
+    onPreviewPlaylist={(url) => playlistImport?.preview(url)}
+    busy={busy || adding}
+    capacity={limit}
+    {queuedIds}
+    onAdd={(ids) => add(ids, true)}
+  />
 </section>
 
 <style>
   .music-library {
-    margin-top: 32px;
+    display: grid;
+    gap: 24px;
+    margin-top: 28px;
+    min-width: 0;
+  }
+  .library-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+  .library-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: #d8d9e2;
+    font-size: 13px;
+    font-weight: 550;
+  }
+  .library-nav a:hover {
+    border-color: #6b4651;
+    background: #281b22;
+    color: #fff;
   }
   .local-library {
-    border-top: 1px solid var(--line);
-    padding-top: 28px;
-    margin-top: 32px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    padding: clamp(22px, 2.2vw, 36px);
+    min-width: 0;
   }
   h2 {
-    font-size: 26px;
-    letter-spacing: -0.8px;
+    font-size: clamp(25px, 2.2vw, 33px);
+    line-height: 1.2;
+    letter-spacing: -0.045em;
     margin: 10px 0;
+    scroll-margin-top: 24px;
   }
   h3 {
-    font-size: 17px;
-    margin: 28px 0 14px;
+    font-size: 20px;
+    letter-spacing: -0.025em;
+    margin: 30px 0 16px;
   }
   h3 span {
-    color: var(--muted);
+    color: #c8c8d3;
     font-size: 12px;
     margin-left: 8px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: #282c35;
+    font-variant-numeric: tabular-nums;
   }
   p {
-    font-size: 12px;
+    font-size: 14px;
     color: var(--muted);
-    line-height: 1.8;
+    line-height: 1.75;
     margin: 12px 0;
+    max-width: 74ch;
+  }
+  .queue-capacity {
+    display: inline-block;
+    color: #d7d8e2;
+    border: 1px solid #3b3f4a;
+    padding: 7px 12px;
+    border-radius: 9px;
+    font-size: 12px;
+    margin-top: 10px;
   }
   form {
-    margin: 22px 0;
+    margin: 24px 0;
+    padding: 22px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
   }
   label {
-    font-size: 12px;
+    font-size: 13px;
+    color: #dedee6;
+    font-weight: 550;
   }
   .row {
     display: flex;
@@ -383,27 +438,47 @@
     margin: 12px 0;
   }
   input:not([type='file']) {
-    background: #161619;
-    border: 1px solid #3c3a42;
+    background: #101216;
+    border: 1px solid #424753;
+    border-radius: 10px;
     color: inherit;
-    padding: 12px;
-    min-height: 44px;
+    padding: 12px 14px;
+    min-height: 48px;
     min-width: 0;
     flex: 1;
+    font-size: 16px;
   }
   button,
   .file-button {
-    background: #1b1b1f;
-    border: 1px solid #38383e;
-    color: inherit;
+    background: var(--surface-raised);
+    border: 1px solid #3b404c;
+    border-radius: 10px;
+    color: #eeeef4;
     min-height: 44px;
-    padding: 10px 14px;
-    font-size: 12px;
+    padding: 11px 15px;
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 550;
+  }
+  button:hover:not(:disabled),
+  .file-button:hover {
+    background: var(--surface-hover);
+    border-color: #656571;
+  }
+  button[aria-pressed='true'] {
+    color: #ff7a8b;
+    border-color: #925062;
+    background: #2a1a23;
   }
   .primary {
     background: var(--red);
-    color: #0b0b0d;
-    font-weight: 650;
+    color: #100b0e;
+    border-color: var(--red);
+    font-weight: 700;
+  }
+  .primary:hover:not(:disabled) {
+    background: #ff6578;
+    border-color: #ff6578;
   }
   .file-button {
     display: flex;
@@ -413,62 +488,97 @@
     cursor: pointer;
   }
   .file-button input {
-    max-width: 220px;
-    font-size: 11px;
+    max-width: min(220px, 100%);
+    font-size: 12px;
   }
   details {
     border-bottom: 1px solid var(--line);
-    padding: 15px 0;
+    padding: 16px 0;
+  }
+  .evening[open] {
+    margin-top: 12px;
+    border: 1px solid #3a3f4a;
+    border-radius: 14px;
+    padding: 16px;
+    background: #101216;
   }
   summary {
     cursor: pointer;
-    min-height: 32px;
-    font-size: 13px;
-    line-height: 1.8;
+    min-height: 44px;
+    font-size: 15px;
+    font-weight: 550;
+    line-height: 1.65;
     overflow-wrap: anywhere;
+    padding: 8px 0;
   }
   summary span {
     color: var(--muted);
     margin-left: 10px;
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 400;
   }
   ol,
   ul {
     list-style: none;
     margin: 0;
     padding: 0;
+    max-height: min(65vh, 600px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #555a68 transparent;
+    scrollbar-gutter: stable;
   }
   li {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 0;
-    border-bottom: 1px solid #232327;
+    gap: 10px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
   }
   .track-title {
     min-width: 0;
     flex: 1;
-    font-size: 12px;
-    line-height: 1.7;
+    font-size: 14px;
+    line-height: 1.6;
     overflow-wrap: anywhere;
   }
   small {
     display: block;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
+    margin-top: 4px;
   }
   .empty {
-    padding: 14px 0;
+    padding: 22px;
+    border: 1px dashed #3a3e49;
+    border-radius: 12px;
+    background: #101216;
   }
   .error {
     color: #ff9cab;
+    padding: 12px 16px;
+    background: #2a171f;
+    border: 1px solid #713a4a;
+    border-radius: 10px;
   }
-  @media (max-width: 500px) {
+  @media (max-width: 600px) {
+    .library-nav {
+      gap: 6px;
+    }
+    .library-nav a {
+      padding: 10px 12px;
+      font-size: 12px;
+    }
     .row input:not([type='file']) {
       flex-basis: 100%;
     }
     li button {
       padding: 10px;
+      flex-shrink: 0;
+    }
+    .local-library {
+      padding: 22px 18px;
+      border-radius: 18px;
     }
   }
 </style>

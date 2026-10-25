@@ -48,6 +48,11 @@ test('exit leaves an unrelated fullscreen element alone',async()=>{
  let exits=0;const doc:DocumentFixture={fullscreenElement:elementFixture({}),async exitFullscreen(){exits++;}};
  await leaveFullscreen(elementFixture(doc));assert.equal(exits,0);
 });
+test('exit also closes native fullscreen owned by a descendant YouTube iframe',async()=>{
+ let exits=0;const iframe=elementFixture({});const doc:DocumentFixture={fullscreenElement:iframe,async exitFullscreen(){exits++;}};
+ const stage={ownerDocument:doc,contains:(element:Element)=>element===iframe} as HTMLElement;
+ await leaveFullscreen(stage);assert.equal(exits,1);
+});
 test('native exit is awaited and errors remain observable',async()=>{
  let done=false;const doc:DocumentFixture={fullscreenElement:null,async exitFullscreen(){await Promise.resolve();done=true;}};const element=elementFixture(doc);doc.fullscreenElement=element;
  await leaveFullscreen(element);assert.equal(done,true);

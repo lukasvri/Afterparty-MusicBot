@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from '#lib/ui/Icon.svelte';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
 
   import type { Snippet } from 'svelte';
@@ -25,7 +26,7 @@
       <img src="/afterparty-mark.svg" width="40" height="40" alt="" />
       <span>afterparty<span class="accent">.</span></span>
     </a>
-    <a class="back" href="/">Back to music <span aria-hidden="true">↗</span></a>
+    <a class="back" href="/">Back to music <Icon name="arrow" size={16} /></a>
   </header>
   <main id="content">
     <p class="eyebrow">{eyebrow}</p>
@@ -47,40 +48,28 @@
 </div>
 
 <style>
-  @font-face {
-    font-family: 'Inter';
-    src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2');
-    font-weight: 100 900;
-    font-display: swap;
-  }
-  :global(html) {
-    color-scheme: dark;
-    background: #0b0b0d;
-  }
-  :global(body) {
-    margin: 0;
-  }
   .public-shell {
     min-height: 100dvh;
-    background: #0b0b0d;
-    color: #f2f2f4;
+    background: #0c0d10;
+    color: var(--text);
     font:
-      15px/1.75 Inter,
+      16px/1.8 Inter,
       system-ui,
       sans-serif;
   }
   header,
   footer {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: auto;
-    padding: 28px 40px;
+    padding: 28px var(--page-space);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
+    flex-wrap: wrap;
   }
   header {
-    border-bottom: 1px solid #252529;
+    border-bottom: 1px solid var(--line);
   }
   .brand {
     display: inline-flex;
@@ -88,98 +77,143 @@
     gap: 12px;
     color: inherit;
     text-decoration: none;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 750;
-    letter-spacing: -0.8px;
+    letter-spacing: -1px;
+  }
+  .brand img {
+    flex-shrink: 0;
   }
   .accent {
-    color: #ff263e;
+    color: var(--red);
   }
   .back {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 12px;
-    color: #dddde2;
+    min-height: 46px;
+    padding: 10px 16px;
+    border: 1px solid #3a3e49;
+    border-radius: 12px;
+    background: var(--surface);
+    color: #eeeef3;
     text-decoration: none;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 550;
   }
   main {
-    width: min(800px, calc(100% - 80px));
-    margin: 68px auto 96px;
+    width: min(1000px, calc(100% - var(--page-space) * 2));
+    padding: 0;
+    margin: clamp(40px, 5vw, 88px) auto clamp(56px, 6vw, 104px);
   }
   .eyebrow {
-    color: #ff6072;
-    font-size: 11px;
+    color: #ff7182;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 2px;
+    letter-spacing: 1.7px;
   }
   h1 {
-    margin: 16px 0 40px;
-    font-size: clamp(34px, 5.5vw, 62px);
-    line-height: 1.08;
-    letter-spacing: -2px;
+    margin: 18px 0 36px;
+    font-size: clamp(42px, 5.5vw, 78px);
+    line-height: 1.06;
+    letter-spacing: -0.055em;
     overflow-wrap: anywhere;
+    font-weight: 750;
   }
   .body {
-    color: #b5b5bf;
+    padding: clamp(24px, 4vw, 52px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: #bfc0cb;
+  }
+  .body :global(p) {
+    margin: 0 0 18px;
+    max-width: 76ch;
+    overflow-wrap: anywhere;
   }
   .body :global(h2) {
-    margin: 40px 0 12px;
-    color: #f2f2f4;
-    font-size: 21px;
-    letter-spacing: -0.4px;
-    line-height: 1.4;
+    margin: 36px 0 14px;
+    color: var(--text);
+    font-size: clamp(23px, 2vw, 29px);
+    letter-spacing: -0.035em;
+    line-height: 1.3;
+  }
+  .body :global(h2:first-child) {
+    margin-top: 0;
   }
   .body :global(h3) {
-    color: #f2f2f4;
+    color: var(--text);
+    font-size: 19px;
+    line-height: 1.4;
+    margin: 28px 0 12px;
   }
   .body :global(strong) {
-    color: #dddde4;
+    color: #ededf2;
     font-weight: 650;
   }
   .body :global(a),
   footer a {
-    color: #e2e2e8;
+    color: #f0c5cc;
+    text-decoration: underline;
+    text-decoration-color: #77545d;
     text-underline-offset: 4px;
   }
   .body :global(a:hover),
   footer a:hover,
   .back:hover {
-    color: #ff6072;
+    color: #ff8493;
+  }
+  .back:hover {
+    border-color: #73525c;
+    background: #24191f;
   }
   .body :global(code) {
-    color: #f0f0f4;
-    padding: 3px 6px;
-    border-radius: 4px;
-    background: #202025;
+    color: #f4f3ef;
+    padding: 3px 7px;
+    border: 1px solid #363a45;
+    border-radius: 6px;
+    background: #1e222a;
+    font-size: 0.9em;
+    overflow-wrap: anywhere;
+  }
+  .body :global(ul),
+  .body :global(ol) {
+    padding-left: 22px;
+    margin: 16px 0 24px;
   }
   .body :global(li) {
+    padding-left: 4px;
     margin: 10px 0;
+    max-width: 76ch;
   }
   .body :global(.service-action) {
     display: inline-flex;
     align-items: center;
-    min-height: 48px;
-    padding: 0 22px;
-    background: #ff263e;
-    border-radius: 8px;
+    justify-content: center;
+    min-height: 50px;
+    padding: 12px 22px;
+    background: var(--red);
+    border-radius: 12px;
     text-decoration: none;
-    color: white;
-    font-weight: 650;
+    color: #100b0e;
+    font-weight: 700;
   }
   .body :global(.service-date) {
     font-size: 13px;
-    color: #85858f;
+    color: var(--muted);
   }
   footer {
-    border-top: 1px solid #252529;
-    color: #85858f;
-    font-size: 12px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    flex-wrap: wrap;
   }
   footer nav {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 20px;
+    gap: 4px 20px;
   }
   footer a {
     display: inline-flex;
@@ -193,8 +227,9 @@
     top: -100px;
     z-index: 5;
     padding: 12px 20px;
-    background: #ff263e;
-    color: white;
+    border-radius: 12px;
+    background: var(--red);
+    color: #100b0e;
     font:
       14px system-ui,
       sans-serif;
@@ -203,7 +238,7 @@
     top: 12px;
   }
   .public-shell :global(:focus-visible) {
-    outline: 2px solid #ff6072;
+    outline: 2px solid #ff7182;
     outline-offset: 5px;
   }
   @media (max-width: 600px) {
@@ -212,21 +247,27 @@
       padding: 20px;
     }
     .brand {
-      font-size: 18px;
+      font-size: 20px;
       gap: 8px;
     }
-    main {
-      width: calc(100% - 40px);
-      margin-top: 44px;
-      margin-bottom: 56px;
+    .brand img {
+      width: 34px;
+      height: 34px;
     }
-    h1 {
-      letter-spacing: -1.2px;
+    .back {
+      padding: 10px 12px;
+      font-size: 12px;
+      gap: 8px;
+    }
+    .body {
+      padding: 24px 20px;
+      border-radius: 18px;
+      font-size: 15px;
     }
     footer {
       align-items: flex-start;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
     }
   }
 </style>

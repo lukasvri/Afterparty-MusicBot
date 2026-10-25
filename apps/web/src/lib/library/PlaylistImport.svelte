@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from '#lib/ui/Icon.svelte';
   import { ROOM_QUEUE_LIMIT } from '../../../../../services/core/src/protocol.ts';
   import { onMount } from 'svelte';
   import { createPlaylistImport, type PlaylistState } from '#lib/library/playlist-import-client.ts';
@@ -82,7 +83,7 @@
 </script>
 
 <section class="playlist" aria-label="Import a playlist" aria-busy={view.loading || adding}>
-  <h2>Bring your playlist</h2>
+  <h2 id="playlist-import-title">Bring your playlist</h2>
   <p>Load a YouTube or Spotify playlist, then choose the songs for this room.</p>
   <form
     onsubmit={(event) => {
@@ -127,8 +128,12 @@
           ? ''
           : ` · ${view.job.total} playlist entries`}
       </p>
-      {#if view.sourceUrl}<a href={view.sourceUrl} target="_blank" rel="noopener noreferrer"
-          >Open original playlist ↗</a
+      {#if view.sourceUrl}<a
+          href={view.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open original playlist ↗"
+          >Open original playlist <Icon name="external" size={15} /></a
         >{/if}
     </div>
     {#if view.job.skipped}<p>
@@ -211,25 +216,33 @@
 
 <style>
   .playlist {
-    border-top: 1px solid var(--line);
-    padding-top: 28px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    padding: clamp(22px, 2.2vw, 36px);
+    min-width: 0;
   }
   h2 {
-    font-size: 22px;
-    letter-spacing: -0.7px;
-    margin-bottom: 12px;
+    font-size: clamp(25px, 2.2vw, 33px);
+    letter-spacing: -0.045em;
+    line-height: 1.2;
+    margin-bottom: 14px;
+    scroll-margin-top: 24px;
   }
   p {
     color: var(--muted);
-    font-size: 12px;
-    line-height: 1.8;
+    font-size: 14px;
+    line-height: 1.75;
     margin: 12px 0;
+    max-width: 74ch;
   }
   form {
-    margin-top: 20px;
+    margin-top: 24px;
   }
   label {
-    font-size: 12px;
+    font-size: 13px;
+    color: #dedee6;
+    font-weight: 550;
     display: block;
     margin-bottom: 10px;
   }
@@ -238,62 +251,105 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
-    margin: 14px 0;
+    margin: 16px 0;
   }
   .row input {
     flex: 1;
-    min-width: min(230px, 100%);
+    min-width: min(260px, 100%);
   }
   input {
-    padding: 12px;
+    padding: 12px 14px;
     color: inherit;
-    background: #161619;
-    border: 1px solid #3c3a42;
-    min-height: 44px;
+    background: #101216;
+    border: 1px solid #424753;
+    border-radius: 10px;
+    min-height: 48px;
+    font-size: 16px;
   }
   button {
-    min-height: 44px;
-    border: 1px solid #38383e;
-    padding: 10px 14px;
-    background: #1b1b1f;
+    min-height: 46px;
+    border: 1px solid #3b404c;
+    border-radius: 10px;
+    padding: 11px 15px;
+    background: var(--surface-raised);
     color: inherit;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1.4;
+  }
+  button:hover:not(:disabled) {
+    background: var(--surface-hover);
+    border-color: #656571;
   }
   .primary {
     background: var(--red);
-    color: #0b0b0d;
-    font-weight: 650;
+    color: #100b0e;
+    border-color: var(--red);
+    font-weight: 700;
+  }
+  .primary:hover:not(:disabled) {
+    background: #ff6578;
   }
   .note,
   .row span,
   a {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
+    line-height: 1.7;
   }
   a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #eed0d5;
     text-decoration: underline;
     text-underline-offset: 4px;
     padding: 10px 0;
   }
+  .summary {
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    justify-content: space-between;
+  }
   .error {
     color: #ff9cab;
+    border: 1px solid #713a4a;
+    border-radius: 10px;
+    background: #2a171f;
+    padding: 12px 16px;
   }
   ol {
-    padding-left: 24px;
+    padding: 0 0 0 28px;
+    margin: 20px 0;
+    max-height: min(65vh, 600px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #555a68 transparent;
+    scrollbar-gutter: stable;
   }
   li {
-    padding: 8px 0;
+    padding: 14px 4px;
     border-bottom: 1px solid var(--line);
+  }
+  li::marker {
+    color: #7e8493;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
   }
   .track {
     display: flex;
     align-items: center;
     gap: 14px;
     margin: 0;
+    min-height: 44px;
+    cursor: pointer;
   }
   .track input {
     accent-color: var(--red);
     flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    min-height: 22px;
   }
   .track span {
     min-width: 0;
@@ -304,12 +360,31 @@
     overflow-wrap: anywhere;
   }
   strong {
+    font-size: 14px;
     font-weight: 550;
     line-height: 1.6;
   }
   small {
     color: var(--muted);
-    font-size: 11px;
-    margin-top: 3px;
+    font-size: 12px;
+    font-weight: 400;
+    margin-top: 4px;
+  }
+  @media (max-width: 600px) {
+    .playlist {
+      padding: 22px 18px;
+      border-radius: 18px;
+    }
+    .row input {
+      flex-basis: 100%;
+    }
+    nav.row {
+      justify-content: space-between;
+      gap: 8px;
+    }
+    nav button {
+      padding: 10px 12px;
+      font-size: 12px;
+    }
   }
 </style>

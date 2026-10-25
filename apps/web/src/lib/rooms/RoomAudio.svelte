@@ -16,6 +16,12 @@
   import type { Room } from '../../../../../lib/types.ts';
   import Icon from '../ui/Icon.svelte';
   import { browserStorage } from '../../../../../lib/browser-storage.ts';
+  import { confirmsPlayerIntent, createPlayerIntent, type PlayerIntent } from './player-intent.ts';
+  export type SharedPlayerIntent = PlayerIntent & {
+    code: string;
+    videoId: string;
+    playbackKey?: string;
+  };
   import {
     notePlayerError,
     notePlayerEvent,
@@ -107,7 +113,9 @@
       browserStorage.subscribe(SYNC_MODE_KEY, readSync),
     ];
     const changed = () => {
-      fullscreen = fullscreenFallback || fullscreenElement(document) === stage;
+      const active = fullscreenElement(document);
+      fullscreen =
+        fullscreenFallback || active === stage || Boolean(active && stage.contains(active));
     };
     const keyboard = (event: KeyboardEvent) => {
       const target = event.target;
@@ -148,10 +156,20 @@
     room,
     position,
     playing,
+    canControl = false,
+    canSeek = canControl,
+    controlBusy = false,
+    onIntent,
+    onActiveChange,
   }: {
     room: Room;
     position: number;
     playing: boolean;
+    canControl?: boolean;
+    canSeek?: boolean;
+    controlBusy?: boolean;
+    onIntent?: (intent: SharedPlayerIntent) => Promise<boolean>;
+    onActiveChange?: (active: boolean) => void;
   } = $props();
   let container = $state<HTMLDivElement>();
   let player: Player | null = null;
@@ -165,33 +183,172 @@
     correctedAt = -Infinity,
     settleUntil = 0,
     generation = 0;
+  const native = createPlayerIntent();
+  let localPaused = $state(false);
+  let nativePending = $state<{
+    identity: string;
+    intent: PlayerIntent;
+    settled: boolean;
+    deadline: number;
+    version: number;
+    issuedAt: number;
+  } | null>(null);
+  const identity = () => `${room.code}:${room.current?.id ?? ''}:${room.playbackKey ?? ''}`;
+  function command(action: 'load' | 'cue' | 'play' | 'pause' | 'seek', position?: number) {
+    native.command(identity(), action, performance.now(), position);
+  }
+  function observation(state = player?.getPlayerState() ?? -1) {
+    let sourceMatches = false;
+    try {
+      const url = new URL(player?.getVideoUrl?.() ?? '');
+      sourceMatches =
+        ['www.youtube.com', 'youtube.com', 'youtu.be'].includes(url.hostname) &&
+        (url.searchParams.get('v') ?? url.pathname.slice(1)) === room.current?.id;
+    } catch {
+      /* Only the loaded, identified video can control shared playback. */
+    }
+    const iframe = player?.getIframe?.() ?? stage?.querySelector('iframe');
+    return {
+      identity: identity(),
+      state,
+      position: player?.getCurrentTime() ?? 0,
+      now: performance.now(),
+      gesture: Boolean(
+        sourceMatches &&
+        iframe &&
+        document.activeElement === iframe &&
+        document.hasFocus() &&
+        document.visibilityState === 'visible' &&
+        navigator.userActivation?.isActive,
+      ),
+    };
+  }
+  async function nativeIntent(intent: PlayerIntent) {
+    if (!ready || !player || !room.current || nativePending || controlBusy || loaded !== identity())
+      return;
+    if (
+      intent.action === 'seek' &&
+      (room.current.live ||
+        !Number.isFinite(intent.position) ||
+        intent.position! < 0 ||
+        intent.position! >= room.current.duration)
+    ) {
+      sync(true);
+      return;
+    }
+    if (intent.action === 'pause') localPaused = true;
+    if (intent.action === 'play') localPaused = false;
+    const shared = !intent.local && onIntent && (intent.action === 'seek' ? canSeek : canControl);
+    const needed =
+      intent.action === 'seek' || (intent.action === 'play' ? !room.playing : room.playing);
+    if (!shared || !needed) {
+      if (intent.action === 'play' && !playing) message = 'The host has paused shared playback.';
+      sync(true);
+      return;
+    }
+    const issuedAt = performance.now();
+    const pending = {
+      identity: identity(),
+      intent,
+      settled: false,
+      deadline: issuedAt + 40000,
+      version: room.version,
+      issuedAt,
+    };
+    nativePending = pending;
+    if (intent.action === 'seek' && player.getPlayerState() === 1) {
+      command('pause');
+      player.pauseVideo();
+      lastPlaying = false;
+    }
+    const epoch = generation;
+    message = '';
+    let accepted = false;
+    try {
+      accepted = await onIntent!({
+        ...intent,
+        ...(intent.action === 'seek'
+          ? { position: calibratedPlaybackPosition(room, intent.position!, -syncOffset) }
+          : {}),
+        code: room.code,
+        videoId: room.current.id,
+        playbackKey: room.playbackKey,
+      });
+    } catch {
+      /* The existing client reports the scoped command failure. */
+    }
+    if (disposed || generation !== epoch || nativePending?.identity !== pending.identity) return;
+    if (!accepted) {
+      nativePending = null;
+      message = 'Shared playback could not be updated. Reconnect before trying again.';
+    } else nativePending = { ...pending, settled: true };
+    await afterRender();
+    if (!disposed && generation === epoch) sync(true);
+  }
+  function readNativePosition() {
+    if (!ready || !player || nativePending || controlBusy || loaded !== identity()) return;
+    try {
+      const intent = native.time(observation());
+      if (intent) void nativeIntent(intent);
+    } catch {
+      /* A replacing iframe cannot issue a command. */
+    }
+  }
 
   function sync(force = false) {
     if (!ready || !player || !room.current) return;
     const localPosition = calibratedPlaybackPosition(room, position, syncOffset);
     const key = `${room.code}:${room.current.id}:${room.playbackKey ?? ''}`;
+    if (nativePending && nativePending.identity !== key) nativePending = null;
+    if (nativePending) {
+      if (!nativePending.settled || controlBusy) return;
+      const confirmed = confirmsPlayerIntent(nativePending.intent, {
+        version: room.version,
+        previousVersion: nativePending.version,
+        playing: room.playing,
+        position: localPosition,
+        elapsed: room.buffering ? 0 : performance.now() - nativePending.issuedAt,
+      });
+      if (!confirmed && performance.now() < nativePending.deadline) return;
+      if (confirmed && nativePending.intent.action !== 'seek') localPaused = false;
+      if (!confirmed) {
+        if (nativePending.intent.action === 'seek') localPaused = true;
+        message = 'Shared playback has not caught up. Reconnect before trying again.';
+      }
+      nativePending = null;
+    }
+    const audible = playing && !localPaused;
     if (loaded !== key) {
       loaded = key;
       writePlayerAudio(true);
       const video = { videoId: room.current.id, startSeconds: localPosition };
-      if (playing) player.loadVideoById(video);
+      command(audible ? 'load' : 'cue', localPosition);
+      if (audible) player.loadVideoById(video);
       else player.cueVideoById(video);
-      lastPlaying = playing;
+      lastPlaying = audible;
       settleUntil = performance.now() + syncRecoveryMs(syncMode);
       return;
     }
-    if (playing !== lastPlaying) {
-      if (playing) player.playVideo();
-      else player.pauseVideo();
-      lastPlaying = playing;
+    if (audible !== lastPlaying || (force && !audible && player.getPlayerState() === 1)) {
+      const state = player.getPlayerState();
+      if (audible && state !== 1) {
+        command('play');
+        player.playVideo();
+      } else if (!audible && state !== 2) {
+        command('pause');
+        player.pauseVideo();
+      }
+      lastPlaying = audible;
       force = true;
     }
     const now = performance.now();
     if (
       !room.current.live &&
-      canCorrectPlayback(player.getPlayerState(), playing, now, settleUntil, force) &&
+      !localPaused &&
+      canCorrectPlayback(player.getPlayerState(), audible, now, settleUntil, force) &&
       shouldCorrect(localPosition, player.getCurrentTime(), now, correctedAt, force, syncMode)
     ) {
+      command('seek', localPosition);
       player.seekTo(localPosition, true);
       notePlayerEvent('correction');
       correctedAt = now;
@@ -202,7 +359,12 @@
     if (disposed) return;
     message = '';
     if (player && ready) {
-      if (playing) player.playVideo();
+      localPaused = false;
+      if (playing && player.getPlayerState() !== 1) {
+        command('play');
+        player.playVideo();
+      }
+      sync(true);
       return;
     }
     if (player && !loading) {
@@ -220,7 +382,7 @@
       player = new window.YT.Player(container, {
         width: '100%',
         height: '100%',
-        playerVars: { playsinline: 1, controls: 1, disablekb: 1, rel: 0, origin: location.origin },
+        playerVars: { playsinline: 1, controls: 1, disablekb: 0, rel: 0, origin: location.origin },
         events: {
           onReady: () => {
             if (!disposed && current === generation) {
@@ -236,6 +398,7 @@
           onError: (event: PlayerEvent) => {
             if (disposed || current !== generation) return;
             loading = false;
+            ready = false;
             notePlayerError(Number(event.data));
             message = 'This source cannot play here. Try the next track or add another song.';
           },
@@ -259,8 +422,31 @@
               bufferingAt = null;
               settleUntil = performance.now() + syncRecoveryMs(syncMode);
             }
-            // Official controls remain local; they cannot override a shared pause.
-            if (event.data === 1 && !playing) player?.pauseVideo();
+            // Only a freshly activated, focused current iframe can issue a shared intent.
+            const value = observation(event.data);
+            if (player?.getPlayerState() === event.data) {
+              const intent = native.state(value);
+              if (intent) {
+                void nativeIntent(intent);
+                if (
+                  event.data === 1 &&
+                  (!playing || localPaused || nativePending?.intent.action === 'seek') &&
+                  player?.getPlayerState() === 1
+                ) {
+                  command('pause');
+                  player?.pauseVideo();
+                }
+                return;
+              }
+            }
+            if (
+              event.data === 1 &&
+              (!playing || localPaused || nativePending?.intent.action === 'seek') &&
+              player?.getPlayerState() === 1
+            ) {
+              command('pause');
+              player?.pauseVideo();
+            }
           },
           // Core, or the D1 room handler, advances the shared queue. A delayed
           // browser ENDED callback must never skip a newer playback instance.
@@ -289,6 +475,8 @@
       /* The keyed mount also removes the previous iframe. */
     }
     loaded = '';
+    nativePending = null;
+    native.reset('');
     correctedAt = -Infinity;
     settleUntil = 0;
     bufferingAt = null;
@@ -302,6 +490,7 @@
     void playing;
     void room;
     void syncMode;
+    void controlBusy;
     if (ready) sync();
   });
   $effect(() => {
@@ -310,10 +499,14 @@
   });
   $effect(() => {
     if (!ready) return;
-    const timer = setInterval(readPlayerAudio, 250);
+    const timer = setInterval(() => {
+      readPlayerAudio();
+      readNativePosition();
+    }, 250);
     return () => clearInterval(timer);
   });
   onDestroy(() => {
+    onActiveChange?.(false);
     disposed = true;
     generation++;
     try {
@@ -322,6 +515,9 @@
       /* Removing the stage ends a stale iframe context. */
     }
     player = null;
+  });
+  $effect(() => {
+    onActiveChange?.(enabled && ready);
   });
 </script>
 
@@ -349,36 +545,64 @@
     </div>
   {/if}
 </div>
-<div class="local-audio" aria-label="Audio on this device">
-  <button
-    class="button secondary"
-    aria-pressed={audio.muted}
-    onclick={() => {
-      audio = toggleAudioMute(audio);
-      saveAudio();
-    }}>{audio.muted ? 'Unmute' : 'Mute'}</button
+<div class="player-status" role="status">
+  <span class="status-dot" class:online={enabled && ready && playing && !localPaused}></span>
+  <span
+    >{!enabled
+      ? 'Audio is off on this device'
+      : !ready
+        ? 'The video player is unavailable'
+        : nativePending || controlBusy
+          ? 'Updating shared playback…'
+          : localPaused
+            ? 'Paused on this device'
+            : playing
+              ? 'Following the shared clock'
+              : room.playing
+                ? 'Waiting for the shared clock'
+                : 'Shared playback is paused'}</span
   >
-  <label for="local-volume">Volume on this device</label><input
-    id="local-volume"
-    aria-label="Volume on this device"
-    type="range"
-    min="0"
-    max="100"
-    value={audio.level}
-    oninput={(event) => {
-      audio = changeAudioLevel(audio, Number(event.currentTarget.value));
-      saveAudio();
-    }}
-  />
-  <button
-    class="button secondary"
-    onclick={() => {
-      void toggleFullscreen();
-    }}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button
+  <span class="control-scope"
+    >{!enabled
+      ? 'Enable audio to use the video controls'
+      : canControl
+        ? canSeek
+          ? 'Your YouTube controls update the room'
+          : 'Play and pause update the concert; seeking is local'
+        : 'Volume and pause are local to you'}</span
   >
 </div>
 <details class="local-sync">
   <summary>Playback settings</summary>
+  <p>Use YouTube's controls for volume, playback, quality, captions and fullscreen.</p>
+  <div class="local-audio" aria-label="Audio on this device">
+    <button
+      class="button secondary"
+      aria-pressed={audio.muted}
+      onclick={() => {
+        audio = toggleAudioMute(audio);
+        saveAudio();
+      }}>{audio.muted ? 'Unmute' : 'Mute'}</button
+    >
+    <label for="local-volume">Volume on this device</label><input
+      id="local-volume"
+      aria-label="Volume on this device"
+      type="range"
+      min="0"
+      max="100"
+      value={audio.level}
+      oninput={(event) => {
+        audio = changeAudioLevel(audio, Number(event.currentTarget.value));
+        saveAudio();
+      }}
+    />
+    <button
+      class="button secondary"
+      onclick={() => {
+        void toggleFullscreen();
+      }}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button
+    >
+  </div>
   <p>These settings affect this device. The shared music and queue stay unchanged.</p>
   <label
     >Synchronization mode<select
@@ -419,19 +643,19 @@
     >
   </div>
   <p>Use the video's controls for quality and captions when the source supports them.</p>
-</details>
-<details
-  class="playback-diagnostics"
-  ontoggle={(event) => {
-    diagnostics = event.currentTarget.open ? playerDiagnostics() : null;
-  }}
->
-  <summary>Playback diagnostics</summary>
-  <p>Anonymous counters on this device. No song, room or account details are recorded.</p>
-  <button class="button secondary" onclick={() => (diagnostics = playerDiagnostics())}
-    >Refresh diagnostics</button
+  <details
+    class="playback-diagnostics"
+    ontoggle={(event) => {
+      diagnostics = event.currentTarget.open ? playerDiagnostics() : null;
+    }}
   >
-  {#if diagnostics}<pre>{JSON.stringify(diagnostics, null, 2)}</pre>{/if}
+    <summary>Playback diagnostics</summary>
+    <p>Anonymous counters on this device. No song, room or account details are recorded.</p>
+    <button class="button secondary" onclick={() => (diagnostics = playerDiagnostics())}
+      >Refresh diagnostics</button
+    >
+    {#if diagnostics}<pre>{JSON.stringify(diagnostics, null, 2)}</pre>{/if}
+  </details>
 </details>
 {#if message}
   <div class="audio-message" role="status">
@@ -441,6 +665,39 @@
 {/if}
 
 <style>
+  .player-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: var(--tv-body, 13px);
+  }
+  .control-scope {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 0.9em;
+  }
+  .local-sync {
+    border: 1px solid var(--line);
+    border-radius: var(--radius, 12px);
+    padding: 12px 16px;
+    background: var(--surface, #14161a);
+  }
+  .local-sync[open] {
+    display: grid;
+    gap: 12px;
+  }
+  .local-sync summary {
+    font-weight: 650;
+  }
+  @media (max-width: 600px) {
+    .control-scope {
+      width: 100%;
+      margin-left: 0;
+    }
+  }
   .player-mount,
   .player-mount > div {
     width: 100%;
@@ -449,7 +706,7 @@
   .local-sync {
     margin-top: 12px;
     color: var(--muted);
-    font-size: var(--tv-body, 12px);
+    font-size: var(--tv-body, 13px);
   }
   .local-sync summary {
     cursor: pointer;

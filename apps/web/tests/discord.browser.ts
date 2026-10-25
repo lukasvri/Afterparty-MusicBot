@@ -117,6 +117,12 @@ for (const [width, height] of [
       });
       await page.goto(`${origin}/v3/discord?guildId=${guildId}`);
       await page.getByRole('heading', { name: 'Together after midnight' }).waitFor();
+      assert.equal(
+        await page
+          .getByRole('link', { name: 'DJ & server tools', exact: true })
+          .getAttribute('href'),
+        `/admin?guildId=${guildId}`,
+      );
       assert.equal(await page.getByText('Private track must never appear').count(), 0);
       assert.equal(await page.getByRole('button', { name: /^Remove / }).count(), 0);
       assert.equal(await page.getByRole('slider', { name: 'Shared concert position' }).count(), 0);
@@ -329,243 +335,359 @@ for (const width of [1440, 390])
     }
   });
 
-test('browser concert audio requires consent and follows fresh Core SSE without issuing recovery commands', async () => {
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: process.env.CHROMIUM_PATH,
-    args: ['--no-sandbox'],
-  });
-  try {
-    const page = await browser.newPage({
-      viewport: { width: 390, height: 1000 },
-      reducedMotion: 'reduce',
+for (const canManage of [false, true])
+  test(`concert audio follows fresh Core SSE and native ${canManage ? 'manager' : 'listener'} controls retain scoped authority`, async () => {
+    const browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.CHROMIUM_PATH,
+      args: ['--no-sandbox'],
     });
-    const errors: string[] = [],
-      writes: unknown[] = [],
-      external: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    await page.addInitScript(() => {
-      type Calls = Array<{ action: string; position?: number }>;
-      const scope = window as unknown as {
-        __calls: Calls;
-        __emit?: (state: unknown) => void;
-        __disconnect?: () => void;
-        __streamPath?: string;
-        __closedStreams: number;
-      };
-      scope.__calls = [];
-      scope.__closedStreams = 0;
-      Object.defineProperty(window, 'EventSource', {
-        value: class {
-          static CLOSED = 2;
-          readyState = 1;
-          onopen: (() => void) | null = null;
-          onmessage: ((event: { data: string }) => void) | null = null;
-          onerror: (() => void) | null = null;
-          constructor(path: string) {
-            scope.__streamPath = path;
-            scope.__emit = (state) =>
-              this.onmessage?.({ data: JSON.stringify({ type: 'state', state }) });
-            scope.__disconnect = () => this.onerror?.();
-            setTimeout(() => this.onopen?.(), 0);
-          }
-          close() {
-            this.readyState = 2;
-            scope.__closedStreams++;
-          }
-        },
+    try {
+      const page = await browser.newPage({
+        viewport: { width: 390, height: 1000 },
+        reducedMotion: 'reduce',
       });
-      Object.defineProperty(window, 'YT', {
-        value: {
-          Player: class {
-            position = 0;
-            state = 2;
-            constructor(_container: HTMLElement, options: { events: { onReady: () => void } }) {
-              scope.__calls.push({ action: 'construct' });
-              setTimeout(() => options.events.onReady(), 0);
+      const errors: string[] = [],
+        writes: Record<string, unknown>[] = [],
+        external: string[] = [];
+      let allowCommands = false;
+      page.on('pageerror', (error) => errors.push(error.message));
+      await page.addInitScript(() => {
+        if (window !== window.top) return;
+        type Calls = Array<{ action: string; position?: number }>;
+        const scope = window as unknown as {
+          __calls: Calls;
+          __emit?: (state: unknown) => void;
+          __disconnect?: () => void;
+          __streamPath?: string;
+          __closedStreams: number;
+        };
+        scope.__calls = [];
+        scope.__closedStreams = 0;
+        Object.defineProperty(window, 'EventSource', {
+          value: class {
+            static CLOSED = 2;
+            readyState = 1;
+            onopen: (() => void) | null = null;
+            onmessage: ((event: { data: string }) => void) | null = null;
+            onerror: (() => void) | null = null;
+            constructor(path: string) {
+              scope.__streamPath = path;
+              scope.__emit = (state) =>
+                this.onmessage?.({ data: JSON.stringify({ type: 'state', state }) });
+              scope.__disconnect = () => this.onerror?.();
+              setTimeout(() => this.onopen?.(), 0);
             }
-            loadVideoById(value: { startSeconds: number }) {
-              this.position = value.startSeconds;
-              this.state = 1;
-              scope.__calls.push({ action: 'load', position: this.position });
-            }
-            cueVideoById(value: { startSeconds: number }) {
-              this.position = value.startSeconds;
-              this.state = 2;
-              scope.__calls.push({ action: 'cue', position: this.position });
-            }
-            playVideo() {
-              this.state = 1;
-              scope.__calls.push({ action: 'play' });
-            }
-            pauseVideo() {
-              this.state = 2;
-              scope.__calls.push({ action: 'pause' });
-            }
-            seekTo(position: number) {
-              this.position = position;
-              scope.__calls.push({ action: 'seek', position });
-            }
-            getCurrentTime() {
-              return this.position;
-            }
-            getPlayerState() {
-              return this.state;
-            }
-            level = 100;
-            muted = false;
-            setVolume(level: number) {
-              this.level = level;
-            }
-            mute() {
-              this.muted = true;
-            }
-            unMute() {
-              this.muted = false;
-            }
-            getVolume() {
-              return this.level;
-            }
-            isMuted() {
-              return this.muted;
-            }
-            destroy() {
-              scope.__calls.push({ action: 'destroy' });
+            close() {
+              this.readyState = 2;
+              scope.__closedStreams++;
             }
           },
-        },
-      });
-    });
-    const snapshot = {
-      guildId,
-      guildName: 'Synthetic stage',
-      roomCode: 'DISCORD1',
-      ready: true,
-      connected: true,
-      playing: false,
-      position: 20,
-      volume: 50,
-      current: track('concert0001', 'Synchronized concert'),
-      queue: [],
-      queueRevision: 'queue-1',
-      lastSeen: Date.now(),
-      online: true,
-      playbackKey: 'playback-1',
-    };
-    await page.route('**/*', async (route) => {
-      const url = new URL(route.request().url());
-      if (url.origin !== origin) {
-        external.push(url.href);
-        await route.abort();
-        return;
-      }
-      if (!url.pathname.startsWith('/api/')) {
-        await route.continue();
-        return;
-      }
-      if (route.request().method() === 'POST') {
-        writes.push(route.request().postDataJSON());
-        await route.fulfill({ status: 500, json: { error: 'No writes expected' } });
-        return;
-      }
-      if (url.pathname === '/api/realtime/clock') {
-        await route.fulfill({ json: { serverTime: Date.now() } });
-        return;
-      }
-      if (url.pathname === '/api/discord/queue') {
-        await route.fulfill({
-          json: { canManage: false, state: { revision: 'queue-1', queue: [] } },
         });
-        return;
-      }
-      if (url.pathname === '/api/discord') {
-        await route.fulfill({ json: { state: snapshot } });
-        return;
-      }
-      if (url.pathname === '/api/admin/guilds') {
-        await route.fulfill({ json: { guilds: [] } });
-        return;
-      }
-      await route.fulfill({ status: 404, json: { error: 'Unexpected endpoint' } });
-    });
-    await page.goto(`${origin}/v3/discord?guildId=${guildId}`);
-    await page.getByRole('heading', { name: 'Synchronized concert' }).waitFor();
-    await page.waitForFunction(() => Boolean((window as unknown as { __emit?: unknown }).__emit));
-    assert.equal(await page.getByRole('button', { name: 'Enable room audio' }).count(), 0);
-    const emit = async (sequence: number, playing: boolean, position: number) =>
-      page.evaluate(
-        ({ snapshot, sequence, playing, position }) => {
-          (window as unknown as { __emit: (state: unknown) => void }).__emit({
-            ...snapshot,
-            engine: 'gutta-krutt-core',
-            epoch: 'epoch-1',
-            sequence,
-            playing,
-            position,
-            serverTime: Date.now(),
-            buffering: false,
+        Object.defineProperty(window, 'YT', {
+          value: {
+            Player: class {
+              position = 0;
+              state = 2;
+              iframe: HTMLIFrameElement;
+              receive: (event: MessageEvent) => void;
+              constructor(
+                container: HTMLElement,
+                options: {
+                  events: {
+                    onReady: () => void;
+                    onStateChange?: (event: { data: number }) => void;
+                  };
+                },
+              ) {
+                this.iframe = document.createElement('iframe');
+                this.iframe.title = 'Synthetic YouTube player';
+                this.iframe.sandbox.add('allow-scripts');
+                this.receive = (event) => {
+                  if (
+                    event.source !== this.iframe.contentWindow ||
+                    event.data?.type !== 'native-concert'
+                  )
+                    return;
+                  if (event.data.action === 'seek') this.position = 60;
+                  else {
+                    this.state = event.data.action === 'play' ? 1 : 2;
+                    options.events.onStateChange?.({ data: this.state });
+                  }
+                };
+                window.addEventListener('message', this.receive);
+                this.iframe.srcdoc = `<button onclick="parent.postMessage({type:'native-concert',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'native-concert',action:'pause'},'*')">Pause video</button><button onclick="parent.postMessage({type:'native-concert',action:'seek'},'*')">Seek video</button>`;
+                container.replaceWith(this.iframe);
+                scope.__calls.push({ action: 'construct' });
+                setTimeout(() => options.events.onReady(), 0);
+              }
+              loadVideoById(value: { startSeconds: number }) {
+                this.position = value.startSeconds;
+                this.state = 1;
+                scope.__calls.push({ action: 'load', position: this.position });
+              }
+              cueVideoById(value: { startSeconds: number }) {
+                this.position = value.startSeconds;
+                this.state = 2;
+                scope.__calls.push({ action: 'cue', position: this.position });
+              }
+              playVideo() {
+                this.state = 1;
+                scope.__calls.push({ action: 'play' });
+              }
+              pauseVideo() {
+                this.state = 2;
+                scope.__calls.push({ action: 'pause' });
+              }
+              seekTo(position: number) {
+                this.position = position;
+                scope.__calls.push({ action: 'seek', position });
+              }
+              getCurrentTime() {
+                return this.position;
+              }
+              getIframe() {
+                return this.iframe;
+              }
+              getVideoUrl() {
+                return 'https://www.youtube.com/watch?v=concert0001';
+              }
+              getPlayerState() {
+                return this.state;
+              }
+              level = 100;
+              muted = false;
+              setVolume(level: number) {
+                this.level = level;
+              }
+              mute() {
+                this.muted = true;
+              }
+              unMute() {
+                this.muted = false;
+              }
+              getVolume() {
+                return this.level;
+              }
+              isMuted() {
+                return this.muted;
+              }
+              destroy() {
+                window.removeEventListener('message', this.receive);
+                this.iframe.remove();
+                scope.__calls.push({ action: 'destroy' });
+              }
+            },
+          },
+        });
+      });
+      const snapshot = {
+        guildId,
+        guildName: 'Synthetic stage',
+        roomCode: 'DISCORD1',
+        ready: true,
+        connected: true,
+        playing: false,
+        position: 20,
+        volume: 50,
+        current: track('concert0001', 'Synchronized concert'),
+        queue: [],
+        queueRevision: 'queue-1',
+        lastSeen: Date.now(),
+        online: true,
+        playbackKey: 'playback-1',
+      };
+      await page.route('**/*', async (route) => {
+        const url = new URL(route.request().url());
+        if (url.origin !== origin) {
+          external.push(url.href);
+          await route.abort();
+          return;
+        }
+        if (!url.pathname.startsWith('/api/')) {
+          await route.continue();
+          return;
+        }
+        if (route.request().method() === 'POST') {
+          const input = route.request().postDataJSON();
+          writes.push(input);
+          assert(allowCommands, 'clock recovery never sends commands');
+          if (url.pathname === '/api/admin/control') {
+            assert(canManage);
+            assert.equal(input.guildId, guildId);
+            assert.equal(input.command.action, 'seek');
+            assert.equal(input.command.playbackKey, snapshot.playbackKey);
+            assert.equal(input.command.queueRevision, snapshot.queueRevision);
+            snapshot.position = input.command.seconds;
+            return route.fulfill({ json: { id: input.commandId, status: 'done' } });
+          }
+          assert.equal(url.pathname, '/api/discord');
+          assert.equal(input.guildId, guildId);
+          assert.equal(input.playbackKey, snapshot.playbackKey);
+          assert.equal(input.queueRevision, snapshot.queueRevision);
+          assert(['resume', 'pause'].includes(input.action));
+          snapshot.playing = input.action === 'resume';
+          await route.fulfill({ json: { id: `public:${input.commandId}`, status: 'done' } });
+          return;
+        }
+        if (url.pathname === '/api/realtime/clock') {
+          await route.fulfill({ json: { serverTime: Date.now() } });
+          return;
+        }
+        if (url.pathname === '/api/discord/queue') {
+          await route.fulfill({
+            json: { canManage, state: { revision: 'queue-1', queue: [] } },
           });
-        },
-        { snapshot, sequence, playing, position },
+          return;
+        }
+        if (url.pathname === '/api/discord') {
+          await route.fulfill({ json: { state: snapshot } });
+          return;
+        }
+        if (url.pathname === '/api/admin/guilds') {
+          await route.fulfill({ json: { guilds: [] } });
+          return;
+        }
+        await route.fulfill({ status: 404, json: { error: 'Unexpected endpoint' } });
+      });
+      await page.goto(`${origin}/v3/discord?guildId=${guildId}`);
+      await page.getByRole('heading', { name: 'Synchronized concert' }).waitFor();
+      await page.waitForFunction(() => Boolean((window as unknown as { __emit?: unknown }).__emit));
+      assert.equal(await page.getByRole('button', { name: 'Enable room audio' }).count(), 0);
+      const emit = async (sequence: number, playing: boolean, position: number) =>
+        page.evaluate(
+          ({ snapshot, sequence, playing, position }) => {
+            (window as unknown as { __emit: (state: unknown) => void }).__emit({
+              ...snapshot,
+              engine: 'gutta-krutt-core',
+              epoch: 'epoch-1',
+              sequence,
+              playing,
+              position,
+              serverTime: Date.now(),
+              buffering: false,
+            });
+          },
+          { snapshot, sequence, playing, position },
+        );
+      await emit(1, true, 25);
+      await page.getByRole('button', { name: 'Enable room audio' }).waitFor();
+      assert.deepEqual(
+        await page.evaluate(() => (window as unknown as { __calls: unknown[] }).__calls),
+        [],
       );
-    await emit(1, true, 25);
-    await page.getByRole('button', { name: 'Enable room audio' }).waitFor();
-    assert.deepEqual(
-      await page.evaluate(() => (window as unknown as { __calls: unknown[] }).__calls),
-      [],
-    );
-    await page.getByRole('button', { name: 'Enable room audio' }).click();
-    await page.waitForFunction(() =>
-      (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
-        (call) => call.action === 'load',
-      ),
-    );
-    const started = await page.evaluate(
-      () =>
-        (
-          window as unknown as { __calls: Array<{ action: string; position?: number }> }
-        ).__calls.find((call) => call.action === 'load')?.position,
-    );
-    assert(started !== undefined && started >= 25 && started < 27);
-    await emit(2, false, 30);
-    await page.waitForFunction(() =>
-      (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
-        (call) => call.action === 'pause',
-      ),
-    );
-    await emit(3, true, 31);
-    await page.waitForFunction(() =>
-      (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
-        (call) => call.action === 'play',
-      ),
-    );
-    await page.evaluate(() => (window as unknown as { __disconnect: () => void }).__disconnect());
-    await page.waitForFunction(() =>
-      (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
-        (call) => call.action === 'destroy',
-      ),
-    );
-    assert.equal(await page.getByRole('button', { name: 'Enable room audio' }).count(), 0);
-    await emit(4, false, 40);
-    await page.getByRole('button', { name: 'Enable room audio' }).waitFor();
-    await page.getByRole('button', { name: 'Enable room audio' }).click();
-    await page.waitForFunction(() =>
-      (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
-        (call) => call.action === 'cue',
-      ),
-    );
-    assert.equal(
-      await page.evaluate(() => (window as unknown as { __streamPath: string }).__streamPath),
-      '/api/realtime/stream?guildId=' + guildId,
-    );
-    assert.equal(
-      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-      true,
-    );
-    assert.deepEqual(writes, []);
-    assert.deepEqual(errors, []);
-    assert.deepEqual(external, []);
-  } finally {
-    await browser.close();
-  }
-});
+      await page.getByRole('button', { name: 'Enable room audio' }).click();
+      await page.waitForFunction(() =>
+        (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
+          (call) => call.action === 'load',
+        ),
+      );
+      const started = await page.evaluate(
+        () =>
+          (
+            window as unknown as { __calls: Array<{ action: string; position?: number }> }
+          ).__calls.find((call) => call.action === 'load')?.position,
+      );
+      assert(started !== undefined && started >= 25 && started < 27);
+      await emit(2, false, 30);
+      await page.waitForFunction(() =>
+        (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
+          (call) => call.action === 'pause',
+        ),
+      );
+      await emit(3, true, 31);
+      await page.waitForFunction(() =>
+        (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
+          (call) => call.action === 'play',
+        ),
+      );
+      await page.evaluate(() => (window as unknown as { __disconnect: () => void }).__disconnect());
+      await page.waitForFunction(() =>
+        (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
+          (call) => call.action === 'destroy',
+        ),
+      );
+      assert.equal(await page.getByRole('button', { name: 'Enable room audio' }).count(), 0);
+      await emit(4, false, 40);
+      await page.getByRole('button', { name: 'Enable room audio' }).waitFor();
+      await page.getByRole('button', { name: 'Enable room audio' }).click();
+      await page.waitForFunction(() =>
+        (window as unknown as { __calls: Array<{ action: string }> }).__calls.some(
+          (call) => call.action === 'cue',
+        ),
+      );
+      assert.equal(
+        await page.evaluate(() => (window as unknown as { __streamPath: string }).__streamPath),
+        '/api/realtime/stream?guildId=' + guildId,
+      );
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+      assert.equal(writes.length, 0);
+      allowCommands = true;
+      const native = page.frameLocator('.audio-stage iframe');
+      const resumed = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.request().postDataJSON()?.action === 'resume',
+      );
+      await native.getByRole('button', { name: 'Play video', exact: true }).click();
+      await resumed;
+      await emit(5, true, 40);
+      await page
+        .locator('.player-status')
+        .filter({ hasText: 'Following the shared clock' })
+        .waitFor();
+      const paused = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.request().postDataJSON()?.action === 'pause',
+      );
+      await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+      await paused;
+      await emit(6, false, 40);
+      await page
+        .locator('.player-status')
+        .filter({ hasText: 'Shared playback is paused' })
+        .waitFor();
+      assert.deepEqual(
+        writes.map((write) => write.action),
+        ['resume', 'pause'],
+      );
+      await page.evaluate(() => {
+        localStorage.setItem('afterparty-sync-offset', '2');
+        window.dispatchEvent(
+          new StorageEvent('storage', { key: 'afterparty-sync-offset', storageArea: localStorage }),
+        );
+      });
+      await page.waitForTimeout(1100);
+      if (canManage) {
+        const sought = page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/api/admin/control',
+        );
+        await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+        await sought;
+        assert.equal(
+          (writes.at(-1)!.command as { seconds: number }).seconds,
+          58,
+          'local calibration is removed from the shared seek',
+        );
+        await emit(7, false, 58);
+        await page
+          .locator('.player-status')
+          .filter({ hasText: 'Shared playback is paused' })
+          .waitFor();
+      } else {
+        await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+        await page.waitForTimeout(500);
+        assert.equal(writes.length, 2, 'listeners cannot send administrator seeks');
+      }
+      assert.deepEqual(errors, []);
+      assert.deepEqual(external, []);
+    } finally {
+      await browser.close();
+    }
+  });

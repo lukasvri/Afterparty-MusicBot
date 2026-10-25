@@ -301,7 +301,7 @@ for (const mode of ['room', 'discord'] as const) {
       const calls = () =>
         page.evaluate(() => (window as unknown as ProbeWindow).__audioSettings.calls);
       assert.equal((await calls()).find((call) => call.action === 'construct')?.controls, 1);
-      assert.equal((await calls()).find((call) => call.action === 'construct')?.disablekb, 1);
+      assert.equal((await calls()).find((call) => call.action === 'construct')?.disablekb, 0);
       await page.evaluate(() =>
         (window as unknown as ProbeWindow).__audioSettings.stateChanged?.(1),
       );

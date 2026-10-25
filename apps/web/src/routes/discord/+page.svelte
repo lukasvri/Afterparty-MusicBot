@@ -37,6 +37,7 @@
   const resultPages = $derived(Math.max(1, Math.ceil(view.results.length / 10)));
   let tick = $state(0);
   let tv = $state(false);
+  let playerActive = $state(false);
   function toggleTV() {
     tv = !tv;
     const url = new URL(location.href);
@@ -70,6 +71,7 @@
     client = createDiscordClient();
     const unsubscribe = client.subscribe((value) => {
       if (value.loading || value.guildId !== view.guildId) {
+        playerActive = false;
         panel = 'search';
         query = '';
         resultPage = 0;
@@ -136,7 +138,10 @@
       {#if view.guildId}<button class="button secondary" aria-pressed={tv} onclick={toggleTV}
           >{tv ? 'Exit TV mode' : 'TV mode'}</button
         >{/if}
-      <a href="/">Listening rooms</a><a href="/admin" data-sveltekit-reload>Server settings</a>
+      <a href="/">Listening rooms</a><a
+        href={view.guildId ? `/admin?guildId=${encodeURIComponent(view.guildId)}` : '/admin'}
+        data-sveltekit-reload>DJ & server tools</a
+      >
     </nav>
   </header>
   <main id="concert">
@@ -201,6 +206,25 @@
                   room={view.audioRoom}
                   position={target.position}
                   playing={target.playing}
+                  canControl={!controlsDisabled}
+                  canSeek={!controlsDisabled && canManage}
+                  controlBusy={view.busy}
+                  onActiveChange={(active) => (playerActive = active)}
+                  onIntent={async (intent) => {
+                    if (
+                      !client ||
+                      view.audioRoom?.code !== intent.code ||
+                      concert?.current?.id !== intent.videoId ||
+                      concert.playbackKey !== intent.playbackKey ||
+                      controlsDisabled
+                    )
+                      return false;
+                    return intent.action === 'seek'
+                      ? canManage
+                        ? client.seek(intent.position!)
+                        : false
+                      : client.control(intent.action === 'play' ? 'resume' : 'pause');
+                  }}
                 />{/key}
             {:else}
               <div class="concert-art">
@@ -223,16 +247,17 @@
               <p>{concert.current.artist}</p>
             </div>
             <div class="concert-controls">
-              <button
-                class="button primary"
-                disabled={controlsDisabled}
-                onclick={() => {
-                  void client?.control(concert?.playing ? 'pause' : 'resume');
-                }}
-                ><Icon name={concert.playing ? 'pause' : 'play'} />{concert.playing
-                  ? 'Pause'
-                  : 'Resume'}</button
-              ><button
+              {#if !playerActive}
+                <button
+                  class="button primary"
+                  disabled={controlsDisabled}
+                  onclick={() => {
+                    void client?.control(concert?.playing ? 'pause' : 'resume');
+                  }}
+                  ><Icon name={concert.playing ? 'pause' : 'play'} />{concert.playing
+                    ? 'Pause'
+                    : 'Resume'}</button
+                >{/if}<button
                 class="button secondary"
                 disabled={controlsDisabled}
                 onclick={() => {
@@ -248,7 +273,7 @@
               Controls update the shared Discord concert. The bot must already be connected to a
               voice channel.
             </p>
-            {#if canManage && !concert.current.live}
+            {#if canManage && !concert.current.live && !playerActive}
               <form
                 class="shared-seek"
                 onsubmit={(event) => {
@@ -283,8 +308,8 @@
                   >Seek concert</button
                 >
                 <p>
-                  Administrator action for everyone in this concert. Moving the video’s own controls
-                  only affects your browser.
+                  Administrator action for everyone in this concert. Enable browser audio to use the
+                  video controls with the shared timeline.
                 </p>
               </form>
             {/if}
@@ -404,7 +429,11 @@
               </ul>{/if}
           {/if}
         </section>
-        <section class="concert-discovery" aria-label="Concert music tools">
+        <section
+          class="concert-discovery"
+          class:workspace-expanded={panel === 'library'}
+          aria-label="Concert music tools"
+        >
           <nav class="music-tabs" aria-label="Concert music tools">
             <button
               class="button"
@@ -425,24 +454,7 @@
                 onclick={() => client?.cancelAdditions()}>Cancel additions</button
               >{/if}
           </nav>
-          {#if panel === 'library'}
-            {#key view.guildId}
-              {#await import('#lib/library/MusicLibrary.svelte')}
-                <p role="status">Opening your library…</p>
-              {:then { default: MusicLibrary }}
-                <MusicLibrary
-                  tracks={[...(concert?.current ? [concert.current] : []), ...queue]}
-                  capacity={roomQueueCapacity(queue.length, view.queue?.state.requests?.length)}
-                  pendingIds={view.queue?.state.requests?.map((video) => video.id) ?? []}
-                  history={view.history}
-                  busy={view.busy || !view.connected || !concert?.online || !concert?.connected}
-                  onAdd={(ids) => addTracks(ids, true)}
-                />
-              {:catch}<p class="error-message" role="alert">
-                  The library could not load. Check your connection and open it again.
-                </p>{/await}
-            {/key}
-          {:else}
+          <div class="concert-search">
             <form
               class="search-form"
               role="search"
@@ -513,6 +525,24 @@
                   onclick={() => resultPage++}>Next results</button
                 >
               </nav>{/if}
+          </div>
+          {#if panel === 'library'}
+            {#key view.guildId}
+              {#await import('#lib/library/MusicLibrary.svelte')}
+                <p role="status">Opening your library…</p>
+              {:then { default: MusicLibrary }}
+                <MusicLibrary
+                  tracks={[...(concert?.current ? [concert.current] : []), ...queue]}
+                  capacity={roomQueueCapacity(queue.length, view.queue?.state.requests?.length)}
+                  pendingIds={view.queue?.state.requests?.map((video) => video.id) ?? []}
+                  history={view.history}
+                  busy={view.busy || !view.connected || !concert?.online || !concert?.connected}
+                  onAdd={(ids) => addTracks(ids, true)}
+                />
+              {:catch}<p class="error-message" role="alert">
+                  The library could not load. Check your connection and open it again.
+                </p>{/await}
+            {/key}
           {/if}
         </section>
       </section>
@@ -552,6 +582,28 @@
     min-width: 0;
     border-top: 1px solid var(--line);
     padding-top: 26px;
+  }
+  .concert-search .search-results {
+    max-height: min(52dvh, 560px);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+  }
+  @media (min-width: 1200px) {
+    .workspace-expanded {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
+      align-items: start;
+      gap: 24px;
+    }
+    .workspace-expanded .music-tabs {
+      grid-column: 1 / -1;
+      margin-bottom: 0;
+    }
+    .workspace-expanded .concert-search {
+      position: sticky;
+      top: 24px;
+    }
   }
   .music-tabs,
   .result-pages {

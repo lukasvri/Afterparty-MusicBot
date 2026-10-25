@@ -44,8 +44,8 @@
     display: grid;
     grid-template-columns: 150px minmax(0, 1fr);
     gap: 24px;
-    border-top: 1px solid #29292e;
-    padding: 28px 0;
+    border-top: 1px solid var(--line);
+    padding: 32px 0;
   }
   .stamp {
     display: flex;
@@ -59,12 +59,12 @@
     font-size: 14px;
   }
   time {
-    font-size: 12px;
-    color: #94949f;
+    font-size: 14px;
+    color: var(--muted);
   }
   small {
-    color: #94949f;
-    font-size: 9px;
+    color: var(--muted);
+    font-size: 11px;
     letter-spacing: 1px;
   }
   h2 {
