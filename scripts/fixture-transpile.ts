@@ -13,6 +13,8 @@ export function transpileFixtureModule(url: URL | string) {
       module: ts.ModuleKind.ESNext,
       target: ts.ScriptTarget.ES2022,
       isolatedModules: true,
+      inlineSourceMap: true,
+      inlineSources: true,
     },
   }).outputText;
 }

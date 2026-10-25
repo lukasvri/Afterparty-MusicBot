@@ -44,58 +44,39 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Creative authority for the private alpha
 
-- The owner grants broad creative and technical discretion for the Afterparty
-  alpha website. Treat the existing UI as a starting point, not a fixed design,
-  feature layout or component specification. Proactively choose distinctive,
-  professional design, information architecture, navigation, responsive
-  layouts, interactions, accessible motion and supporting tools that produce a
-  better, coherent experience. Avoid generic template-like or "AI-looking" UI.
-- For an authorized website goal, independently make routine, reversible
-  design and implementation decisions. Rework, merge or replace screens and
-  components, propose and build relevant usability improvements, and improve
-  related flows without asking for approval on each detail. Significant
-  redesigns are welcome while the site is alpha; do not require pixel-perfect
-  parity with previous screenshots. Preserve the Afterparty identity as the
-  starting brand, including its name, canonical logo and black/red direction.
-  A full rebrand remains a distinct owner decision.
-- Creative freedom is not a license for feature bloat or unbounded unrelated
-  scope. Prioritize real usability, memorable polish, accessibility, readable
-  mobile UI, maintainable architecture and demonstrable performance. Record
-  substantial new independent feature ideas in GitHub issues, and split risky
-  changes into reviewable draft PRs. Explain major tradeoffs, not every minor
-  styling choice. Validate relevant user journeys with tests and visual review.
-- Preserve functional user outcomes and critical authorization, persistence,
-  privacy, queue, music and shared playback contracts, or document/test a safe,
-  intentional migration with rollback. Do not change production systems or
-  use live data during cloud development.
-- This authority covers investigation, source edits, refactoring, tests,
-  documentation, commits, branches, issues and draft PRs only. Never infer
-  permission to merge/auto-merge, publish, deploy, change production/DNS/access
-  or secrets, spend money, destroy important data or restart paused Rust work.
-  Explicit owner approval is still required for those protected actions.
+- Within an authorized alpha website goal, independently redesign screens,
+  navigation, layouts and related usability flows. Existing UI/screenshots are
+  a starting point; significant redesigns need no pixel-perfect parity. Preserve
+  the Afterparty name, canonical logo and black/red identity; full rebranding
+  requires an owner decision. Aim for distinctive, professional, accessible,
+  responsive design, readable mobile UI, useful motion and measured performance.
+- Avoid feature bloat and unrelated scope. Put substantial independent ideas in
+  GitHub issues, split risky changes into draft PRs, explain major tradeoffs and
+  verify relevant journeys through tests and visual review.
+- Preserve authorization, persistence, privacy, queues, music and shared playback
+  outcomes, or document and test an intentional migration with rollback.
+  Cloud development uses no production systems or live data.
+- Authority covers investigation, source edits, refactoring, tests, docs,
+  branches, commits, issues and draft PRs. Merge/auto-merge, publication,
+  deployment, production/DNS/access/secrets changes, spending, destruction of
+  important data and resuming paused Rust work require explicit owner approval.
 
 ## Keep every change organized
 
-- Treat source consolidation and navigability as acceptance criteria for every
-  change, not a separate cleanup task. Before adding a module, setting, type,
-  validation rule or helper, find its existing owner in the
-  [source map](docs/ARCHITECTURE.md#source-map) and reuse or extend it.
-- Keep related components, clients and behavior helpers together in their
-  feature folder. Keep routes thin. Avoid a new parallel implementation when
-  an existing shared contract or pure function serves the same responsibility.
-- Settings, bounds, protocol types and validation rules shared by Core and the website must have one canonical browser-safe definition. Keep authorization,
-  persistence and distinct UI lifecycles in their appropriate implementations.
-- Remove duplication and dead code introduced or exposed by the current change
-  when its callers and compatibility requirements are understood. Preserve
-  migrations, public entry points, rollback and operational recovery tools.
-  Compression means less duplication and clearer ownership, not minified source
-  or unrelated wholesale rewrites.
-- Update the canonical source map when adding, moving or changing ownership of
-  a feature. Link to existing guidance rather than creating competing overviews.
-- Before submitting, review the diff for misplaced files, duplicate definitions,
-  stale imports and unnecessary dependencies. Run the required checks, including
-  the existing unused-file audit and affected browser/contract tests. State any
-  remaining structural limitation in the PR; do not claim unperformed cleanup.
+- Before adding a module, setting, type, validator or helper, find and extend its
+  owner in the [source map](docs/ARCHITECTURE.md#source-map). Keep routes thin and
+  related components, clients and helpers in their feature folder; reuse shared
+  contracts and pure functions instead of parallel implementations.
+- Shared settings, bounds, protocol types and validation need one canonical
+  browser-safe definition across Core and the website variants in this checkout.
+  Keep authorization, persistence and distinct UI lifecycles with their owners.
+- Remove duplication/dead code introduced or exposed by the task only when callers
+  and compatibility are understood. Preserve migrations, public entry points,
+  rollback and recovery tools. Do not minify source or undertake unrelated rewrites.
+- Update the source map when feature ownership changes; link existing guidance.
+  Review placement, duplicate definitions, stale imports and dependencies. Run
+  required checks, the existing unused-file audit and affected browser/contract
+  tests. Record remaining structural limits and only verified cleanup in the PR.
 
 ## Technology decisions
 
@@ -124,63 +105,34 @@ use em dashes. Keep global personal preferences out of repository instructions.
 
 ## Codex allowance and efficient execution
 
-- Chat handles requirements, focused source inspection, research, issue triage,
-  design decisions and PR review with its own available tools before consuming
-  Codex capacity. Do not start Codex merely to plan, summarize, repeat earlier
-  analysis, generate a prompt or perform a simple GitHub/documentation action
-  that an existing authorized tool can do.
-- Send one short, executable handoff: repository/ref, observed issue, desired
-  outcome, constraints, relevant paths, acceptance criteria and targeted checks.
-  Refer to these repository instructions by path; do not paste the entire
-  instruction set, repository history or broad feature wishlist on every task.
-  Reuse an existing issue or working thread rather than restarting discovery.
-- Work in bounded, useful slices with a clear stop condition. Implement related
-  changes together and report a concrete diff. For major alpha rewrites, advance
-  one testable vertical slice at a time instead of requesting a complete
-  redesign plus unrelated features in one Codex run.
-- Subagents are opt-in for substantial independent work with a clear net
-  benefit. Avoid default fan-out, duplicate exploration, overlapping agents
-  and repeated reviews. Use one focused reviewer after meaningful changes
-  when warranted; reuse existing CI and review results.
-- During coding, run fast tests relevant to modified behavior and reuse their
-  output. Before a review-ready code PR, run the required full validation and
-  affected browser/security suites. Documentation-only edits need diff/link
-  checks, not full application tests. Never reduce security, playback or data
-  verification just to save allowance.
-- Check remaining usage in Settings > Usage or Codex CLI `/status` when
-  available. If running low, finish the smallest useful verified slice, record
-  remaining work in the issue/PR and stop nonessential reruns. Never assume
-  an exact quota, promise a saving percentage or spend API credits automatically.
+- Default to one main agent. Use subagents only for meaningful independent
+  parallel work, isolated context or review. Bound tasks and writes; the lead
+  integrates and verifies. Avoid duplicate discovery, handoffs and reviews.
+- Load Skills, tools and docs on demand. Reuse issues, evidence and valid checks.
+  Handoffs need repository/ref, problem, outcome, constraints, paths, acceptance
+  criteria and focused checks, not copied instructions or project history.
+- Deliver reviewable vertical slices. Run focused tests first; retain meaningful
+  regressions/review and required full/browser/security checks before code PRs.
+  Internal docs need diff/link checks. Rerun when changes or failures justify it.
+- Optimize verified quality per token without sacrificing correctness, security,
+  accessibility, playback/data integrity or maintainability.
+- Prefer lightweight models for trivial work, GPT-6.1 Sol Medium for ordinary
+  coding and High for difficult debugging, architecture or migrations. Verify
+  actual availability/settings. If usage is low, finish a useful verified slice
+  and record remaining work. Do not guess quotas, promise fixed savings or spend
+  API credits without approval.
 
 ## Delegation and review
 
-- ChatGPT Chat is the project coordinator and primary owner dialogue. Dot
-  (Sjefen) is temporarily excluded from the active workflow because it is
-  unstable. Do not route tasks, handoffs or reviews through Dot. Resume its role
-  only after an explicit owner decision. ChatGPT Work remains excluded.
-- For Chat-led requests, inspect current GitHub evidence and only the files,
-  issues and documentation relevant to the task. Investigate bugs, constraints
-  and tradeoffs enough to define observable acceptance criteria. Skip lengthy
-  discovery for small, obvious changes. Chat resolves research-only requests
-  directly; delegate code edits, executable tests or environment-specific
-  debugging to Codex when needed, with a focused technical handoff.
-- Conserve Codex allowance: use an available lightweight model for trivial edits,
-  GPT-6.1 Sol at Medium effort for ordinary coding, and Sol High for difficult
-  debugging, architecture or migrations. Escalate to the heaviest model only
-  with a concrete reason. Verify actual model/effort and report fallbacks.
-- Use subagents or delegation when the active tool supports it and independent
-  work benefits from parallel execution, such as source inspection and review.
-  Give each agent a bounded task, source ref and acceptance criteria. Assign
-  non-overlapping writes or separate worktrees; review the combined result.
-- Check actual tool availability and permissions first. Chat model selection,
-  including Pro, does not by itself provide subagent tools. If delegation is
-  unavailable or would add unnecessary coordination, work sequentially and
-  report the limitation or reason. Never claim that an agent or check ran unless it did.
-- The lead agent owns integration, validation and the final report. When Chat is
-  coordinating an owner request, it should follow the task through GitHub review
-  and Codex handoffs without making the owner manually relay routine updates.
-  Request decisions only for genuinely ambiguous goals or protected actions.
-  Delegation does not grant merge, publishing, deployment or production access.
+- ChatGPT Chat coordinates requirements and owner dialogue; Codex handles code,
+  executable tests and environment-specific debugging when needed. Resolve
+  research, triage and simple GitHub/documentation actions with existing tools.
+  Do not start another coding run merely to plan or repeat available analysis.
+- Dot (Sjefen) is paused until an explicit owner decision; ChatGPT Work remains
+  excluded. Check actual tools and permissions before delegating. The lead owns
+  integration, validation, GitHub review follow-through and the final report.
+- Report only agents and checks that actually ran. Ask for ambiguous goals or
+  protected actions; delegation grants no merge, deployment or production rights.
 
 ## Code Review Rules
 

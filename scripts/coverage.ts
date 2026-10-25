@@ -14,7 +14,7 @@ for (const suite of [
 ]) {
   const output = `coverage/${suite.name}.lcov`;
   const result = spawnSync(process.execPath, [
-    "--test", "--experimental-test-coverage", `--test-coverage-include=${suite.include}`,
+    "--enable-source-maps", "--test", "--experimental-test-coverage", `--test-coverage-include=${suite.include}`,
     "--test-reporter=spec", "--test-reporter-destination=stdout",
     "--test-reporter=lcov", `--test-reporter-destination=${output}`, ...suite.args,
   ], { cwd: root, stdio: "inherit" });

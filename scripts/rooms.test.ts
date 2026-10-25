@@ -67,8 +67,39 @@ const hooks = registerHooks({
     return next(url, context);
   },
 });
-const { mutate: mutateHandler, hash, publicRoom, search: searchHandler } = await import("../lib/server.ts");
+const { mutate: mutateHandler, hash, publicRoom, search: searchHandler, body } = await import("../lib/server.ts");
 hooks.deregister();
+test("foreign-origin JSON is fully discarded and remains forbidden", async () => {
+  const request = new Request("https://afterparty.test/api/rooms/TESTROOM", {
+    method: "POST",
+    headers: { Origin: "https://foreign.invalid", "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "radio", enabled: false }),
+  });
+  await assert.rejects(() => body(request), { status: 403 });
+  assert.equal(request.bodyUsed, true);
+  assert.equal(request.body?.locked, false);
+});
+test("discarding an untrusted origin stops at the body limit and cancels the stream", async () => {
+  let chunks = 0;
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      chunks++;
+      controller.enqueue(new Uint8Array([1]));
+    },
+    cancel() { cancelled = true; },
+  }, { highWaterMark: 0 });
+  const request = new Request("https://afterparty.test/api/rooms/TESTROOM", {
+    method: "POST",
+    headers: { Origin: "https://foreign.invalid", "Content-Type": "application/json" },
+    body: stream,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+  await assert.rejects(() => body(request, 2), { status: 403 });
+  assert.equal(cancelled, true);
+  assert(chunks <= 3, "A rejected stream must not be drained without a bound");
+  assert.equal(request.body?.locked, false);
+});
 const mutate = async (...args: Parameters<typeof mutateHandler>) => {
   const result = await mutateHandler(...args);
   assert(result.room, "The tested room mutation must return the resulting room");

@@ -95,8 +95,27 @@ export async function limit(
 }
 export async function body(request: Request, maximum = 16000) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  if (origin && origin !== new URL(request.url).origin) {
+    // Drain rejected bodies within the existing cap so the request finishes cleanly.
+    const reader = request.body?.getReader();
+    if (reader) {
+      let size = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > maximum) {
+            await reader.cancel();
+            break;
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
     fail(403, "Forespørselen kommer fra en annen nettside.");
+  }
   if (
     !(request.headers.get("content-type") ?? "").startsWith("application/json")
   )
