@@ -5,12 +5,12 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { scripts: { "test:unit": string } };
 if (!pkg.scripts["test:unit"].startsWith("node --test ")) throw new Error("Update the coverage runner for the changed root unit-test command.");
-const classicTests = pkg.scripts["test:unit"].replace(/^node --test /, "").split(" ");
+const sharedTests = pkg.scripts["test:unit"].replace(/^node --test /, "").split(" ");
 mkdirSync(new URL("../coverage/", import.meta.url), { recursive: true });
 for (const suite of [
-  { name: "classic", include: "lib/**/*.ts", args: classicTests },
+  { name: "shared", include: "lib/**/*.ts", args: sharedTests },
   { name: "core", include: "services/core/src/**/*.ts", args: ["--test-concurrency=1", "--test-timeout=30000", "services/core/tests/*.test.ts"] },
-  { name: "v3", include: "apps/web/src/lib/**/*.ts", args: ["--test-isolation=none", "apps/web/tests/*.test.ts"] },
+  { name: "native", include: "apps/web/src/lib/**/*.ts", args: ["--test-isolation=none", "apps/web/tests/*.test.ts"] },
 ]) {
   const output = `coverage/${suite.name}.lcov`;
   const result = spawnSync(process.execPath, [

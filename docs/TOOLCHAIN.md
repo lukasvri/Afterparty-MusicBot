@@ -9,11 +9,11 @@ official compatibility documentation before implementing each change.
 
 | Area | Verified existing source | Preferred direction | Implementation gate |
 | --- | --- | --- | --- |
-| Website framework | React 19, Next.js 16, Vinext/Vite | **SvelteKit 3 + Svelte 5** for an alpha redesign | Prove Cloudflare Workers/D1, OAuth/session, API and real-time contracts before switching; compare measured baseline |
-| Website language | TypeScript 5.9 | TypeScript 6 where framework/build/plugin support is verified | Do not force a toolchain upgrade that breaks CI or Cloudflare |
-| Website styling | Tailwind CSS 4 | Keep Tailwind 4 only when it improves design-system consistency | Preserve Afterparty black/red identity and accessibility; avoid duplicate styling systems |
+| Website framework | **SvelteKit 3 + Svelte 5**, sole native website | Maintain the native implementation | Classic and React/Next/Vinext have been retired at the owner’s request; preserve API/data/security contracts |
+| Website/Core source language | **TypeScript 6.0.3** | One supported compiler generation across the project | Validate strict types, native Worker and Core audio/recovery |
+| Website styling | Native Svelte component CSS | Maintain one design system | Preserve Afterparty black/red identity, accessibility and touch targets |
 | Database/API | Drizzle ORM, Cloudflare tooling | Retain Drizzle for applicable database access, Workers and D1 for website hosting | Validate bindings, schema changes and authorization without touching production |
-| Core/audio | Node.js 24, TypeScript, discord.js, FFmpeg | Evaluate Node.js 26 for the next LTS baseline while keeping the working Core stable | Test build, dependencies, native audio paths and recovery before any Node/Docker production change; protect guild/room isolation, persistence, queue revisions and playback clock |
+| Core/audio | Source image: immutable Node.js 26.12.1, TypeScript 6, discord.js and FFmpeg | Complete actual LTS/host acceptance in #117 | Source qualification is separate from installed hosts; preserve isolation, queue revisions, explicit intent and clock |
 | Other service languages | Existing Core is TypeScript | Consider Go for independent APIs, Rust for measured low-level work, Python for automation/AI | Choose per workload, interoperability, hosting and test evidence; paused Rust work is not resumed by this decision |
 
 SvelteKit 3 was released on 1 October 2026. Its selection is an **approved
@@ -28,9 +28,9 @@ reason to add Astro to this application's runtime.
 ## Developer workflow and testing
 
 The repository includes an SvelteKit 3/Svelte 5/TypeScript 6 website
-candidate in `apps/web/`. See [the migration guide](SVELTEKIT_MIGRATION.md) for its
+in `apps/web/`. See [the migration guide](SVELTEKIT_MIGRATION.md) for its
 locked versions, service-binding/D1 boundary, local verification and limitations.
-The existing website and Core remain the release baseline.
+The native website is the sole source implementation. Installed revisions and runtime promotion remain separately verified operator decisions.
 
 | Tool | Project rule | Adoption state |
 | --- | --- | --- |
@@ -39,13 +39,13 @@ The existing website and Core remain the release baseline.
 | Playwright | Use targeted desktop/mobile browser suites for user journeys, room synchronization, playback controls, search, admin and permissions. | Already in website dependencies and test scripts |
 | Node.js built-in tests | Retain current unit/integration suites until the migration justifies changing them. | Already used |
 | Vitest | Preferred for new Svelte component/unit tests when it gives useful framework integration. Do not replace all existing tests or add it before needed. | **Not yet adopted** |
-| Vite | Use the toolchain integrated with the chosen framework. | Used by the Vinext baseline and the isolated SvelteKit candidate; no production cutover |
+| Vite | Use the toolchain integrated with the chosen framework. | Used by the sole native SvelteKit build; no production cutover is implied |
 | ESLint | Retain existing checks and zero-warning discipline. | Already configured |
 | Knip | Review unused module files with explicit framework, manual test and operational entry points. | Pinned at 6.43.0; `npm run audit:unused` runs in local checks and CI. Findings require source verification before deletion. |
 | Prettier | Scope formatting to the new Svelte candidate with the Svelte plugin. | Adopted in `apps/web/` only; legacy formatting remains unchanged |
 | Wrangler and Cloudflare | Validate the actual target Workers/D1 build locally in isolation; do not enable deployment or modify secrets/DNS. | Cloudflare tooling already present; production cutover not established |
 | Drizzle ORM | Retain typed schema/data access where already suitable. Test migrations against synthetic data only. | Already present |
-| Node.js runtime | **Node 26** is the preferred next LTS target; **Node 24** stays the proven production fallback. Node 26 enters LTS on 28 October 2026, subject to schedule changes. | Use Node 26 in the existing **website CI validation job** for early compatibility feedback. The Core Dockerfile and host runtime stay on Node 24 until tested and separately approved. |
+| Node.js runtime | **Node 26** is the preferred next LTS target; **Node 24** stays the proven production fallback. Node 26 enters LTS on 28 October 2026, subject to schedule changes. | Use Node 26 in the existing **website CI validation job** for early compatibility feedback. The Core source Dockerfile targets qualified immutable Node 26.12.1. Installed hosts remain unchanged until separately approved updates; actual LTS confirmation is still open. |
 
 Practical standards:
 
@@ -53,10 +53,9 @@ Practical standards:
 2. Diagnose and measure first; prefer stable, supported dependency versions over
    speculative upgrades. Avoid adding a framework or test runner without a
    specific benefit.
-3. Design, implement and test a vertical slice of the SvelteKit frontend before
-   attempting a wholesale cutover. Validate D1, authorization, public/private
-   server data boundaries, shared playback state, mobile accessibility and the
-   Cloudflare target build.
+3. Maintain the sole native SvelteKit frontend. Validate D1, authorization,
+   public/private server boundaries, shared playback state, mobile accessibility
+   and the packaged Cloudflare build after each substantive change.
 4. Keep operational Core stable. Use `npm run setup:cloud` and
    `npm run check:all`, plus relevant existing Playwright scripts and new
    framework-specific tests when introduced.
@@ -81,10 +80,11 @@ Practical standards:
 
 ## Node 26 compatibility rollout
 
-1. **Now:** Run existing website GitHub CI on Node 26 in a review branch,
-   without adding an extra job. Preserve the Node 24 baseline for Core and
-   local/production operation. This only tests the website source and tools.
-2. **Before switching Core:** Test a Node 26 Core build and the required
+1. **Source candidate:** Website CI uses Node 26, all maintained TypeScript
+   projects use compiler 6.0.3 and Core targets the qualified immutable Node
+   26.12.1 image. Node 24 remains a recorded compatibility/recovery baseline.
+   Source changes do not update any installed host.
+2. **Before switching an installed Core:** Test the Node 26 build and required
    synthetic FFmpeg, transport, recovery, queue and audio suites. Validate
    the exact Node 26 Docker base image digest and dependencies.
 3. **When LTS is available:** Reconfirm supported Cloudflare tooling and
@@ -92,6 +92,81 @@ Practical standards:
    owner approval, compatible CI/host validation and a rollback plan.
 4. A successful Node 26 CI workflow is not evidence that a website has
    been published or that audible Discord playback was tested.
+
+### Core qualification evidence, 24 October 2026
+
+Tracking: [issue #117](https://github.com/lukasvri/Afterparty-MusicBot/issues/117).
+The Core application source in main `d9d38ee51530cd577d5d8279aab00f38f3ebd31c`
+is unchanged from the earlier tested `7cd059c` baseline, product `3.0.0-alpha.1`.
+Qualification uses a clean archive of tracked Core files, excluding local
+credentials, databases and installed dependencies. Dependencies are installed
+from the existing lockfile with the Docker stage's flags:
+`npm ci --omit=peer --ignore-scripts --no-audit --no-fund`.
+
+| Check | Node 24.19.0 baseline | Node 26.12.1 qualification |
+| --- | --- | --- |
+| Platform | Linux x64 | Linux x64, container `linux/amd64` |
+| Node module ABI / OpenSSL | 137 / 3.5.7 | 147 / 3.5.9 |
+| Clean locked dependency install and strict typecheck | Passed | Passed |
+| Core unit, HTTP, isolation, recovery and audio tests | 741 passed | 741 passed locally and 741 in the actual image validation stage; none failed or skipped |
+| FFmpeg | Real local synthetic audio | Local FFmpeg 7.1.5 and image FFmpeg 5.1.9 |
+| Final image probes | Existing Node 24 CI | UID 1000, readable source/package, Discord voice imports, ESM worker and FFmpeg pass with read-only filesystem and no network |
+
+The Node 24 source baseline is full local validation of code head `6b8c9ee`,
+whose Core source tree matches the commits above. Its documentation follow-up
+passed Node 24 Docker validation in
+[GitHub run 40129899214](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40129899214).
+Core executes TypeScript directly and has no separate application compilation step.
+
+The verified Node 26 `linux/amd64` base is
+`node:26.12.1-bookworm-slim@sha256:1884ec272c7c06aba7696262fb822dc602f8fa5eb978d03617d6bfe487d7ebac`.
+The qualification image follows the canonical multi-stage Dockerfile with that
+base substituted in a temporary copy. Cloud proxy trust is supplied through
+BuildKit secret mounts, never copied into image layers. At qualification time, the
+production source Dockerfile retained its pinned Node 24 base; the native-only
+source now pins Node 26 as described above. This local experimental image is not a signed
+production release and is not published or deployed.
+
+The final local image also passed the existing read-only runtime probe and
+saved-archive validation in `scripts/build_release.py core-package`. Its image ID
+was `sha256:361389159ecc7830f10f1f6f4a1826a354afd869b698fc77a10eebbc98d78e05`.
+The temporary qualification Dockerfile SHA-256 was
+`dbbac4c7261b2564ae3c1206585256e402f820ea3e2d7ce13f1b876d51ee10b9`. The variant is
+identified separately from the canonical Node 24 release image.
+
+The restrictive-umask reproduction used 0600 source files and 0700 directories.
+The first image passed all 741 tests as root but failed its final unprivileged
+`guess-pack --list` check because package.json was unreadable. The Dockerfile now
+normalizes public `/app` read/traverse permissions while keeping root ownership
+and the existing unprivileged runtime user. The same reproduction then passes
+both that CLI check and the final runtime probes. No stored data permissions or
+host configuration are changed.
+
+To reproduce the source suite, select Node 26.12.1 in an isolated checkout,
+verify `node --version`, then run:
+
+```sh
+npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
+npm --prefix services/core run check
+npm --prefix services/core test
+```
+
+For image qualification, use only tracked Core files, substitute the immutable
+base above in a temporary Dockerfile, and build `--platform linux/amd64
+--target final`. Retain the validation stage and final unprivileged CLI check.
+Run the existing `scripts/build_release.py core-package` locally against the
+tested image to probe its runtime and validate the saved archive; do not run its
+publication operations. Labels and local qualification metadata must identify
+the tested source and record the temporary base/Dockerfile variant.
+
+The official [Node distribution index](https://nodejs.org/dist/index.json)
+reported v26.12.1 dated 21 October 2026, `security: true` and `lts: false` at this
+check. LTS qualification cannot be marked complete before the actual transition.
+Remaining gates: reconfirm LTS/security support after the scheduled 28 October
+transition, execute the prepared [host staging/backup/rollback plan](HOST_READINESS.md#qualifying-a-core-runtime-change)
+and separately authorize live listening and any runtime switch. No real Discord account, provider recording,
+production data, deployment or restart was used. Node 24 remains the operational
+Core runtime baseline.
 
 ## Technology choices for other projects
 

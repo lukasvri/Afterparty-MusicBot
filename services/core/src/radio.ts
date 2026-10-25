@@ -53,15 +53,15 @@ export function isRadioTitle(title: string) {
     ) &&
     // These words also occur inside ordinary studio song names. Reject
     // explicit upload-format positions and qualifiers, not every occurrence.
-    !/[\[(][^\])]*\b(?:live|covers?|demo)\b/i.test(title) &&
+    !/[[(][^\])]*\b(?:live|covers?|demo)\b/i.test(title) &&
     !/(?:\s[-|\u2013\u2014]\s*|\|)\s*(?:(?:hd|hq|4k|official|piano|guitar|drum|vocal|acoustic|instrumental)\s+)*(?:live|covers?|demo)\b/i.test(title) &&
-    !/\S+\s+demo(?:\s+version)?\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\S+\s+demo(?:\s+version)?\s*(?:[|[(]|$)/i.test(title) &&
     !/(?:^|\s[-|\u2013\u2014]\s*)\s*(?:live|covers?)\s*[:|-]/i.test(title) &&
-    !/\b(?:live|covers?)\s*(?:[|\[(]|$)/i.test(title) &&
-    !/\b(?:live|covers?)\s+(?:official|music|audio|video|hd|hq|4k)(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\b(?:live|covers?)\s*(?:[|[(]|$)/i.test(title) &&
+    !/\b(?:live|covers?)\s+(?:official|music|audio|video|hd|hq|4k)(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|[(]|$)/i.test(title) &&
     !/\b(?:live|covers?)\s+(?:at|from|in|on|by|session|performance|version|recording)\b/i.test(text) &&
     // Recognized venue/broadcast labels, not arbitrary words after "Live".
-    !/\blive\s+(?:wembley(?:\s+stadium)?|glastonbury(?:\s+festival)?|bbc\s+radio\s*1)\b(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\blive\s+(?:wembley(?:\s+stadium)?|glastonbury(?:\s+festival)?|bbc\s+radio\s*1)\b(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|[(]|$)/i.test(title) &&
     !/\blive(?:\s+[\p{L}\p{N}]+){0,4}\s+(?:19|20)\d{2}\b/iu.test(title) &&
     !/^how to\s*:/i.test(title) &&
     !/\bhow to$|\bhow (?:i|we) (?:made|make|produced|produce|remade|recreated|built)\b/i.test(
@@ -120,7 +120,7 @@ export function radioArtist(track: RadioTrack) {
   // Topic titles often append a recording label without naming the artist.
   // A normal Artist - Song title wins over a conflicting uploader, including
   // channels that happen to end in Topic or VEVO.
-  const versionSuffix = /^(?:(?:19|20)\d{2}\s+)?(?:re[ -]?master(?:ed)?|radio edit|single edit|original mix|extended(?: mix| version)?|official(?: music)? (?:audio|video)|instrumental(?: version)?|acoustic(?: version)?)(?:\s+(?:version|audio|(?:19|20)\d{2}))?\s*(?:[|\[(].*)?$/i.test(suffix);
+  const versionSuffix = /^(?:(?:19|20)\d{2}\s+)?(?:re[ -]?master(?:ed)?|radio edit|single edit|original mix|extended(?: mix| version)?|official(?: music)? (?:audio|video)|instrumental(?: version)?|acoustic(?: version)?)(?:\s+(?:version|audio|(?:19|20)\d{2}))?\s*(?:[|[(].*)?$/i.test(suffix);
   const artist =
     track.catalog?.artist ||
     (parts.length > 1 && !versionSuffix

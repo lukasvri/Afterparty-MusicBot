@@ -79,7 +79,7 @@
   <div class="room-actions">
     <button class="button secondary" onclick={onCreate}>Create a room</button><a
       class="button secondary"
-      href="/v3/discord">Discord & concerts</a
+      href="/discord">Discord & concerts</a
     >
   </div>
 </section>

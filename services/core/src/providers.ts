@@ -82,7 +82,7 @@ export function youtubeId(query: string) {
     }
     if (u.hostname === "youtu.be" && /^\/[\w-]{11}$/.test(u.pathname))
       return u.pathname.slice(1);
-  } catch {}
+  } catch { /* Malformed URLs are not supported video identifiers. */ }
   return null;
 }
 function validSearchTrack(value: unknown): value is Track {

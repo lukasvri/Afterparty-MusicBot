@@ -13,7 +13,7 @@ flowchart TB
         UI --> Video
         UI --> Local
     end
-    subgraph Website[Workers / D1 or Sites]
+    subgraph Website[Native Worker / D1]
         Routes[Pages and API routes]
         D1[(Room data and bridge jobs)]
         Routes --> D1
@@ -33,46 +33,50 @@ flowchart TB
 
 ## Source map
 
-Start with the responsibility below rather than reading every file. There are two website implementations during the migration: Classic remains the operational baseline and explicit rollback; `apps/web` is the v3 candidate. Both use the existing API handlers and shared domain rules. A second UI does not imply a second database or a second Core.
+The native SvelteKit website in `apps/web` is the only interface. Shared API handlers live in `lib/api/` and retain their existing public URLs, data and authorization contracts. Classic, its service-binding fallback and its React build have been removed at the owner’s request.
 
 | Responsibility | Canonical location | Entry point |
 | --- | --- | --- |
-| Classic pages and interface | `app/`, `components/`, `hooks/` | `app/page.tsx`, `app/admin/admin.tsx` |
-| v3 routes and page composition | `apps/web/src/routes/` | `v3/+page.svelte`, `games/+page.svelte` |
+| Website routes and page composition | `apps/web/src/routes/` | `+page.svelte`, `discord/+page.svelte`, `games/+page.svelte` |
 | v3 feature implementations | `apps/web/src/lib/` | Feature folders below |
-| Shared website API handlers | `app/api/` | `route.ts` adapters into `lib/` |
+| Shared website API handlers | `lib/api/` | `route.ts` adapters into `lib/` |
 | Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
+| Website visitor counts, heartbeat and directory SQL | `lib/room-visitors.ts` | `server.ts` owns access; `db/schema.ts` and `drizzle/` own the index; `scripts/measure-room-visitors.ts` measures isolated read/write/space cost |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
-| Optional browser error privacy and initialization | `lib/error-reporting.ts` | Classic `components/error-reporting.tsx`, v3 root layout; [policy](OBSERVABILITY.md) |
-| Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core, Classic and v3 |
+| Optional browser error privacy and initialization | `lib/error-reporting.ts` | Native root layout; [policy](OBSERVABILITY.md) |
+| Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core and the native website |
+| Concert links and legacy room resolution | `services/core/src/concert-links.ts`, `apps/web/src/lib/server/legacy-concert.ts` | Explicit guild URLs and bounded, exact-room compatibility redirects |
+| Shared bridge checkpoint wire contract | `services/core/src/bridge-checkpoint.ts` | Core publisher and Worker presence negotiation, intent validation and bounded authority reads; no runtime services or credentials |
 | Shared social messages and validation | `services/core/src/social-protocol.ts` | Browser-safe; no database, token signing or Node imports |
-| Device-local reaction expiry | `lib/social-reactions.ts` | Shared by both website implementations |
+| Device-local reaction expiry | `lib/social-reactions.ts` | Used by the native social client |
 | Discord/Core startup | `services/core/src/` | `main.ts`, `guilds.ts`, `server.ts` |
 | Playback and source extraction | `services/core/src/` | `engine.ts`, `audio.ts`, `providers.ts`, `extractor.ts` |
+| Shared room-radio queue selection and existence checks | `services/core/src/room-radio.ts` | One lazy selection policy for Core and website fallback; `room-state.ts` owns command/prefetch eligibility |
 | Core rooms, games and social authority | `services/core/src/` | `rooms.ts`, `guess-game.ts`, `social.ts` |
 | Website schema and migrations | `db/`, `drizzle/` | Existing D1 migration sequence |
 | Core schema and data | `services/core/src/` | `store.ts`, `migrate.ts`; private data stays outside Git |
 | Local checks, builds and browser fixtures | `scripts/`, `apps/web/scripts/`, `apps/web/tests/`, `services/core/tests/` | `npm run check:all` plus browser suites |
-| Scoped unit coverage and upload | `scripts/coverage.ts`, `.github/workflows/coverage.yml`, `codecov.yml` | `npm run coverage:unit`; account-gated OIDC upload |
 | Host update and recovery | `operations/`, `services/core/` | [Operations](../services/core/PUBLIC_RELEASE.md) |
 
 The v3 feature folders keep each component beside its client and behavior helpers:
 
 | Folder in `apps/web/src/lib/` | Contents |
 | --- | --- |
-| `rooms/` | Room discovery, lifecycle, queue client and synchronized browser player |
-| `concert/` | Public Discord concert client and shared-clock audio adapter |
+| `rooms/` | Room discovery, lifecycle, queue, public QR/TV sharing, synchronized player, local fullscreen and diagnostics |
+| `concert/` | Public Discord concert client, scoped search/additions, protected seek, session history and shared-clock audio adapter |
 | `games/` | Guess the Song client, presets, ranking and game audio |
 | `library/` | Favorites/evenings, playlist import and festival catalog |
 | `social/` | Reactions, moments and host bingo |
 | `admin/` | Server-scoped administration client |
-| `server/` | Native API dispatch and fixed service-binding bridge |
-| `ui/` | Shared icons, public-page frame and copyright form |
+| `server/` | Native API dispatch and host-transition guard |
+| `ui/` | Shared icons, public-page frame, saved motion preference and copyright form |
+
+Shared fluid TV sizing lives in `apps/web/src/app.css`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 
 Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
 
-Shared contracts belong in browser-safe modules; authorization and persistence remain in their server implementations. Reuse contracts and pure rules across Classic and v3 without forcing different UI lifecycles into a single controller. Keep the 26 existing API route adapters so URLs, authorization and rollback continue using the same handlers.
+Shared contracts belong in browser-safe modules; authorization and persistence remain in their server implementations. Reuse the existing contracts and pure rules across Core and the website. The 26 API route adapters in `lib/api/` preserve URLs and authorization without a second frontend.
 
 ## Discord playback
 
@@ -92,7 +96,7 @@ Each browser plays video through the official YouTube embed and applies the shar
 
 ## Commands and live state
 
-Browser APIs and hooks live in `app/api/`, `lib/` and `hooks/`. The website authorizes commands before forwarding them to Core. Direct live transport uses short-lived tickets. WebSocket and continuous HTTP updates carry live state; polling and queued bridge jobs provide fallback paths.
+Browser APIs and clients live in `lib/api/`, `lib/` and `apps/web/src/lib/`. The website authorizes commands before forwarding them to Core. Direct live transport uses short-lived tickets. WebSocket and continuous HTTP updates carry live state; polling and queued bridge jobs provide fallback paths.
 
 Queue revisions reject stale edits. Clock sampling accounts for transport delay, while each client compensates for its own buffering. The website displays playback state; it does not independently advance Discord audio.
 
@@ -104,6 +108,6 @@ Bot tokens, OAuth client secrets, environment files and deployment-specific host
 
 ## Build and operations
 
-The website uses React, Vinext, Vite and Cloudflare Workers/D1 with Sites integration. Core uses Node.js, Discord libraries, SQLite, FFmpeg and yt-dlp. Compose runs Core separately from the website. A website deployment does not keep an offline Core host available.
+The website uses SvelteKit, Svelte 5, Vite and a standalone Cloudflare Worker/D1 backend. Core uses Node.js, Discord libraries, SQLite, FFmpeg and yt-dlp. Compose runs Core separately from the website. A website deployment does not keep an offline Core host available.
 
 `npm run check:all` validates isolated application and recovery behavior and builds the website. Production listening, source availability, reconnect behavior and simultaneous real voice capacity require host validation. [Host readiness](HOST_READINESS.md) and [operations](../services/core/PUBLIC_RELEASE.md) cover backups and reviewed updates.

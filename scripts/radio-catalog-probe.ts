@@ -21,11 +21,13 @@ type Snapshot = {
   seeds: Seed[]; calls: Call[]; results: Result[];
 };
 const fixedArgs = ['--ignore-config', '--no-cache-dir', '--socket-timeout', '10', '--retries', '0', '--extractor-retries', '0'];
+// eslint-disable-next-line no-control-regex -- Reject or strip control characters at the input boundary.
 const clean = (value: string) => value.replace(/[\u0000-\u001f]/g, ' ').slice(0, 200);
 const watch = (id: string) => `https://www.youtube.com/watch?v=${id}`;
 function targetOf(args: string[]) {
   const target = args.at(-1) ?? '';
   if (/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(target)) return target;
+  // eslint-disable-next-line no-control-regex -- Reject or strip control characters at the input boundary.
   if (/^ytsearch5:[^\u0000-\u001f]{1,250}$/.test(target)) return target;
   throw new Error('Only public YouTube video metadata and five-result search are allowed.');
 }

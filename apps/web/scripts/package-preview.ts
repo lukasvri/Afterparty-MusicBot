@@ -12,7 +12,7 @@ const result = spawnSync(
     'deploy',
     '--dry-run',
     '--config',
-    'wrangler.standalone.jsonc',
+    'wrangler.jsonc',
     '--outdir',
     output,
   ],
@@ -30,7 +30,6 @@ writeFileSync(
       compatibility_date: '2026-05-15',
       compatibility_flags: ['nodejs_compat'],
       assets: { directory: '../cloudflare', binding: 'ASSETS' },
-      vars: { AFTERPARTY_NATIVE_API: '1', AFTERPARTY_BETA_ENTRY: '1' },
       d1_databases: [
         {
           binding: 'DB',

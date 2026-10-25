@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chromium } from 'playwright';
+import { readFile } from 'node:fs/promises';
 
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5174').origin;
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname));
@@ -18,7 +19,13 @@ const track = (id: string, title: string, concert = true) => ({
   concert,
 });
 
-for (const width of [1440, 390]) {
+for (const [width, height] of [
+  [3840, 2160],
+  [2560, 1440],
+  [1920, 1080],
+  [1440, 1000],
+  [390, 1000],
+]) {
   test(`public concert keeps transport and votes scoped at ${width}px`, async () => {
     const browser = await chromium.launch({
       headless: true,
@@ -27,7 +34,7 @@ for (const width of [1440, 390]) {
     });
     try {
       const page = await browser.newPage({
-        viewport: { width, height: 1000 },
+        viewport: { width, height },
         reducedMotion: 'reduce',
       });
       const errors: string[] = [],
@@ -112,6 +119,7 @@ for (const width of [1440, 390]) {
       await page.getByRole('heading', { name: 'Together after midnight' }).waitFor();
       assert.equal(await page.getByText('Private track must never appear').count(), 0);
       assert.equal(await page.getByRole('button', { name: /^Remove / }).count(), 0);
+      assert.equal(await page.getByRole('slider', { name: 'Shared concert position' }).count(), 0);
       await page.getByRole('button', { name: 'Resume', exact: true }).click();
       await page.getByRole('button', { name: 'Pause', exact: true }).waitFor();
       await page.getByRole('button', { name: /^Vote for An especially/ }).click();
@@ -129,6 +137,37 @@ for (const width of [1440, 390]) {
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         true,
       );
+      const commandsBeforeTV = writes.length;
+      await page.getByRole('button', { name: 'TV mode', exact: true }).click();
+      await page.getByAltText('QR code to join this listening room').waitFor();
+      assert.equal(
+        await page.getByRole('textbox', { name: 'Public room invitation link' }).inputValue(),
+        `${origin}/discord?guildId=${guildId}`,
+      );
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.screenshot({
+        path: `/tmp/afterparty-native-concert-tv-${width}.png`,
+        fullPage: true,
+      });
+      if (width >= 1920) {
+        const stage = await page.locator('.concert-share').boundingBox();
+        const content = await page.locator('.concert-content').boundingBox();
+        assert(stage && stage.width >= width * 0.13, 'Concert invitation grows with the viewport');
+        assert(
+          content && content.width >= width * 0.9,
+          'TV concert uses the available screen width',
+        );
+        assert(
+          await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1),
+          'Concert TV controls and invitation fit the screen',
+        );
+      }
+      await page.screenshot({
+        path: `/tmp/afterparty-native-concert-tv-${width}.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: 'Exit TV mode', exact: true }).click();
+      assert.equal(writes.length, commandsBeforeTV, 'TV invitations cannot issue concert commands');
       assert.deepEqual(errors, []);
       assert.deepEqual(external, []);
     } finally {
@@ -136,6 +175,159 @@ for (const width of [1440, 390]) {
     }
   });
 }
+
+for (const width of [1440, 390])
+  test(`concert search, lazy library additions and authorized seek at ${width}px`, async () => {
+    const manifest = JSON.parse(
+      await readFile(
+        new URL('../.svelte-kit/output/client/.vite/manifest.json', import.meta.url),
+        'utf8',
+      ),
+    ) as Record<string, { file: string; src?: string }>;
+    const library = Object.values(manifest).find(
+      (entry) => entry.src === 'src/lib/library/MusicLibrary.svelte',
+    );
+    assert(library);
+    const browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.CHROMIUM_PATH,
+      args: ['--no-sandbox'],
+    });
+    try {
+      const page = await browser.newPage({
+        viewport: { width, height: 1000 },
+        reducedMotion: 'reduce',
+      });
+      const errors: string[] = [],
+        scripts: string[] = [],
+        writes: Array<{ path: string; body: Record<string, unknown> }> = [];
+      const favorite = track('favorite001', 'Saved concert favorite');
+      const found = track('append00001', 'Website search result');
+      const queued: ReturnType<typeof track>[] = [];
+      let revision = 0,
+        position = 20;
+      page.on('pageerror', (error) => errors.push(error.message));
+      page.on('request', (request) => {
+        if (request.resourceType() === 'script') scripts.push(new URL(request.url()).pathname);
+      });
+      await page.addInitScript(
+        (favorite) =>
+          localStorage.setItem(
+            'afterparty-library-v1',
+            JSON.stringify({ version: 1, evenings: [], favorites: [favorite] }),
+          ),
+        favorite,
+      );
+      await page.route('**/*', async (route) => {
+        const url = new URL(route.request().url());
+        if (url.origin !== origin) return route.abort();
+        if (!url.pathname.startsWith('/api/')) return route.continue();
+        if (url.pathname === '/api/admin/guilds')
+          return route.fulfill({
+            json: {
+              authenticated: true,
+              guilds: [{ id: guildId, name: 'Synthetic stage', installed: true }],
+            },
+          });
+        if (url.pathname === '/api/search') {
+          assert.equal(url.searchParams.get('q'), 'festival');
+          return route.fulfill({ json: { videos: [found] } });
+        }
+        if (route.request().method() === 'POST') {
+          const input = route.request().postDataJSON();
+          writes.push({ path: url.pathname, body: input });
+          assert.equal(input.guildId, guildId);
+          if (url.pathname === '/api/discord') {
+            assert.equal(input.action, 'enqueue');
+            assert.equal(input.queueRevision, `transport-${revision}`);
+            queued.push(input.videoId === favorite.id ? favorite : found);
+            revision++;
+            return route.fulfill({ json: { id: `public:${input.commandId}`, status: 'done' } });
+          }
+          assert.equal(url.pathname, '/api/admin/control');
+          assert.equal(input.operation, 'command');
+          assert.deepEqual(input.command, {
+            action: 'seek',
+            seconds: 42,
+            queueRevision: `transport-${revision}`,
+            playbackKey: 'synthetic-playback',
+          });
+          position = 42;
+          return route.fulfill({ json: { id: input.commandId, status: 'done' } });
+        }
+        if (url.pathname === '/api/discord/queue')
+          return route.fulfill({
+            json: {
+              canManage: true,
+              state: { revision: `queue-${revision}`, queue: queued, requests: [], voteCounts: {} },
+            },
+          });
+        if (url.pathname === '/api/discord')
+          return route.fulfill({
+            json: {
+              state: {
+                guildId,
+                guildName: 'Synthetic stage',
+                ready: true,
+                connected: true,
+                playing: false,
+                position,
+                volume: 60,
+                current: track('current0001', 'Current public concert'),
+                queue: queued,
+                queueRevision: `transport-${revision}`,
+                lastSeen: Date.now(),
+                online: true,
+                playbackKey: 'synthetic-playback',
+              },
+            },
+          });
+        return route.fulfill({ status: 404, json: { error: 'Unused synthetic endpoint' } });
+      });
+      await page.goto(`${origin}/discord?guildId=${guildId}`);
+      await page.getByRole('heading', { name: 'Current public concert', exact: true }).waitFor();
+      assert.equal(
+        scripts.includes(`/${library.file}`),
+        false,
+        'library remains lazy on concert startup',
+      );
+      await page.getByRole('textbox', { name: 'Search songs or artists' }).fill('festival');
+      await page.getByRole('button', { name: 'Search music', exact: true }).click();
+      await page
+        .getByRole('button', { name: 'Add Website search result to queue', exact: true })
+        .click();
+      await page.waitForFunction(
+        () => document.querySelectorAll('.concert-queue .queue-list li').length === 1,
+      );
+      await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+      await page.getByRole('heading', { name: 'Your collection', exact: true }).waitFor();
+      assert(scripts.includes(`/${library.file}`));
+      await page
+        .getByRole('button', { name: 'Add Saved concert favorite to queue', exact: true })
+        .click();
+      await page.waitForFunction(
+        () => document.querySelectorAll('.concert-queue .queue-list li').length === 2,
+      );
+      const seek = page.getByRole('slider', { name: 'Shared concert position', exact: true });
+      await seek.evaluate((input) => {
+        (input as HTMLInputElement).value = '42';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await page.getByRole('button', { name: 'Seek concert', exact: true }).click();
+      await page.getByText('Seek confirmed by Core.', { exact: true }).waitFor();
+      assert.deepEqual(
+        writes.map((write) => write.path),
+        ['/api/discord', '/api/discord', '/api/admin/control'],
+      );
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser.close();
+    }
+  });
 
 test('browser concert audio requires consent and follows fresh Core SSE without issuing recovery commands', async () => {
   const browser = await chromium.launch({
@@ -220,9 +412,23 @@ test('browser concert audio requires consent and follows fresh Core SSE without 
             getPlayerState() {
               return this.state;
             }
-            setVolume() {}
-            mute() {}
-            unMute() {}
+            level = 100;
+            muted = false;
+            setVolume(level: number) {
+              this.level = level;
+            }
+            mute() {
+              this.muted = true;
+            }
+            unMute() {
+              this.muted = false;
+            }
+            getVolume() {
+              return this.level;
+            }
+            isMuted() {
+              return this.muted;
+            }
             destroy() {
               scope.__calls.push({ action: 'destroy' });
             }

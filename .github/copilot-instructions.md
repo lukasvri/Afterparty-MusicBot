@@ -4,7 +4,7 @@ Read `AGENTS.md` and the relevant project guide before changing source. Use
 English for code and public documentation, Norwegian Bokmål for owner updates,
 and no em dashes.
 
-- Keep website source, Core (`services/core`) and the opt-in SvelteKit candidate
+- Keep website source, Core (`services/core`) and the native SvelteKit website
   (`apps/web`) within their existing contracts. OpenWorks is a separate project.
 - Apply `AGENTS.md#keep-every-change-organized` to every change: reuse canonical
   rules, keep related feature code together and maintain the source map.

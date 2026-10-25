@@ -14,11 +14,10 @@
     "preview": "node --import ./scripts/runtime.ts node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --local --ip 127.0.0.1 --port 5174 --inspector-port 0",
     "check": "node --import ./scripts/runtime.ts node_modules/@sveltejs/kit/svelte-kit.js sync && node --import ./scripts/runtime.ts node_modules/svelte-check/bin/svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "node --test --test-isolation=none tests/*.test.ts",
-    "test:browser": "node --test --test-concurrency=1 --test-reporter=tap tests/player.browser.ts tests/public-pages.browser.ts tests/library.browser.ts tests/discord.browser.ts tests/admin.browser.ts tests/games.browser.ts tests/room-stream.browser.ts tests/room-social.browser.ts tests/game-night.browser.ts tests/game-audio.browser.ts",
+    "test:browser": "node --test --test-concurrency=1 --test-reporter=tap tests/player.browser.ts tests/public-pages.browser.ts tests/library.browser.ts tests/discord.browser.ts tests/admin.browser.ts tests/games.browser.ts tests/room-stream.browser.ts tests/room-social.browser.ts tests/game-night.browser.ts tests/game-audio.browser.ts tests/game-pack.browser.ts tests/audio-settings.browser.ts",
     "test:stack": "node --test tests/local-stack.browser.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "preview:standalone": "node --import ./scripts/runtime.ts node_modules/wrangler/bin/wrangler.js dev --config wrangler.standalone.jsonc --local --ip 127.0.0.1 --port 5174 --inspector-port 0",
     "package:preview": "node scripts/package-preview.ts",
     "measure:startup": "node scripts/measure-startup.ts --verify-lazy",
     "sync": "node --import ./scripts/runtime.ts node_modules/@sveltejs/kit/svelte-kit.js sync"

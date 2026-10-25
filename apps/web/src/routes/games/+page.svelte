@@ -1,4 +1,6 @@
 <script lang="ts">
+  import MotionPreference from '#lib/ui/MotionPreference.svelte';
+
   import { onMount, tick as afterRender } from 'svelte';
   import { replaceState } from '$app/navigation';
   import GameAudio from '#lib/games/GameAudio.svelte';
@@ -270,11 +272,11 @@
 <a class="skip" href="#game">Skip to game</a>
 <div class="game-shell">
   <header class="game-header">
-    <a class="brand" href="/v3" aria-label="Afterparty home"
+    <a class="brand" href="/" aria-label="Afterparty home"
       ><img src="/afterparty-mark.svg" width="34" height="34" alt="" /><span
         >afterparty<span class="red">.</span></span
       ></a
-    ><a class="back" href={scope?.scope === 'room' ? `/v3?room=${scope.scopeId}` : '/v3'}
+    ><a class="back" href={scope?.scope === 'room' ? `/?room=${scope.scopeId}` : '/'}
       >Back to music <Icon name="arrow" size={16} /></a
     >
   </header>
@@ -365,8 +367,7 @@
           />
         </details>{/if}
       {#if view.error}<div class="notice" role="status">
-          {view.error}<button class="subtle" onclick={() => client?.reconnect()}
-            >Reconnect game</button
+          {view.error}<button class="subtle" onclick={() => client?.rejoin()}>Reconnect game</button
           >{#if view.signIn}<a href="/api/auth/discord" data-sveltekit-reload
               >Sign in with Discord</a
             >{/if}
@@ -814,6 +815,7 @@
     {/if}
   </main>
   <footer>
+    <MotionPreference />
     <span>afterparty<span class="red">.</span></span><a href="/support">Need a hand?</a><span
       >GOOD MUSIC. FRIENDLY RIVALRIES.</span
     >

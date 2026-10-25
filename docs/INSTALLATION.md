@@ -144,7 +144,7 @@ For a direct GitHub-to-Cloudflare Workers setup without Sites or Codex, use the
 and separates local validation from approved account setup, data migration and
 live cutover. Existing Sites databases must not receive fresh-database SQL blindly.
 
-The repository includes Sites/Vinext/Workers integration. Deployment still requires a hosting account and a real D1 database. This guide does not claim a tested one-click deploy to every Workers provider setup.
+The native SvelteKit website builds a standalone Cloudflare Worker with the existing hosting artifact layout. Deployment still requires a hosting account and a real D1 database. This guide does not claim a tested one-click deploy to every Workers provider setup.
 
 For your chosen Sites or Workers deployment:
 

@@ -18,17 +18,21 @@ use em dashes. Keep global personal preferences out of repository instructions.
 ## Development and validation
 
 - Use Node.js 24.17+, Python 3.11+ and FFmpeg. `npm run setup:cloud` installs the
-  locked website, Core and isolated `apps/web` candidate dependency trees.
+  locked tooling, Core and native `apps/web` dependency trees.
   `npm run check:all` runs lint with zero warnings,
   recovery and application tests, both typechecks, Core audio tests with real
   FFmpeg, and the website production build. It also checks formatting/types,
-  tests and builds the SvelteKit candidate; see `docs/SVELTEKIT_MIGRATION.md`.
+  tests and builds the SvelteKit website; see `docs/SVELTEKIT_MIGRATION.md`.
   Separate Playwright browser suites
   are not included; run relevant browser suites for UI/playback changes. Docker
   is not required for these checks. For internal documentation-only edits,
   verify links and the diff without running the full application suite.
-- Core lives in `services/core/src/`; the website is in `app/`, `components/`,
-  `hooks/` and `lib/`; the opt-in SvelteKit candidate is in `apps/web/`.
+- For playback and TV layout changes, prioritize 3840×2160 (4K),
+  2560×1440 (QHD/2K) and 1920×1080 (1080p), while retaining mobile coverage.
+  Use fluid viewport sizing with readable bounds; check screenshots as well as
+  overflow and player/QR/control visibility.
+- Core lives in `services/core/src/`; the only website is in `apps/web/`.
+  Shared browser/domain services live in `lib/`, with API handlers in `lib/api/`.
   Preserve third-party license notices.
 - Keep changes focused and report the checks actually run and any limitations.
 - Preserve per-server queues, settings, permissions and databases. Owner access
@@ -51,7 +55,7 @@ use em dashes. Keep global personal preferences out of repository instructions.
   components, propose and build relevant usability improvements, and improve
   related flows without asking for approval on each detail. Significant
   redesigns are welcome while the site is alpha; do not require pixel-perfect
-  parity with React or screenshots. Preserve the Afterparty identity as the
+  parity with previous screenshots. Preserve the Afterparty identity as the
   starting brand, including its name, canonical logo and black/red direction.
   A full rebrand remains a distinct owner decision.
 - Creative freedom is not a license for feature bloat or unbounded unrelated
@@ -79,8 +83,7 @@ use em dashes. Keep global personal preferences out of repository instructions.
 - Keep related components, clients and behavior helpers together in their
   feature folder. Keep routes thin. Avoid a new parallel implementation when
   an existing shared contract or pure function serves the same responsibility.
-- Settings, bounds, protocol types and validation rules shared by Core, Classic
-  and v3 must have one canonical browser-safe definition. Keep authorization,
+- Settings, bounds, protocol types and validation rules shared by Core and the website must have one canonical browser-safe definition. Keep authorization,
   persistence and distinct UI lifecycles in their appropriate implementations.
 - Remove duplication and dead code introduced or exposed by the current change
   when its callers and compatibility requirements are understood. Preserve
@@ -100,12 +103,11 @@ use em dashes. Keep global personal preferences out of repository instructions.
   security support and long-term maintenance rather than defaulting to
   JavaScript/TypeScript or always selecting the newest release. The existing
   TypeScript/Core stack remains supported while it is the sound choice.
-- The alpha website may evaluate a substantial SvelteKit/Svelte 5 redesign
-  under [issue #114](https://github.com/lukasvri/Afterparty-MusicBot/issues/114).
-  Compare supported versions, Cloudflare/D1 compatibility, developer experience,
-  testability and actual performance before adopting anything. Preserve critical
-  authorization, persistence and playback contracts; do not restart paused Rust
-  experiments or replace Core without a separate, justified decision.
+- The owner explicitly retired Classic. SvelteKit/Svelte 5 in `apps/web/` is the
+  sole website; do not restore React/Next/Vinext, a Classic fallback, or a second
+  website build. Preserve shared API URLs, stored data, authorization and playback
+  contracts. Runtime promotion, production rollout and replacing Core remain
+  separate decisions. Prior signed artifacts remain operator recovery material.
 - Independent new projects choose their own fit-for-purpose stack, which could
   include Rust, Go, Python, TypeScript or other actively maintained technologies.
   Do not copy Afterparty's stack merely by habit, or introduce trendy tooling

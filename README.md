@@ -71,11 +71,13 @@ keeps the reveal and next-round controls. See the [two-client test guide](docs/G
 
 ## Stable and experimental channels
 
-The opt-in [Afterparty 3 SvelteKit candidate](docs/SVELTEKIT_MIGRATION.md) starts
-the `3.0.0-alpha.1` review build at `/v3`, including rooms, library/playlists,
-concerts, administration, games and native API mode. It preserves the Node 24
-Core and existing storage contracts. Review builds do not establish production
-deployment or restart the Activity/Rust experiments.
+The [native Afterparty 3 website](docs/SVELTEKIT_MIGRATION.md) is the sole
+website implementation, with listening rooms at `/`, public concerts at `/discord`,
+and native administration, games and library tools. Existing `/v3` bookmarks
+redirect to the matching native page. The source uses SvelteKit/Svelte 5 and
+TypeScript 6; Core's source image targets qualified Node 26.12.1. Actual LTS and
+host rollout remain separate acceptance requirements, and review builds do not
+establish production deployment or restart Activity/Rust experiments.
 
 Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
 
@@ -147,7 +149,7 @@ Back up the complete `/data` volume, including `guilds/`, before an update. `doc
 
 ## Work on the project
 
-Use the [source map](docs/ARCHITECTURE.md#source-map) to find a feature, its shared rules and its tests. The v3 candidate groups rooms, concerts, games, library, social tools and administration in `apps/web/src/lib/`; Classic and v3 share the existing API handlers, bot settings and social contracts.
+Use the [source map](docs/ARCHITECTURE.md#source-map) to find a feature, its shared rules and its tests. Native features group rooms, concerts, games, library, social tools and administration in `apps/web/src/lib/`; `lib/api/` holds the existing API handlers and Core supplies shared settings and social contracts.
 
 With Node.js 24.17+, Python 3.11+ and FFmpeg installed:
 
@@ -156,16 +158,16 @@ npm run setup:cloud
 npm run check:all
 ```
 
-`setup:cloud` installs both locked dependency trees. `check:all` runs lint, deployment recovery tests, website unit tests, both TypeScript checks, Core tests and a website production build. Audio tests use real FFmpeg with synthetic tones. Separate Playwright browser suites, such as `npm run test:party` and `npm run test:sync`, use simulated playback and isolated fixtures; `check:all` does not launch them. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
+`setup:cloud` installs the root, Core and native website locked dependency trees. `check:all` runs lint, deployment recovery tests, website unit tests, both TypeScript checks, Core tests and a website production build. Audio tests use real FFmpeg with synthetic tones. Separate Playwright browser suites, through `npm run test:browser` and `npm run test:stack`, use simulated playback and isolated fixtures; `check:all` does not launch them. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
 
 The validation command requires repository-wide lint with zero warnings. Automated checks do not establish live Discord audio quality or multi-server production capacity; the [release review](docs/RELEASE_REVIEW.md) records the remaining live checks.
 
 ## TypeScript and project status
 
-The website (`app/`, `components/`, `hooks/`, `lib/`), Core
+The website (`apps/web/`, `lib/`), Core
 (`services/core/src/`), tests and maintained Node scripts are written in
-TypeScript. Node.js 24.17+ runs the Node scripts directly using native type
-stripping. ESLint and PostCSS load typechecked TypeScript configuration through
+TypeScript 6. Node.js 24.17+ runs the Node scripts directly using native type
+stripping. ESLint loads typechecked TypeScript configuration through
 small `.mjs` adapters. Existing installer adapters remain compatible with older
 configured entry points. See [TypeScript boundaries](docs/TYPESCRIPT.md) for the
 retired legacy dashboard and retained Python, shell and container tooling.

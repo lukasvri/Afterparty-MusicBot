@@ -50,7 +50,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
-          files: coverage/classic.lcov,coverage/core.lcov,coverage/v3.lcov
+          files: coverage/shared.lcov,coverage/core.lcov,coverage/native.lcov
           disable_search: true
           disable_telem: true
           fail_ci_if_error: true

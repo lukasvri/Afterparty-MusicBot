@@ -1,4 +1,6 @@
 <script lang="ts">
+  import MotionPreference from '#lib/ui/MotionPreference.svelte';
+
   import { onMount } from 'svelte';
   import {
     adminSettingGroups,
@@ -127,16 +129,13 @@
 <a class="skip-link" href="#admin-main">Skip to server settings</a>
 <div class="admin-page">
   <header class="admin-header">
-    <a class="brand" href="/v3"
+    <a class="brand" href="/"
       ><img src="/afterparty-mark.svg" width="36" height="36" alt="" /><span
         >afterparty<span class="red">.</span></span
       ></a
     >
     <nav aria-label="Administration navigation">
-      <a href="/v3">Listening rooms</a><a href="/v3/discord">Concerts</a><a
-        href="/admin?classic=1"
-        data-sveltekit-reload>Classic settings</a
-      >
+      <a href="/">Listening rooms</a><a href="/discord">Concerts</a>
     </nav>
     {#if view.authenticated}<button
         class="button secondary"
@@ -237,7 +236,7 @@
               aria-pressed={tab === key}
               onclick={() => openTab(key)}>{label}</button
             >{/each}
-          <a href={'/v3/discord?guildId=' + view.guildId}>Watch concert ↗</a>
+          <a href={'/discord?guildId=' + view.guildId}>Watch concert ↗</a>
         </nav>
         {#if !detail}<p role="status">Loading {selected?.name}…</p>
           <button
@@ -493,7 +492,7 @@
                   <h3>{room.name}</h3>
                   <p>{room.current?.title ?? 'No video'} · {room.viewers} in the room</p>
                 </div>
-                <a class="button secondary" href={'/v3?room=' + encodeURIComponent(room.code)}
+                <a class="button secondary" href={'/?room=' + encodeURIComponent(room.code)}
                   >Open room ↗</a
                 >{#if room.mode !== 'discord'}<button
                     class="button secondary"
@@ -643,6 +642,7 @@
     {/if}
   </main>
   <footer>
+    <MotionPreference />
     <a href="/support">Need a hand?</a><span>afterparty. / your music. your people.</span>
   </footer>
 </div>

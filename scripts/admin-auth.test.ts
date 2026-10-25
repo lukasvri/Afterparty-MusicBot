@@ -36,6 +36,8 @@ const hooks = registerHooks({
     if (specifier.endsWith("core-server")) return {
       url: moduleUrl(`
         export const coreUrl=()=>null;
+        export const corePresence=async()=>{throw Error('Core disabled');};
+        export const legacyBridgeOverride=()=>false;
         export const commandTicket=async()=>({});
         export const coreRequest=async(...args)=>{
           globalThis.__afterpartyAuthTest.coreCalls.push(args);
@@ -82,11 +84,11 @@ const hooks = registerHooks({
 const { isAdmin, hash } = await import("../lib/server.ts");
 const { login, hasPasswordSession } = await import("../lib/admin-session.ts");
 const { adminGuilds, adminContext, adminState } = await import("../lib/discord-auth.ts");
-const session = await import("../app/api/admin/session/route.ts");
-const guilds = await import("../app/api/admin/guilds/route.ts");
-const me = await import("../app/api/me/route.ts");
-const queue = await import("../app/api/discord/queue/route.ts");
-const control = await import("../app/api/admin/control/route.ts");
+const session = await import("../lib/api/admin/session/route.ts");
+const guilds = await import("../lib/api/admin/guilds/route.ts");
+const me = await import("../lib/api/me/route.ts");
+const queue = await import("../lib/api/discord/queue/route.ts");
+const control = await import("../lib/api/admin/control/route.ts");
 hooks.deregister();
 
 function fixture() {

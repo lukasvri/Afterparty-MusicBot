@@ -9,6 +9,7 @@ import { Metrics } from './metrics.ts';
 import { Commands } from './commands.ts';
 import { DiscordSink } from './audio.ts';
 import { UserError, type Track, type SavedQueue } from './types.ts';
+import { concertLink } from './concert-links.ts';
 function adminLink(site: string, guildId?: string) {
     try {
         const url = new URL('/admin', site);
@@ -318,8 +319,10 @@ export class DiscordBot {
                     await this.updateMessage(true);
                     await interaction.deleteReply();
                 }
-                else
-                    await interaction.editReply('Watch the shared concert in Afterparty: ' + this.site + '/?room='+this.roomCode);
+                else {
+                    const url = concertLink(this.site, this.guildId);
+                    await interaction.editReply(url ? 'Watch the shared concert in Afterparty: ' + url : 'Ask the bot owner to configure the website URL.');
+                }
                 return;
             }
             if (name === 'favorites') {

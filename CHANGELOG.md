@@ -14,6 +14,11 @@ See [release policy](docs/RELEASING.md).
 - Guess the Song has a dedicated game-night lobby with private hosting and invite links, recording-aware pace presets, one-step start, clearer live points and hints, focused reveals and final standings that recognize ties. Game audio can follow new rounds after explicit activation, with separate local volume and safe stop/cancel controls.
 - Room playback adds local volume, mute and fullscreen controls, and follows the shared timeline with stream leases and read-only reconnection. This is an alpha review build; live provider playback, Discord listening and production login still require acceptance testing.
 - The listening room loads library, playlist and festival tools when you open them, reducing the initial JavaScript payload while keeping those tools available. Game hosting code also loads on demand.
+- The native v3 source now provides the sole interface at the home address, with public concerts at /discord. Existing v3 bookmarks keep working; the Classic interface and its fallback have been retired while APIs and saved data retain their existing contracts.
+- TV mode scales video, QR invitations and controls dynamically from 1080p through QHD and 4K. Local QR invitations and keyboard fullscreen/mute controls now use the native player. Switching views retains the active player; public invitation links exclude private host credentials.
+- Reconnect game can rejoin after Core loses its in-memory game membership. Existing games retain their scores; lost games return to a lobby without replaying guesses or starting a round automatically.
+- Core saves pause and resume choices immediately for restart recovery, closing the gap before the next playback clock tick.
+- Optional Core-authoritative concert rooms show a saved checkpoint as offline when Core cannot be reached, keeping stale playback paused until fresh state is available.
 
 ## v2.4.0-alpha.15: Prepare an opt-in Cloudflare website build
 

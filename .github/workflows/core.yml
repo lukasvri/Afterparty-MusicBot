@@ -68,7 +68,6 @@ jobs:
     timeout-minutes: 15
     # Public build configuration, never Sentry authentication/upload tokens.
     env:
-      NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
       VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,28 +86,27 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Install locked Core dependencies for typed integration fixtures
         run: npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
-      - name: Install locked SvelteKit candidate dependencies
+      - name: Install locked native website dependencies
         run: npm --prefix apps/web ci --no-audit --no-fund
-      - name: Lint, typecheck, browser behavior tests and production build
+      - name: Lint, typecheck and shared contract tests
         run: |
           npm run lint
           npm run audit:unused
           node node_modules/typescript/bin/tsc --noEmit --incremental false
           npm run test:unit
-          CF_WORKER_NAME=afterparty-ci CF_D1_DATABASE_NAME=afterparty-ci-db CF_D1_DATABASE_ID=12345678-1234-4123-8123-123456789abc npm run build:cloudflare
-          npm run build
-      - name: Validate the SvelteKit candidate without changing the release artifact
+      - name: Validate the native website
         run: |
           npm --prefix apps/web run format:check
           npm --prefix apps/web run check
           npm --prefix apps/web test
-          npm --prefix apps/web run build
-      - name: Bundle the tested v3 candidate without publishing
-        run: npm --prefix apps/web run package:preview
-      - name: Check SvelteKit desktop and mobile journeys with synthetic data
+      - name: Build and package the sole native release artifact without publishing
+        run: npm run build
+      - name: Check native release desktop and mobile journeys with synthetic data
         run: |
           npx playwright install --with-deps chromium
-          npm --prefix apps/web run preview > /tmp/afterparty-web-preview.log 2>&1 &
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          npm run start -- --port 5174 > /tmp/afterparty-web-preview.log 2>&1 &
           preview_pid=$!
           trap 'result=$?; if [ "$result" -ne 0 ]; then tail -200 /tmp/afterparty-web-preview.log; fi; kill "$preview_pid" 2>/dev/null || true; exit "$result"' EXIT
           node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
@@ -124,17 +122,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
           archive: true
-      - name: Preserve the v3 review bundle separately from operational releases
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: v3-review-website
-          path: |
-            apps/web/.svelte-kit/v3-artifact/
-            apps/web/.svelte-kit/cloudflare/
-          if-no-files-found: error
-          retention-days: 7
-          archive: true
-          overwrite: true
       - name: Package the tested website output without rebuilding
         run: python3 scripts/build_release.py website
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

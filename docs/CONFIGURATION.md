@@ -75,9 +75,18 @@ Local file: `.dev.vars` in the repository root. In production, use the hosting p
 | --- | --- | --- |
 | `ADMIN_BRIDGE_KEY` | Yes for Core integration | Exactly the same value as Core's `PUBLIC_SITE_ADMIN_KEY` |
 | `GUTTA_CORE_PUBLIC_URL` | Yes for Core integration | Core's HTTPS origin, for example `https://core.example.com` |
+| `GUTTA_CORE_BRIDGE_MODE` | Optional rollback only | `legacy` requests a return to five-second D1 heartbeats after a newer checkpoint is verified against Core. Removing Core configuration alone never revives a saved authority checkpoint. See [D1 write budget](D1_WRITE_BUDGET.md). |
 | `GUTTA_CORE_SITE_ORIGIN` | Recommended | Your website origin; otherwise derived from the request URL |
 | `YOUTUBE_API_KEY` | For website search | YouTube Data API key with access to the required API |
 | `COPYRIGHT_CONTACT_EMAIL` | For independently hosted copies | Your operator's public copyright contact address. If absent, the hosted installation's owner-approved address is used. An empty or invalid value disables email drafts and shows the support fallback. See [copyright requests](COPYRIGHT_REQUESTS.md). |
+
+Core's optional `CORE_BRIDGE_PRESENCE=authority` enables the negotiated presence
+contract only with a configured authenticated Core URL on the website. Leave it
+unset for bridge-only/rolling-upgrade operation. In negotiated mode, failed direct
+reads become offline after at most the 1,500 ms upstream deadline, replacing the
+legacy 15-second heartbeat grace. The bridge keeps safe receipts but does not claim
+pending commands without current Core verification. Follow the rollback and
+restored-backup limitations in [D1 write budget](D1_WRITE_BUDGET.md).
 
 Discord OAuth credentials belong in **Core's** environment. They are not browser configuration. The website calls Core to perform the token exchange.
 

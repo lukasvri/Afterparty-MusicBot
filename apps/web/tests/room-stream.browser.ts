@@ -252,15 +252,23 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
             destroy() {
               calls.push('destroy');
             }
-            setVolume() {}
-            mute() {}
-            unMute() {}
+            level = 100;
+            muted = false;
+            setVolume(level: number) {
+              this.level = level;
+            }
+            mute() {
+              this.muted = true;
+            }
+            unMute() {
+              this.muted = false;
+            }
             setPlaybackRate() {}
             getVolume() {
-              return 100;
+              return this.level;
             }
             isMuted() {
-              return false;
+              return this.muted;
             }
           },
         },
@@ -268,7 +276,7 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
     },
     { code, token, visitor, owner },
   );
-  await page.goto(`${origin}/v3?room=${code}`);
+  await page.goto(`${origin}/?room=${code}`);
   await page.getByRole('heading', { name: 'Synthetic live listening', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
   return { page, errors };

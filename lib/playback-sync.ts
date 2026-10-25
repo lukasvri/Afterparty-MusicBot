@@ -10,9 +10,20 @@ export function playbackTarget(room:Room,receivedAt:number,now:number,offset=0){
  const stale=tracked&&age>=(room.syncValidForMs??12000);
  const playing=room.playing&&!stale&&(!room.startsAt||room.serverTime+age>=room.startsAt);
  const advance=room.playing&&!room.buffering?elapsedPlayingMs(room.serverTime,room.startsAt,Math.min(age,tracked?(room.syncValidForMs??12000):age))/1000:0;
- const raw=room.position+advance+(room.mode==='discord'?offset:0);
- const position=Math.max(0,room.current&&!room.current.live?Math.min(Math.max(0,room.current.duration-.1),raw):raw);
+ const position=calibratedPlaybackPosition(room,room.position+advance,offset);
  return {position,playing,stale};
+}
+export const SYNC_OFFSET_KEY='afterparty-sync-offset';
+export const SYNC_MODE_KEY='afterparty-sync-mode-v1';
+export const MAX_SYNC_OFFSET_SECONDS=5;
+export function readSyncOffset(saved:string|null){
+ const value=Number(saved??0);
+ return Number.isFinite(value)?Math.max(-MAX_SYNC_OFFSET_SECONDS,Math.min(MAX_SYNC_OFFSET_SECONDS,value)):0;
+}
+/** Local video calibration never alters shared room clocks or own-room playback. */
+export function calibratedPlaybackPosition(room:Pick<Room,'current'|'mode'>,position:number,offset=0){
+ const raw=position+(room.mode==='discord'?offset:0);
+ return Math.max(0,room.current&&!room.current.live?Math.min(Math.max(0,room.current.duration-.1),raw):raw);
 }
 export type SyncMode='stable'|'precise';
 export function readSyncMode(saved:string|null):SyncMode{return saved==='stable'?'stable':'precise';}

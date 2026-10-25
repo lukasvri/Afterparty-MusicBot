@@ -15,11 +15,5 @@ export default defineConfig({
   ],
   server: {
     fs: { allow: ['../..'] },
-    proxy: {
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: false },
-      '/fonts': 'http://127.0.0.1:8787',
-      '/afterparty-mark.svg': 'http://127.0.0.1:8787',
-      '/favicon.svg': 'http://127.0.0.1:8787',
-    },
   },
 });

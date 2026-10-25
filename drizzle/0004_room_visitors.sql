@@ -1,0 +1,1 @@
+CREATE INDEX `visitors_room_until` ON `visitors` (`room`,`until`);

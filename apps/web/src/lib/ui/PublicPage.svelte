@@ -1,4 +1,6 @@
 <script lang="ts">
+  import MotionPreference from '#lib/ui/MotionPreference.svelte';
+
   import type { Snippet } from 'svelte';
 
   let {
@@ -19,11 +21,11 @@
 <a class="skip" href="#content">Skip to content</a>
 <div class="public-shell">
   <header>
-    <a class="brand" href="/v3" aria-label="Afterparty home">
+    <a class="brand" href="/" aria-label="Afterparty home">
       <img src="/afterparty-mark.svg" width="40" height="40" alt="" />
       <span>afterparty<span class="accent">.</span></span>
     </a>
-    <a class="back" href="/v3">Back to music <span aria-hidden="true">↗</span></a>
+    <a class="back" href="/">Back to music <span aria-hidden="true">↗</span></a>
   </header>
   <main id="content">
     <p class="eyebrow">{eyebrow}</p>
@@ -31,6 +33,7 @@
     <div class="body">{@render children()}</div>
   </main>
   <footer>
+    <MotionPreference />
     <span>Music brings us here.</span>
     <nav aria-label="Information">
       <a href="/install">Install bot</a>

@@ -70,5 +70,5 @@ test('Player timeline is bounded and the image sits beside the text, with the or
  assert.equal(progressBar(-1,100),'🔘'+'▬'.repeat(15));assert.equal(progressBar(100,100),'▬'.repeat(15)+'🔘');assert.equal(progressBar(NaN,0),'🔘'+'▬'.repeat(15));
  const rows=playerComponents(t.bot as never).map(r=>r.toJSON());assert.deepEqual(rows.map(r=>r.components.length),[3,3]);assert.equal(rows[0].components[1].style,1);assert.equal(rows[0].components[2].style,4);
  t.bot.engine.paused=true;t.state.playing=false;const resume=playerComponents(t.bot as never)[0].components[0].toJSON();assert('emoji' in resume);assert.equal(resume.emoji?.name,'▶️');
- t.state.current.concert=true;assert.equal(playerComponents(t.bot as never)[1].components.length,4);
+ t.state.current.concert=true;t.bot.guildId='111111111111111';const concert=playerComponents(t.bot as never)[1].components;assert.equal(concert.length,4);const link=concert[3].toJSON();assert('url' in link);assert.equal(link.url,'https://example.test/discord?guildId=111111111111111');
 });

@@ -1,3 +1,4 @@
+export type PlayerEvent = { data?: unknown };
 export type Player = {
   loadVideoById: (v: { videoId: string; startSeconds: number }) => void;
   cueVideoById: (v: { videoId: string; startSeconds: number }) => void;

@@ -16,6 +16,7 @@ const cleanText = (value: unknown, length: number) =>
   typeof value === 'string' &&
   value.trim().length > 0 &&
   value.length <= length &&
+  // eslint-disable-next-line no-control-regex -- Reject or strip control characters at the input boundary.
   !/[\u0000-\u001f\u007f]/.test(value);
 export function validSocial(value: SocialState): boolean {
   return Boolean(

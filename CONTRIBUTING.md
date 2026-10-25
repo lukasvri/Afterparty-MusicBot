@@ -29,14 +29,14 @@ These commands install the locked website and Core dependency trees, run deploym
 
 | Area | Location |
 | --- | --- |
-| Website pages and API routes | `app/` |
-| v3 routes and feature modules | `apps/web/src/routes/`, `apps/web/src/lib/{rooms,concert,games,library,social,admin,server,ui}/` |
+| Website pages and API routes | `apps/web/src/routes/`, `lib/api/` |
+| Native routes and feature modules | `apps/web/src/routes/`, `apps/web/src/lib/{rooms,concert,games,library,social,admin,server,ui}/` |
 | Shared settings and social contracts | `services/core/src/settings.ts`, `services/core/src/social-protocol.ts` |
-| Player and room interface | `components/`, `hooks/` |
+| Player and room interface | `apps/web/src/lib/rooms/`, `apps/web/src/lib/concert/` |
 | Website permissions, storage and transport | `lib/` |
 | D1 schema and migrations | `db/`, `drizzle/` |
 | Discord, audio engine and server storage | `services/core/src/` |
-| Build and preview integration | `build/`, `scripts/` |
+| Build and preview integration | `scripts/`, `apps/web/scripts/` |
 | Installation, operations and design references | `docs/`, `services/core/docs/` |
 
 ## Preserve the contracts

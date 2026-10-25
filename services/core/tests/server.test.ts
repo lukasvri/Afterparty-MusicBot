@@ -58,7 +58,7 @@ test('public transport is read only, admin stays private, commands are acknowled
  const servers=await createServers(engine,commands,{key:'test-key',origin:'https://site.example',publicPort:0,host:'127.0.0.1'});
  const publicPort=(servers.publicServer.address() as {port:number}).port,base=`http://127.0.0.1:${publicPort}`;
  try{
-  assert.equal((await fetch(base+'/v1/jobs?diagnostics=1')).status,403);const diagnostics=await fetch(base+'/v1/jobs?diagnostics=1',{headers:{Authorization:'Bearer test-key'}});assert.equal(diagnostics.status,200);assert.equal((await diagnostics.json() as {clients:number}).clients,0);
+  assert.equal((await fetch(base+'/v1/jobs?diagnostics=1')).status,403);assert.equal((await fetch(base+'/v1/state?authority=1')).status,403);assert.equal((await fetch(base+'/v1/state?authority=1',{headers:{Authorization:'Bearer test-key'}})).status,200);const diagnostics=await fetch(base+'/v1/jobs?diagnostics=1',{headers:{Authorization:'Bearer test-key'}});assert.equal(diagnostics.status,200);assert.equal((await diagnostics.json() as {clients:number}).clients,0);
   assert.equal('adminServer' in servers,false);
   // Removed dashboard paths stay unavailable even with valid bridge credentials.
   for(const [path,methods] of [
@@ -109,4 +109,40 @@ test('the authenticated own-room bridge advances radio without a Discord connect
   const {room}=await response.json() as {room:RoomTimeline};assert.equal(room.current?.id,'next1234567');assert.equal(room.playing,true);assert.equal(room.version,2);assert.equal(lookups,3);
   assert.equal(engine.current,null);assert.equal(engine.connected,false);assert.equal(store.history(10).length,0);
  }finally{await servers.close();commands.close();engine.close();store.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('reconciliation quarantine masks only the selected public guild, rejects authority and old public tickets, and preserves private state and audio',async()=>{
+ const {Guilds}=await import('../src/guilds.ts');
+ const guildA='111111111111111',guildB='222222222222222';
+ const guilds=new Guilds(guildA);
+ const sessions=[guildA,guildB].map(id=>{
+  const store=new Store(':memory:');let pauses=0;
+  const sink:Sink={onIdle:null,onError:null,play(){},pause(){pauses++;},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
+  const engine=new Engine(store,new Providers(store,{}),sink),commands=new Commands(engine);
+  engine.connected=true;engine.ready=true;engine.current={id:'abcdefghijk',entryId:'entry',title:'Concert',artist:'Artist',image:'',duration:100,live:false,embeddable:true,concert:true};
+  const session={id,name:'Synthetic',roomCode:guilds.roomCode(id),engine,commands,bot:{} as never};guilds.register(session);
+  return {...session,store,pauses:()=>pauses};
+ });
+ const servers=await createServers(sessions[0].engine,sessions[0].commands,{key:'synthetic-key',origin:'https://site.example',publicPort:0,host:'127.0.0.1',guilds});
+ const base=`http://127.0.0.1:${(servers.publicServer.address() as {port:number}).port}`;
+ const auth={Authorization:'Bearer synthetic-key'};
+ try{
+  const claims={id:'public:'+randomUUID(),scope:'public',guildId:guildA,action:'pause',playbackKey:'core:entry',aud:'gutta-krutt-core',exp:Date.now()+30000};
+  const encoded=Buffer.from(JSON.stringify(claims)).toString('base64url'),ticket=encoded+'.'+createHmac('sha256','synthetic-key').update(encoded).digest('base64url');
+  sessions[0].store.set('bridge-reconciliation-block',true);
+  assert.equal((await fetch(base+'/v1/state?authority=1&guildId='+guildA,{headers:auth})).status,409);
+  const publicState=await(await fetch(base+'/v1/state?guildId='+guildA)).json() as {state:{online:boolean;ready:boolean;playing:boolean}};
+  assert.equal(publicState.state.online,false);assert.equal(publicState.state.ready,false);assert.equal(publicState.state.playing,false);
+  const privateState=await(await fetch(base+'/v1/state?all=1&guildId='+guildA,{headers:auth})).json() as {state:{playing:boolean}};
+  assert.equal(privateState.state.playing,true);
+  const other=await(await fetch(base+'/v1/state?authority=1&guildId='+guildB,{headers:auth})).json() as {state:{online:boolean;playing:boolean}};
+  assert.equal(other.state.online,true);assert.equal(other.state.playing,true);
+  const response=await fetch(base+'/v1/ticket',{method:'POST',headers:{Origin:'https://site.example','Content-Type':'application/json'},body:JSON.stringify({ticket})});assert.equal(response.status,409);
+  assert.equal(sessions[0].store.jobs().length,0);
+  const stream=await fetch(base+'/events?guildId='+guildA,{headers:{Origin:'https://site.example'}});const reader=stream.body!.getReader();
+  const frame=Buffer.from((await reader.read()).value!).toString();assert(frame.includes('"online":false'));assert(frame.includes('"playing":false'));await reader.cancel();
+  const ws=new WebSocket(base.replace('http:','ws:')+'/live?guildId='+guildA,{origin:'https://site.example'});const [message]=await once(ws,'message');
+  const event=JSON.parse(String(message));assert.equal(event.state.online,false);assert.equal(event.state.ready,false);assert.equal(event.state.playing,false);ws.close();await once(ws,'close');
+  assert.equal(sessions[0].engine.paused,false);assert.equal(sessions[0].pauses(),0);assert.equal(sessions[0].store.get('bridge-reconciliation-block',false),true);
+ }finally{await servers.close();for(const session of sessions){session.commands.close();session.engine.close();session.store.close();}}
 });

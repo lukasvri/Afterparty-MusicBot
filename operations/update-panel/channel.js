@@ -14,7 +14,7 @@ if (panel && workspace && workspace.querySelector('.project-switcher')) {
   let channel = readSelection() === 'beta' ? 'beta' : 'production';
   select.value = channel;
   let preferredProject = null, restoreScheduled = false;
-  try {preferredProject = sessionStorage.getItem('afterparty-update-project');} catch {}
+  try {preferredProject = sessionStorage.getItem('afterparty-update-project');} catch { /* Project selection remains available without browser storage. */ }
   const sync = () => {
     const header = workspace.querySelector('.project-header');
     if (!header) return;
@@ -54,7 +54,7 @@ if (panel && workspace && workspace.querySelector('.project-switcher')) {
     const name = choice?.querySelector('.project-name strong')?.textContent.trim();
     if (!name) return;
     preferredProject = name;
-    try {sessionStorage.setItem('afterparty-update-project', name);} catch {}
+    try {sessionStorage.setItem('afterparty-update-project', name);} catch { /* Retain the current in-memory project selection. */ }
   });
   sync();
   const status = find('status'), check = find('check'), open = find('open');

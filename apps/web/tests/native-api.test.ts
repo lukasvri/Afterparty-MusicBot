@@ -6,7 +6,7 @@ import { nativeApi, nativeRoutes, type NativeLoader } from '../src/lib/server/na
 const origin = 'https://afterparty.invalid';
 
 test('the native map covers every existing API route and imports its canonical handler', async () => {
-  const directory = new URL('../../../app/api/', import.meta.url);
+  const directory = new URL('../../../lib/api/', import.meta.url);
   const files = await readdir(directory, { recursive: true });
   const paths = files
     .filter((file) => file.endsWith('/route.ts'))
@@ -19,7 +19,7 @@ test('the native map covers every existing API route and imports its canonical h
   );
   for (const path of paths) {
     assert(
-      source.includes(`import('../../../../../app${path}/route.ts')`),
+      source.includes(`import('../../../../../lib${path}/route.ts')`),
       `${path} reuses its canonical handler`,
     );
   }

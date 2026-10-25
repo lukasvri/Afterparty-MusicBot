@@ -7,17 +7,16 @@ account-wide spending limit.
 
 ## Sentry: errors only
 
-Classic and v3 share `lib/error-reporting.ts`, using the pinned official Sentry
+The native website uses `lib/error-reporting.ts` and the pinned official Sentry
 Browser SDK. Core and Worker API processes are not instrumented by this change.
-The two browser entry points call the same lazy initializer. With an empty or
+The native root layout calls the shared lazy initializer. With an empty or
 malformed DSN, the SDK is not imported and sends no requests.
 
 Set the **public project DSN** only for an explicitly approved build:
 
 | Website | Build variable | Example file |
 | --- | --- | --- |
-| Classic | `NEXT_PUBLIC_SENTRY_DSN` | Root `.env.example` |
-| v3 | `VITE_SENTRY_DSN` | `apps/web/.env.example` |
+| Native website | `VITE_SENTRY_DSN` | `apps/web/.env.example` |
 
 These are build-time values, not Cloudflare runtime secrets. A DSN is visible in
 client code and must never be replaced with a Sentry API/auth token. Use separate
@@ -25,8 +24,8 @@ projects/configuration for independent projects and development environments.
 Only official HTTPS Sentry ingestion DSNs are accepted by the current validator.
 Changing configuration requires a rebuild and separately approved deployment.
 
-The GitHub `Core validation` website job reads these two public repository Actions
-variables into its build environment. They apply to Classic and the v3 review
+The GitHub `Core validation` website job reads the public `VITE_SENTRY_DSN` repository Actions
+variable into its build environment. It applies to the sole native website
 artifact, not Core. The separate Cloudflare Workers Builds service rebuilds from
 source and must receive the same public build variables on its approved trigger;
 GitHub variables do not propagate to Cloudflare. Runtime Worker variables cannot
@@ -42,7 +41,7 @@ context. Logs, metrics and breadcrumbs are dropped.
 An allowlist reconstructs each event and the final transport envelope. It removes
 attachments, request details, user/context/extra data, raw messages, function and
 module names, full URLs, room/guild identifiers and source context. Only the
-generic JavaScript error class, coarse Classic/v3 bundle category, generated
+generic JavaScript error class, coarse browser bundle category, generated
 line/column, random event ID, timestamp and fixed surface label remain. This
 deliberately limits diagnostic detail; source-map upload and raw error-message
 collection are not implemented. No screenshots or media are attached.
@@ -64,9 +63,9 @@ for the complete command. Reports are generated under ignored `coverage/`:
 
 | Report | Instrumented source filter | Tests |
 | --- | --- | --- |
-| `classic.lcov` | `lib/**/*.ts` | Existing root `test:unit` list |
+| `shared.lcov` | `lib/**/*.ts` | Existing root `test:unit` list |
 | `core.lcov` | `services/core/src/**/*.ts` | Existing Core Node tests |
-| `v3.lcov` | `apps/web/src/lib/**/*.ts` | Existing v3 Node tests |
+| `native.lcov` | `apps/web/src/lib/**/*.ts` | Existing native Node tests |
 
 Only loaded files actually instrumented by V8 are reported. This is **not full
 repository, UI, Svelte-component or browser coverage**. Modules evaluated through
