@@ -6,57 +6,57 @@
       "viewport": 1440,
       "scenario": "welcome",
       "scriptRequests": 23,
-      "decodedJavaScriptBytes": 265986,
-      "sumIndividualGzipBytes": 98106
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
     },
     {
       "viewport": 1440,
       "scenario": "joined-room",
       "scriptRequests": 23,
-      "decodedJavaScriptBytes": 265986,
-      "sumIndividualGzipBytes": 98106
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
     },
     {
       "viewport": 1440,
       "scenario": "playing-room",
       "scriptRequests": 22,
-      "decodedJavaScriptBytes": 249920,
-      "sumIndividualGzipBytes": 93308
+      "decodedJavaScriptBytes": 250300,
+      "sumIndividualGzipBytes": 93450
     },
     {
       "viewport": 1440,
       "scenario": "games",
       "scriptRequests": 16,
       "decodedJavaScriptBytes": 148186,
-      "sumIndividualGzipBytes": 55999
+      "sumIndividualGzipBytes": 56001
     },
     {
       "viewport": 390,
       "scenario": "welcome",
       "scriptRequests": 23,
-      "decodedJavaScriptBytes": 265986,
-      "sumIndividualGzipBytes": 98106
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
     },
     {
       "viewport": 390,
       "scenario": "joined-room",
       "scriptRequests": 23,
-      "decodedJavaScriptBytes": 265986,
-      "sumIndividualGzipBytes": 98106
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
     },
     {
       "viewport": 390,
       "scenario": "playing-room",
       "scriptRequests": 22,
-      "decodedJavaScriptBytes": 249920,
-      "sumIndividualGzipBytes": 93308
+      "decodedJavaScriptBytes": 250300,
+      "sumIndividualGzipBytes": 93450
     },
     {
       "viewport": 390,
       "scenario": "games",
       "scriptRequests": 16,
       "decodedJavaScriptBytes": 148186,
-      "sumIndividualGzipBytes": 55999
+      "sumIndividualGzipBytes": 56001
     }
   ]
 }

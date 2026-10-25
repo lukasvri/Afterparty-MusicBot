@@ -515,11 +515,11 @@ are identical at 1440px and 390px:
 
 | Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
 | --- | ---: | ---: |
-| Welcome / empty browser room, including the scene | 265,986 B | 98,106 B |
-| Active browser room, before audio consent | 249,920 B | 93,308 B |
-| Game entry | 148,186 B | 55,999 B |
+| Welcome / empty browser room, including the scene | 266,366 B | 98,248 B |
+| Active browser room, before audio consent | 250,300 B | 93,450 B |
+| Game entry | 148,186 B | 56,001 B |
 
-The active-room response total is 8,699 decoded bytes / 2,892 recomputed gzip bytes
+The active-room response total is 9,079 decoded bytes / 3,034 recomputed gzip bytes
 above the previous `b192b1e` candidate. The library still loads only after an
 explicit visit, and active rooms still exclude the optional scene. These bounded
 feature additions are not a bundle-size reduction or a field-performance claim.
@@ -545,13 +545,26 @@ Persistent drift still corrects within 750 ms precise / 1500 ms stable once elig
 manual alignment, large drift and pause paths retain their fast behavior. This is
 a deterministic correction-decision trace, not measured real YouTube playback.
 
-The Discord mixer now derives prefetch size and transition size from the same
-effective fade duration. A real FFmpeg 4-second source followed by an 8-second
-source with configured 12-second fade buffers 50 rather than 400 PCM frames
-(192,000 rather than 1,536,000 bytes). Output remains 550 PCM frames / 11 seconds,
-with the same source identities and transition at frame 150. A separate five-run
-synthetic provider stall after the required 50 frames measured median readiness
-250.582 ms before / 0.028 ms after (maximum 252.626 / 0.188 ms). That controlled
-fixture injects 250 ms delay into excess provider reads; it does not measure
-Discord network, initial extraction, provider delivery or human listening latency.
-The twelve-second/600-frame bound and no-fade warm frame remain tested.
+The Discord mixer separates overlap readiness from its original bounded PCM
+reservoir. A controlled held-read fixture can start the ready 50-frame overlap
+while the next provider read remains pending. Background prefetch continues;
+the previous 12-second/600-frame reservoir and no-fade warm frame remain bounded.
+Tests retain 550 cached post-fade frames through provider delay and deliver ten
+individually paced handoff reads with maximum decoder-read concurrency 1. The
+promoted main source waits only for its single retiring read, not for 600 frames
+or EOF. Late invalidation, failures and disposal cannot lose/announce stale audio.
+An outgoing EOF during a partial fade retains consumed incoming frames and its
+original clock segment instead of resetting/announcing the same source again.
+
+The original reservoir is retained to protect playback after the handoff.
+
+Configured fades are now honored when the remaining tail can cover them, while
+shorter tails keep the prior quarter-tail fallback. With saved 6-second fade,
+real FFmpeg 24-second + 24-second sources decode to exactly 42 seconds; the new
+segment starts at frame 900 (18 seconds). An 8-second seeked tail uses the full
+300-frame/6-second overlap. An existing 1-second seek transition now decodes to
+exactly 260 PCM frames (5.2 seconds), matching 2.8+3.4-1 instead of the former
+quarter-capped overlap. Track IDs and extraction offsets remain protected.
+
+These are synthetic/locally decoded regression measurements, not proof of human
+Discord listening quality, provider delivery speed or zero network latency.

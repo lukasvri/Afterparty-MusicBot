@@ -105,12 +105,20 @@ transport are immediate. Pause behavior is unchanged. Evidence is retired on
 buffering, local pause, source replacement, reload, mode changes and sample gaps.
 The current source does not inherit the previous source's correction cooldown.
 
-Core's mixer uses one effective fade duration for PCM prefetch and actual mixing.
-Short songs and seeked tails prepare only the fade they can use, while preserving
-the twelve-second bound, one warm frame without fade, consumed segment identity,
-backpressure and existing transition timing. Unused provider data no longer holds
-an already prepared short transition. These are local buffering improvements;
-real Discord voice and provider availability remain separate listening gates.
+Core's mixer uses one effective fade duration for readiness and mixing. A
+transition can start once its overlap frames are ready; the original bounded
+reservoir continues filling in the background. Promotion transfers its captured
+queue and any single in-flight read. The main source waits only for that retiring
+read when needed, never for an entire reservoir, and never reads the same decoder
+concurrently. Queue invalidation cannot discard the promoted source's frames. Early outgoing
+EOF during a fade retains incoming progress and its original clock segment.
+
+The configured fade is honored whenever the remaining source tail can cover it,
+including the canonical six-second default. Shorter tails retain the quarter-tail
+fallback; incoming-source eligibility and per-server saved values remain intact.
+Real FFmpeg regressions cover six seconds of overlap, seeked tails, paced reads,
+reserve retention, late cancellation, failures and disposal. These improvements
+remain separate from real Discord voice/provider listening acceptance.
 
 ## Radio and discovery
 
