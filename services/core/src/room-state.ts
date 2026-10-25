@@ -1,5 +1,5 @@
 import { UserError } from "./types.ts";
-import type { RoomVideo } from "./protocol.ts";
+import { ROOM_QUEUE_LIMIT, roomQueueCapacity, type RoomVideo } from "./protocol.ts";
 import { roomRadioSeed, playableRoomQueue, hasPlayableRoomQueue, roomRadioHistory } from "./room-radio.ts";
 import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
 
@@ -172,8 +172,8 @@ export function changeRoom(
       state.playbackKey = crypto.randomUUID();
       state.skipVoters = [];
     } else {
-      if (state.queue.length + (state.requests?.length ?? 0) >= 50)
-        throw new UserError("The queue holds up to 50 songs.");
+      if (!roomQueueCapacity(state.queue.length, state.requests?.length))
+        throw new UserError(`The queue holds up to ${ROOM_QUEUE_LIMIT} songs.`);
       if (
         state.current?.id === track.id ||
         [...state.queue, ...(state.requests ?? [])].some(
@@ -231,7 +231,7 @@ export function changeRoom(
     const i = index(items);
     const [track] = items.splice(i, 1);
     if (action === "approve") {
-      if (state.queue.length >= 50) throw new UserError("The queue is full.");
+      if (!roomQueueCapacity(state.queue.length)) throw new UserError("The queue is full.");
       if (!state.current) {
         state.current = track;
         state.radioSeed = structuredClone(track);
@@ -274,7 +274,7 @@ export function changeRoom(
     const additions = state.queue.filter(
       (v) => !restored.some((saved) => saved.id === v.id),
     );
-    if (restored.length + additions.length + (state.requests?.length ?? 0) > 50)
+    if (restored.length + additions.length + (state.requests?.length ?? 0) > ROOM_QUEUE_LIMIT)
       throw new UserError(
         "The queue is too full to undo. Remove some songs first.",
       );

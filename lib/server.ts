@@ -2,6 +2,7 @@ import {readLiveState,liveRoom} from "./live-room.ts";
 import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
 import { metadataAiGenerated } from "../services/core/src/music-content.ts";
+import { rankMusicSearch } from "../services/core/src/music-search.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { visitorSQL } from "./room-visitors.ts";
 import { env as cloudEnv } from "cloudflare:workers";
@@ -291,7 +292,7 @@ export async function videos(
   ids: string[],
 ): Promise<Video[]> {
   if (!ids.length) return [];
-  return cached(`videos:v4:${ids.join(",")}`, async () => {
+  return cached(`videos:v5:${ids.join(",")}`, async () => {
     if (coreUrl()) {
       try {
         return (
@@ -334,14 +335,15 @@ async function searchVideos(request: Request, query: string, radio: boolean) {
   if (/^https?:\/\//.test(query))
     return { videos: await videos(request, [videoId(query)]) };
   const count = radio ? 20 : 30;
-  const result = await cached(`search:v5:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async () => {
+  const result = await cached(`search:v6:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async () => {
     if (coreUrl()) {
       try {
-        return (
+        const result = (
           await coreRequest<{ videos: Video[] }>(
             "/v1/catalog?q=" + encodeURIComponent(query) + (radio ? "&mode=radio" : ""),
           )
         ).videos.slice(0, count);
+        return radio ? result : rankMusicSearch(query, result);
       } catch {
         /* retain the direct metadata API */
       }
@@ -356,10 +358,11 @@ async function searchVideos(request: Request, query: string, radio: boolean) {
       safeSearch: "moderate",
       ...(radio ? { videoCategoryId: "10" } : {}),
     });
-    return videos(
+    const result = await videos(
       request,
       [...new Set(data.items.map((v) => v.id.videoId).filter(id => /^[\w-]{11}$/.test(id)))].slice(0, count),
     );
+    return radio ? result : rankMusicSearch(query, result);
   }, videos => videos.length ? 3600000 : 60000);
   return { videos: result };
 }

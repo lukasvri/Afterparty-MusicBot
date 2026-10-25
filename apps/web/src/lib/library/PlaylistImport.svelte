@@ -1,13 +1,16 @@
 <script lang="ts">
+  import { ROOM_QUEUE_LIMIT } from '../../../../../services/core/src/protocol.ts';
   import { onMount } from 'svelte';
   import { createPlaylistImport, type PlaylistState } from '#lib/library/playlist-import-client.ts';
   let {
     busy,
-    capacity = 50,
+    capacity = ROOM_QUEUE_LIMIT,
+    queuedIds = [],
     onAdd,
   }: {
     busy: boolean;
     capacity?: number;
+    queuedIds?: readonly string[];
     onAdd: (ids: readonly string[]) => Promise<void> | void;
   } = $props();
   let client: ReturnType<typeof createPlaylistImport> | undefined;
@@ -19,12 +22,13 @@
     sourceUrl: '',
   });
   let query = $state('');
+  let input = $state<HTMLInputElement>();
   let selected = $state<string[]>([]);
   let page = $state(0);
   let adding = $state(false);
   let addError = $state('');
   const limit = $derived(
-    Math.max(0, Math.min(50, Number.isFinite(capacity) ? Math.floor(capacity) : 0)),
+    Math.max(0, Math.min(ROOM_QUEUE_LIMIT, Number.isFinite(capacity) ? Math.floor(capacity) : 0)),
   );
   const videos = $derived(
     view.job?.status === 'done'
@@ -34,6 +38,8 @@
         )
       : [],
   );
+  const available = $derived(videos.filter((video) => !queuedIds.includes(video.id)));
+  const pendingSelected = $derived(selected.filter((id) => !queuedIds.includes(id)));
   const pages = $derived(Math.max(1, Math.ceil(videos.length / 20)));
   const currentPage = $derived(Math.min(page, pages - 1));
   const shown = $derived(videos.slice(currentPage * 20, (currentPage + 1) * 20));
@@ -50,12 +56,22 @@
       client?.destroy();
     };
   });
+  export function preview(url: string) {
+    if (adding) return;
+    query = url;
+    selected = [];
+    page = 0;
+    addError = '';
+    input?.focus();
+    input?.scrollIntoView({ block: 'center' });
+    void client?.load(url);
+  }
   async function add() {
-    if (busy || adding || !selected.length || selected.length > limit) return;
+    if (busy || adding || !pendingSelected.length || pendingSelected.length > limit) return;
     adding = true;
     addError = '';
     try {
-      await onAdd([...selected]);
+      await onAdd([...pendingSelected]);
       selected = [];
     } catch (error) {
       addError = error instanceof Error ? error.message : 'The selected tracks could not be added.';
@@ -81,6 +97,7 @@
     <div class="row">
       <input
         id="playlist-link"
+        bind:this={input}
         type="url"
         bind:value={query}
         maxlength="2000"
@@ -129,10 +146,10 @@
       <div class="row">
         <button
           type="button"
-          disabled={!limit || adding}
+          disabled={!limit || adding || !available.length}
           onclick={() => {
-            selected = videos.slice(0, limit).map((video) => video.id);
-          }}>Select first {Math.min(limit, videos.length)}</button
+            selected = available.slice(0, limit).map((video) => video.id);
+          }}>Select first {Math.min(limit, available.length)}</button
         >
         <button
           type="button"
@@ -140,22 +157,27 @@
           onclick={() => {
             selected = [];
           }}>Clear selection</button
-        ><span role="status">{selected.length} selected</span>
+        ><span role="status">{pendingSelected.length} selected</span>
       </div>
       <ol start={currentPage * 20 + 1}>
         {#each shown as video (video.id)}<li>
             <label class="track"
               ><input
                 type="checkbox"
-                checked={selected.includes(video.id)}
-                disabled={adding || (!selected.includes(video.id) && selected.length >= limit)}
+                checked={selected.includes(video.id) || queuedIds.includes(video.id)}
+                disabled={adding ||
+                  queuedIds.includes(video.id) ||
+                  (!selected.includes(video.id) && pendingSelected.length >= limit)}
                 onchange={(event) => {
                   selected = event.currentTarget.checked
                     ? [...selected, video.id]
                     : selected.filter((id) => id !== video.id);
                 }}
               />
-              <span><strong>{video.title}</strong><small>{video.artist}</small></span></label
+              <span
+                ><strong>{video.title}</strong><small>{video.artist}</small
+                >{#if queuedIds.includes(video.id)}<small>Already queued</small>{/if}</span
+              ></label
             >
           </li>{/each}
       </ol>
@@ -178,10 +200,10 @@
       <button
         type="button"
         class="primary"
-        disabled={busy || adding || !selected.length || selected.length > limit}
+        disabled={busy || adding || !pendingSelected.length || pendingSelected.length > limit}
         onclick={() => {
           void add();
-        }}>{adding ? 'Adding tracks…' : `Add ${selected.length} selected to queue`}</button
+        }}>{adding ? 'Adding tracks…' : `Add ${pendingSelected.length} selected to queue`}</button
       >
     {/if}
   {/if}

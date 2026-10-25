@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { roomQueueCapacity } from '../../../../../services/core/src/protocol.ts';
   import { onMount } from 'svelte';
   import { createDiscordClient, type ConcertView } from '#lib/concert/discord-client.ts';
   import { request } from '../../../../../lib/browser-api.ts';
@@ -431,6 +432,8 @@
               {:then { default: MusicLibrary }}
                 <MusicLibrary
                   tracks={[...(concert?.current ? [concert.current] : []), ...queue]}
+                  capacity={roomQueueCapacity(queue.length, view.queue?.state.requests?.length)}
+                  pendingIds={view.queue?.state.requests?.map((video) => video.id) ?? []}
                   history={view.history}
                   busy={view.busy || !view.connected || !concert?.online || !concert?.connected}
                   onAdd={(ids) => addTracks(ids, true)}

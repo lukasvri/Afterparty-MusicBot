@@ -46,11 +46,12 @@ function fixture(
   now?: () => number,
   audio?: ConcertAudioOptions,
   delay?: (signal: AbortSignal) => Promise<void>,
+  pollMs = 60000,
 ) {
   const calls: Array<{ path: string; init: RequestInit }> = [];
   const data = new Map<string, string>([['afterparty-visitor', 'synthetic-visitor']]);
   const client = createDiscordClient({
-    pollMs: 60000,
+    pollMs,
     now,
     audio,
     delay,
@@ -446,7 +447,8 @@ test('a command confirmation deadline releases busy state even while reads fail'
   const f = fixture(
     async (path, init) => {
       if (broken) throw new Error('Disconnected');
-      if (init.method === 'POST') return { id: 'public:synthetic-command', status: 'pending' };
+      if (init.method === 'POST')
+        return { id: `public:${JSON.parse(String(init.body)).commandId}`, status: 'pending' };
       return path.includes('/queue') ? queue() : { state: state() };
     },
     () => clock,
@@ -559,6 +561,72 @@ test('played history stays public, bounded and isolated to the selected session'
     );
     await f.client.connect(guildB);
     assert.deepEqual(f.view.history, []);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+for (const status of ['failed', 'expired', 'unknown'])
+  test(`concert transport reports ${status} as failure without replaying`, async () => {
+    const f = fixture(async (path, init) => {
+      if (init.method === 'POST')
+        return { id: `public:${JSON.parse(String(init.body)).commandId}`, status };
+      return path.includes('/queue') ? queue() : { state: state() };
+    });
+    try {
+      await f.client.connect(guildA);
+      assert.equal(await f.client.control('resume'), false);
+      assert.equal(f.view.busy, false);
+      assert.equal(f.view.notice, '');
+      assert.match(f.view.error, /could not confirm/);
+      assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
+    } finally {
+      f.client.destroy();
+    }
+  });
+
+for (const receipt of [{ id: 'public:another-command', status: 'done' }, { status: 'unexpected' }])
+  test(`concert transport rejects an unrelated or invalid receipt: ${receipt.status}`, async () => {
+    const f = fixture(async (path, init) => {
+      if (init.method === 'POST')
+        return { id: `public:${JSON.parse(String(init.body)).commandId}`, ...receipt };
+      return path.includes('/queue') ? queue() : { state: state() };
+    });
+    try {
+      await f.client.connect(guildA);
+      assert.equal(await f.client.control('resume'), false);
+      assert.equal(f.view.busy, false);
+      assert.equal(f.view.notice, '');
+      assert.match(f.view.error, /Unexpected command receipt/);
+      assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
+    } finally {
+      f.client.destroy();
+    }
+  });
+
+test('automatic concert reconnection clears its transport error without replaying music commands', async () => {
+  let reads = 0;
+  const f = fixture(
+    async (path) => {
+      if (path.includes('/queue')) return queue();
+      if (++reads === 2) throw Error('Temporary disconnection');
+      return { state: state() };
+    },
+    undefined,
+    undefined,
+    undefined,
+    5,
+  );
+  try {
+    await f.client.connect(guildA);
+    await f.client.refresh();
+    assert.equal(f.view.connected, false);
+    assert.equal(f.view.error, 'Temporary disconnection');
+    for (let attempts = 0; attempts < 50 && !f.view.connected; attempts++)
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    assert.equal(f.view.connected, true);
+    assert.equal(f.view.error, '');
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
   } finally {
     f.client.destroy();
   }

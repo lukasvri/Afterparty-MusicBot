@@ -21,11 +21,13 @@ const url = 'https://www.youtube.com/playlist?list=PL1234567890123456789';
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 function fixture(fetcher: typeof fetch, hidden = () => false) {
   const timers = new Map<number, () => void>();
+  const delays: number[] = [];
   let counter = 0;
   const client = createPlaylistImport({
     fetch: fetcher,
     hidden,
-    setTimeout: ((callback: () => void) => {
+    setTimeout: ((callback: () => void, delay: number) => {
+      delays.push(delay);
       const key = ++counter;
       timers.set(key, callback);
       return key;
@@ -41,6 +43,7 @@ function fixture(fetcher: typeof fetch, hidden = () => false) {
   return {
     client,
     timers,
+    delays,
     state: () => state!,
     tick: async () => {
       const active = [...timers.values()];
@@ -165,4 +168,84 @@ test('malformed provider results and invalid capabilities are rejected', () => {
   assert.throws(() => playlistJob({ ...job(), token: 'secret' }));
   assert.throws(() => playlistJob({ ...job(), videos: [{ id: '<script>' }] }));
   assert.throws(() => playlistJob({ ...job(), total: -1 }));
+});
+
+test('a transient poll failure retries the existing preview without cancelling or restarting it', async () => {
+  const actions: string[] = [];
+  let reads = 0;
+  const f = fixture((async (_url, options) => {
+    const { action } = JSON.parse(String(options?.body));
+    actions.push(action);
+    if (action === 'read' && ++reads === 1) throw new TypeError('Network disconnected');
+    return Response.json(job(action === 'read' ? 'done' : 'processing'));
+  }) as typeof fetch);
+  await f.client.load(url);
+  await f.tick();
+  assert.equal(f.state().loading, true);
+  assert.match(f.state().notice, /retrying/i);
+  assert.equal(f.timers.size, 1);
+  assert.deepEqual(actions, ['start', 'read']);
+  await f.tick();
+  assert.equal(f.state().loading, false);
+  assert.equal(f.state().job?.status, 'done');
+  assert.equal(f.state().notice, '');
+  assert.deepEqual(actions, ['start', 'read', 'read']);
+  f.client.destroy();
+});
+test('temporary server failures retry with a bound and cancellation stops recovery', async () => {
+  const actions: string[] = [];
+  const f = fixture((async (_url, options) => {
+    const { action } = JSON.parse(String(options?.body));
+    actions.push(action);
+    return action === 'read'
+      ? new Response('Temporarily unavailable', { status: 503 })
+      : Response.json(job());
+  }) as typeof fetch);
+  await f.client.load(url);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await f.tick();
+    assert.equal(f.state().loading, true);
+  }
+  await f.tick();
+  await flush();
+  assert.equal(f.state().loading, false);
+  assert.match(f.state().error, /could not be loaded/);
+  assert.equal(f.timers.size, 0);
+  assert.deepEqual(actions, ['start', 'read', 'read', 'read', 'read', 'cancel']);
+  assert.deepEqual(f.delays, [1500, 3000, 6000, 12000]);
+  await f.client.load(url);
+  await f.tick();
+  f.client.cancel();
+  await f.tick();
+  assert.equal(f.state().job, null);
+  assert.equal(f.timers.size, 0);
+  assert.equal(actions.filter((action) => action === 'start').length, 2);
+  f.client.destroy();
+});
+test('failed start requests and denied polling are never retried automatically', async () => {
+  let starts = 0;
+  const failed = fixture((async () => {
+    starts++;
+    throw new TypeError('Network disconnected');
+  }) as typeof fetch);
+  await failed.client.load(url);
+  assert.equal(failed.state().loading, false);
+  assert.equal(failed.timers.size, 0);
+  assert.equal(starts, 1);
+  failed.client.destroy();
+  const actions: string[] = [];
+  const denied = fixture((async (_url, options) => {
+    const { action } = JSON.parse(String(options?.body));
+    actions.push(action);
+    return action === 'read'
+      ? Response.json({ error: 'This preview has expired.' }, { status: 403 })
+      : Response.json(job());
+  }) as typeof fetch);
+  await denied.client.load(url);
+  await denied.tick();
+  assert.equal(denied.state().loading, false);
+  assert.equal(denied.timers.size, 0);
+  assert.equal(denied.state().error, 'This preview has expired.');
+  assert.deepEqual(actions, ['start', 'read', 'cancel']);
+  denied.client.destroy();
 });

@@ -11,11 +11,15 @@
     gamePresets,
     presetSettings,
     rankPlayers,
+    sameGameConfiguration,
     validGameSettings,
   } from '#lib/games/game-experience.ts';
   import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import { guessAvailability } from '../../../../../lib/guess-availability.ts';
-  import type { GuessSettings } from '../../../../../services/core/src/guess-game.ts';
+  import type {
+    GuessPublicState,
+    GuessSettings,
+  } from '../../../../../services/core/src/guess-game.ts';
 
   let mounted = $state(false),
     hosting = $state(false),
@@ -37,7 +41,9 @@
     inviteUrl = $state(''),
     advanced = $state(false);
   let stageHeading = $state<HTMLHeadingElement>();
+  let answerInput = $state<HTMLInputElement>();
   let previousStage = '';
+  let editedFrom: Pick<GuessPublicState, 'sessionId' | 'categoryId' | 'settings'> | undefined;
   let settings = $state<GuessSettings>({
     durationSeconds: 30,
     roundCount: 5,
@@ -99,9 +105,15 @@
     category = game.categoryId;
     base = game.revision;
     dirty = false;
+    editedFrom = undefined;
   }
   function edit() {
-    if (!dirty) base = game?.revision ?? 0;
+    if (!dirty) {
+      base = game?.revision ?? 0;
+      editedFrom = game
+        ? { sessionId: game.sessionId, categoryId: game.categoryId, settings: { ...game.settings } }
+        : undefined;
+    }
     dirty = true;
   }
   function preset(id: string) {
@@ -135,6 +147,7 @@
     view = { data: null, ready: false, busy: false, error: '', signIn: false };
     answer = '';
     dirty = false;
+    editedFrom = undefined;
     audioEnabled = false;
     previousStage = '';
     copied = false;
@@ -165,6 +178,9 @@
       if (state.data && !dirty) {
         settings = { ...state.data.game.settings };
         category = state.data.game.categoryId;
+        base = state.data.game.revision;
+      } else if (state.data && editedFrom && sameGameConfiguration(editedFrom, state.data.game)) {
+        // Keep unsaved choices when guests arrive; actual remote setting changes stay a conflict.
         base = state.data.game.revision;
       }
     });
@@ -213,8 +229,25 @@
     }
   }
   async function act(action: string, fields: Record<string, unknown> = {}) {
-    const result = await client?.act(action, fields);
-    if (result && action === 'guess') answer = '';
+    const actionClient = client;
+    const result = await actionClient?.act(action, fields);
+    if (client !== actionClient) return null;
+    if (result && action === 'guess') {
+      if (result.self.result?.correct) answer = '';
+      else {
+        await afterRender();
+        if (
+          client === actionClient &&
+          game?.sessionId === result.game.sessionId &&
+          round?.roundId === result.game.round?.roundId &&
+          game?.phase === 'round' &&
+          view.ready
+        ) {
+          answerInput?.focus({ preventScroll: true });
+          answerInput?.select();
+        }
+      }
+    }
     if (result && action === 'configure') useLatest();
     return result;
   }
@@ -650,6 +683,7 @@
                   <div>
                     <input
                       id="answer"
+                      bind:this={answerInput}
                       bind:value={answer}
                       maxlength="120"
                       autocomplete="off"

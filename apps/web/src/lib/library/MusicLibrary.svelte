@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ROOM_QUEUE_LIMIT } from '../../../../../services/core/src/protocol.ts';
   import { onMount } from 'svelte';
   import PlaylistImport from '#lib/library/PlaylistImport.svelte';
   import ConcertCatalog from '#lib/library/ConcertCatalog.svelte';
@@ -14,11 +15,15 @@
     tracks,
     history,
     busy,
+    capacity = Math.max(0, ROOM_QUEUE_LIMIT - tracks.length),
+    pendingIds = [],
     onAdd,
   }: {
     tracks: Video[];
     history: Video[];
     busy: boolean;
+    capacity?: number;
+    pendingIds?: readonly string[];
     onAdd: (ids: readonly string[]) => Promise<void> | void;
   } = $props();
   const key = 'afterparty-library-v1';
@@ -29,7 +34,15 @@
   let adding = $state(false);
   let ready = $state(false);
   let invalidStored = $state(false);
+  let playlistImport = $state<{ preview: (url: string) => void }>();
   const available = $derived(uniqueEveningTracks(history, tracks));
+  const limit = $derived(
+    Math.max(0, Math.min(ROOM_QUEUE_LIMIT, Number.isFinite(capacity) ? Math.floor(capacity) : 0)),
+  );
+  const queuedIds = $derived([...tracks.map((track) => track.id), ...pendingIds]);
+  function additions(ids: readonly string[]) {
+    return [...new Set(ids)].filter((id) => !queuedIds.includes(id));
+  }
   onMount(() => {
     const read = () => {
       try {
@@ -116,10 +129,21 @@
   }
   async function add(ids: readonly string[], rethrow = false) {
     if (busy || adding || !ids.length) return;
+    const next = additions(ids);
+    if (!next.length) {
+      notice = 'Those tracks are already in this queue.';
+      return;
+    }
+    if (next.length > limit) {
+      error = `The queue has room for ${limit} more tracks. Choose fewer tracks or make room first.`;
+      if (rethrow) throw new Error(error);
+      return;
+    }
     adding = true;
     error = '';
+    notice = '';
     try {
-      await onAdd(ids);
+      await onAdd(next);
     } catch (caught) {
       error =
         caught instanceof Error ? caught.message : 'The tracks could not be added to this room.';
@@ -132,17 +156,30 @@
 
 <section class="music-library" aria-label="Your music library">
   <PlaylistImport
+    bind:this={playlistImport}
     busy={busy || adding}
-    capacity={Math.max(0, 50 - tracks.length)}
+    capacity={limit}
+    {queuedIds}
     onAdd={(ids) => add(ids, true)}
   />
-  <ConcertCatalog busy={busy || adding} onAdd={(ids) => add(ids, true)} />
+  <ConcertCatalog
+    onPreviewPlaylist={(url) => playlistImport?.preview(url)}
+    busy={busy || adding}
+    capacity={limit}
+    {queuedIds}
+    onAdd={(ids) => add(ids, true)}
+  />
   <section class="local-library" aria-labelledby="library-title">
     <p class="eyebrow red">GOOD NIGHTS, SAVED</p>
     <h2 id="library-title">Your collection</h2>
     <p>
       Favorites and evenings stay on this device. Your existing Afterparty library is available here
       too.
+    </p>
+    <p class="queue-capacity" role="status">
+      {limit
+        ? `${limit} queue spaces available.`
+        : 'The queue is full. Make room before adding tracks.'}
     </p>
     <form
       onsubmit={(event) => {
@@ -204,7 +241,10 @@
           />
           <button
             type="button"
-            disabled={busy || adding || !evening.tracks.length}
+            disabled={busy ||
+              adding ||
+              !evening.tracks.length ||
+              additions(evening.tracks.map((video) => video.id)).length > limit}
             onclick={() => {
               void add(evening.tracks.map((video) => video.id));
             }}>Add evening to queue</button
@@ -269,11 +309,11 @@
             <span class="track-title">{video.title}<small>{video.artist}</small></span>
             <button
               type="button"
-              disabled={busy || adding}
+              disabled={busy || adding || !limit || queuedIds.includes(video.id)}
               aria-label={`Add ${video.title} to queue`}
               onclick={() => {
                 void add([video.id]);
-              }}>Add</button
+              }}>{queuedIds.includes(video.id) ? 'Queued' : 'Add'}</button
             >
             <button
               type="button"

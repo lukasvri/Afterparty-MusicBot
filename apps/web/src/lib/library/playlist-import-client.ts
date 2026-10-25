@@ -21,6 +21,13 @@ export type PlaylistState = {
 };
 type Capability = { id: string; token: string };
 const failure = 'Playlist could not be loaded. Try again.';
+class PlaylistRequestError extends Error {
+  readonly retryable: boolean;
+  constructor(message: string, retryable: boolean) {
+    super(message);
+    this.retryable = retryable;
+  }
+}
 const count = (value: unknown) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 export function playlistJob(raw: unknown): PlaylistJob {
@@ -86,18 +93,26 @@ export function createPlaylistImport(
     listeners.forEach((listener) => listener(state));
   };
   async function request(body: object, signal?: AbortSignal): Promise<PlaylistJob> {
-    const response = await fetcher('/api/playlists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
-        : AbortSignal.timeout(15000),
-    });
-    const data: unknown = await response.json();
+    let response: Response;
+    try {
+      response = await fetcher('/api/playlists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+          : AbortSignal.timeout(15000),
+      });
+    } catch {
+      throw new PlaylistRequestError(failure, true);
+    }
+    const data: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const error = data && typeof data === 'object' ? (data as { error?: unknown }).error : null;
-      throw new Error(typeof error === 'string' ? error : failure);
+      throw new PlaylistRequestError(
+        typeof error === 'string' ? error : failure,
+        response.status === 408 || response.status === 429 || response.status >= 500,
+      );
     }
     return playlistJob(data);
   }
@@ -126,6 +141,7 @@ export function createPlaylistImport(
       if (destroyed) return;
       invalidate();
       const version = generation;
+      let readFailures = 0;
       let url: string;
       try {
         url = normalizePlaylistUrl(value.trim()).url;
@@ -156,6 +172,7 @@ export function createPlaylistImport(
             return;
           }
           if (body.id && next.id !== body.id) throw new Error(failure);
+          readFailures = 0;
           if (next.token) capability = { id: next.id, token: next.token };
           if (next.status === 'processing' && !capability) throw new Error(failure);
           publish({
@@ -170,10 +187,31 @@ export function createPlaylistImport(
           } else if (!hidden()) timer = schedule(() => poll?.(), 1500);
         } catch (error) {
           if (destroyed || version !== generation || active.signal.aborted) return;
+          // Only a read can be safely repeated. A lost start response may already
+          // have allocated a job, and queue mutations never belong to this client.
+          if (
+            body.action === 'read' &&
+            capability &&
+            error instanceof PlaylistRequestError &&
+            error.retryable &&
+            ++readFailures <= 3
+          ) {
+            publish({
+              loading: true,
+              error: '',
+              notice: 'Connection interrupted. Retrying playlist loading…',
+            });
+            if (!hidden()) timer = schedule(() => poll?.(), 1500 * 2 ** readFailures);
+            return;
+          }
           if (capability) cancelRemote(capability);
           capability = null;
           poll = null;
-          publish({ loading: false, error: error instanceof Error ? error.message : failure });
+          publish({
+            loading: false,
+            notice: '',
+            error: error instanceof Error ? error.message : failure,
+          });
         } finally {
           if (controller === active) controller = null;
         }

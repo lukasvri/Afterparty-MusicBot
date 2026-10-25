@@ -20,6 +20,20 @@ test('ordinary names and unlabelled metadata do not claim either AI or human pro
   assert.equal(metadataAiGenerated(null, 123, {}, [null, false], false), undefined);
 });
 
+test('explicit production and recreation declarations survive metadata placement and Norwegian wording', () => {
+  for (const label of ['AI-produced', 'AI composed music', 'AI-assisted music', 'AI remake',
+    'AI re-created', 'AI re-creation', 'KI-assistert musikk', 'Laget med KI',
+    'Produsert ved hjelp av AI', 'Komponert med kunstig intelligens']) {
+    assert.equal(metadataAiGenerated(label, ''), true, label);
+    assert.equal(metadataAiGenerated('', label), true, label);
+    assert.equal(metadataAiGenerated('', '', label), true, label);
+    assert.equal(metadataAiGenerated('', '', '', [label]), true, label);
+  }
+  for (const label of ['Recreate Me', 'Recreating Memories', 'Produced by an orchestra',
+    'Laget med ekte instrumenter', 'No AI-assisted music', 'Generated Memories'])
+    assert.equal(metadataAiGenerated(label, 'Artist'), undefined, label);
+});
+
 test('SoundCloud metadata and public recording copies retain only explicit negative evidence', () => {
   const data = { id: 'synthetic', title: 'Artist - Song', uploader: 'Artist', webpage_url: 'https://soundcloud.com/artist/song', duration: 200 };
   assert.equal(soundcloudTrack(data).aiGenerated, undefined);

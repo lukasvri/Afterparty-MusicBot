@@ -74,3 +74,20 @@ export function validGameSettings(settings: GuessSettings): boolean {
     (settings.answerMode === undefined || ['title', 'artist'].includes(settings.answerMode))
   );
 }
+
+/** A participant or catalog refresh can advance the revision without changing host settings. */
+export function sameGameConfiguration(
+  previous: Pick<GuessPublicState, 'sessionId' | 'categoryId' | 'settings'>,
+  current: Pick<GuessPublicState, 'sessionId' | 'categoryId' | 'settings'>,
+): boolean {
+  return (
+    previous.sessionId === current.sessionId &&
+    previous.categoryId === current.categoryId &&
+    previous.settings.durationSeconds === current.settings.durationSeconds &&
+    previous.settings.roundCount === current.settings.roundCount &&
+    previous.settings.maxPoints === current.settings.maxPoints &&
+    previous.settings.minPoints === current.settings.minPoints &&
+    previous.settings.hints === current.settings.hints &&
+    (previous.settings.answerMode ?? 'title') === (current.settings.answerMode ?? 'title')
+  );
+}

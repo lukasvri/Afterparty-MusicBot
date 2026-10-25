@@ -4,6 +4,7 @@ import {
   presetSettings,
   rankPlayers,
   validGameSettings,
+  sameGameConfiguration,
 } from '../src/lib/games/game-experience.ts';
 const settings = {
   durationSeconds: 30,
@@ -63,4 +64,28 @@ test('one-click start rejects incomplete scoring inputs before it can save or st
     { maxPoints: undefined },
   ])
     assert.equal(validGameSettings({ ...settings, ...change } as typeof settings), false);
+});
+test('unsaved host settings may follow unrelated revisions but never another session or configuration', () => {
+  const previous = { sessionId: 'session-one', categoryId: 'party', settings };
+  assert(sameGameConfiguration(previous, structuredClone(previous)));
+  for (const change of [
+    { durationSeconds: 15 },
+    { roundCount: 8 },
+    { maxPoints: 1500 },
+    { minPoints: 50 },
+    { hints: false },
+    { answerMode: 'title' as const },
+  ])
+    assert.equal(
+      sameGameConfiguration(previous, { ...previous, settings: { ...settings, ...change } }),
+      false,
+    );
+  assert.equal(sameGameConfiguration(previous, { ...previous, categoryId: 'other' }), false);
+  assert.equal(sameGameConfiguration(previous, { ...previous, sessionId: 'session-two' }), false);
+  assert(
+    sameGameConfiguration(
+      { ...previous, settings: { ...settings, answerMode: undefined } },
+      { ...previous, settings: { ...settings, answerMode: 'title' } },
+    ),
+  );
 });

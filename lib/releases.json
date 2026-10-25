@@ -1,5 +1,24 @@
 [
   {
+    "version": "3.0.0-alpha.2",
+    "date": "2026-10-25",
+    "title": "Better radio, festival browsing and game nights",
+    "items": [
+      "Music searches use title, artist and recording-format relevance to order the existing results. Exact songs take priority over incidental matches, while explicit remix, cover and live-set searches remain available.",
+      "Radio gives less recently exposed artists a turn among equally suitable candidates, reducing repeated loops through the first artists returned by a source. The original station anchor, style checks and independent room histories remain in place.",
+      "Automatic radio catches more declared AI production and song-recreation labels, including Norwegian KI and vlogg wording. Matching music videos remain preferred without replacing the chosen song with another recording.",
+      "Festival browsing expands from 49 to 290 source-backed sets, including every linked recording in the checked EDC 2023, 2025 and 2026 indexes and all matching-year links in the checked Creamfields 2024 index. Artist and stage search, pages of 20 and explicit capacity-sized batches keep larger years usable.",
+      "Each existing Tomorrowland year can open its source playlist in the metadata preview before you choose tracks. Other festival archives remain partial where their complete source inventory could not be verified.",
+      "Join or host Guess the Song without entering a nickname. A default player name is supplied, while incorrect guesses remain selected for quick correction.",
+      "Unsaved game settings survive guests arriving and song preparation updates. Changes made by another host still require you to review the latest settings before saving.",
+      "Playlist previews retry temporary connection failures with a bounded delay. Starting an import and adding music are never automatically repeated.",
+      "Library and festival tools show remaining queue capacity and account for tracks already queued or awaiting approval. Explicitly retrying a partial addition skips tracks already present and retains the original room or concert.",
+      "Concert controls check their own command confirmation and report failed commands without claiming success. Temporary concert disconnections clear after a successful read without replaying music commands.",
+      "A newly created room keeps its address after a temporary connection failure, so reloading can return to it with saved host access.",
+      "This alpha source candidate still requires live provider, real-device audio and Discord listening acceptance before a stable release."
+    ]
+  },
+  {
     "version": "3.0.0-alpha.1",
     "date": "2026-10-24",
     "title": "Afterparty 3 website preview",

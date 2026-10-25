@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { roomQueueCapacity } from '../../../../services/core/src/protocol.ts';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
 
   import { onMount } from 'svelte';
@@ -13,7 +14,6 @@
   import { time } from '../../../../lib/types.ts';
   import releases from '../../../../lib/releases.json';
 
-  let roomSession = 0;
   let client = $state<ReturnType<typeof createRoomClient>>();
   let view = $state<RoomClientState>({
     room: null,
@@ -49,13 +49,16 @@
     directory = new URL(location.href).searchParams.get('view') === 'rooms';
     client = createRoomClient();
     const unsubscribe = client.subscribe((value) => {
+      const changedRoom = value.room && value.room.code !== view.room?.code;
       if (view.room && !value.room) {
-        roomSession++;
         invitationLink = '';
         invitationError = '';
         copied = false;
       }
       view = value;
+      // Initial reads can fail after creation. Keep the room recoverable when
+      // polling eventually succeeds, even after the creating promise returned.
+      if (changedRoom) rememberRoom();
     });
     const initialUrl = new URL(location.href);
     tv = initialUrl.searchParams.get('tv') === '1';
@@ -118,20 +121,10 @@
     }
   }
   async function addTracks(ids: readonly string[]) {
-    const code = view.room?.code;
-    const session = roomSession;
-    if (!code || importing) return;
+    if (!client || importing) throw new Error('Another addition is still in progress.');
     importing = true;
     try {
-      for (const id of ids) {
-        if (view.room?.code !== code || roomSession !== session)
-          throw new Error('Room changed. Check the queue before importing again.');
-        if (!(await client?.add(id)))
-          throw new Error(
-            view.error ||
-              'Not all selected tracks could be added. Check the queue before retrying.',
-          );
-      }
+      await client.append(ids);
     } finally {
       importing = false;
     }
@@ -497,6 +490,8 @@
                 <MusicLibrary
                   tracks={[...(room.current ? [room.current] : []), ...room.queue]}
                   history={room.history ?? []}
+                  capacity={roomQueueCapacity(room.queue.length, room.requests?.length)}
+                  pendingIds={room.requests?.map((video) => video.id) ?? []}
                   busy={view.busy || importing || view.connection !== 'connected'}
                   onAdd={addTracks}
                 />
@@ -531,6 +526,10 @@
                     }}
                   /> Keep the music going with radio</label
                 >
+                <p class="permission-note">
+                  Radio skips declared AI, vlogs and song recreations. Matching music videos are
+                  preferred when available.
+                </p>
                 <label class="checkbox-label"
                   ><input
                     type="checkbox"

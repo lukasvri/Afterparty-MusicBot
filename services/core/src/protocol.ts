@@ -42,6 +42,13 @@ export type RoomTimeline = {
 };
 export const ROOM_START_LEAD_MS = 1500;
 export const ROOM_LEASE_MS = 5000;
+export const ROOM_QUEUE_LIMIT = 50;
+/** Pending guest requests reserve the same room capacity as queued tracks. */
+export function roomQueueCapacity(queueLength: number, pendingLength = 0): number {
+  if (!Number.isSafeInteger(queueLength) || queueLength < 0 ||
+      !Number.isSafeInteger(pendingLength) || pendingLength < 0) return 0;
+  return Math.max(0, ROOM_QUEUE_LIMIT - queueLength - pendingLength);
+}
 // Clients project the timestamped timeline locally between these snapshots.
 // Control changes and buffering transitions are still sent immediately.
 export const LIVE_SNAPSHOT_INTERVAL_MS = 1000;
@@ -74,7 +81,7 @@ export function readRoomTimeline(value: unknown): RoomTimeline | null {
     (r.radio !== undefined && typeof r.radio !== "boolean") ||
     !video(r.current) ||
     !Array.isArray(r.queue) ||
-    r.queue.length > 50 ||
+    r.queue.length > ROOM_QUEUE_LIMIT ||
     !r.queue.every((v) => v && video(v)) ||
     r.syncSource !== "live" ||
     typeof r.syncEpoch !== "string" ||

@@ -1097,3 +1097,49 @@ test('negotiated room reads require bounded authenticated Core and immediately s
   assert.deepEqual(f.roomRow(code),original,'presence reads do not update the checkpoint');
  }finally{delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
 });
+
+test('D1 user search shares title and artist ranking without extra provider requests', async () => {
+  const f = fixture();
+  try {
+    const ids = ['remix000001', 'original001', 'unrelated01'];
+    let calls = 0;
+    globalThis.fetch = async target => {
+      calls++;
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      if (url.pathname.endsWith('/search'))
+        return Response.json({ items: ids.map(videoId => ({ id: { videoId } })) });
+      return Response.json({ items: ids.map((id, i) => ({ id,
+        snippet: { title: ['Janji - Heroes Tonight (Remix)', 'Janji - Heroes Tonight (Official Audio)', 'Unrelated'][i], channelTitle: 'Janji', categoryId: '10' },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true },
+      })) });
+    };
+    assert.deepEqual((await searchHandler(f.request, 'Janji Heroes Tonight')).videos.map(video => video.id), [ids[1], ids[0], ids[2]]);
+    await searchHandler(f.request, 'Janji Heroes Tonight');
+    assert.equal(calls, 2, 'one discovery and one metadata batch, reused on subsequent reads');
+  } finally { f.close(); }
+});
+
+test('D1 bypasses old metadata when newer declared-AI evidence is only in the description', async () => {
+  const f = fixture();
+  try {
+    const id = 'declared001';
+    const previous = { ...next, id, title: 'Artist - Original', artist: 'Artist', aiGenerated: undefined };
+    f.sqlite.prepare('INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)')
+      .run(`videos:v4:${id}`, JSON.stringify([previous]), Date.now() + 3600000);
+    let metadataReads = 0;
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      if (url.pathname.endsWith('/search')) return Response.json({ items: [{ id: { videoId: id } }] });
+      metadataReads++;
+      return Response.json({ items: [{ id,
+        snippet: { title: previous.title, channelTitle: previous.artist, categoryId: '10', description: 'AI-produced music' },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true },
+      }] });
+    };
+    const result = await searchHandler(f.request, 'new classification');
+    assert.equal(metadataReads, 1);
+    assert.equal(result.videos[0].aiGenerated, true);
+  } finally { f.close(); }
+});

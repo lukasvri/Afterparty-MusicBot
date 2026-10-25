@@ -92,6 +92,89 @@ function fixture(
 }
 const json = (value: unknown, status = 200) => Response.json(value, { status });
 
+test('library retry skips confirmed tracks and uses each new room revision', async () => {
+  let snapshot = room(),
+    fail = true;
+  const f = fixture(async (_path, init) => {
+    if (init.method !== 'POST') return json(snapshot);
+    const input = JSON.parse(String(init.body));
+    assert.equal(input.version, snapshot.version);
+    if (input.videoId === 'newtrack002' && fail) return json({ error: 'Temporary failure' }, 503);
+    snapshot = {
+      ...snapshot,
+      version: snapshot.version + 1,
+      queue: [...snapshot.queue, { ...snapshot.current!, id: input.videoId }],
+    };
+    return json({ room: snapshot });
+  });
+  try {
+    await f.client.join('ROOM0001');
+    await assert.rejects(
+      f.client.append(['current0001', 'newtrack001', 'newtrack002']),
+      /1 tracks added/,
+    );
+    fail = false;
+    await f.client.append(['current0001', 'newtrack001', 'newtrack002']);
+    assert.deepEqual(
+      snapshot.queue.map((video) => video.id),
+      ['newtrack001', 'newtrack002'],
+    );
+    const writes = f.calls.filter((call) => call.init.method === 'POST');
+    assert.deepEqual(
+      writes.map((call) => JSON.parse(String(call.init.body)).videoId),
+      ['newtrack001', 'newtrack002', 'newtrack002'],
+    );
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('library additions preflight the full queue including pending requests without partial writes', async () => {
+  const snapshot = room();
+  snapshot.queue = Array.from({ length: 48 }, (_, index) => ({
+    ...snapshot.current!,
+    id: `q${String(index).padStart(10, '0')}`,
+  }));
+  snapshot.requests = [{ ...snapshot.current!, id: 'requested01' }];
+  const f = fixture(async () => json(snapshot));
+  try {
+    await f.client.join('ROOM0001');
+    await assert.rejects(f.client.append(['newtrack001', 'newtrack002']), /room for 1 more/);
+    assert.equal(
+      f.calls.some((call) => call.init.method === 'POST'),
+      false,
+    );
+    await f.client.append(['current0001', 'requested01']);
+    assert.equal(
+      f.calls.some((call) => call.init.method === 'POST'),
+      false,
+    );
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('a library batch cannot continue after leaving and rejoining the same room', async () => {
+  const command = deferred<Response>();
+  const f = fixture(async (_path, init) =>
+    init.method === 'POST' ? command.promise : json(room()),
+  );
+  try {
+    await f.client.join('ROOM0001');
+    const adding = f.client.append(['newtrack001', 'newtrack002']);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const rejected = assert.rejects(adding, /room changed/);
+    f.client.leave();
+    await f.client.join('ROOM0001');
+    command.resolve(json({ room: room('ROOM0001', 2) }));
+    await rejected;
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
+    assert.equal(f.state.room?.version, 1);
+  } finally {
+    f.client.destroy();
+  }
+});
+
 test('a delayed room response cannot cross a room switch, even when transport ignores abort', async () => {
   const slow = deferred<Response>();
   const f = fixture(async (path) =>

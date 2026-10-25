@@ -52,7 +52,9 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Device-local reaction expiry | `lib/social-reactions.ts` | Used by the native social client |
 | Discord/Core startup | `services/core/src/` | `main.ts`, `guilds.ts`, `server.ts` |
 | Playback and source extraction | `services/core/src/` | `engine.ts`, `audio.ts`, `providers.ts`, `extractor.ts` |
+| User search relevance | `services/core/src/music-search.ts` | One bounded title/artist and recording-format ranking policy for Core search and Worker fallback; radio retains its separate admission and ranking pipeline |
 | Shared room-radio queue selection and existence checks | `services/core/src/room-radio.ts` | One lazy selection policy for Core and website fallback; `room-state.ts` owns command/prefetch eligibility |
+| Shared browser-room queue capacity | `services/core/src/protocol.ts` | `ROOM_QUEUE_LIMIT` and `roomQueueCapacity` reserve pending requests; Core and native room/library controls use the same bounds |
 | Core rooms, games and social authority | `services/core/src/` | `rooms.ts`, `guess-game.ts`, `social.ts` |
 | Website schema and migrations | `db/`, `drizzle/` | Existing D1 migration sequence |
 | Core schema and data | `services/core/src/` | `store.ts`, `migrate.ts`; private data stays outside Git |
@@ -75,6 +77,13 @@ The v3 feature folders keep each component beside its client and behavior helper
 Shared fluid TV sizing lives in `apps/web/src/lib/ui/AppTheme.svelte`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 
 Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
+
+The room client owns sequential library additions, capacity preflight and session
+retirement. Library tools exclude current, queued and pending tracks before an
+explicit addition. Playlist metadata polling alone may retry transient failures;
+starts and queue mutations are never automatically replayed. Concert additions
+retain their separate fresh-revision and private-receipt lifecycle. The website's
+50-track selection budget does not change the bot's configured playlist limit.
 
 Shared contracts belong in browser-safe modules; authorization and persistence remain in their server implementations. Reuse the existing contracts and pure rules across Core and the website. The 26 API route adapters in `lib/api/` preserve URLs and authorization without a second frontend.
 

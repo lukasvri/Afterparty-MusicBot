@@ -88,6 +88,7 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
   let creates = 0,
     authorizedReads = 0,
     roomReads = 0,
+    failedReads = 0,
     version = 1,
     playing = true,
     position = 12;
@@ -208,6 +209,10 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       if (!input) {
         roomReads++;
         if (authorized) authorizedReads++;
+        if (failedReads > 0) {
+          failedReads--;
+          return route.fulfill({ status: 503, json: { error: 'Temporary room outage.' } });
+        }
         return route.fulfill({ json: snapshot(authorized) });
       }
       assert.equal(input.version, version, 'mutations carry the current server revision');
@@ -251,6 +256,9 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
     get roomReads() {
       return roomReads;
     },
+    failNextReads(count: number) {
+      failedReads = count;
+    },
     async close() {
       await closeFixture(page, browser);
     },
@@ -283,6 +291,28 @@ async function find(page: Page, query: string) {
   await input.fill(query);
   await input.press('Enter');
 }
+
+test('a created room remains bookmarked after its first ownership read fails and polling recovers', async (t) => {
+  const f = await fixture(t, 390);
+  try {
+    f.failNextReads(1);
+    await f.page
+      .getByRole('textbox', { name: 'Room name', exact: true })
+      .fill('Friday, after hours');
+    await f.page.getByRole('button', { name: 'Create private room' }).click();
+    await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
+    assert.equal(f.creates, 1);
+    assert.equal(new URL(f.page.url()).searchParams.get('room'), code);
+    assert.equal(await f.page.getByRole('button', { name: 'Pause playback' }).isEnabled(), true);
+    await f.page.reload();
+    await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
+    assert.equal(f.creates, 1);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
 async function noOverflow(page: Page) {
   assert(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),

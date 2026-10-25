@@ -198,6 +198,7 @@ export function createDiscordClient(options: Options = {}) {
   };
   const read = async (target: Session, clearError = false) => {
     if (!current(target) || (view.busy && !pending)) return;
+    const recovering = !view.connected;
     const serial = ++target.serial;
     const params = new URLSearchParams();
     if (target.guildId) params.set('guildId', target.guildId);
@@ -253,7 +254,7 @@ export function createDiscordClient(options: Options = {}) {
         queue,
         connected: true,
         loading: false,
-        ...(clearError ? { error: '' } : {}),
+        ...(clearError || recovering ? { error: '' } : {}),
       });
       if (resolvedGuild && !audio) {
         audio = createConcertAudio(resolvedGuild, target.selectedGuildId, options.audio);
@@ -596,6 +597,7 @@ export function createDiscordClient(options: Options = {}) {
       ++target.serial;
       publish({ busy: true, error: '', notice: '' });
       try {
+        const commandId = crypto.randomUUID();
         const receipt = await request<{ id: string; status: string }>('/api/discord', {
           method: 'POST',
           headers: headers(),
@@ -603,12 +605,19 @@ export function createDiscordClient(options: Options = {}) {
           body: JSON.stringify({
             action,
             guildId: target.guildId,
-            commandId: crypto.randomUUID(),
+            commandId,
             playbackKey: state.playbackKey,
             queueRevision: state.queueRevision,
           }),
         });
         if (!current(target)) return false;
+        if (
+          receipt.id !== `public:${commandId}` ||
+          !['done', 'pending', 'processing', 'failed', 'expired', 'unknown'].includes(
+            receipt.status,
+          )
+        )
+          throw Error('Unexpected command receipt. Check the current state before retrying.');
         if (receipt.status === 'done')
           publish({ busy: false, notice: 'Command confirmed by Core.' });
         else if (['failed', 'expired', 'unknown'].includes(receipt.status))
@@ -621,7 +630,7 @@ export function createDiscordClient(options: Options = {}) {
           publish({ notice: 'Waiting for Core confirmation…' });
         }
         await read(target);
-        return true;
+        return ['done', 'pending', 'processing'].includes(receipt.status);
       } catch (error) {
         if (current(target)) {
           publish({ busy: false, error: errorText(error) });
