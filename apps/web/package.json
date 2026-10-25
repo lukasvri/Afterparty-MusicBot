@@ -23,9 +23,7 @@
     "sync": "node --import ./scripts/runtime.ts node_modules/@sveltejs/kit/svelte-kit.js sync"
   },
   "overrides": {
-    "miniflare": {
-      "sharp": "0.35.5"
-    },
+    "sharp": "0.35.5",
     "undici": "7.30.1"
   },
   "devDependencies": {
