@@ -36,6 +36,8 @@ const hooks = registerHooks({
     if (specifier.endsWith("core-server")) return {
       url: moduleUrl(`
         export const coreUrl=()=>null;
+        export const corePresence=async()=>{throw Error('Core disabled');};
+        export const legacyBridgeOverride=()=>false;
         export const commandTicket=async()=>({});
         export const coreRequest=async(...args)=>{
           globalThis.__afterpartyAuthTest.coreCalls.push(args);

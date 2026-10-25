@@ -1,6 +1,8 @@
 # Local Workers variables. Configure equivalent secrets in production.
 ADMIN_BRIDGE_KEY=
 GUTTA_CORE_PUBLIC_URL=https://core.example.com
+# Optional explicit rollback override. Requires a newer Core-verified checkpoint.
+# GUTTA_CORE_BRIDGE_MODE=legacy
 GUTTA_CORE_SITE_ORIGIN=https://afterparty.example.com
 YOUTUBE_API_KEY=
 # Optional owner-password fallback. Store a PBKDF2 hash, never a plaintext password.

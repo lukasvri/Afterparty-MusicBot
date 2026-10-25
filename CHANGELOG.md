@@ -17,6 +17,8 @@ See [release policy](docs/RELEASING.md).
 - The native v3 source now provides the sole interface at the home address, with public concerts at /discord. Existing v3 bookmarks keep working; the Classic interface and its fallback have been retired while APIs and saved data retain their existing contracts.
 - TV mode scales video, QR invitations and controls dynamically from 1080p through QHD and 4K. Local QR invitations and keyboard fullscreen/mute controls now use the native player. Switching views retains the active player; public invitation links exclude private host credentials.
 - Reconnect game can rejoin after Core loses its in-memory game membership. Existing games retain their scores; lost games return to a lobby without replaying guesses or starting a round automatically.
+- Core saves pause and resume choices immediately for restart recovery, closing the gap before the next playback clock tick.
+- Optional Core-authoritative concert rooms show a saved checkpoint as offline when Core cannot be reached, keeping stale playback paused until fresh state is available.
 
 ## v2.4.0-alpha.15: Prepare an opt-in Cloudflare website build
 

@@ -143,8 +143,10 @@ export async function createServers(
     input: Record<string, unknown>,
     scope: "public" | "admin",
   ) => {
-    const target = select(input.guildId),
-      previous = target.engine.store.job(id, input);
+    const target = select(input.guildId);
+    if (scope === 'public' && target.engine.store.get('bridge-reconciliation-block', false))
+      throw new UserError('This server requires manual state reconciliation.', 409);
+    const previous = target.engine.store.job(id, input);
     if (!previous) {
       void target.commands
         .execute(input, scope)
@@ -288,16 +290,14 @@ export async function createServers(
       }
       if (request.method === "GET" && url.pathname === "/v1/state") {
         const all = url.searchParams.get("all") === "1";
-        if (all) authenticate(request);
-        json(response, 200, {
-          state: snapshot(
-            url.searchParams.get("room") && options.guilds
-              ? (options.guilds.byRoom(url.searchParams.get("room")!) ??
-                  select("invalid"))
-              : select(url.searchParams.get("guildId")),
-            all,
-          ),
-        });
+        const authority = url.searchParams.get("authority") === "1";
+        if (all || authority) authenticate(request);
+        const target = url.searchParams.get("room") && options.guilds
+          ? (options.guilds.byRoom(url.searchParams.get("room")!) ?? select("invalid"))
+          : select(url.searchParams.get("guildId"));
+        if (authority && target.engine.store.get('bridge-reconciliation-block', false))
+          throw new UserError('This server requires manual state reconciliation.', 409);
+        json(response, 200, {state: snapshot(target, all)});
         return;
       }
       if (request.method === "GET" && url.pathname === "/health") {

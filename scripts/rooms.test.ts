@@ -17,6 +17,8 @@ type FixtureEnvironment = {
     };
   };
   YOUTUBE_API_KEY?: string;
+  GUTTA_CORE_PUBLIC_URL?: string;
+  ADMIN_BRIDGE_KEY?: string;
 };
 const syntheticEnv: FixtureEnvironment = {};
 const globals = globalThis as typeof globalThis & { __roomTestEnv: FixtureEnvironment };
@@ -234,6 +236,48 @@ test("Discord heartbeat lookup preserves guild isolation and legacy room-only fa
   } finally {
     f.close();
   }
+});
+
+test("checkpointed Discord rooms use only their canonical transient clock and stop across outage and paused reconnect", async (t) => {
+  const f = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, 'now', () => now);
+  const guildId = '111111111111111', roomCode = 'D0123456';
+  const concert = { ...seed, concert: true };
+  try {
+    await f.save(roomCode, { current: concert, queue: [], playing: true, position: 0 });
+    f.sqlite.prepare('UPDATE rooms SET guild_id=?,updated_at=? WHERE code=?').run(guildId, now - 45000, roomCode);
+    const snapshot = f.roomRow(roomCode);
+    const heartbeat = (extra: Record<string, unknown> = {}) => f.sqlite.prepare('INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at').run(
+      `discord:${guildId}`, JSON.stringify({ guildId, roomCode, bridgeRevision: 10, checkpointRevision: 1, current: concert, queue: [], playing: true, position: 60, ...extra }), now,
+    );
+    heartbeat();
+    now += 2000;
+    const first = await publicRoom(f.request, snapshot, false);
+    assert.equal(first.position, 62, 'the old room checkpoint does not freeze an advancing guild clock at twelve seconds');
+    assert.equal(first.playing, true);
+    assert.equal(first.isHost, false);
+    assert.equal(first.syncValidForMs, 10000);
+    heartbeat({ bridgeRevision: 11, checkpointRevision: 11, playing: false, position: 42, queue: [concert, { ...next, concert: false }] });
+    const paused = await publicRoom(f.request, snapshot, false);
+    assert.equal(paused.position, 42);
+    assert.equal(paused.playing, false);
+    assert.deepEqual(paused.queue.map(video => video.id), [concert.id], 'private music stays out of fallback concert responses');
+    now += 14999;
+    assert.equal((await publicRoom(f.request, snapshot, false)).discordOnline, true);
+    now++;
+    const offline = await publicRoom(f.request, snapshot, false);
+    assert.equal(offline.discordOnline, false);
+    assert.equal(offline.playing, false);
+    assert.equal(offline.syncValidForMs, 0);
+    heartbeat({ bridgeRevision: 12, checkpointRevision: 11, playing: false, position: 42 });
+    const reconnected = await publicRoom(f.request, snapshot, false);
+    assert.equal(reconnected.discordOnline, true);
+    assert.equal(reconnected.playing, false, 'a read-only browser reconnect cannot resume a deliberately paused song');
+    heartbeat({ guildId: '222222222222222', position: 99 });
+    assert.equal((await publicRoom(f.request, snapshot, false)).position, 12, 'mismatched guild payloads cannot supply another room clock');
+    assert.deepEqual(f.roomRow(roomCode), snapshot, 'repeated reads never write the durable checkpoint');
+  } finally { f.close(); }
 });
 
 test("D1 own-room radio advances the queue, keeps manual priority and hides its bounded history", async () => {
@@ -979,4 +1023,46 @@ for (const example of [
     assert.equal(f.roomState().radioSeed?.id, original.id);
     assert(!JSON.stringify(room).includes('radioRelatedTo'));
   } finally { f.close(); }
+});
+
+test('negotiated room reads require bounded authenticated Core and immediately stop on outage or configuration loss',async(t)=>{
+ const f=fixture();
+ const guildId='111111111111111',code='D0123456';
+ const concert={...seed,concert:true};
+ const checkpoint={current:concert,queue:[],playing:true,position:12,presenceCapability:'core-authority-v1'};
+ try{
+  await f.save(code,checkpoint);
+  f.sqlite.prepare('UPDATE rooms SET guild_id=? WHERE code=?').run(guildId,code);
+  f.sqlite.prepare('INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?)').run('discord:'+guildId,JSON.stringify({...checkpoint,guildId,roomCode:code,bridgeRevision:20,checkpointRevision:20,presenceCapability:'core-authority-v1'}),Date.now());
+  const original=f.roomRow(code);
+  syntheticEnv.GUTTA_CORE_PUBLIC_URL='https://synthetic-core.invalid';syntheticEnv.ADMIN_BRIDGE_KEY='synthetic-key';
+  let mode='live';
+  const calls:Array<{url:string,signal:AbortSignal|null|undefined}>=[];
+  t.mock.method(globalThis,'fetch',async(url:unknown,init:RequestInit)=>{
+   calls.push({url:String(url),signal:init.signal});
+   assert.equal(init.headers&&new Headers(init.headers).get('Authorization'),'Bearer synthetic-key');
+   assert.equal(init.redirect,'manual');
+   if(mode==='outage')throw Error('Offline');
+   if(mode==='timeout')return await new Promise<Response>((_resolve,reject)=>init.signal!.addEventListener('abort',()=>reject(init.signal!.reason),{once:true}));
+   return Response.json({state:{...checkpoint,queue:[concert,{...next,concert:false}],current:concert,position:77,ready:true,connected:true,playing:mode!=='paused',volume:100,queueRevision:'queue',buffering:false,playbackKey:'core:test',epoch:'epoch-current',sequence:5,engine:'gutta-krutt-core',serverTime:Date.now(),online:true,guildId:mode==='wrong-guild'?'222222222222222':guildId,roomCode:code}});
+  });
+  const live=await publicRoom(f.request,original,false);
+  assert.equal(live.position,77);assert.equal(live.playing,true);assert.equal(live.discordOnline,true);
+  assert.equal(live.syncSource,'live');assert.equal(live.isHost,false);assert.equal(live.queue.length,1);
+  assert.equal(new URL(calls[0].url).searchParams.get('authority'),'1');
+  mode='paused';assert.equal((await publicRoom(f.request,original,false)).playing,false);
+  for(const failure of ['outage','wrong-guild','timeout']){
+   mode=failure;
+   const start=performance.now();
+   const offline=await publicRoom(f.request,original,false);
+   assert(performance.now()-start<2500,'Core fallback is bounded to its short presence deadline');
+   assert.equal(offline.discordOnline,false);assert.equal(offline.playing,false);assert.equal(offline.position,12);assert.equal(offline.syncValidForMs,0);
+  }
+  delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;
+  const offline=await publicRoom(f.request,original,false);
+  assert.equal(offline.discordOnline,false);assert.equal(offline.position,12);assert.equal(offline.playing,false);
+  f.sqlite.prepare('DELETE FROM bot_state').run();
+  assert.equal((await publicRoom(f.request,original,false)).discordOnline,false,'the room also persists authority mode if its heartbeat is missing');
+  assert.deepEqual(f.roomRow(code),original,'presence reads do not update the checkpoint');
+ }finally{delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
 });

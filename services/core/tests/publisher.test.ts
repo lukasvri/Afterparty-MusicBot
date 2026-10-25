@@ -9,6 +9,9 @@ import { Publisher } from "../src/publisher.ts";
 import type { Sink } from "../src/audio.ts";
 import type { PublicTrack } from "../src/types.ts";
 import { deferred } from "./deferred.ts";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const video: PublicTrack = {
   id: "abcdefghijk", title: "Synthetic concert", artist: "Test artist",
@@ -29,6 +32,68 @@ function fixture() {
     close() { commands.close(); engine.close(); store.close(); },
   };
 }
+
+test("publication ordering survives database reopen and refuses corrupt or exhausted counters", () => {
+  const directory = mkdtempSync(join(tmpdir(), 'afterparty-publication-'));
+  const file = join(directory, 'synthetic.sqlite');
+  let store: Store | undefined;
+  try {
+    store = new Store(file);
+    assert.equal(store.nextBridgeRevision(), 1);
+    assert.equal(store.nextBridgeRevision(), 2);
+    store.close();
+    store = new Store(file);
+    assert.equal(store.nextBridgeRevision(), 3);
+    store.set('bridge-publication-revision', Number.MAX_SAFE_INTEGER);
+    assert.throws(() => store!.nextBridgeRevision(), /invalid or exhausted/);
+    store.set('bridge-publication-revision', -1);
+    assert.throws(() => store!.nextBridgeRevision(), /invalid or exhausted/);
+  } finally {
+    store?.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("advancing positions reuse their checkpoint, while pause, seek, replacement and restart publish new intent", async (t) => {
+  const f = fixture();
+  let monotonic = 1000;
+  t.mock.method(performance, 'now', () => monotonic);
+  let snapshot = { ...f.engine.websiteSnapshot(), current: video, playing: true, sequence: 1, position: 10 };
+  t.mock.method(f.engine, 'websiteSnapshot', () => ({ ...snapshot }));
+  const sent: Array<{ bridgeRevision: number; checkpointRevision: number }> = [];
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+    sent.push(JSON.parse(String(init.body)));
+    return Response.json({ serverTime: Date.now(), commands: [] });
+  });
+  let publisher = new Publisher(f.engine, f.commands, 'https://synthetic.invalid', 'test-key');
+  try {
+    await setImmediate();
+    monotonic += 5000;
+    snapshot.position = 15;
+    await publisher.sync();
+    assert.deepEqual(sent.map(value => [value.bridgeRevision, value.checkpointRevision]), [[1, 1], [2, 1]]);
+    snapshot = { ...snapshot, sequence: 2, playing: false };
+    await publisher.sync();
+    snapshot = { ...snapshot, sequence: 3, position: 42 };
+    await publisher.sync();
+    snapshot = { ...snapshot, sequence: 4, current: { ...video, id: 'bcdefghijkl' } };
+    await publisher.sync();
+    assert.deepEqual(sent.slice(2).map(value => value.checkpointRevision), [3, 4, 5]);
+    monotonic += 60000;
+    await publisher.sync();
+    assert.equal(sent.at(-1)?.checkpointRevision, 5, 'an idle publisher does not add minute checkpoints');
+    snapshot = { ...snapshot, sequence: 5, playing: true };
+    await publisher.sync();
+    monotonic += 60000;
+    await publisher.sync();
+    assert.equal(sent.at(-1)?.checkpointRevision, 8, 'active position is bounded by a minute checkpoint');
+    publisher.close();
+    publisher = new Publisher(f.engine, f.commands, 'https://synthetic.invalid', 'test-key');
+    await setImmediate();
+    assert.equal(sent.at(-1)?.bridgeRevision, 9);
+    assert.equal(sent.at(-1)?.checkpointRevision, 9, 'a new publisher always establishes a newer checkpoint');
+  } finally { publisher.close(); f.close(); }
+});
 
 test("publisher validates replies before acknowledging and keeps private music off the bridge", async (t) => {
   const f = fixture();
@@ -208,4 +273,42 @@ test("a command that finishes after publisher closure does not write to a closed
   result.resolve("Finished after shutdown");
   await setImmediate();
   assert.equal(finish.mock.callCount(), 0);
+});
+
+test('terminal reconciliation persists across publishers and restart without allocating, acknowledging or changing audio',async(t)=>{
+ const directory=mkdtempSync(join(tmpdir(),'afterparty-reconciliation-'));
+ const file=join(directory,'core.sqlite');
+ const f=fixture();
+ f.store.close();
+ f.engine.store=new Store(file);
+ let calls=0;
+ t.mock.method(console,'warn',()=>{});
+ t.mock.method(globalThis,'fetch',async()=>{calls++;return Response.json({code:'bridge_reconciliation_required',error:'Reconcile first'},{status:409});});
+ const checkpoint=t.mock.method(f.engine,'checkpoint');
+ const stop=t.mock.method(f.engine,'stop');
+ f.engine.store.record('pending',video);
+ let publisher=new Publisher(f.engine,f.commands,'https://synthetic.invalid','synthetic-key',{presenceCapability:'core-authority-v1'});
+ try{
+  await setImmediate();
+  assert.equal(f.engine.store.get('bridge-reconciliation-block',false),true);
+  assert.equal(f.engine.store.get('bridge-publication-revision',0),1);
+  assert.equal(f.engine.store.events().length,1);
+  for(let i=0;i<10;i++){publisher.changed();await publisher.sync();}
+  publisher.close();f.engine.store.close();f.engine.store=new Store(file);
+  publisher=new Publisher(f.engine,f.commands,'https://synthetic.invalid','synthetic-key',{presenceCapability:'core-authority-v1'});
+  await setImmediate();await publisher.sync();
+  assert.equal(calls,1);assert.equal(f.engine.store.get('bridge-publication-revision',0),1);
+  assert.equal(stop.mock.callCount(),0);assert.equal(checkpoint.mock.callCount(),0);
+ }finally{publisher.close();f.commands.close();f.engine.close();f.engine.store.close();rmSync(directory,{recursive:true,force:true});}
+});
+
+test('closing during terminal reply parsing cannot write a reconciliation block to a closed database',async(t)=>{
+ const f=fixture();const parsed=deferred<{code:string}>();
+ const response=Response.json({},{status:409});
+ t.mock.method(response,'json',()=>parsed.promise);
+ t.mock.method(globalThis,'fetch',async()=>response);
+ const publisher=new Publisher(f.engine,f.commands,'https://synthetic.invalid','synthetic-key');
+ await setImmediate();publisher.close();f.close();
+ parsed.resolve({code:'bridge_reconciliation_required'});await setImmediate();
+ assert.equal(publisher.running,false);
 });

@@ -180,6 +180,23 @@ test('clock and recovery avoid snapshots while preserving position and revision'
  }finally{t.close();}
 });
 
+test('pause and resume durably replace recovery intent before a clock tick or state notification',()=>{
+ for(const paused of [true,false]){
+  const t=setup();let reopened:Store|undefined;
+  try{
+   clearInterval(t.engine.timer);t.engine.connected=true;t.engine.current=track();
+   t.engine.segments=[{track:t.engine.current,startFrame:0,offset:10}];t.sink.ms=2000;
+   t.engine.paused=!paused;t.engine.checkpoint();
+   t.engine.on('state',()=>assert.equal(t.store.get<{paused:boolean}>('recovery',{paused:!paused}).paused,paused,'intent is durable before publishing its state change'));
+   if(paused)t.engine.pause();else t.engine.resume();
+   const file=String(t.store.db.prepare('PRAGMA database_list').get()!.file);
+   reopened=new Store(file);
+   const recovery=reopened.get<{paused:boolean;position:number;track:Track}|null>('recovery',null);
+   assert.equal(recovery?.paused,paused);assert.equal(recovery?.position,12);assert.equal(recovery?.track.entryId,t.engine.current.entryId);
+  }finally{t.engine.removeAllListeners('state');reopened?.close();t.close();}
+ }
+});
+
 test('a superseded paused seek cannot pause its replacement or reject after stop',async()=>{
  for(const action of ['replace','stop']){
   const t=setup(),pending=deferred<Prepared>(),replacement=deferred<Prepared>();let newer:Promise<void>|undefined;

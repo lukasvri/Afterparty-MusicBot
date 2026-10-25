@@ -51,6 +51,10 @@ FFmpeg. The source Docker target is the qualified, immutable Node 26.12.1 image;
 Node 26 is still Current in the latest verified release index, so actual LTS
 confirmation and approved host promotion remain tracked in issue #117.
 
+## Core authority and checkpoints
+
+Core owns transient concert playback in negotiated authority mode. The Worker reads fresh scoped presence within a bounded deadline and retains durable intent/checkpoints for recovery. A failed authority read keeps checkpoint playback offline; it never resumes stale playback. D1-only operation and an explicit legacy compatibility override retain their tested paths. See [D1 write budget and authority](D1_WRITE_BUDGET.md) for negotiation, ownership and upgrade behavior.
+
 ## Build and isolated validation
 
 ```sh
