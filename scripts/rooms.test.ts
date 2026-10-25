@@ -79,6 +79,34 @@ test("foreign-origin JSON is fully discarded and remains forbidden", async () =>
   assert.equal(request.bodyUsed, true);
   assert.equal(request.body?.locked, false);
 });
+
+test('D1 fallback shares the future-start clock and duplicate-play behavior with Core', async () => {
+  const previousNow = Date.now;
+  let now = 1000000;
+  Date.now = () => now;
+  const f = fixture();
+  try {
+    await f.save('TESTROOM', { current: seed, queue: [], playing: false, position: 20, radio: false, playbackKey: 'same-track' });
+    let state = (await mutate(f.request, 'TESTROOM', { action: 'play', version: 1 })).room;
+    assert.equal(state.playing, true); assert.equal(state.position, 20); assert.equal(state.startsAt, now + 1500);
+    const startsAt = state.startsAt;
+    now += 1000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 20);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'play', version: state.version })).room;
+    assert.equal(state.startsAt, startsAt); assert.equal(state.position, 20);
+    now += 1000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 20.5);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 50, version: state.version })).room;
+    assert.equal(state.playing, true); assert.equal(state.position, 50); assert.equal(state.startsAt, now + 1500);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'pause', version: state.version })).room;
+    assert.equal(state.playing, false); assert.equal(state.startsAt, undefined);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 100, version: state.version })).room;
+    assert.equal(state.position, 100); assert.equal(state.playing, false); assert.equal(state.playbackKey, 'same-track');
+    now += 5000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 100);
+    assert.equal(f.calls(), 0, 'clock controls do not search for music');
+  } finally { f.close(); Date.now = previousNow; }
+});
 test("discarding an untrusted origin stops at the body limit and cancels the stream", async () => {
   let chunks = 0;
   let cancelled = false;

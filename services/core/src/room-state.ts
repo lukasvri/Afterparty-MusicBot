@@ -1,5 +1,5 @@
 import { UserError } from "./types.ts";
-import { ROOM_QUEUE_LIMIT, roomQueueCapacity, type RoomVideo } from "./protocol.ts";
+import { ROOM_QUEUE_LIMIT, ROOM_START_LEAD_MS, roomQueueCapacity, type RoomVideo } from "./protocol.ts";
 import { roomRadioSeed, playableRoomQueue, hasPlayableRoomQueue, roomRadioHistory } from "./room-radio.ts";
 import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
 
@@ -52,20 +52,24 @@ export function publicPlayback(state: RoomPlayback) {
     skipVotes: state.skipVoters?.length ?? 0,
   };
 }
+/** One room clock for Core and the Worker, including an agreed future start. */
+export function roomPlaybackPosition(state: RoomPlayback, updatedAt: number, now: number) {
+  return state.position + (state.playing
+    ? Math.max(0, now - Math.max(updatedAt, state.startsAt ?? updatedAt)) / 1000
+    : 0);
+}
 export function finished(state: RoomPlayback, updatedAt: number, now: number) {
   return Boolean(
     state.playing &&
     state.current &&
     !state.current.live &&
     state.current.duration > 0 &&
-    state.position +
-      Math.max(0, now - Math.max(updatedAt, state.startsAt ?? updatedAt)) /
-        1000 >=
+    roomPlaybackPosition(state, updatedAt, now) >=
       state.current.duration,
   );
 }
 export function prefetchDue(state:RoomPlayback,updatedAt:number,now:number){
- const remaining=(state.current?.duration??0)-state.position-Math.max(0,now-Math.max(updatedAt,state.startsAt??updatedAt))/1000;
+ const remaining=(state.current?.duration??0)-roomPlaybackPosition(state,updatedAt,now);
  return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && remaining>0 && now>=(state.radioRetryAt??0) && !hasPlayableRoomQueue(state));
 }
 export function needsRecommendation(
@@ -199,6 +203,7 @@ export function changeRoom(
     if (
       !state.current ||
       state.current.live ||
+      state.current.duration <= 0 ||
       typeof input.position !== "number" ||
       !Number.isFinite(input.position)
     )
@@ -316,5 +321,9 @@ export function changeRoom(
     for (const id of Object.keys(state.votes))
       if (!retained.has(id)) delete state.votes[id];
   }
+  if (!state.playing) delete state.startsAt;
+  else if (typeof input.now === 'number' && Number.isFinite(input.now) &&
+    (state.playbackKey !== previous.playbackKey || !previous.playing || action === 'seek'))
+    state.startsAt = input.now + ROOM_START_LEAD_MS;
   return state;
 }

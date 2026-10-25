@@ -86,6 +86,50 @@ test("one persisted room clock, shared start deadline, host protection and queue
   }
 });
 
+test('duplicate play acknowledgments preserve the agreed start and the advancing room clock', () => {
+  const store = new Store(':memory:');
+  let now = 10000;
+  const rooms = new Rooms(store, () => now), owner = 'a'.repeat(64);
+  try {
+    rooms.import({ code: 'TESTROOM', name: 'Clock', owner_hash: owner,
+      state: { current: video, queue: [], playing: false, position: 12, radio: false, playbackKey: 'same-track' },
+      version: 1, updated_at: now, expires_at: 100000 });
+    let state = rooms.mutate('TESTROOM', { action: 'play', actorHash: owner, version: 1 });
+    assert.equal(state.startsAt, 11500);
+    now = 11000;
+    state = rooms.mutate('TESTROOM', { action: 'play', actorHash: owner, version: state.version });
+    assert.equal(state.startsAt, 11500); assert.equal(state.position, 12);
+    now = 12500;
+    state = rooms.mutate('TESTROOM', { action: 'play', actorHash: owner, version: state.version });
+    assert.equal(state.startsAt, 11500); assert.equal(state.position, 13);
+    now = 13000;
+    assert.equal(rooms.snapshot('TESTROOM').position, 13.5);
+    state = rooms.mutate('TESTROOM', { action: 'pause', actorHash: owner, version: state.version });
+    assert.equal(state.startsAt, undefined);
+    state = rooms.mutate('TESTROOM', { action: 'seek', position: video.duration, actorHash: owner, version: state.version });
+    assert.equal(state.position, video.duration - 1); assert.equal(state.playing, false);
+    assert.equal(state.playbackKey, 'same-track'); assert.equal(state.startsAt, undefined);
+    now += 1000;
+    assert.equal(rooms.snapshot('TESTROOM').position, video.duration - 1);
+    state = rooms.mutate('TESTROOM', { action: 'play', actorHash: owner, version: state.version });
+    assert.equal(state.startsAt, now + 1500);
+  } finally { rooms.dispose(); store.close(); }
+});
+
+test('room seek rejects unknown-length and live videos without changing shared state', () => {
+  for (const change of [{ live: true }, { duration: 0 }]) {
+    const store = new Store(':memory:'), rooms = new Rooms(store, () => 10000);
+    try {
+      rooms.import({ code: 'TESTROOM', name: 'Clock', owner_hash: 'a'.repeat(64),
+        state: { current: { ...video, ...change }, queue: [], playing: false, position: 0, radio: false },
+        version: 1, updated_at: 10000, expires_at: 100000 });
+      const before = rooms.snapshot('TESTROOM');
+      assert.throws(() => rooms.mutate('TESTROOM', { action: 'seek', position: 1, actorHash: 'a'.repeat(64), version: 1 }), /does not support seeking/);
+      assert.deepEqual(rooms.snapshot('TESTROOM'), before);
+    } finally { rooms.dispose(); store.close(); }
+  }
+});
+
 const seed = {
   ...video,
   id: "seed1234567",
