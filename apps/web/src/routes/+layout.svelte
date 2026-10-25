@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AppTheme from '#lib/ui/AppTheme.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { initializeErrorReporting } from '../../../../lib/error-reporting.ts';
   import { browserStorage } from '../../../../lib/browser-storage.ts';
@@ -16,6 +17,7 @@
   });
 </script>
 
+<AppTheme />
 {@render children()}
 
 <style>

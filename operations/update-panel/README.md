@@ -10,21 +10,37 @@ with the existing test bot. It does not restart either bot.
 
 ## Install or update
 
-Run this installer locally after reviewing the source. Supply the directory of
-the existing authenticated operations panel, outside the Git checkout:
+The browser controller and display model are strict TypeScript. The website
+build compiles them once using esbuild and includes standalone browser assets
+and a checksum/source manifest in `dist/.openai/update-panel`. This directory is
+inside the signed website archive and outside its public `dist/client` assets.
+The host still needs only Python; it never installs Node or builds TypeScript.
+The small HTML fragment and stylesheet remain the Python panel's integration
+boundary, with no second client runtime.
+
+Verify the website archive using the existing signed-release/provenance process,
+then use its private assets with the matching reviewed source checkout. Supply
+the existing authenticated panel directory outside the Git checkout:
 
 ```sh
-python3 operations/update-panel/install.py --panel-dir /path/to/private/panel
-python3 operations/update-panel/install.py --panel-dir /path/to/private/panel --apply
+python3 operations/update-panel/install.py --panel-dir /path/to/private/panel --assets-dir /path/to/verified/dist/.openai/update-panel
+python3 operations/update-panel/install.py --panel-dir /path/to/private/panel --assets-dir /path/to/verified/dist/.openai/update-panel --apply
 ```
 
-The first command validates without writing. The second backs up the index,
+The first command validates without writing. Both commands reject missing,
+stale or altered compiler output before making changes: the manifest must match
+the reviewed TypeScript, CSS and HTML sources, and each compiled asset must match
+its full checksum and content-hashed filename. Checksum validation supplements
+the signed artifact verification; it does not establish the artifact's origin. The second backs up the index,
 server, adapter and existing channel source. It installs content-hashed assets
 and a small index-rendering hook. Restart only the panel's web service to load
 Python changes. The installer never runs systemctl or a deployment command.
 
 The rendering hook restores this integration after the base HTML/assets are
-rebuilt, using the installed `channel-ui-source` directory. When upgrading the
+rebuilt, using the installed `channel-ui-source` directory. That private directory keeps
+the reviewed inputs, manifest and compiled assets so recovery also needs no
+Node or access to the original archive. Previously installed JavaScript source
+layouts remain readable by the hook. When upgrading the
 Python panel server itself, run this installer again. It rejects an unfamiliar
 server template instead of silently editing it. Reviewed source changes require
 rerunning the installer; fetching Git alone does not install executable code.
@@ -58,13 +74,17 @@ hosting identifiers, log contents and credentials are never returned to the UI.
 ## Validation
 
 ```sh
-node --test operations/update-panel/test_model.mjs
+node --test operations/update-panel/test_model.ts operations/update-panel/build.test.ts
 python3 -m unittest discover -s operations/update-panel -p 'test_*.py'
 ```
 
 Tests use synthetic state and temporary directories. They verify same-version
 blocking, frozen confirmation, stale errors, progress, HTML replacement,
-idempotence, CSRF template preservation, dry-run behavior and rebuild retention.
+idempotence, CSRF template preservation, dry-run behavior, compiler/source
+freshness, tamper/path/symlink rejection, legacy source recovery and rebuild
+retention. The Python suite uses synthetic compiled assets and has no Node
+prerequisite; the TypeScript compiler test also verifies real output with the
+Python asset loader.
 Validate project/channel switching, reload, a read-only status check and mobile
 layout against the authenticated panel. Do not publish merely to test the UI.
 

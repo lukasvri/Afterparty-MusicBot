@@ -12,7 +12,6 @@
   import { browserStorage } from '../../../../lib/browser-storage.ts';
   import { time } from '../../../../lib/types.ts';
   import releases from '../../../../lib/releases.json';
-  import '../app.css';
 
   let roomSession = 0;
   let client = $state<ReturnType<typeof createRoomClient>>();

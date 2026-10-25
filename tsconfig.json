@@ -32,6 +32,7 @@
     "db/**/*.ts",
     "scripts/**/*.ts",
     "scripts/**/*.mts",
+    "operations/update-panel/**/*.ts",
     "cloudflare-env.d.ts",
     "drizzle.config.ts",
     "eslint.config.ts"

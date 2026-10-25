@@ -10,7 +10,10 @@ browser automation are TypeScript. The installer, operational probes and browser
 fixtures participate in strict `tsc --noEmit` checks alongside the application.
 Core also checks its benchmark sources. Test fixtures use application and
 Playwright types; the migration does not add `ts-nocheck` directives or weaken
-strict checking. The website checker no longer accepts JavaScript source inputs.
+strict checking. The website checker no longer accepts JavaScript source inputs. The synthetic
+Worker transpiler, real toolchain tests and private update-panel controller/model
+are also strict TypeScript. The private panel ships precompiled browser assets;
+its Python-only host does not need Node or a build tool.
 
 These compatibility and system boundaries remain:
 
@@ -23,8 +26,13 @@ These compatibility and system boundaries remain:
   loaders and cache/profile shims have been removed.
 - The obsolete optional Core dashboard assets and their separate HTTP listener
   have been removed. Administration remains on the website at `/admin`.
-- CSS describes presentation. Shell and Dockerfiles provide system and container
-  entry points. They remain appropriate for those jobs.
+- The website theme lives in the root-rendered `AppTheme.svelte` component,
+  avoiding duplicate route-level CSS imports. SvelteKit still requires its
+  `app.html` document template. The private operations panel retains its small
+  HTML/CSS integration fragment for the existing authenticated Python host.
+- Shell and Dockerfiles provide existing system/container entry points. Their
+  installed command names and the two tiny `.mjs` compatibility loaders remain
+  supported; these are not alternate application implementations.
 
 Run `npm run check:all` to validate the website, Core, deployer and production
 build. `npm run release:check` checks the shared version and release notes.
