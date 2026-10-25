@@ -1,7 +1,7 @@
 // UI integration uses isolated browser contexts, synthetic API state and no real media.
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chromium, type Page } from 'playwright';
+import { test, type TestContext } from 'node:test';
+import { chromium, type Browser, type Page } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
 
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5174').origin;
@@ -30,12 +30,54 @@ const results = [
 ];
 type Write = { action: string; version: number; videoId?: string; position?: number };
 
-async function fixture(width: number, host = true, initial = false) {
+async function fixtureBrowser(registerCleanup: (cleanup: () => Promise<void>) => void) {
   const browser = await chromium.launch({
     headless: true,
     executablePath: process.env.CHROMIUM_PATH,
     args: ['--no-sandbox'],
   });
+  // Own the process before newPage, route setup or navigation can fail.
+  registerCleanup(() => browser.close());
+  return browser;
+}
+
+async function closeFixture(page: Page, browser: Browser) {
+  try {
+    await page.unrouteAll({ behavior: 'default' });
+  } finally {
+    await browser.close();
+  }
+}
+
+test('fixture teardown closes its real browser even when route cleanup fails', async (t) => {
+  const browser = await fixtureBrowser((cleanup) => t.after(cleanup));
+  const page = await browser.newPage();
+  t.mock.method(page, 'unrouteAll', async () => {
+    throw new Error('Synthetic route cleanup failure');
+  });
+  await assert.rejects(closeFixture(page, browser), /Synthetic route cleanup failure/);
+  assert.equal(browser.isConnected(), false);
+});
+
+test('fixture teardown closes its real browser after navigation setup fails', async () => {
+  let cleanup: (() => Promise<void>) | undefined;
+  const browser = await fixtureBrowser((callback) => {
+    cleanup = callback;
+  });
+  try {
+    const page = await browser.newPage();
+    await page.route('**/*', (route) => route.abort());
+    await assert.rejects(page.goto(`${origin}/v3`), /ERR_FAILED/);
+    assert(cleanup, 'cleanup is registered before navigation');
+    await cleanup();
+    assert.equal(browser.isConnected(), false);
+  } finally {
+    await browser.close();
+  }
+});
+
+async function fixture(t: TestContext, width: number, host = true, initial = false) {
+  const browser = await fixtureBrowser((cleanup) => t.after(cleanup));
   const page = await browser.newPage({
     viewport: { width, height: 1000 },
     reducedMotion: 'reduce',
@@ -210,8 +252,7 @@ async function fixture(width: number, host = true, initial = false) {
       return roomReads;
     },
     async close() {
-      await page.unrouteAll({ behavior: 'wait' });
-      await browser.close();
+      await closeFixture(page, browser);
     },
   };
 }
@@ -219,8 +260,8 @@ async function fixture(width: number, host = true, initial = false) {
 test(
   'cold catalog requests can complete after the generic twelve-second API deadline',
   { timeout: 25000 },
-  async () => {
-    const f = await fixture(390, true, true);
+  async (t) => {
+    const f = await fixture(t, 390, true, true);
     try {
       await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
       await find(f.page, 'cold artist');
@@ -261,8 +302,8 @@ async function noOverflow(page: Page) {
 }
 
 for (const width of [1440, 390]) {
-  test(`${width}px: private creation, keyboard search, queue and synchronized host transport`, async () => {
-    const f = await fixture(width);
+  test(`${width}px: private creation, keyboard search, queue and synchronized host transport`, async (t) => {
+    const f = await fixture(t, width);
     try {
       const { page } = f;
       await page.keyboard.press('Tab');
@@ -436,8 +477,8 @@ for (const width of [1440, 390]) {
     }
   });
 
-  test(`${width}px: guests can add, host controls stay disabled and search recovers from empty/error`, async () => {
-    const f = await fixture(width, false, true);
+  test(`${width}px: guests can add, host controls stay disabled and search recovers from empty/error`, async (t) => {
+    const f = await fixture(t, width, false, true);
     try {
       const { page } = f;
       await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();

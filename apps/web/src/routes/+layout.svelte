@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
+  import { initializeErrorReporting } from '../../../../lib/error-reporting.ts';
   import { browserStorage } from '../../../../lib/browser-storage.ts';
   import { motionEnabled, motionKey } from '#lib/ui/motion.ts';
   let { children }: { children: Snippet } = $props();
   onMount(() => {
+    void initializeErrorReporting(import.meta.env.VITE_SENTRY_DSN, 'v3');
     const apply = () => {
       document.documentElement.dataset.motion = motionEnabled(browserStorage.get(motionKey))
         ? 'on'

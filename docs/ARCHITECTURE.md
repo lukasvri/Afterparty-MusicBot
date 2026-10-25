@@ -43,6 +43,7 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
+| Optional browser error privacy and initialization | `lib/error-reporting.ts` | Native root layout; [policy](OBSERVABILITY.md) |
 | Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core and the native website |
 | Concert links and legacy room resolution | `services/core/src/concert-links.ts`, `apps/web/src/lib/server/legacy-concert.ts` | Explicit guild URLs and bounded, exact-room compatibility redirects |
 | Shared social messages and validation | `services/core/src/social-protocol.ts` | Browser-safe; no database, token signing or Node imports |
