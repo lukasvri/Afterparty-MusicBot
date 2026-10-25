@@ -41,3 +41,10 @@ test('SoundCloud metadata and public recording copies retain only explicit negat
   assert.equal(track.aiGenerated, true);
   assert.equal(publicTrack(track)?.aiGenerated, true);
 });
+
+test('explicit Norwegian KI negations remain unknown without erasing a separate positive declaration', () => {
+  for (const description of ['Ikke KI-generert musikk', 'Ikkje AI-generert', 'Uten KI-assistert produksjon', 'Ingen AI music']) {
+    assert.equal(metadataAiGenerated('Artist - Original', 'Artist', description), undefined);
+    assert.equal(metadataAiGenerated('Artist - Original', 'Artist', description + '. Made with Suno.'), true);
+  }
+});
