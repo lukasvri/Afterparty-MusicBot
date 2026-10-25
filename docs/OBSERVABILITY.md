@@ -79,7 +79,26 @@ Exactly one upload includes all three LCOV files per eligible workflow run.
 `codecov.yml` defines separate path components without extra uploads. Automatic
 file discovery and Codecov uploader telemetry are disabled. Upload failures fail
 the job when enabled; no missing-report or failed-test result is concealed. No
-upload is attempted while the variable is absent/false.
+upload is attempted while the variable is absent/false. Manual `workflow_dispatch`
+can still generate and validate reports with uploads disabled. Its boolean
+`upload_coverage` input defaults to `false`; an explicit `true` additionally needs
+`CODECOV_ENABLED=true` before consuming one upload.
+
+Coverage runs on `main` pushes and same-repository PRs ready for review, including
+the `ready_for_review` transition. Draft PRs keep the independent full validation
+but skip the additional instrumented suites and upload. Newer coverage runs cancel
+superseded runs for the same PR or `main`; release validation and release artifacts
+retain their existing concurrency policy. There is no scheduled or duplicate
+branch-push upload. Manual runs default to local report validation only.
+Keep this optional job outside required merge checks if drafts
+must remain eligible for full validation without Codecov.
+
+The free account's private-repository upload allowance is shared across projects.
+This policy reduces draft churn, but cannot enforce a global monthly allowance.
+Review the account's actual usage before requesting reruns, and set
+`CODECOV_ENABLED=false` if the allowance is nearly exhausted. Keep required
+application validation active. Reports for intermediate draft commits will be
+absent; PR comparison needs both the base and reviewed head reports.
 
 ## Validate before activation
 

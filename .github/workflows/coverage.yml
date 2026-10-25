@@ -4,15 +4,25 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      upload_coverage:
+        description: Upload reports to Codecov and consume one upload
+        type: boolean
+        required: true
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: coverage-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Coverage needs the latest baseline, unlike the separate release workflow.
+  group: coverage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   coverage:
-    # Opt in after the free account/repository is linked. Forks receive no OIDC grant.
-    if: vars.CODECOV_ENABLED == 'true' && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    # Full validation still runs for drafts. Save optional coverage uploads for review.
+    # Forks and Dependabot receive no OIDC grant.
+    if: (vars.CODECOV_ENABLED == 'true' || github.event_name == 'workflow_dispatch') && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -36,6 +46,7 @@ jobs:
       - run: npm --prefix apps/web ci --no-audit --no-fund
       - run: npm run coverage:unit
       - name: Upload the three scoped reports once, without a long-lived token
+        if: vars.CODECOV_ENABLED == 'true' && (github.event_name != 'workflow_dispatch' || inputs.upload_coverage)
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
