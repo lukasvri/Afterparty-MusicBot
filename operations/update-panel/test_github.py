@@ -112,3 +112,13 @@ def select():
         source = self.SOURCE.replace(" if r.returncode:raise BuildError('Betaens GitHub-kilde kunne ikke bekreftes.')", " if r.returncode:raise RuntimeError('different wrapper')")
         with self.assertRaisesRegex(ValueError, 'Unsupported beta runner Git check'):
             patch_runner(source)
+
+class AdminRetryPatch(unittest.TestCase):
+    def test_known_model_patch_is_idempotent_and_rejects_unknown_source(self):
+        from install import patch_admin_retry
+        source = 'import { projectProgress } from "./model.mjs";\n  const failed =\n    !busy && state.failed;\n    message: upToDate\n'
+        result = patch_admin_retry(source)
+        self.assertEqual(patch_admin_retry(result), result)
+        self.assertIn('canRetryProduction(state, now)', result)
+        self.assertIn('!busy && !recovered &&', result)
+        with self.assertRaises(ValueError): patch_admin_retry('unknown')

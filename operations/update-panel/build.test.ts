@@ -88,6 +88,11 @@ test("standalone multi-project model uses the same lifecycle rules as the channe
     "data:text/javascript;base64," +
       Buffer.from(buildProgressModel(source)).toString("base64")
   );
+  assert.equal(model.canRetryProduction({
+    failed: true, readiness: { can_start: true },
+    update: { commit: "a".repeat(40), checked_at: 1000, fresh: true,
+      available: true, build: { ready: true } },
+  }, 1000), true);
   for (const project of ["production", "beta", "openworks"]) {
     const state = {
       running: false,

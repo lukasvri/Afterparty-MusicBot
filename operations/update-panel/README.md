@@ -99,6 +99,17 @@ layout against the authenticated panel. Do not publish merely to test the UI.
 
 ## Recovery
 
+The private multi-project host must distinguish a historical production failure
+from current readiness. `canRetryProduction` in the shared compiled model permits
+retry only with a fresh, valid candidate, approved build and server readiness,
+and no active operation or check error. It never clears failed progress or history.
+`install.patch_admin_retry` updates the known maintained `admin.js` import and
+display model idempotently, rejecting unknown source. Apply it to the host's
+`admin-ui-source/admin.js` together with `buildProgressModel` output as
+`model.mjs`, then package immutable assets and replace the index last. Back up
+the maintained source and index first and retain old hashed assets. This static
+UI repair requires no backend or bot restart and starts no publication.
+
 Restore the prior index, server, adapter and `update_panel.py` from the installer
 backup. If the beta runner was patched, restore its backed-up `beta_update.py`
 and prior `github_checks.py` alongside it. Restore its `channel-ui-source` directory when present, or remove the
