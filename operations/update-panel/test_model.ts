@@ -252,3 +252,23 @@ test("unknown or malformed state stays pending without inventing success", () =>
       ),
     );
 });
+
+test("a fresh server-approved production check permits retry without erasing failure history", async () => {
+  const { canRetryProduction } = await import("./model.ts");
+  const now = 2000000000;
+  const value = {
+    failed: true, running: false,
+    readiness: { can_start: true },
+    update: { commit, checked_at: now, fresh: true, available: true, build: { ready: true } },
+    progress: { failed: true, stage: "failed", steps: [{ state: "done" }, { state: "failed" }] },
+  };
+  assert.equal(canRetryProduction(value, now), true);
+  assert.equal(projectProgress("production", value).kind, "failed");
+  for (const patch of [
+    { running: true }, { busy: true }, { checking: true },
+    { readiness: { can_start: false } },
+    ...[{ checked_at: now - 1800 }, { checked_at: now + 1 }, { error: "blocked" },
+      { fresh: false }, { available: false }, { checking: true },
+      { build: { ready: false } }, { commit: "invalid" }].map(update => ({ update: { ...value.update, ...update } })),
+  ]) assert.equal(canRetryProduction({ ...value, ...patch }, now), false);
+});
