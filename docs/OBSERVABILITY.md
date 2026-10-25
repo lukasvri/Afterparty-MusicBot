@@ -25,6 +25,13 @@ projects/configuration for independent projects and development environments.
 Only official HTTPS Sentry ingestion DSNs are accepted by the current validator.
 Changing configuration requires a rebuild and separately approved deployment.
 
+The GitHub `Core validation` website job reads these two public repository Actions
+variables into its build environment. They apply to Classic and the v3 review
+artifact, not Core. The separate Cloudflare Workers Builds service rebuilds from
+source and must receive the same public build variables on its approved trigger;
+GitHub variables do not propagate to Cloudflare. Runtime Worker variables cannot
+retroactively enable an already compiled client. Missing values keep reporting off.
+
 Only unhandled JavaScript errors/rejections with an application-bundle stack are
 eligible. Default integrations are disabled; only global errors and deduplication
 are installed. Session recording, Replay, tracing, profiling and console capture
