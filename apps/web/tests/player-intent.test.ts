@@ -124,3 +124,21 @@ test('scrubbing a cued paused video changes position without implicitly resuming
     position: 42,
   });
 });
+test('scrubbing immediately after cue does not resume before the first position sample', () => {
+  const bridge = createPlayerIntent(),
+    key = observation().identity;
+  bridge.command(key, 'cue', 0, 12);
+  bridge.state(observation({ state: 5, now: 50, position: 12, gesture: false }));
+  assert.deepEqual(bridge.state(observation({ state: 1, now: 100, position: 42 })), {
+    action: 'seek',
+    position: 42,
+  });
+});
+test('a playing event caused by an unacknowledged API seek cannot resume a paused room', () => {
+  const bridge = createPlayerIntent(),
+    key = observation().identity;
+  bridge.reset(key);
+  bridge.state(observation({ state: 2, now: 0, position: 12, gesture: false }));
+  bridge.command(key, 'seek', 10, 42);
+  assert.equal(bridge.state(observation({ state: 1, now: 100, position: 42 })), null);
+});

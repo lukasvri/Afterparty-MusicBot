@@ -37,8 +37,13 @@ export function createPlayerIntent() {
   let sample: { position: number; at: number; state: number } | null = null;
   let expected: { state: number; until: number } | null = null;
   let positionUntil = 0;
-  let expectedPosition: { position: number; at: number; until: number; playing: boolean } | null =
-    null;
+  let expectedPosition: {
+    position: number;
+    at: number;
+    until: number;
+    playing: boolean;
+    kind: 'load' | 'cue' | 'seek';
+  } | null = null;
   const reset = (key: string) => {
     identity = key;
     state = -1;
@@ -60,7 +65,7 @@ export function createPlayerIntent() {
         const target = action === 'cue' ? 5 : action === 'pause' ? 2 : 1;
         expected = target === state ? null : { state: target, until: now + 3000 };
       }
-      if (['load', 'cue', 'seek'].includes(action)) {
+      if (action === 'load' || action === 'cue' || action === 'seek') {
         sample = null;
         expectedPosition = Number.isFinite(position)
           ? {
@@ -68,6 +73,7 @@ export function createPlayerIntent() {
               at: now,
               until: now + 15000,
               playing: action === 'load' || state === 1,
+              kind: action,
             }
           : null;
         positionUntil = now + 1000;
@@ -89,6 +95,20 @@ export function createPlayerIntent() {
       }
       // A delayed PLAYING callback cannot defeat an outstanding shared pause.
       if (expected?.state === 2 && value.state === 1) return null;
+      if (expectedPosition?.kind === 'seek' && value.state === 1) return null;
+      if (
+        value.gesture &&
+        value.state === 1 &&
+        previous === 5 &&
+        expectedPosition?.kind === 'cue' &&
+        Number.isFinite(value.position) &&
+        value.position >= 0 &&
+        Math.abs(value.position - expectedPosition.position) > 1.5
+      ) {
+        expectedPosition = null;
+        sample = { position: value.position, at: value.now, state: value.state };
+        return { action: 'seek', position: value.position };
+      }
       if (
         value.gesture &&
         value.state === 1 &&
