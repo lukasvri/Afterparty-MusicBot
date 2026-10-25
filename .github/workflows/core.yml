@@ -69,6 +69,8 @@ jobs:
     # Public build configuration, never Sentry authentication/upload tokens.
     env:
       VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+      WRANGLER_WRITE_LOGS: 'true'
+      WRANGLER_LOG_PATH: /tmp/afterparty-wrangler
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -110,19 +112,44 @@ jobs:
       - name: Check native release desktop and mobile journeys with synthetic data
         timeout-minutes: 8
         run: |
-          npm run start -- --port 5174 > /tmp/afterparty-web-preview.log 2>&1 &
+          # Isolate both process trees so failure/cancellation cleans up children.
+          setsid npm run start -- --port 5174 > /tmp/afterparty-web-preview.log 2>&1 &
           preview_pid=$!
-          trap 'result=$?; if [ "$result" -ne 0 ]; then tail -200 /tmp/afterparty-web-preview.log; fi; kill "$preview_pid" 2>/dev/null || true; exit "$result"' EXIT
+          validation_pid=''
+          cleanup() {
+            result=$?
+            trap - EXIT
+            if [ "$result" -ne 0 ]; then tail -200 /tmp/afterparty-web-preview.log; fi
+            kill -- -"$preview_pid" 2>/dev/null || true
+            if [ -n "$validation_pid" ]; then kill -- -"$validation_pid" 2>/dev/null || true; fi
+            wait "$preview_pid" 2>/dev/null || true
+            if [ -n "$validation_pid" ]; then wait "$validation_pid" 2>/dev/null || true; fi
+            exit "$result"
+          }
+          trap cleanup EXIT
+          trap 'exit 130' INT TERM
           node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
-          npm --prefix apps/web run measure:startup
-          npm --prefix apps/web run test:browser
-          npm --prefix apps/web run test:stack
+          setsid bash -e -c '
+            npm --prefix apps/web run measure:startup
+            npm --prefix apps/web run test:browser
+            npm --prefix apps/web run test:stack
+          ' &
+          validation_pid=$!
+          result=0
+          wait -n -p finished_pid "$preview_pid" "$validation_pid" || result=$?
+          if [ "$finished_pid" = "$preview_pid" ]; then
+            echo 'The local preview exited before browser validation completed.' >&2
+            exit 1
+          fi
+          exit "$result"
       - name: Preserve preview diagnostics when browser validation fails
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: v3-browser-diagnostics
-          path: /tmp/afterparty-web-preview.log
+          path: |
+            /tmp/afterparty-web-preview.log
+            /tmp/afterparty-wrangler/*.log
           if-no-files-found: ignore
           retention-days: 3
           archive: true

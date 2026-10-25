@@ -445,6 +445,11 @@ class CIProducer(unittest.TestCase):
         metadata=json.loads((output/'core.json').read_text())
         self.assertEqual(metadata,{key:self.fixture.manifest[key] for key in ('commit','image_tag','image_id','platform')})
         self.assertEqual(artifacts.validate_image(output/'core-image.tar.gz',metadata),{metadata['image_id']})
+        # Faster packaging must preserve every byte of the saved Docker archive.
+        import gzip
+        with gzip.open(self.fixture.root/'core-image.tar.gz','rb') as expected, \
+                gzip.open(output/'core-image.tar.gz','rb') as actual:
+            self.assertEqual(actual.read(),expected.read())
         self.assertFalse((output/'core-image.tar').exists())
 
     def test_existing_image_failure_never_falls_back_to_a_build(self):

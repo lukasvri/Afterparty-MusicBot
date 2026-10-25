@@ -41,7 +41,8 @@ check('/app/src');await import('/app/src/data-import.ts');"""
     import gzip
     import shutil
     with raw.open('rb') as source, (directory/'core-image.tar.gz').open('wb') as output:
-        with gzip.GzipFile(fileobj=output, mode='wb', mtime=0) as compressed:
+        # CI prioritizes packaging time; signed digests cover the resulting bytes.
+        with gzip.GzipFile(fileobj=output, mode='wb', compresslevel=1, mtime=0) as compressed:
             shutil.copyfileobj(source,compressed)
     raw.unlink()
     metadata = {'commit':commit,'image_tag':tag,'image_id':image['Id'],'platform':'linux/amd64'}
