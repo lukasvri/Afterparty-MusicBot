@@ -1,13 +1,15 @@
 <script lang="ts">
+  import { onMount, type Snippet } from 'svelte';
   let {
     composition = 'welcome',
     animated = true,
+    action,
   }: {
     composition?: 'welcome' | 'room';
     animated?: boolean;
+    action?: Snippet;
   } = $props();
   const prefix = $props.id();
-  import { onMount } from 'svelte';
   let motionPaused = $state(false);
   let venue = $state<HTMLDivElement>();
   onMount(() => {
@@ -35,9 +37,9 @@
   class:animated
   class:motion-paused={motionPaused}
   data-composition={composition}
-  aria-hidden="true"
+  aria-hidden={action ? undefined : 'true'}
 >
-  <svg viewBox="0 0 1200 675" fill="none" focusable="false">
+  <svg viewBox="0 0 1200 675" fill="none" focusable="false" aria-hidden="true">
     <defs>
       <radialGradient id={`${prefix}-ambience`} cx="50%" cy="45%" r="65%">
         <stop stop-color="#711c35" stop-opacity=".8" />
@@ -461,16 +463,18 @@
           </g>
         </g>
       </g>
-      <text
-        x="600"
-        y="544"
-        text-anchor="middle"
-        fill="#eeedf0"
-        font-family="Inter, Arial, sans-serif"
-        font-size="27"
-        font-weight="750"
-        letter-spacing="-1.3">afterparty<tspan fill="#ff3855">.</tspan></text
-      >
+      {#if !action}
+        <text
+          x="600"
+          y="544"
+          text-anchor="middle"
+          fill="#eeedf0"
+          font-family="Inter, Arial, sans-serif"
+          font-size="27"
+          font-weight="750"
+          letter-spacing="-1.3">afterparty<tspan fill="#ff3855">.</tspan></text
+        >
+      {/if}
 
       <g transform="translate(600 425)" stroke-linecap="round" stroke-linejoin="round">
         <path d="M-38-20Q-47-19-52-3L-67 16L-91 24" stroke="#253041" stroke-width="18" />
@@ -527,10 +531,12 @@
       </g>
     {/each}
   </svg>
+  {#if action}<div class="stage-action">{@render action()}</div>{/if}
 </div>
 
 <style>
   .concert-scenery {
+    position: relative;
     width: 100%;
     aspect-ratio: 16 / 9;
     pointer-events: none;
@@ -542,6 +548,27 @@
     display: block;
     width: 100%;
     height: 100%;
+  }
+  .stage-action {
+    position: absolute;
+    left: 50%;
+    top: 81%;
+    transform: translate(-50%, -50%);
+    max-width: 42%;
+    pointer-events: auto;
+  }
+  .stage-action :global(.button) {
+    white-space: nowrap;
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: clamp(12px, 0.75vw, 15px);
+    gap: 7px;
+    border-radius: var(--control-radius);
+    box-shadow: 0 5px 18px #0008;
+  }
+  .stage-action :global(svg) {
+    width: 16px;
+    height: 16px;
   }
   .animated .light-beam {
     transform-box: fill-box;

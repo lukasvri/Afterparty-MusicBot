@@ -3,6 +3,7 @@
   import { request } from '../../../../../lib/browser-api.ts';
   import type { OpenRoom } from '../../../../../lib/types.ts';
   import Icon from '../ui/Icon.svelte';
+  import PageToolbar from '../ui/PageToolbar.svelte';
   let {
     busy,
     onJoin,
@@ -67,18 +68,18 @@
 </script>
 
 <section class="directory" aria-labelledby="directory-title">
-  <header class="directory-heading">
-    <div>
-      <p class="eyebrow red">THERE'S ROOM FOR YOU</p>
-      <h1 id="directory-title">Find your people.</h1>
-      <p class="directory-intro">
-        A shared queue. A new crowd. Join a room its host has opened to everyone.
-      </p>
-    </div>
+  {#snippet directoryActions()}
     <button class="button secondary refresh-rooms" disabled={loading} onclick={() => void refresh()}
       >{loading ? 'Refreshing rooms…' : 'Refresh rooms'}</button
     >
-  </header>
+    <button class="button primary" onclick={onCreate}>Create a room</button>
+  {/snippet}
+  <PageToolbar
+    title="Open rooms"
+    id="directory-title"
+    description="A shared queue. A new crowd. Join a room its host has opened to everyone."
+    actions={directoryActions}
+  />
   <div class="directory-toolbar">
     <div class="room-filter">
       <label for="room-filter">Find an open room</label>
@@ -150,9 +151,8 @@
       <p>Start a room and make it your own.</p>
     </div>
     <div class="room-actions">
-      <button class="button primary" onclick={onCreate}>Create a room</button><a
-        class="button secondary"
-        href="/discord">Discord & concerts <Icon name="arrow" size={18} /></a
+      <a class="button secondary" href="/discord"
+        >Discord & concerts <Icon name="arrow" size={18} /></a
       >
     </div>
   </footer>
@@ -160,29 +160,8 @@
 
 <style>
   .directory {
-    max-width: 1680px;
+    max-width: none;
     margin-inline: auto;
-  }
-  .directory-heading {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: clamp(28px, 4vw, 48px);
-  }
-  .directory-heading .eyebrow {
-    margin-bottom: 14px;
-  }
-  h1 {
-    font-size: clamp(36px, 4.8vw, 72px);
-    letter-spacing: -0.055em;
-    line-height: 1.05;
-  }
-  .directory-intro {
-    max-width: 620px;
-    color: var(--muted);
-    line-height: 1.7;
-    margin-top: 20px;
   }
   .refresh-rooms {
     flex-shrink: 0;
@@ -408,10 +387,6 @@
   @media (max-width: 700px) {
     .room-cards {
       grid-template-columns: minmax(0, 1fr);
-    }
-    .directory-heading {
-      align-items: flex-start;
-      flex-direction: column;
     }
     .directory-toolbar {
       align-items: stretch;

@@ -1,5 +1,37 @@
 # Afterparty interface review
 
+## Unified section frame and compact empty room, 2026-10-25
+
+Music, Open rooms, Concerts, DJ tools and Games now compose the same
+`AppHeader.svelte`, `PageToolbar.svelte` and `AppFooter.svelte`. Header branding,
+navigation, content gutters, H1 sizing and the top action row have one owner.
+Shared theme tokens cover control height, radius, typography and panel spacing.
+Feature-specific workflows retain their own components, authorization and
+clients. Public legal/help pages retain their existing information-page frame.
+
+Page actions stay with the heading: directory refresh/create, room and game
+invitations, concert layout/invitation, and administration access/settings save.
+The settings save button is associated with the existing form, preserving native
+validation and submission. Concert invitations remain scoped to the selected
+server and expand from the toolbar; TV keeps its visible invitation. The common
+footer owns the motion preference on all five sections.
+
+The empty listening room has a bounded stage rather than a second large
+headline/record/action panel below it. Choose a song sits on the DJ booth front
+as a normal keyboard-accessible HTML button outside the decorative SVG. The
+route retains search/focus authority and renders the same action while the
+optional illustration loads or fails. The complete scene keeps its aspect ratio;
+lighting, CDJ geometry, reduced-motion and visibility pausing are preserved.
+
+[Desktop empty room](assets/v3-unified-empty-desktop-20261025.png) and
+[mobile empty room](assets/v3-unified-empty-mobile-20261025.png) use synthetic
+local fixtures and reduced motion, with external requests blocked. Browser
+regressions compare exact brand, navigation and heading geometry across all five
+sections at 3840, 2560, 1920, 1440 and 390px. Stage checks cover compact sizing,
+44px action targets, clipping, search focus and failed optional artwork alongside
+the existing lighting/equipment/motion assertions. These are local interface
+checks, not live media or Discord listening acceptance.
+
 ## Navigation and theater follow-up, 2026-10-25
 
 The interactive Music, Open rooms, Concerts, DJ tools and Games links share one

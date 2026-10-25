@@ -99,7 +99,7 @@
   .music-workspace {
     min-width: 0;
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: var(--panel-radius);
     background: #111113;
     overflow: clip;
   }

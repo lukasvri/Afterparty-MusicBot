@@ -1,6 +1,7 @@
 <script lang="ts">
-  import AppNavigation from '#lib/ui/AppNavigation.svelte';
-  import MotionPreference from '#lib/ui/MotionPreference.svelte';
+  import AppHeader from '#lib/ui/AppHeader.svelte';
+  import AppFooter from '#lib/ui/AppFooter.svelte';
+  import PageToolbar from '#lib/ui/PageToolbar.svelte';
   import DJDesk from '#lib/admin/DJDesk.svelte';
 
   import { onMount } from 'svelte';
@@ -128,40 +129,41 @@
 </svelte:head>
 
 <a class="skip-link" href="#admin-main">Skip to server settings</a>
-<div class="admin-page">
-  <header class="admin-header">
-    <a class="brand" href="/"
-      ><img src="/afterparty-mark.svg" width="36" height="36" alt="" /><span
-        >afterparty<span class="red">.</span></span
-      ></a
-    >
-    <AppNavigation active="admin" guildId={view.guildId} />
-    {#if view.authenticated}<button
-        class="button secondary"
-        disabled={view.busy}
-        onclick={() => void client?.logout()}>Sign out</button
-      >{/if}
-  </header>
-  <main id="admin-main">
-    <div class="heading">
-      <div>
-        <p class="eyebrow red">AFTERPARTY / CONTROL ROOM</p>
-        <h1>Your server.<br />Your soundtrack.</h1>
-        <p>Playback, queues and settings, scoped to the server you choose.</p>
-      </div>
-      {#if view.authenticated}<div class="heading-actions">
-          <button
+<div class="admin-page app-page">
+  <AppHeader active="admin" guildId={view.guildId} />
+  <main class="app-main" id="admin-main">
+    {#snippet adminPageActions()}
+      {#if view.authenticated}
+        <button class="button secondary" disabled={view.busy} onclick={() => void client?.logout()}
+          >Sign out</button
+        >
+        <button
+          class="button secondary"
+          disabled={view.busy}
+          onclick={() => void client?.loadAccess()}>Refresh access</button
+        >
+        {#if view.ownerUpdateUrl}<a
             class="button secondary"
-            disabled={view.busy}
-            onclick={() => void client?.loadAccess()}>Refresh access</button
-          >{#if view.ownerUpdateUrl}<a
-              class="button secondary"
-              href={view.ownerUpdateUrl}
-              target="_blank"
-              rel="noopener noreferrer">Update bot and website ↗</a
-            >{/if}
-        </div>{/if}
-    </div>
+            href={view.ownerUpdateUrl}
+            target="_blank"
+            rel="noopener noreferrer">Update bot and website ↗</a
+          >{/if}
+        {#if tab === 'settings' && detail}<button
+            class="button primary"
+            form="server-settings-form"
+            disabled={view.busy}>Save server settings</button
+          >{/if}
+      {:else if !view.checking}
+        <a class="button primary" href="/api/auth/discord" data-sveltekit-reload
+          >Sign in with Discord ↗</a
+        >
+      {/if}
+    {/snippet}
+    <PageToolbar
+      title="DJ tools"
+      description="Playback, queues and settings for the server you choose."
+      actions={adminPageActions}
+    />
     {#if view.error}<p class="notice error" role="alert">{view.error}</p>{/if}
     {#if view.notice}<p class="notice" role="status">{view.notice}</p>{/if}
     {#if view.checking}<p role="status">Checking your access…</p>
@@ -169,9 +171,7 @@
       <section class="card login">
         <h2>Welcome to the control room</h2>
         <p>Sign in with Discord to manage servers where you have administration permissions.</p>
-        <a class="button primary" href="/api/auth/discord" data-sveltekit-reload
-          >Sign in with Discord ↗</a
-        >{#if view.invite}<a
+        {#if view.invite}<a
             class="button secondary"
             href={view.invite}
             target="_blank"
@@ -197,7 +197,7 @@
         </details>
       </section>
     {:else}
-      <div class="server-picker">
+      <div class="server-picker context-bar">
         <label for="admin-guild">Discord server</label><select
           id="admin-guild"
           value={view.guildId}
@@ -418,6 +418,7 @@
         {:else if tab === 'settings'}
           <form
             class="card settings"
+            id="server-settings-form"
             onsubmit={(event) => {
               event.preventDefault();
               saveSettings();
@@ -458,9 +459,7 @@
                           })}
                       />{/if}</label
                   >{/each}
-              </fieldset>{/each}<button class="button primary" disabled={view.busy}
-              >Save server settings</button
-            >
+              </fieldset>{/each}
           </form>
         {:else if tab === 'rooms'}
           <section class="card">
@@ -623,10 +622,7 @@
       {/if}
     {/if}
   </main>
-  <footer>
-    <MotionPreference />
-    <a href="/support">Need a hand?</a><span>afterparty. / your music. your people.</span>
-  </footer>
+  <AppFooter />
 </div>
 
 <style>
@@ -634,36 +630,8 @@
     min-height: 100vh;
     background: #0c0d10;
   }
-  .admin-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    padding: 24px var(--page-space);
-    border-bottom: 1px solid var(--line);
-    background: #101115;
-  }
-  main {
-    width: 100%;
-    max-width: 1440px;
-    margin: auto;
-    padding: clamp(36px, 4vw, 72px) var(--page-space) 80px;
-  }
-  .heading {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 36px;
-  }
-  h1 {
-    font-size: clamp(40px, 5vw, 70px);
-    letter-spacing: -0.055em;
-    line-height: 1.05;
-    margin: 16px 0 20px;
-  }
   h2 {
-    font-size: 25px;
+    font-size: var(--panel-title);
     letter-spacing: -0.035em;
     line-height: 1.25;
     margin-bottom: 14px;
@@ -681,7 +649,6 @@
   .eyebrow {
     font-size: 12px;
   }
-  .heading-actions,
   .actions {
     display: flex;
     flex-wrap: wrap;
@@ -689,10 +656,10 @@
     gap: 9px;
   }
   .card {
-    padding: clamp(24px, 2.3vw, 36px);
+    padding: var(--panel-space);
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
+    border-radius: var(--panel-radius);
     margin: 24px 0;
     min-width: 0;
   }
@@ -720,9 +687,9 @@
   input:not([type='range']):not([type='checkbox']),
   select {
     min-width: 0;
-    min-height: 48px;
+    min-height: var(--control-height);
     border: 1px solid #424753;
-    border-radius: 10px;
+    border-radius: var(--control-radius);
     background: #101216;
     color: white;
     padding: 10px 13px;
@@ -739,11 +706,6 @@
     flex-wrap: wrap;
     gap: 16px;
     align-items: center;
-    padding: 20px 24px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: var(--surface);
-    margin-bottom: 16px;
   }
   .server-picker label {
     font-size: 14px;
@@ -818,7 +780,7 @@
     place-items: center;
     background: #101216;
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: var(--panel-radius);
     overflow: hidden;
   }
   .art img {
@@ -926,7 +888,7 @@
   }
   fieldset {
     border: 1px solid #3a3f4a;
-    border-radius: 16px;
+    border-radius: var(--panel-radius);
     padding: 24px;
     margin: 28px 0;
     min-width: 0;
@@ -1013,24 +975,7 @@
     margin-left: 16px;
     color: var(--muted);
   }
-  footer {
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-    padding: 26px var(--page-space);
-    border-top: 1px solid var(--line);
-    color: var(--muted);
-    font-size: 13px;
-  }
   @media (max-width: 800px) {
-    .admin-header {
-      padding: 20px;
-      flex-wrap: wrap;
-      gap: 18px;
-    }
-    main {
-      padding: 30px 20px 50px;
-    }
     .tabs {
       gap: 6px;
       padding-block: 10px;
@@ -1039,12 +984,6 @@
       flex: 1 0 auto;
       padding: 10px;
       font-size: 13px;
-    }
-    .heading {
-      display: block;
-    }
-    .heading-actions {
-      margin-top: 20px;
     }
     .card {
       padding: 24px 18px;
@@ -1095,10 +1034,6 @@
     }
     .room-row > div {
       flex-basis: 100%;
-    }
-    footer {
-      flex-wrap: wrap;
-      padding: 25px 20px;
     }
   }
 </style>

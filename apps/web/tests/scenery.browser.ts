@@ -1,6 +1,7 @@
 // Decorative stage checks use synthetic empty rooms and never request real media.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5174').origin;
@@ -58,16 +59,23 @@ for (const [width, height] of [
         await page.goto(`${origin}${path}`);
         await page
           .getByRole('heading', {
-            name: path === '/' ? 'afterparty.' : 'Synthetic empty stage',
+            name: path === '/' ? 'Music' : 'Synthetic empty stage',
             exact: true,
           })
           .waitFor();
         const scene = page.locator('.concert-scenery');
         await scene.waitFor();
         assert.equal(await scene.count(), 1);
-        assert.equal(await scene.getAttribute('aria-hidden'), 'true');
-        assert.equal(await scene.locator('a, button, input, [tabindex]').count(), 0);
-        assert.equal(await scene.locator('svg').getAttribute('focusable'), 'false');
+        assert.equal(await scene.getAttribute('aria-hidden'), path === '/' ? 'true' : null);
+        assert.equal(
+          await scene.locator('svg a, svg button, svg input, svg [tabindex]').count(),
+          0,
+        );
+        assert.equal(
+          await scene.getByRole('button', { name: 'Choose a song', exact: true }).count(),
+          path === '/' ? 0 : 1,
+        );
+        assert.equal(await scene.locator(':scope > svg').getAttribute('focusable'), 'false');
         const geometry = await scene.evaluate((node) => {
           const box = node.getBoundingClientRect();
           return {
@@ -88,6 +96,30 @@ for (const [width, height] of [
         assert(geometry.left >= -1 && geometry.right <= width + 1, 'stage stays inside viewport');
         assert.equal(geometry.pointerEvents, 'none');
         assert.equal(geometry.foreignNodes, 0, 'snippets retain the SVG namespace');
+        if (path !== '/') {
+          const card = await page.locator('.empty-stage').boundingBox();
+          const action = await scene
+            .getByRole('button', { name: 'Choose a song', exact: true })
+            .boundingBox();
+          assert(
+            card && card.height <= 480 && card.height <= Math.max(240, height * 0.46) + 1,
+            'empty player stays compact',
+          );
+          assert(
+            card && geometry.height >= card.height * 0.75,
+            'stage fills the compact card without intrinsic grid shrinkage',
+          );
+          assert(action && action.height >= 44, 'integrated action retains a touch target');
+          assert(
+            action &&
+              action.x >= geometry.left &&
+              action.x + action.width <= geometry.right &&
+              action.y >= (await scene.boundingBox())!.y &&
+              action.y + action.height <= (await scene.boundingBox())!.y + geometry.height,
+            'first-song action fits inside the stage',
+          );
+        }
+
         assert.equal(geometry.running, 0, 'system reduced motion stops stage animations');
         assert.match(
           await page.getByRole('button', { name: 'Page animations', exact: true }).innerText(),
@@ -200,6 +232,33 @@ for (const [width, height] of [
         await page.waitForFunction(() => document.documentElement.dataset.motion === 'on');
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         await page.emulateMedia({ reducedMotion: 'reduce' });
+      }
+      await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+      assert(
+        await page
+          .getByRole('textbox', { name: 'Search songs or artists' })
+          .evaluate((node) => node === document.activeElement),
+      );
+      if (width === 390) {
+        const manifest = JSON.parse(
+          await readFile(
+            new URL('../.svelte-kit/output/client/.vite/manifest.json', import.meta.url),
+            'utf8',
+          ),
+        ) as Record<string, { src?: string; file: string }>;
+        const chunk = Object.values(manifest).find(
+          (entry) => entry.src === 'src/lib/ui/ConcertScenery.svelte',
+        );
+        assert(chunk);
+        await page.route(`**/${chunk.file}`, (route) => route.abort());
+        await page.reload();
+        await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+        assert(
+          await page
+            .getByRole('textbox', { name: 'Search songs or artists' })
+            .evaluate((node) => node === document.activeElement),
+          'first-song action survives failed optional artwork',
+        );
       }
       assert.deepEqual(writes, [], 'decorative scenery causes no API mutations');
       assert.deepEqual(errors, []);

@@ -1,11 +1,12 @@
 <script lang="ts">
-  import AppNavigation from '#lib/ui/AppNavigation.svelte';
+  import AppHeader from '#lib/ui/AppHeader.svelte';
+  import AppFooter from '#lib/ui/AppFooter.svelte';
+  import PageToolbar from '#lib/ui/PageToolbar.svelte';
   import TheaterToggle from '#lib/ui/TheaterToggle.svelte';
   import { roomQueueCapacity } from '../../../../services/core/src/protocol.ts';
-  import MotionPreference from '#lib/ui/MotionPreference.svelte';
   import TrackThumbnail from '#lib/ui/TrackThumbnail.svelte';
 
-  import { onMount, tick as afterRender } from 'svelte';
+  import { onMount, tick as afterRender, type Snippet } from 'svelte';
   import { createRoomClient, type RoomClientState } from '#lib/rooms/room-client.ts';
   import Icon from '#lib/ui/Icon.svelte';
   import MusicWorkspace from '#lib/ui/MusicWorkspace.svelte';
@@ -16,7 +17,6 @@
   import RoomQueue from '#lib/rooms/RoomQueue.svelte';
   import { browserStorage } from '../../../../lib/browser-storage.ts';
   import { time } from '../../../../lib/types.ts';
-  import releases from '../../../../lib/releases.json';
 
   let client = $state<ReturnType<typeof createRoomClient>>();
   let view = $state<RoomClientState>({
@@ -194,9 +194,13 @@
   }
 </script>
 
-{#snippet scenery(composition: 'welcome' | 'room')}
-  {#await import('#lib/ui/ConcertScenery.svelte') then { default: ConcertScenery }}
-    <ConcertScenery {composition} />
+{#snippet scenery(composition: 'welcome' | 'room', action?: Snippet)}
+  {#await import('#lib/ui/ConcertScenery.svelte')}
+    {#if action}<div class="scene-fallback">{@render action()}</div>{/if}
+  {:then { default: ConcertScenery }}
+    <ConcertScenery {composition} {action} />
+  {:catch}
+    {#if action}<div class="scene-fallback">{@render action()}</div>{/if}
   {/await}
 {/snippet}
 
@@ -211,26 +215,21 @@
 
 <a class="skip-link" href="#main">Skip to music</a>
 <div
-  class="app-shell"
+  class="app-shell app-page"
   class:tv-mode={tv && Boolean(room)}
   class:theater-mode={theater && !tv && Boolean(room?.current)}
 >
-  <header class="app-header">
-    <a class="brand" href="/" aria-label="Afterparty home" onclick={goHome}
-      ><img src="/afterparty-mark.svg" width="42" height="42" alt="" /><span
-        >afterparty<span class="red">.</span></span
-      ></a
-    >
-    <AppNavigation
-      active={directory ? 'rooms' : 'music'}
-      roomCode={room?.code}
-      onMusic={goListening}
-      onRooms={toggleDirectory}
-    />
-  </header>
+  <AppHeader
+    active={directory ? 'rooms' : 'music'}
+    roomCode={room?.code}
+    onMusic={goListening}
+    onRooms={toggleDirectory}
+    onHome={goHome}
+    hidden={tv && Boolean(room)}
+  />
 
   <div class="workspace">
-    <main id="main">
+    <main class="app-main" id="main">
       {#if directory}
         <RoomDirectory
           busy={view.busy || view.connection === 'connecting'}
@@ -243,16 +242,19 @@
           }}
         />
       {:else if !room}
+        <PageToolbar title="Music" description="Create a listening room or join your people." />
         <section class="welcome">
           <div class="welcome-hero">
             <div class="welcome-copy">
               <p class="eyebrow red">GOOD MUSIC NEEDS GOOD COMPANY</p>
-              <h1>afterparty<span class="red">.</span></h1>
+              <p class="welcome-wordmark">afterparty<span class="red">.</span></p>
               <p class="intro">Play music and video together. One room, one shared soundtrack.</p>
             </div>
             <div class="welcome-stage">
               <div class="stage-heading">
-                <span class="eyebrow">THE AFTERPARTY STAGE</span><MotionPreference />
+                <span class="eyebrow">THE AFTERPARTY STAGE</span><span class="stage-note"
+                  >YOUR MUSIC. YOUR PEOPLE.</span
+                >
               </div>
               <div class="stage-visual">
                 {#if welcomeScene}{@render scenery('welcome')}{/if}
@@ -321,10 +323,7 @@
           </div>
         </section>
       {:else}
-        <section class="room-heading">
-          <div>
-            <h1>{room.name}</h1>
-          </div>
+        {#snippet roomPageActions()}
           <div class="room-actions">
             {#if room.current && !tv}<TheaterToggle
                 bind:active={theater}
@@ -334,14 +333,17 @@
               >{tv ? 'Exit TV mode' : 'TV mode'}</button
             >
             <button class="button secondary" onclick={leave}>Leave room</button><button
-              class="button secondary invite"
+              class="button primary invite"
               aria-expanded={invitationExpanded || tv}
               aria-controls="room-invitation"
               onclick={() => (invitationExpanded = !invitationExpanded)}
               ><Icon name="link" />Invite friends<span class="room-code">{room.code}</span></button
             >
           </div>
-        </section>
+        {/snippet}
+        <div class="room-heading">
+          <PageToolbar title={room.name} actions={roomPageActions} compact={tv} />
+        </div>
         <div class="room-share">
           {#key room.code}<RoomSharing
               code={room.code}
@@ -561,16 +563,14 @@
                   }}
                 />{/key}
             {:else}
-              <div class="empty-stage">
-                {@render scenery('room')}
-                <div class="record" aria-hidden="true">
-                  <span>ap<span class="red">.</span></span>
-                </div>
-                <h2>Every great night starts<br />with one song.</h2>
-                <p>Choose a song and make this room your own.</p>
+              {#snippet firstSongAction()}
                 <button class="button primary" onclick={() => void findMusic()}
                   ><Icon name="search" />Choose a song</button
                 >
+              {/snippet}
+              <div class="empty-stage">
+                <h2 class="sr-only">Every great night starts with one song.</h2>
+                <div class="empty-stage-scene">{@render scenery('room', firstSongAction)}</div>
               </div>
               <details class="room-settings-empty">
                 <summary>Room settings</summary>{@render roomControls()}
@@ -722,26 +722,11 @@
         >
       </nav>
     {/if}
-    <footer class="footer">
-      {#if room || directory}<MotionPreference />{/if}
-      <span>afterparty<span class="red">.</span></span><a
-        href={`/patch-notes#v${releases[0].version}`}>v{releases[0].version} · Patch notes</a
-      ><span>YOUR MUSIC. YOUR PEOPLE.</span>
-    </footer>
+    <AppFooter hidden={tv && Boolean(room)} />
   </div>
 </div>
 
 <style>
-  .app-shell:has(.welcome) .workspace,
-  .app-shell:has(.welcome) .app-header {
-    max-width: 3200px;
-  }
-  .workspace > main:has(.welcome) {
-    max-width: none;
-    min-height: calc(100svh - 184px);
-    display: grid;
-    align-items: center;
-  }
   .welcome {
     max-width: none;
     padding-top: clamp(12px, 2vh, 36px);
@@ -757,8 +742,11 @@
     grid-column: 1;
     align-self: end;
   }
-  .welcome h1 {
+  .welcome-wordmark {
     font-size: clamp(64px, 5.9vw, 184px);
+    font-weight: 750;
+    line-height: 1.01;
+    letter-spacing: -0.065em;
     margin: 20px 0;
   }
   .welcome .intro {
@@ -808,27 +796,27 @@
     align-self: start;
   }
   .room-forms > form {
-    padding: clamp(18px, 1.4vw, 30px);
-    border-radius: 18px;
+    padding: var(--panel-space);
+    border-radius: var(--panel-radius);
     background: linear-gradient(150deg, #19181e, #111216);
   }
   .room-forms h2 {
-    font-size: clamp(20px, 1.2vw, 32px);
+    font-size: var(--panel-title);
   }
   .room-forms p {
-    font-size: clamp(13px, 0.55vw, 17px);
+    font-size: var(--body-size);
   }
   .room-forms label {
     margin-top: 20px;
     font-size: clamp(13px, 0.6vw, 18px);
   }
   .room-forms input:not([type='checkbox']) {
-    height: clamp(50px, 2vw, 64px);
+    height: var(--control-height);
     font-size: clamp(16px, 0.7vw, 22px);
   }
   .room-forms .button {
-    min-height: clamp(48px, 2vw, 64px);
-    font-size: clamp(14px, 0.7vw, 20px);
+    min-height: var(--control-height);
+    font-size: var(--control-font);
   }
   .room-forms .checkbox-label {
     font-size: clamp(12px, 0.55vw, 17px);
@@ -872,7 +860,7 @@
       grid-template-columns: 1fr;
       gap: 24px;
     }
-    .welcome h1 {
+    .welcome-wordmark {
       font-size: clamp(56px, 15vw, 82px);
       margin: 12px 0;
     }
@@ -893,7 +881,7 @@
       gap: 16px;
     }
     .room-forms > form {
-      padding: 22px;
+      padding: var(--panel-space);
     }
     .welcome-foot {
       gap: 12px 18px;
@@ -904,32 +892,16 @@
     flex-shrink: 0;
   }
   .app-shell {
-    display: block;
-    background: #09090b;
-  }
-  .app-header {
-    max-width: 2400px;
-    margin: auto;
-    min-height: 88px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    padding: 18px 40px;
-    border-bottom: 1px solid var(--line);
+    background: var(--app-background);
   }
   .workspace {
-    max-width: 2400px;
-    margin-inline: auto;
-  }
-  .workspace > main {
-    padding: clamp(20px, 2.8vw, 48px);
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
   }
   .theater-mode .workspace {
     max-width: 3200px;
-  }
-  .theater-mode .workspace > main {
-    max-width: none;
   }
   .theater-mode .listening-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -948,21 +920,45 @@
     }
   }
   .room-heading {
-    margin-bottom: 28px;
-  }
-  .room-heading h1 {
+    display: block;
     margin: 0;
-    font-size: clamp(30px, 3.6vw, 52px);
   }
   .listening-grid {
     grid-template-columns: minmax(0, 1fr) clamp(340px, 28vw, 520px);
     gap: 24px;
   }
+  .empty-stage {
+    --empty-stage-height: clamp(240px, 32vw, min(46svh, 480px));
+    display: grid;
+    place-items: center;
+    height: var(--empty-stage-height);
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    overflow: hidden;
+  }
+  .empty-stage-scene {
+    width: min(100%, calc(var(--empty-stage-height) * 16 / 9));
+    aspect-ratio: 16 / 9;
+    max-height: 100%;
+  }
+  .scene-fallback {
+    aspect-ratio: 16 / 9;
+    display: grid;
+    place-items: center;
+  }
+  .stage-note {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
   .now-playing {
     min-width: 0;
     overflow: clip;
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: var(--panel-radius);
     background: #111113;
   }
   .player-bar {
@@ -1165,10 +1161,6 @@
       padding-inline: 12px;
       gap: 8px;
     }
-    .app-header {
-      display: block;
-      padding: 16px 20px;
-    }
     .listening-grid {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -1181,10 +1173,6 @@
   .tv-mode {
     grid-template-columns: 1fr;
   }
-  .tv-mode .app-header,
-  .tv-mode .footer {
-    display: none;
-  }
   .tv-mode main {
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--tv-sidebar);
@@ -1194,9 +1182,6 @@
   .tv-mode .room-heading {
     grid-column: 1 / -1;
     margin: 0;
-  }
-  .tv-mode .room-heading h1 {
-    font-size: var(--tv-title);
   }
   .tv-mode .room-share {
     grid-column: 2;

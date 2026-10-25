@@ -1,6 +1,7 @@
 <script lang="ts">
-  import AppNavigation from '#lib/ui/AppNavigation.svelte';
-  import MotionPreference from '#lib/ui/MotionPreference.svelte';
+  import AppHeader from '#lib/ui/AppHeader.svelte';
+  import AppFooter from '#lib/ui/AppFooter.svelte';
+  import PageToolbar from '#lib/ui/PageToolbar.svelte';
 
   import { onMount, tick as afterRender } from 'svelte';
   import { replaceState } from '$app/navigation';
@@ -304,20 +305,24 @@
   /></svelte:head
 >
 <a class="skip" href="#game">Skip to game</a>
-<div class="game-shell">
-  <header class="game-header">
-    <a class="brand" href="/" aria-label="Afterparty home"
-      ><img src="/afterparty-mark.svg" width="34" height="34" alt="" /><span
-        >afterparty<span class="red">.</span></span
-      ></a
-    >
-    <AppNavigation active="games" roomCode={scope?.scope === 'room' ? scope.scopeId : undefined} />
-  </header>
-  <main id="game">
+<div class="game-shell app-page">
+  <AppHeader active="games" roomCode={scope?.scope === 'room' ? scope.scopeId : undefined} />
+  <main class="app-main" id="game">
+    {#snippet gamePageActions()}
+      {#if scope}<button class="button secondary" onclick={leave}>Leave game</button><button
+          class="button primary"
+          onclick={() => void share()}
+          >{copied ? 'Invite copied' : 'Invite friends'}<Icon name="link" size={16} /></button
+        >{/if}
+    {/snippet}
+    <PageToolbar
+      title="Games"
+      description="Pick a soundtrack, invite friends and race to name the song."
+      actions={gamePageActions}
+    />
     {#if !scope}
       <section class="welcome">
-        <p class="eyebrow red">THE MUSIC QUIZ / AFTERPARTY</p>
-        <h1>Know the song.<br />Own the night<span class="red">.</span></h1>
+        <h2>Know the song.<br />Own the night<span class="red">.</span></h2>
         <p class="intro">
           That first note. The scramble for the title. The friend who somehow knows every song.
           Bring them all.
@@ -375,7 +380,7 @@
         </div>
       </section>
     {:else}
-      <div class="room-bar">
+      <div class="room-bar context-bar">
         <div>
           <span class="eyebrow red">GUESS THE SONG</span>
           <p>
@@ -384,11 +389,6 @@
               class:online={view.ready}>{view.ready ? 'Connected' : 'Connecting'}</span
             >
           </p>
-        </div>
-        <div class="actions">
-          <button class="subtle" onclick={() => void share()}
-            >{copied ? 'Invite copied' : 'Invite friends'}<Icon name="link" size={16} /></button
-          ><button class="subtle" onclick={leave}>Leave game</button>
         </div>
       </div>
       {#if inviteUrl}<details class="invite">
@@ -407,7 +407,7 @@
         </div>{/if}
       {#if !game}<div class="joining" role="status">
           <div class="record"></div>
-          <h1>{view.error ? 'This game isn’t ready yet.' : 'Finding your people…'}</h1>
+          <h2>{view.error ? 'This game isn’t ready yet.' : 'Finding your people…'}</h2>
           <p>
             {view.error
               ? 'Check the invite, then reconnect or return to your host.'
@@ -432,9 +432,9 @@
               >
             </div>
             {#if game.phase === 'lobby'}
-              <h1 bind:this={stageHeading} tabindex="-1">
+              <h2 bind:this={stageHeading} tabindex="-1">
                 {view.data?.canManage ? 'Set the mood.' : 'Get comfortable.'}
-              </h1>
+              </h2>
               <p class="stage-intro">
                 {view.data?.canManage
                   ? 'Pick a soundtrack and a pace. We’ll handle the scorekeeping.'
@@ -623,7 +623,7 @@
                 >
               </div>
               <div class="round-title">
-                <h1 bind:this={stageHeading} tabindex="-1">
+                <h2 bind:this={stageHeading} tabindex="-1">
                   {countdown > 0
                     ? 'Get ready.'
                     : answered
@@ -631,7 +631,7 @@
                       : game.settings.answerMode === 'artist'
                         ? 'Who’s the artist?'
                         : 'What’s the song?'}
-                </h1>
+                </h2>
                 <div class="countdown" class:urgent={remaining <= 10 && countdown === 0}>
                   <strong>{Math.ceil(remaining).toString().padStart(2, '0')}</strong><span
                     >seconds</span
@@ -736,11 +736,11 @@
               <p class="eyebrow red">
                 {game.settings.answerMode === 'artist' ? 'THE ARTIST WAS' : 'THE SONG WAS'}
               </p>
-              <h1 class="revealed-title" bind:this={stageHeading} tabindex="-1">
+              <h2 class="revealed-title" bind:this={stageHeading} tabindex="-1">
                 {game.settings.answerMode === 'artist'
                   ? (round?.answer?.artist ?? 'Waiting for the reveal…')
                   : (round?.answer?.title ?? 'Waiting for the reveal…')}
-              </h1>
+              </h2>
               <p class="artist">
                 {game.settings.answerMode === 'artist'
                   ? round?.answer?.title
@@ -767,13 +767,13 @@
                 </p>{/if}
             {:else if game.phase === 'results'}
               <p class="eyebrow red">THE BRAGGING RIGHTS GO TO</p>
-              <h1 bind:this={stageHeading} tabindex="-1">
+              <h2 bind:this={stageHeading} tabindex="-1">
                 {winners.length === 1
                   ? `${winners[0].nickname}.`
                   : winners.length > 1
                     ? 'The joint champions.'
                     : 'The next game.'}
-              </h1>
+              </h2>
               <p class="stage-intro">
                 {winners.length > 1
                   ? winners.map((player) => player.nickname).join(' · ')
@@ -848,12 +848,7 @@
       {/if}
     {/if}
   </main>
-  <footer>
-    <MotionPreference />
-    <span>afterparty<span class="red">.</span></span><a href="/support">Need a hand?</a><span
-      >GOOD MUSIC. FRIENDLY RIVALRIES.</span
-    >
-  </footer>
+  <AppFooter />
 </div>
 
 <style>
@@ -864,7 +859,7 @@
     color: inherit;
     text-decoration: none;
   }
-  h1,
+  h2,
   h2,
   h3,
   p {
@@ -888,34 +883,7 @@
     min-height: 100dvh;
     background: #0c0d10;
   }
-  .game-header {
-    max-width: clamp(1440px, 80vw, 2400px);
-    margin: auto;
-    padding: 24px var(--page-space);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--line);
-    gap: 20px;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 23px;
-    font-weight: 750;
-    letter-spacing: -1px;
-  }
-  .brand img {
-    flex-shrink: 0;
-  }
 
-  main {
-    width: 100%;
-    max-width: clamp(1440px, 80vw, 2400px);
-    margin: auto;
-    padding: clamp(32px, 3vw, 60px) var(--page-space) 80px;
-  }
   .entry-card:first-child {
     border-top: 2px solid var(--red);
   }
@@ -930,7 +898,7 @@
     padding-top: clamp(16px, 2vw, 36px);
     max-width: 1300px;
   }
-  .welcome h1 {
+  .welcome > h2 {
     font-size: clamp(52px, 6.4vw, 100px);
     line-height: 1.02;
     letter-spacing: -0.065em;
@@ -951,17 +919,17 @@
     gap: 24px;
   }
   .entry-card {
-    padding: 32px;
+    padding: var(--panel-space);
     display: flex;
     flex-direction: column;
     align-items: stretch;
     border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
+    border-radius: var(--panel-radius);
     background: var(--surface);
     min-width: 0;
   }
   .entry-card + .entry-card {
-    padding: 32px;
+    padding: var(--panel-space);
     border: 1px solid var(--line);
   }
   .step {
@@ -969,7 +937,7 @@
   }
   .entry-card h2 {
     margin: 16px 0 12px;
-    font-size: 28px;
+    font-size: var(--panel-title);
     line-height: 1.2;
     letter-spacing: -0.04em;
   }
@@ -989,7 +957,7 @@
   }
   label {
     display: block;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     color: #d7d3dd;
     margin: 0 0 10px;
   }
@@ -998,7 +966,7 @@
     min-height: 48px;
     background: #101216;
     border: 1px solid #424753;
-    border-radius: 10px;
+    border-radius: var(--control-radius);
     color: inherit;
     padding: 11px 14px;
     width: 100%;
@@ -1011,14 +979,14 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-height: 46px;
+    min-height: var(--control-height);
     padding: 12px 18px;
     border: 1px solid #3b3841;
-    border-radius: 10px;
+    border-radius: var(--control-radius);
     background: var(--surface-raised);
     color: #f2eff5;
     font-weight: 600;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     cursor: pointer;
   }
   button:hover {
@@ -1047,7 +1015,7 @@
     outline: 2px solid #ff6274;
     outline-offset: 4px;
   }
-  h1:focus {
+  h2:focus {
     outline: none;
   }
   .how-it-works {
@@ -1071,7 +1039,7 @@
   }
   .room-bar p {
     margin-top: 8px;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     color: var(--muted);
   }
   .room-bar strong {
@@ -1096,11 +1064,6 @@
   .connection.online:before {
     background: #ff263e;
   }
-  .actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
   .invite {
     margin-top: 15px;
     max-width: 600px;
@@ -1109,12 +1072,12 @@
     cursor: pointer;
     min-height: 44px;
     align-content: center;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     color: var(--muted);
   }
   .invite input {
     margin-top: 10px;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
   }
   .game-grid {
     display: grid;
@@ -1127,7 +1090,7 @@
     background: var(--surface);
     border: 1px solid #333742;
     padding: clamp(26px, 2.7vw, 44px);
-    border-radius: var(--radius-lg);
+    border-radius: var(--panel-radius);
     min-width: 0;
   }
   .stage-top {
@@ -1142,7 +1105,7 @@
   .stage-top .eyebrow {
     font-size: clamp(11px, 0.45vw, 18px);
   }
-  .stage h1 {
+  .stage h2 {
     font-size: clamp(34px, 2.3vw, 78px);
     line-height: 1.12;
     letter-spacing: -0.045em;
@@ -1179,7 +1142,7 @@
     box-shadow: inset 0 0 0 1px #ff6376;
   }
   .preset > span {
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     font-weight: 650;
   }
   .preset strong {
@@ -1210,7 +1173,7 @@
   .advanced summary {
     padding: 16px 0;
     color: #ddd7e4;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
   }
   .advanced summary span {
     margin-left: 18px;
@@ -1262,7 +1225,7 @@
     margin-top: 8px;
   }
   .waiting {
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     color: #b8b0c1;
     line-height: 1.8;
   }
@@ -1272,7 +1235,7 @@
     background: #21171d;
     border: 1px solid #583444;
     border-radius: 12px;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     line-height: 1.8;
     margin: 20px 0;
   }
@@ -1295,7 +1258,7 @@
     padding: 25px;
     border: 1px solid #353039;
     background: #18151a;
-    border-radius: 16px;
+    border-radius: var(--panel-radius);
   }
   .guest-summary > span {
     font-size: clamp(11px, 0.45vw, 18px);
@@ -1308,7 +1271,7 @@
     letter-spacing: -1px;
   }
   .guest-summary p {
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     color: #bcb2c5;
     line-height: 1.7;
   }
@@ -1410,7 +1373,7 @@
   .feedback {
     color: #d8b6c4;
     margin: 12px 0;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
   }
   .correct {
     display: flex;
@@ -1419,7 +1382,7 @@
     padding: 24px;
     background: #211d20;
     border: 1px solid #66515b;
-    border-radius: 16px;
+    border-radius: var(--panel-radius);
     margin: 28px 0;
   }
   .correct > span {
@@ -1438,7 +1401,7 @@
   }
   .correct p {
     color: #bbb0bc;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     line-height: 1.7;
     margin-top: 8px;
   }
@@ -1503,12 +1466,12 @@
     color: #ff6274;
   }
   .reveal-summary > span {
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
   }
   .reveal-summary small {
     display: block;
     color: #aaa0b3;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     margin-top: 10px;
   }
   .next {
@@ -1533,7 +1496,7 @@
     background: #19161b;
     border: 1px solid #3b303e;
     padding: 22px 14px;
-    border-radius: 16px;
+    border-radius: var(--panel-radius);
     min-width: 0;
   }
   .podium .champion {
@@ -1582,7 +1545,7 @@
   }
   .board-heading > span {
     color: #ac9bb5;
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
   }
   .board-intro {
     color: #9f92a8;
@@ -1608,7 +1571,7 @@
     min-width: 0;
   }
   .rank {
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     color: #a8a4b4;
     min-width: 20px;
   }
@@ -1617,7 +1580,7 @@
     flex: 1;
   }
   .scores strong {
-    font-size: clamp(14px, 0.55vw, 20px);
+    font-size: var(--control-font);
     display: block;
     overflow-wrap: anywhere;
     font-weight: 550;
@@ -1664,38 +1627,13 @@
   .joining .record {
     margin: 0 auto 30px;
   }
-  .joining h1 {
+  .joining h2 {
     font-size: 36px;
     letter-spacing: -1px;
   }
   .joining p {
     color: var(--muted);
     margin-top: 18px;
-  }
-  footer {
-    max-width: clamp(1440px, 80vw, 2400px);
-    margin: auto;
-    border-top: 1px solid var(--line);
-    padding: 26px var(--page-space);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  footer > span:first-of-type {
-    font-size: 19px;
-    font-weight: 750;
-    letter-spacing: -1px;
-  }
-  footer a {
-    font-size: clamp(13px, 0.5vw, 20px);
-    color: var(--muted);
-  }
-  footer > span:last-child {
-    font-size: 10px;
-    letter-spacing: 1.3px;
-    color: #887c90;
   }
   .skip {
     position: fixed;
@@ -1723,7 +1661,7 @@
       gap: 24px;
     }
     .stage {
-      padding: 26px;
+      padding: var(--panel-space);
     }
     .presets {
       grid-template-columns: 1fr;
@@ -1746,31 +1684,26 @@
   @media (min-width: 1200px) {
     .welcome {
       max-width: none;
-      min-height: calc(100svh - 260px);
+      min-height: calc(100svh - 380px);
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       column-gap: clamp(32px, 4vw, 100px);
       align-content: center;
       padding-block: 32px;
     }
-    .welcome > .eyebrow {
+    .welcome > h2 {
       grid-column: 1;
       grid-row: 1;
-      align-self: end;
-    }
-    .welcome h1 {
-      grid-column: 1;
-      grid-row: 2;
       font-size: clamp(64px, 4.7vw, 140px);
     }
     .welcome .intro {
       grid-column: 1;
-      grid-row: 3;
+      grid-row: 2;
       font-size: clamp(18px, 0.7vw, 26px);
     }
     .welcome .how-it-works {
       grid-column: 1;
-      grid-row: 4;
+      grid-row: 3;
       flex-wrap: wrap;
       font-size: clamp(12px, 0.5vw, 18px);
     }
@@ -1779,7 +1712,7 @@
     }
     .entry-grid {
       grid-column: 2;
-      grid-row: 1 / 5;
+      grid-row: 1 / 4;
       grid-template-columns: minmax(0, 1fr);
       align-self: center;
       justify-self: end;
@@ -1789,7 +1722,7 @@
       gap: 18px;
     }
     .entry-card h2 {
-      font-size: clamp(28px, 0.95vw, 36px);
+      font-size: var(--panel-title);
     }
     .entry-card p {
       max-width: 52ch;
@@ -1800,13 +1733,6 @@
     }
   }
   @media (max-width: 800px) {
-    .game-header {
-      flex-wrap: wrap;
-      padding: 18px 22px;
-    }
-    main {
-      padding: 28px 22px 50px;
-    }
     .game-grid {
       grid-template-columns: 1fr;
       gap: 32px;
@@ -1814,27 +1740,24 @@
     .welcome {
       padding-top: 15px;
     }
-    .welcome h1 {
+    .welcome > h2 {
       font-size: clamp(48px, 9vw, 72px);
       letter-spacing: -0.06em;
     }
     .intro {
-      font-size: clamp(14px, 0.55vw, 20px);
+      font-size: var(--control-font);
     }
     .entry-grid {
       margin-top: 35px;
     }
     .entry-card {
-      padding: 26px;
+      padding: var(--panel-space);
     }
     .entry-card + .entry-card {
-      padding: 26px;
+      padding: var(--panel-space);
     }
     .entry-card h2 {
       font-size: 21px;
-    }
-    footer {
-      padding: 25px 22px;
     }
     .leaderboard {
       position: static;
@@ -1857,7 +1780,7 @@
     .preset p {
       font-size: clamp(11px, 0.45vw, 18px);
     }
-    .stage h1 {
+    .stage h2 {
       font-size: 36px;
     }
     .stage .revealed-title {
@@ -1879,16 +1802,10 @@
     .stage {
       padding: 24px 18px;
     }
-    .room-bar .actions {
-      width: 100%;
-    }
-    .room-bar .actions button {
-      flex: 1;
-    }
     .connection {
       margin-left: 12px;
     }
-    .stage h1 {
+    .stage h2 {
       font-size: 30px;
       letter-spacing: -1px;
     }
@@ -1955,7 +1872,7 @@
       gap: 12px;
     }
     .correct strong {
-      font-size: clamp(14px, 0.55vw, 20px);
+      font-size: var(--control-font);
     }
     .podium {
       gap: 8px;
@@ -1967,7 +1884,7 @@
       font-size: 24px;
     }
     .podium h2 {
-      font-size: clamp(14px, 0.55vw, 20px);
+      font-size: var(--control-font);
     }
     .next {
       width: 100%;
@@ -1975,9 +1892,6 @@
     }
     .round-footer {
       flex-wrap: wrap;
-    }
-    footer > span:last-child {
-      display: none;
     }
     .how-it-works {
       gap: 18px;
