@@ -23,8 +23,8 @@ def core(directory, commit):
     package_core(directory, commit)
 
 
-def package_core(directory, commit):
-    """Probe and save the exact loaded image, including CI's cached Buildx output."""
+def probe_core(commit):
+    """Verify the loaded final image without archiving it or starting the bot."""
     commit = sha(commit)
     tag = 'gutta-krutt-core:git-' + commit
     image = json.loads(run('docker','image','inspect',tag))[0]
@@ -36,6 +36,13 @@ check('/app/src');await import('/app/src/data-import.ts');"""
     subprocess.run(['docker','run','--rm','--network','none','--read-only','--cpus=1',
                     '--memory=256m','--memory-swap=256m','--pids-limit=64','--entrypoint',
                     'node',tag,'--input-type=module','-e',smoke],check=True)
+    return {'commit':commit,'image_tag':tag,'image_id':image['Id'],'platform':'linux/amd64'}
+
+
+def package_core(directory, commit):
+    """Probe and save the exact loaded image, including CI's cached Buildx output."""
+    metadata = probe_core(commit)
+    tag = metadata['image_tag']
     raw = directory / 'core-image.tar'
     subprocess.run(['docker','save','-o',str(raw),tag],check=True)
     import gzip
@@ -45,7 +52,6 @@ check('/app/src');await import('/app/src/data-import.ts');"""
         with gzip.GzipFile(fileobj=output, mode='wb', compresslevel=1, mtime=0) as compressed:
             shutil.copyfileobj(source,compressed)
     raw.unlink()
-    metadata = {'commit':commit,'image_tag':tag,'image_id':image['Id'],'platform':'linux/amd64'}
     validate_image(directory/'core-image.tar.gz',metadata)
     (directory/'core.json').write_text(json.dumps(metadata)+'\n')
 
@@ -141,13 +147,16 @@ def publish(directory, commit):
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('operation',choices=['core','core-package','website','prepare','publish'])
+    parser.add_argument('operation',choices=['core','core-probe','core-package','website','prepare','publish'])
     parser.add_argument('--directory',type=Path,default=Path('release-assets'))
     parser.add_argument('--commit',default=os.environ.get('GITHUB_SHA'))
     args=parser.parse_args()
-    args.directory.mkdir(parents=True,exist_ok=True)
+    if args.operation!='core-probe':
+        args.directory.mkdir(parents=True,exist_ok=True)
     if args.operation=='core':
         core(args.directory,args.commit)
+    elif args.operation=='core-probe':
+        print(json.dumps(probe_core(args.commit)))
     elif args.operation=='core-package':
         package_core(args.directory,args.commit)
     elif args.operation=='website':

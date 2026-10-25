@@ -27,10 +27,17 @@ website job supervises its local preview and validation process groups; a previe
 exit fails validation immediately, and failure/cancellation retires both trees.
 Failure artifacts retain the preview output and Wrangler diagnostic log.
 
-Coverage requires FFmpeg, reuses downloaded packages through APT checksum
-verification, checks an existing executable first, and bounds package installation to three minutes with short download timeouts. A missing or broken
-installation still fails the job. Core packaging uses gzip level 1 while keeping
-the saved image bytes, runtime probe, archive validation and signed digest checks.
+Pull requests run the required `deployer`, `core`, `website` and dependency
+checks, including the final Core image probe. They do not create or upload
+release archives. Main pushes retain exact-image/archive validation, packaging,
+artifact uploads and the existing signed release gates. `core-probe` and
+`core-package` share the same runtime probe in `scripts/build_release.py`.
+
+Instrumented coverage runs on main pushes and explicit workflow dispatch, rather
+than repeating the three unit suites on PRs. Coverage requires FFmpeg, caches
+APT-verified package downloads, checks an existing executable first, and bounds
+installation to three minutes. Missing or broken tools fail the job. Main image
+packaging uses gzip level 1 and preserves the saved image bytes and digest checks.
 See the [measured validation review](OPTIMIZATION_REVIEW.md#ci-validation-time-2026-10-26)
 for baseline timings and the compression size tradeoff. CI-only changes do not
 belong in public product patch notes.

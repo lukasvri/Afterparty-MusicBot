@@ -614,3 +614,22 @@ files; lifecycle regressions execute the actual journey shell with controlled
 children for success, suite failure, preview exit and cancellation. The old shell
 reproduced waiting after preview death; the corrected shell completes those
 regressions. These changes are internal CI work, not public product release notes.
+
+
+Pull requests also stop producing release archives that no downstream PR job
+consumes. They run the shared Core runtime probe through `core-probe`, while
+main pushes retain `core-package`, website packaging, archive validation,
+uploads and the unchanged signed release dependency chain. Automated coverage
+is limited to main and explicit dispatch; all three ordinary unit suites still
+run on PRs. The active main ruleset requires `deployer`, `core`, `website` and
+`dependency-review`; those contexts are preserved.
+
+GitHub validation of the first candidate passed all jobs plus separately
+dispatched coverage. Against the same main source baseline, the combined
+startup/browser/stack step measured 203 seconds instead of 277, and Core probing
+plus packaging measured 29 seconds instead of 117. The sample Core artifact was
+322,909,801 bytes versus 290,899,179 in the earlier sampled playback candidate;
+source revisions and runner conditions differ, so these are observed samples,
+not a controlled transfer benchmark. PRs now omit that archive entirely.
+The FFmpeg installer completed in 20 seconds and saved 62,790,608 bytes of APT
+packages for reuse. Exact run/commit identifiers are retained in the raw results.

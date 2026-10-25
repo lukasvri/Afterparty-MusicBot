@@ -38,5 +38,28 @@
       }
     ]
   },
-  "upstream_issue": "https://github.com/cloudflare/workers-sdk/issues/15451"
+  "upstream_issue": "https://github.com/cloudflare/workers-sdk/issues/15451",
+  "github_validation": {
+    "baseline": {
+      "run_id": 40229797072,
+      "commit": "4d1347a1dc019b5804f5e9f754316c1f22218f9e",
+      "website_journeys_seconds": 277,
+      "core_probe_package_seconds": 117
+    },
+    "sample": {
+      "run_id": 40245175367,
+      "commit": "dedf34f01d1a77e829dfcff5dec0936b720399e6",
+      "website_journeys_seconds": 203,
+      "core_probe_package_seconds": 29,
+      "core_artifact_bytes": 322909801,
+      "conclusion": "success"
+    },
+    "coverage": {
+      "run_id": 40245180815,
+      "ffmpeg_install_seconds": 20,
+      "cached_package_bytes": 62790608,
+      "conclusion": "success"
+    },
+    "note": "Runner conditions differ. Final PR validation omits release archives; main retains packaging."
+  }
 }

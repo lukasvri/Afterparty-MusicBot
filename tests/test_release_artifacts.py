@@ -452,6 +452,20 @@ class CIProducer(unittest.TestCase):
             self.assertEqual(actual.read(),expected.read())
         self.assertFalse((output/'core-image.tar').exists())
 
+    def test_pr_probe_checks_the_loaded_image_without_saving_an_unused_archive(self):
+        with patch.object(self.producer.subprocess,'run') as calls, \
+                patch.object(self.producer,'run',return_value=json.dumps([{'Id':self.fixture.manifest['image_id']}])) as inspect:
+            metadata=self.producer.probe_core(COMMIT)
+        inspect.assert_called_once_with('docker','image','inspect',TAG)
+        commands=[call.args[0] for call in calls.call_args_list]
+        self.assertEqual([command[:2] for command in commands],[['docker','run']])
+        self.assertEqual(commands[0][commands[0].index('--network')+1],'none')
+        self.assertIn('--read-only',commands[0])
+        self.assertIn('Runtime must be unprivileged',commands[0][-1])
+        self.assertIn("await import('/app/src/data-import.ts')",commands[0][-1])
+        self.assertEqual(metadata,{key:self.fixture.manifest[key] for key in ('commit','image_tag','image_id','platform')})
+        self.assertFalse((self.fixture.root/'core-image.tar').exists())
+
     def test_existing_image_failure_never_falls_back_to_a_build(self):
         output=self.fixture.root/'producer'
         output.mkdir()

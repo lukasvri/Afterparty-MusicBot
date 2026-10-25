@@ -2,9 +2,6 @@ name: Unit coverage
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       upload_coverage:
@@ -16,13 +13,13 @@ permissions:
   contents: read
 concurrency:
   # Coverage needs the latest baseline, unlike the separate release workflow.
-  group: coverage-${{ github.event.pull_request.number || github.ref }}
+  group: coverage-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   coverage:
-    # Full validation still runs for drafts. Save optional coverage uploads for review.
-    # Forks and Dependabot receive no OIDC grant.
-    if: (vars.CODECOV_ENABLED == 'true' || github.event_name == 'workflow_dispatch') && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository))
+    # PRs already run all three test suites. Instrument the main baseline or on demand.
+    # Pull requests do not trigger this workflow or receive its OIDC grant.
+    if: (vars.CODECOV_ENABLED == 'true' || github.event_name == 'workflow_dispatch') && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

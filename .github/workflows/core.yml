@@ -50,9 +50,14 @@ jobs:
           # The release job signs the archives separately. Keep one saved image.
           provenance: false
           sbom: false
+      - name: Probe the tested final image without creating unused PR archives
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/build_release.py core-probe
       - name: Probe and package the tested final image without rebuilding
+        if: github.event_name == 'push'
         run: python3 scripts/build_release.py core-package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push'
         with:
           name: tested-core
           path: |
@@ -154,8 +159,10 @@ jobs:
           retention-days: 3
           archive: true
       - name: Package the tested website output without rebuilding
+        if: github.event_name == 'push'
         run: python3 scripts/build_release.py website
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push'
         with:
           name: tested-website
           path: release-assets/website.tar.gz
