@@ -1,4 +1,6 @@
 import io
+import os
+from types import SimpleNamespace
 import unittest
 from email.message import Message
 from unittest.mock import Mock, MagicMock, patch
@@ -43,3 +45,70 @@ class GithubTests(unittest.TestCase):
         self.assertEqual(patched,patch_runner(patched))
         self.assertIn("s={**s,'stage':'checking','operation':'check'",patched)
         self.assertIn("operation='publish'",patched)
+
+
+class RunnerAncestryTests(unittest.TestCase):
+    SOURCE = """def github(path):
+ return {}
+
+def git(*args):
+ r=subprocess.run(['git',*args],cwd=REPO,capture_output=True,text=True,timeout=60,env={**os.environ,'GIT_TERMINAL_PROMPT':'0'})
+ if r.returncode:raise BuildError('Betaens GitHub-kilde kunne ikke bekreftes.')
+ return r.stdout.strip()
+
+def select():
+ if git('remote','get-url','origin') not in ['https://github.com/lukasvri/Afterparty-MusicBot.git','https://github.com/lukasvri/Afterparty-MusicBot']:raise BuildError('Feil beta-repository.')
+ git('fetch','--no-tags','origin',BRANCH,'main')
+ commit=git('rev-parse','origin/'+BRANCH)
+ git('merge-base','--is-ancestor','origin/main',commit)
+ return commit
+"""
+
+    def runner(self, responses):
+        process = Mock()
+        process.run.side_effect = [SimpleNamespace(returncode=code, stdout=output, stderr='private raw details')
+                                   for code, output in responses]
+        scope = dict(subprocess=process, os=os, REPO='/synthetic/repository',
+                     BRANCH='beta-svelte-3', BuildError=RuntimeError)
+        patched = patch_runner(self.SOURCE)
+        self.assertEqual(patched, patch_runner(patched))
+        exec(compile(patched, '<synthetic-runner>', 'exec'), scope)
+        return scope, process
+
+    def test_outdated_branch_blocks_with_safe_actionable_message(self):
+        scope, process = self.runner([(1, '')])
+        with self.assertRaisesRegex(RuntimeError, 'Betagrenen inneholder ikke siste main') as caught:
+            scope['git']('merge-base','--is-ancestor','origin/main','a' * 40)
+        self.assertNotIn('private', str(caught.exception))
+        self.assertEqual(process.run.call_args.args[0],
+                         ['git','merge-base','--is-ancestor','origin/main','a' * 40])
+
+    def test_other_git_failures_keep_generic_message(self):
+        for code, args in [(2, ('merge-base','--is-ancestor','origin/main','a'*40)),
+                           (1, ('fetch','--no-tags','origin','beta-svelte-3','main')),
+                           (1, ('merge-base','--is-ancestor','other/main','a'*40))]:
+            scope, _ = self.runner([(code, '')])
+            with self.assertRaisesRegex(RuntimeError, '^Betaens GitHub-kilde kunne ikke bekreftes.$'):
+                scope['git'](*args)
+
+    def test_success_keeps_origin_fetch_and_exact_ancestry_gate(self):
+        commit = 'a' * 40
+        scope, process = self.runner([(0, 'https://github.com/lukasvri/Afterparty-MusicBot.git'),
+                                      (0, ''), (0, commit), (0, '')])
+        self.assertEqual(scope['select'](), commit)
+        self.assertEqual([call.args[0] for call in process.run.call_args_list], [
+            ['git','remote','get-url','origin'],
+            ['git','fetch','--no-tags','origin','beta-svelte-3','main'],
+            ['git','rev-parse','origin/beta-svelte-3'],
+            ['git','merge-base','--is-ancestor','origin/main',commit]])
+
+    def test_unapproved_origin_is_still_rejected_before_fetch(self):
+        scope, process = self.runner([(0, 'https://example.invalid/repository')])
+        with self.assertRaisesRegex(RuntimeError, 'Feil beta-repository'):
+            scope['select']()
+        self.assertEqual(process.run.call_count, 1)
+
+    def test_unknown_git_wrapper_is_rejected(self):
+        source = self.SOURCE.replace(" if r.returncode:raise BuildError('Betaens GitHub-kilde kunne ikke bekreftes.')", " if r.returncode:raise RuntimeError('different wrapper')")
+        with self.assertRaisesRegex(ValueError, 'Unsupported beta runner Git check'):
+            patch_runner(source)

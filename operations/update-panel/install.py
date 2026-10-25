@@ -31,10 +31,32 @@ def patch_runner(text):
   failure=BuildError(str(error));failure.retry_after=getattr(error,'retry_after',None);raise failure from None
 """
     text = text[:start] + wrapper + text[end:]
+    # Keep the ancestry gate intact and never expose raw Git stderr.
+    generic = " if r.returncode:raise BuildError('Betaens GitHub-kilde kunne ikke bekreftes.')"
+    diagnostic = """ if r.returncode:
+  if r.returncode == 1 and args[:3] == ('merge-base','--is-ancestor','origin/main') and len(args) == 4:
+   raise BuildError('Betagrenen inneholder ikke siste main. Synkroniser og test beta før publisering. Ingen oppdatering er startet.')
+  raise BuildError('Betaens GitHub-kilde kunne ikke bekreftes.')"""
+    if generic in text:
+        if text.count(generic) != 1:
+            raise ValueError('Unsupported beta runner Git check. No changes were installed.')
+        text = text.replace(generic, diagnostic)
+    elif 'def select():' in text and diagnostic not in text:
+        raise ValueError('Unsupported beta runner Git check. No changes were installed.')
     text = text.replace("s={'stage':'checking','ready':False,'running':False,'message':", "s={**s,'stage':'checking','operation':'check','ready':False,'running':False,'message':")
     text = text.replace("s.update(stage='validate',running=True,ready=False,", "s.update(stage='validate',operation='publish',running=True,ready=False,")
     text = text.replace("error=message,message=message);save(s)", "error=message,message=message,retry_after=getattr(e,'retry_after',None));save(s)")
     return text
+
+
+def patch_features(text):
+    fallback = "                    build = {'ready': False, 'message': 'Det testede GitHub-bygget er ikke klart eller kunne ikke verifiseres. Oppdatering er blokkert til bygget er godkjent.'}"
+    replacement = "                    from build_status import blocked_build\n                    build = blocked_build(self.release_client(), commit)"
+    if replacement in text:
+        return text
+    if text.count(fallback) != 1:
+        raise ValueError('Unsupported updater build status. No changes were installed.')
+    return text.replace(fallback, replacement)
 
 
 def install(directory, *, apply=False, assets_dir=None):
@@ -53,6 +75,10 @@ def install(directory, *, apply=False, assets_dir=None):
     runner_text = patch_runner(runner.read_text()) if runner.is_file() else None
     if runner_text is not None:
         compile(runner_text, str(runner), 'exec')
+    features = directory / 'updater_features.py'
+    features_text = patch_features(features.read_text()) if features.is_file() else None
+    if features_text is not None:
+        compile(features_text, str(features), 'exec')
     original = server.read_bytes()
     newline = '\r\n' if b'\r\n' in original else '\n'
     patched = patch_server(original.decode().replace('\r\n', '\n')).replace('\n', newline).encode()
@@ -65,6 +91,10 @@ def install(directory, *, apply=False, assets_dir=None):
     for target in (index, server, adapter, directory / 'update_panel.py'):
         if target.exists():
             shutil.copy2(target, backup / target.name)
+    if features_text is not None:
+        shutil.copy2(features, backup / features.name)
+        if (directory / 'build_status.py').exists():
+            shutil.copy2(directory / 'build_status.py', backup / 'build_status.py')
     if runner_text is not None:
         shutil.copy2(runner, backup / 'beta_update.py')
         if (runner.parent / 'github_checks.py').exists():
@@ -84,6 +114,9 @@ def install(directory, *, apply=False, assets_dir=None):
     if runner_text is not None:
         shutil.copy2(source / 'github_checks.py', runner.parent / 'github_checks.py')
         runner.write_text(runner_text)
+    if features_text is not None:
+        shutil.copy2(source / 'build_status.py', directory / 'build_status.py')
+        features.write_text(features_text)
     server.write_bytes(patched)
     temporary = index.with_suffix('.new')
     temporary.write_text(page)

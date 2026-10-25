@@ -67,12 +67,18 @@ background checks until the provider permits them. The last deployed source
 remains visible if a new check fails. No token or extra
 GitHub permissions are introduced.
 
-The progress section describes only the current publishing transaction. Before
-publishing starts, including during or after a status check and while dispatch
-is pending, every publishing step stays pending. Completed publishing remains
-visible until a new check starts. Historical deployment commit and time remain
-separate from current progress, including after a failed check. Private hosting
-identifiers, log contents and credentials are never returned to the UI.
+The shared `projectProgress` model in `model.ts` owns publishing progress for
+Production, Beta and OpenWorks. Both the channel UI and the multi-project admin
+host use this same model. `buildProgressModel` in `build.ts` compiles the standalone
+browser module for the existing admin host without requiring Node on that host.
+
+Before publishing starts, during status checks, while dispatch is pending and
+when no job is running, publishing steps stay pending. Previous successful jobs
+are displayed in History rather than filling the next job's steps. Active phases
+can only complete preceding steps, and a failed publication retains documented
+partial progress. Private hosting identifiers, logs and credentials are never
+returned to the UI. The runner patch reports an out-of-date beta branch explicitly
+without removing its main-ancestry, CI or target-isolation checks.
 
 ## Validation
 
@@ -98,3 +104,9 @@ backup. If the beta runner was patched, restore its backed-up `beta_update.py`
 and prior `github_checks.py` alongside it. Restore its `channel-ui-source` directory when present, or remove the
 index-rendering hook when reverting to a version without it. Restart only the
 panel web service. Old hashed assets are retained for already open clients.
+
+The optional `updater_features.py` patch uses read-only GitHub workflow metadata
+to explain a blocked signed build: pending, failed, missing or unverified. Every
+diagnostic remains `ready: false`; successful CI alone never authorizes publication
+or substitutes for the existing signed-artifact verification. Unknown host code
+is rejected before installation rather than silently changing its safety gates.
