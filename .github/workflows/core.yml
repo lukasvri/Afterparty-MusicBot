@@ -101,11 +101,15 @@ jobs:
           npm --prefix apps/web test
       - name: Build and package the sole native release artifact without publishing
         run: npm run build
-      - name: Check native release desktop and mobile journeys with synthetic data
+      - name: Install native browser journey dependencies
+        timeout-minutes: 3
         run: |
           npx playwright install --with-deps chromium
           sudo apt-get install -y --no-install-recommends ffmpeg
           ffmpeg -version
+      - name: Check native release desktop and mobile journeys with synthetic data
+        timeout-minutes: 8
+        run: |
           npm run start -- --port 5174 > /tmp/afterparty-web-preview.log 2>&1 &
           preview_pid=$!
           trap 'result=$?; if [ "$result" -ne 0 ]; then tail -200 /tmp/afterparty-web-preview.log; fi; kill "$preview_pid" 2>/dev/null || true; exit "$result"' EXIT

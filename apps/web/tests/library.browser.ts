@@ -48,136 +48,157 @@ async function fixture(
     executablePath: process.env.CHROMIUM_PATH,
     args: ['--no-sandbox'],
   });
-  const page = await browser.newPage({
-    viewport: { width, height: 1000 },
-    reducedMotion: 'reduce',
-  });
-  page.setDefaultTimeout(8000);
-  const errors: string[] = [];
-  const writes: Record<string, unknown>[] = [];
-  const jobs: Record<string, unknown>[] = [];
-  let version = 1,
-    processing = true,
-    failNextRead = false,
-    failAddition: number | null = null;
-  const queue = [
-    initial,
-    ...Array.from({ length: queued - 1 }, (_, index) =>
-      video(`filler${String(index).padStart(5, '0')}`, `Queued filler ${index}`),
-    ),
-  ];
-  const snapshot = (): Room => ({
-    code,
-    name: 'Library evening',
-    isOwner: true,
-    isHost: true,
-    isPublic: false,
-    current: null,
-    queue,
-    history: [],
-    playing: false,
-    position: 0,
-    version,
-    serverTime: Date.now(),
-    viewers: 1,
-    expiresAt: Date.now() + 3600000,
-  });
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(
-    ({ code, token, visitor, favorite }) => {
-      localStorage.setItem('afterparty-visitor', visitor);
-      localStorage.setItem(`afterparty-host:${code}`, token);
-      localStorage.setItem(
-        'afterparty-library-v1',
-        JSON.stringify({ version: 1, evenings: [], favorites: [favorite] }),
-      );
-    },
-    { code, token, visitor, favorite },
-  );
-  await page.route('**/*', async (route) => {
-    const request = route.request(),
-      url = new URL(request.url());
-    if (url.origin !== origin) return route.abort();
-    if (!url.pathname.startsWith('/api/')) {
-      if (
-        denyLibrary &&
-        (url.pathname === `/${libraryFile}` || url.pathname.endsWith('/MusicLibrary.svelte'))
-      )
-        return route.abort();
-      return route.continue();
-    }
-    const input = request.method() === 'POST' ? request.postDataJSON() : null;
-    if (url.pathname === `/api/rooms/${code}`) {
-      assert.equal(request.headers()['x-afterparty-visitor'], visitor);
-      assert.equal(request.headers().authorization, `Bearer ${token}`);
-      if (input) {
-        assert.equal(input.action, 'add');
-        assert.equal(input.version, version);
-        writes.push(input);
-        if (writes.length === failAddition) {
-          failAddition = null;
-          return route.fulfill({ status: 503, json: { error: 'Temporary add failure.' } });
+  try {
+    const page = await browser.newPage({
+      viewport: { width, height: 1000 },
+      reducedMotion: 'reduce',
+    });
+    page.setDefaultTimeout(8000);
+    const errors: string[] = [];
+    const writes: Record<string, unknown>[] = [];
+    const jobs: Record<string, unknown>[] = [];
+    let version = 1,
+      processing = true,
+      failNextRead = false,
+      failAddition: number | null = null;
+    const queue = [
+      initial,
+      ...Array.from({ length: queued - 1 }, (_, index) =>
+        video(`filler${String(index).padStart(5, '0')}`, `Queued filler ${index}`),
+      ),
+    ];
+    const snapshot = (): Room => ({
+      code,
+      name: 'Library evening',
+      isOwner: true,
+      isHost: true,
+      isPublic: false,
+      current: null,
+      queue,
+      history: [],
+      playing: false,
+      position: 0,
+      version,
+      serverTime: Date.now(),
+      viewers: 1,
+      expiresAt: Date.now() + 3600000,
+    });
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.addInitScript(
+      ({ code, token, visitor, favorite }) => {
+        localStorage.setItem('afterparty-visitor', visitor);
+        localStorage.setItem(`afterparty-host:${code}`, token);
+        localStorage.setItem(
+          'afterparty-library-v1',
+          JSON.stringify({ version: 1, evenings: [], favorites: [favorite] }),
+        );
+      },
+      { code, token, visitor, favorite },
+    );
+    await page.route('**/*', async (route) => {
+      const request = route.request(),
+        url = new URL(request.url());
+      if (url.origin !== origin) return route.abort();
+      if (!url.pathname.startsWith('/api/')) {
+        if (
+          denyLibrary &&
+          (url.pathname === `/${libraryFile}` || url.pathname.endsWith('/MusicLibrary.svelte'))
+        )
+          return route.abort();
+        return route.continue();
+      }
+      const input = request.method() === 'POST' ? request.postDataJSON() : null;
+      if (url.pathname === `/api/rooms/${code}`) {
+        assert.equal(request.headers()['x-afterparty-visitor'], visitor);
+        assert.equal(request.headers().authorization, `Bearer ${token}`);
+        if (input) {
+          assert.equal(input.action, 'add');
+          assert.equal(input.version, version);
+          writes.push(input);
+          if (writes.length === failAddition) {
+            failAddition = null;
+            return route.fulfill({ status: 503, json: { error: 'Temporary add failure.' } });
+          }
+          const recording = CONCERT_CATALOG.find((item) => item.videoId === input.videoId);
+          const track =
+            [favorite, imported].find((item) => item.id === input.videoId) ??
+            (recording ? video(recording.videoId, recording.title) : undefined);
+          assert(track);
+          queue.push(track);
+          version++;
+          return route.fulfill({ json: { room: snapshot() } });
         }
-        const recording = CONCERT_CATALOG.find((item) => item.videoId === input.videoId);
-        const track =
-          [favorite, imported].find((item) => item.id === input.videoId) ??
-          (recording ? video(recording.videoId, recording.title) : undefined);
-        assert(track);
-        queue.push(track);
-        version++;
-        return route.fulfill({ json: { room: snapshot() } });
+        return route.fulfill({ json: snapshot() });
       }
-      return route.fulfill({ json: snapshot() });
-    }
-    if (url.pathname === '/api/playlists') {
-      jobs.push(input);
-      if (input.action === 'read' && failNextRead) {
-        failNextRead = false;
-        return route.fulfill({ status: 503, json: { error: 'Temporary connection failure.' } });
+      if (url.pathname === '/api/playlists') {
+        jobs.push(input);
+        if (input.action === 'read' && failNextRead) {
+          failNextRead = false;
+          return route.fulfill({ status: 503, json: { error: 'Temporary connection failure.' } });
+        }
+        if (input.action !== 'start') {
+          assert.equal(input.id, jobId);
+          assert.equal(input.token, jobToken);
+        }
+        if (input.action === 'start') assert.equal(input.url, playlistUrl);
+        const status = input.action === 'cancel' ? 'cancelled' : processing ? 'processing' : 'done';
+        return route.fulfill({
+          json: {
+            id: jobId,
+            ...(input.action === 'start' ? { token: jobToken } : {}),
+            status,
+            source: 'youtube',
+            videos: status === 'done' ? preview : [],
+            skipped: 0,
+            limited: false,
+            total: preview.length,
+          },
+        });
       }
-      if (input.action !== 'start') {
-        assert.equal(input.id, jobId);
-        assert.equal(input.token, jobToken);
-      }
-      if (input.action === 'start') assert.equal(input.url, playlistUrl);
-      const status = input.action === 'cancel' ? 'cancelled' : processing ? 'processing' : 'done';
-      return route.fulfill({
-        json: {
-          id: jobId,
-          ...(input.action === 'start' ? { token: jobToken } : {}),
-          status,
-          source: 'youtube',
-          videos: status === 'done' ? preview : [],
-          skipped: 0,
-          limited: false,
-          total: preview.length,
-        },
-      });
-    }
-    return route.fulfill({ json: { rooms: [] } });
-  });
-  await page.goto(`${origin}/v3?room=${code}`);
-  await page.getByRole('heading', { name: 'Library evening', exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
-  if (!denyLibrary)
-    await page.getByRole('button', { name: 'Add Saved favorite to queue', exact: true }).waitFor();
-  return {
-    page,
-    writes,
-    jobs,
-    errors,
-    failAdd: (attempt: number) => {
-      failAddition = attempt;
-    },
-    failRead: () => {
-      failNextRead = true;
-    },
-    complete: () => {
-      processing = false;
-    },
-    close: () => browser.close(),
-  };
+      return route.fulfill({ json: { rooms: [] } });
+    });
+    await page.goto(`${origin}/v3?room=${code}`);
+    await page.getByRole('heading', { name: 'Library evening', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    if (!denyLibrary)
+      await page
+        .getByRole('button', { name: 'Add Saved favorite to queue', exact: true })
+        .waitFor();
+    return {
+      page,
+      writes,
+      jobs,
+      errors,
+      failAdd: (attempt: number) => {
+        failAddition = attempt;
+      },
+      failRead: () => {
+        failNextRead = true;
+      },
+      complete: () => {
+        processing = false;
+      },
+      close: () => browser.close(),
+    };
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
 }
+test('library fixture closes its browser if initialization fails before returning cleanup', async (t) => {
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH,
+    args: ['--no-sandbox'],
+  });
+  t.after(() => browser.close());
+  t.mock.method(chromium, 'launch', async () => browser);
+  t.mock.method(browser, 'newPage', async () => {
+    throw new Error('Synthetic library initialization failure');
+  });
+  await assert.rejects(fixture(390), /Synthetic library initialization failure/);
+  assert.equal(browser.isConnected(), false, 'A failed fixture must not retain a Chromium process');
+});
+
 for (const width of [1440, 390])
   test(
     `saved favorites, evenings and playlist import at ${width}px`,
