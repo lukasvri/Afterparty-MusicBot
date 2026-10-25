@@ -133,12 +133,25 @@ test('scrubbing immediately after cue does not resume before the first position 
     action: 'seek',
     position: 42,
   });
+  bridge.command(key, 'cue', 200, 12);
+  bridge.state(observation({ state: 5, now: 250, position: 10, gesture: false }));
+  assert.deepEqual(
+    bridge.state(observation({ state: 1, now: 300, position: 10 })),
+    { action: 'play' },
+    'normal keyframe rounding is not a native scrub',
+  );
 });
-test('a playing event caused by an unacknowledged API seek cannot resume a paused room', () => {
+test('a deliberate resume after a paused seek acknowledgement does not wait for a position poll', () => {
   const bridge = createPlayerIntent(),
     key = observation().identity;
   bridge.reset(key);
   bridge.state(observation({ state: 2, now: 0, position: 12, gesture: false }));
   bridge.command(key, 'seek', 10, 42);
-  assert.equal(bridge.state(observation({ state: 1, now: 100, position: 42 })), null);
+  assert.equal(
+    bridge.state(observation({ state: 2, now: 50, position: 42, gesture: false })),
+    null,
+  );
+  assert.deepEqual(bridge.state(observation({ state: 1, now: 100, position: 42 })), {
+    action: 'play',
+  });
 });

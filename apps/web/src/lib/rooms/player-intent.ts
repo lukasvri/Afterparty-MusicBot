@@ -6,6 +6,7 @@ type Observation = {
   now: number;
   gesture: boolean;
 };
+const POSITION_ACK_TOLERANCE = 2.25;
 
 /** A receipt alone is not a fresh shared timeline. Allow playback progress
  * between the seek and the next authoritative sample, including a delayed start. */
@@ -95,7 +96,6 @@ export function createPlayerIntent() {
       }
       // A delayed PLAYING callback cannot defeat an outstanding shared pause.
       if (expected?.state === 2 && value.state === 1) return null;
-      if (expectedPosition?.kind === 'seek' && value.state === 1) return null;
       if (
         value.gesture &&
         value.state === 1 &&
@@ -103,7 +103,7 @@ export function createPlayerIntent() {
         expectedPosition?.kind === 'cue' &&
         Number.isFinite(value.position) &&
         value.position >= 0 &&
-        Math.abs(value.position - expectedPosition.position) > 1.5
+        Math.abs(value.position - expectedPosition.position) > POSITION_ACK_TOLERANCE
       ) {
         expectedPosition = null;
         sample = { position: value.position, at: value.now, state: value.state };
@@ -144,7 +144,7 @@ export function createPlayerIntent() {
           Math.min(
             Math.abs(value.position - expectedPosition.position),
             Math.abs(value.position - target),
-          ) < 2.25;
+          ) < POSITION_ACK_TOLERANCE;
         if (acknowledged || value.now >= expectedPosition.until) expectedPosition = null;
         sample = { position: value.position, at: value.now, state: value.state };
         return null;

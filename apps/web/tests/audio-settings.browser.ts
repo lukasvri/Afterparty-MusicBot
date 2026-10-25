@@ -302,6 +302,22 @@ for (const mode of ['room', 'discord'] as const) {
         page.evaluate(() => (window as unknown as ProbeWindow).__audioSettings.calls);
       assert.equal((await calls()).find((call) => call.action === 'construct')?.controls, 1);
       assert.equal((await calls()).find((call) => call.action === 'construct')?.disablekb, 0);
+      await page.evaluate(() => {
+        const player = (window as unknown as ProbeWindow).__audioSettings.player!;
+        player.state = 5;
+        player.position = 10;
+      });
+      await page.getByRole('button', { name: 'Sync now', exact: true }).click();
+      await page.waitForFunction(
+        (position) =>
+          (window as unknown as ProbeWindow).__audioSettings.player?.position === position,
+        initialPosition,
+      );
+      assert.equal(
+        (await calls()).at(-1)?.action,
+        'cue',
+        'a paused cued video is re-cued instead of starting playback through seekTo',
+      );
       await page.evaluate(() =>
         (window as unknown as ProbeWindow).__audioSettings.stateChanged?.(1),
       );

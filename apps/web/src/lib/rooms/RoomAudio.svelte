@@ -348,8 +348,15 @@
       canCorrectPlayback(player.getPlayerState(), audible, now, settleUntil, force) &&
       shouldCorrect(localPosition, player.getCurrentTime(), now, correctedAt, force, syncMode)
     ) {
-      command('seek', localPosition);
-      player.seekTo(localPosition, true);
+      // seekTo starts playback from a cued state. Re-cue a paused target so a
+      // clock correction never masquerades as a deliberate native Play action.
+      if (!audible && player.getPlayerState() !== 2) {
+        command('cue', localPosition);
+        player.cueVideoById({ videoId: room.current.id, startSeconds: localPosition });
+      } else {
+        command('seek', localPosition);
+        player.seekTo(localPosition, true);
+      }
       notePlayerEvent('correction');
       correctedAt = now;
     }
