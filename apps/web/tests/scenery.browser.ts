@@ -89,6 +89,43 @@ for (const [width, height] of [
         assert.equal(geometry.pointerEvents, 'none');
         assert.equal(geometry.foreignNodes, 0, 'snippets retain the SVG namespace');
         assert.equal(geometry.running, 0, 'system reduced motion stops stage animations');
+        assert.match(
+          await page.getByRole('button', { name: 'Page animations', exact: true }).innerText(),
+          /Reduced motion/,
+        );
+        if (path === '/') {
+          const welcome = await page.locator('.welcome').boundingBox();
+          assert(
+            welcome && welcome.width >= width * 0.75,
+            'welcome uses the available screen width',
+          );
+          if (width >= 1920) {
+            const create = await page
+              .getByRole('button', { name: 'Create private room', exact: true })
+              .boundingBox();
+            const join = await page
+              .getByRole('button', { name: 'Join room', exact: true })
+              .boundingBox();
+            assert(
+              create &&
+                join &&
+                create.y + create.height <= height &&
+                join.y + join.height <= height,
+              'desktop room actions remain in the first viewport',
+            );
+          }
+        }
+        assert(
+          await scene.locator('.deck-controls').evaluateAll((decks) =>
+            decks.every((deck) => {
+              const screen = deck.querySelector('.deck-screen')!.getBoundingClientRect();
+              const jog = deck.querySelector('.jog-wheel')!.getBoundingClientRect();
+              return screen.y + screen.height / 2 > jog.y + jog.height / 2;
+            }),
+          ),
+          'CDJ jog wheels face the DJ; screens are on their audience-facing edge',
+        );
+
         await page.emulateMedia({ reducedMotion: 'no-preference' });
         await page.evaluate(() => {
           document.documentElement.dataset.motion = 'off';
@@ -103,6 +140,64 @@ for (const [width, height] of [
           0,
           'manual motion preference stops stage animations',
         );
+        await page.evaluate(() => {
+          document.documentElement.dataset.motion = 'on';
+        });
+        await scene.scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => {
+          const venue = document.querySelector('.concert-scenery');
+          return (
+            venue &&
+            ['.light-beam', '.laser-fan', '.stage-orbit'].every((selector) =>
+              [...venue.querySelectorAll(selector)].every((node) =>
+                node.getAnimations().some((animation) => animation.playState === 'running'),
+              ),
+            )
+          );
+        });
+        const transforms = await scene.evaluate((node) =>
+          ['.light-beam', '.laser-fan', '.stage-orbit'].map(
+            (selector) => getComputedStyle(node.querySelector(selector)!).transform,
+          ),
+        );
+        await page.waitForFunction(
+          (before) =>
+            ['.light-beam', '.laser-fan', '.stage-orbit'].every(
+              (selector, index) =>
+                getComputedStyle(document.querySelector(`.concert-scenery ${selector}`)!)
+                  .transform !== before[index],
+            ),
+          transforms,
+        );
+        const hardware = await scene.evaluate((node) => {
+          const frame = node.getBoundingClientRect();
+          return [...node.querySelectorAll('.dj-deck, .dj-mixer, .performer-head')].map((part) => {
+            const box = part.getBoundingClientRect();
+            return (
+              box.width > 0 &&
+              box.height > 0 &&
+              box.left >= frame.left &&
+              box.right <= frame.right &&
+              box.top >= frame.top &&
+              box.bottom <= frame.bottom
+            );
+          });
+        });
+        assert.equal(hardware.length, 4);
+        assert(hardware.every(Boolean), 'both CDJs, mixer and DJ head remain inside the scene');
+        await page.screenshot({
+          path: `/tmp/afterparty-stage-${width}-${path === '/' ? 'welcome' : 'room'}.png`,
+          fullPage: true,
+        });
+        const motion = page.getByRole('button', { name: 'Page animations', exact: true });
+        await motion.click();
+        await page.waitForFunction(() => document.documentElement.dataset.motion === 'off');
+        assert.equal(
+          await scene.evaluate((node) => node.getAnimations({ subtree: true }).length),
+          0,
+        );
+        await motion.click();
+        await page.waitForFunction(() => document.documentElement.dataset.motion === 'on');
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         await page.emulateMedia({ reducedMotion: 'reduce' });
       }

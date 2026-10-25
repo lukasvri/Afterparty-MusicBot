@@ -5,7 +5,7 @@ import { metadataAiGenerated } from "./music-content.ts";
 import { matchesStationRecording, radioStation, stationSong } from "./radio-stations.ts";
 import { copyRadioDescriptor, createRecommendationRanking, type FavoriteRecording } from "./recommendation-ranking.ts";
 import {
-  createRadioRanker, isRadioMusic, isRadioTitle, radioArtist, radioGenre,
+  createRadioRanker, isRadioMusic, isRadioTitle, radioArtist, radioGenre, radioDiscoveryGenre,
   radioQuery, radioRelated, radioStyleCompatible, radioTitle,
   sameRadioRecording, sameRadioSong, specificRadioGenre,
 } from "./radio.ts";
@@ -107,7 +107,7 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
   let lastError: unknown;
   let successfulDiscovery = 0;
   const queries: { source: "genre" | "artist"; query: string }[] = [
-    { source: specificRadioGenre(seed) ? "genre" as const : "artist" as const, query: radioQuery(seed) },
+    { source: radioDiscoveryGenre(seed) ? "genre" as const : "artist" as const, query: radioQuery(seed) },
     ...(artist ? [{ source: "artist" as const, query: `${artist} music audio` }] : []),
   ].filter(query => !station || query.source === "genre").slice(0, RADIO_LIMITS.discoverySearches);
   const reject = (reason: Rejection) => { diagnostic.rejected[reason]++; return false; };

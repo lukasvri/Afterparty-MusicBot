@@ -644,61 +644,81 @@
 {@render footer?.()}
 <details class="local-sync">
   <summary>{settingsLabel}</summary>
-  <p>Use YouTube's controls for volume, playback, quality, captions and fullscreen.</p>
-  <p>These settings affect this device. The shared music and queue stay unchanged.</p>
-  <label
-    >Synchronization mode<select
-      aria-label="Synchronization mode"
-      value={syncMode}
-      onchange={(event) => browserStorage.set(SYNC_MODE_KEY, event.currentTarget.value)}
-      ><option value="precise">Precise alignment</option><option value="stable"
-        >Stable connection</option
-      ></select
-    ></label
-  >
-  <p>
-    Precise follows the shared clock closely. Stable makes fewer adjustments on uneven connections.
-  </p>
-  {#if room.mode === 'discord'}<div class="calibration">
-      <label for="local-sync-offset"
-        >Video timing adjustment <output
-          >{syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)} s</output
-        ></label
+  <div class="settings-content">
+    <div class="device-settings">
+      <section class="setting-card" aria-label="Video and sound">
+        <h3>Video &amp; sound</h3>
+        <p>Use YouTube’s controls for playback, volume, quality, captions and fullscreen.</p>
+        <p class="setting-hint">
+          YouTube manages video quality automatically. Auto can use up to 4K when the recording,
+          device and connection support it. Choose Quality in the video’s settings to change it.
+        </p>
+      </section>
+      <section class="setting-card" aria-label="Device synchronization">
+        <h3>Device synchronization</h3>
+        <p>Local to this device. The shared music and queue stay unchanged.</p>
+        <label
+          >Synchronization mode<select
+            aria-label="Synchronization mode"
+            value={syncMode}
+            onchange={(event) => browserStorage.set(SYNC_MODE_KEY, event.currentTarget.value)}
+            ><option value="precise">Precise alignment</option><option value="stable"
+              >Stable connection</option
+            ></select
+          ></label
+        >
+        <p>
+          Precise follows the shared clock closely. Stable makes fewer adjustments on uneven
+          connections.
+        </p>
+        {#if room.mode === 'discord'}<div class="calibration">
+            <label for="local-sync-offset"
+              >Video timing adjustment <output
+                >{syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)} s</output
+              ></label
+            >
+            <input
+              id="local-sync-offset"
+              aria-label="Video timing adjustment"
+              type="range"
+              min={-MAX_SYNC_OFFSET_SECONDS}
+              max={MAX_SYNC_OFFSET_SECONDS}
+              step="0.1"
+              value={syncOffset}
+              oninput={(event) => adjustOffset(event.currentTarget.value)}
+            />
+            <button class="button secondary" onclick={() => adjustOffset('0')}
+              >Reset video timing</button
+            >
+            <p>If video runs ahead of Discord audio, move left.</p>
+          </div>{/if}
+        <div class="sync-actions">
+          <button class="button secondary" disabled={!ready} onclick={() => sync(true)}
+            >Sync now</button
+          >
+          <button
+            class="button secondary"
+            disabled={!enabled || loading}
+            onclick={() => void reload()}>Reload video</button
+          >
+        </div>
+      </section>
+    </div>
+    {@render settings?.()}
+    <details
+      class="playback-diagnostics"
+      ontoggle={(event) => {
+        diagnostics = event.currentTarget.open ? playerDiagnostics() : null;
+      }}
+    >
+      <summary>Playback diagnostics</summary>
+      <p>Anonymous counters on this device. No song, room or account details are recorded.</p>
+      <button class="button secondary" onclick={() => (diagnostics = playerDiagnostics())}
+        >Refresh diagnostics</button
       >
-      <input
-        id="local-sync-offset"
-        aria-label="Video timing adjustment"
-        type="range"
-        min={-MAX_SYNC_OFFSET_SECONDS}
-        max={MAX_SYNC_OFFSET_SECONDS}
-        step="0.1"
-        value={syncOffset}
-        oninput={(event) => adjustOffset(event.currentTarget.value)}
-      />
-      <button class="button secondary" onclick={() => adjustOffset('0')}>Reset video timing</button>
-      <p>If video runs ahead of Discord audio, move left.</p>
-    </div>{/if}
-  <div class="sync-actions">
-    <button class="button secondary" disabled={!ready} onclick={() => sync(true)}>Sync now</button>
-    <button class="button secondary" disabled={!enabled || loading} onclick={() => void reload()}
-      >Reload video</button
-    >
+      {#if diagnostics}<pre>{JSON.stringify(diagnostics, null, 2)}</pre>{/if}
+    </details>
   </div>
-  <p>Use the video's controls for quality and captions when the source supports them.</p>
-  {@render settings?.()}
-  <details
-    class="playback-diagnostics"
-    ontoggle={(event) => {
-      diagnostics = event.currentTarget.open ? playerDiagnostics() : null;
-    }}
-  >
-    <summary>Playback diagnostics</summary>
-    <p>Anonymous counters on this device. No song, room or account details are recorded.</p>
-    <button class="button secondary" onclick={() => (diagnostics = playerDiagnostics())}
-      >Refresh diagnostics</button
-    >
-    {#if diagnostics}<pre>{JSON.stringify(diagnostics, null, 2)}</pre>{/if}
-  </details>
 </details>
 {#if message}
   <div class="audio-message" role="status">
@@ -723,47 +743,90 @@
     font-size: 0.9em;
   }
   .local-sync {
+    margin-top: 12px;
     border: 1px solid var(--line);
     border-radius: var(--radius, 12px);
-    padding: 12px 16px;
+    padding: 16px 20px;
     background: var(--surface, #14161a);
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
   }
-  .local-sync[open] {
+  .local-sync > summary {
+    cursor: pointer;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 650;
+    padding-block: 4px;
+  }
+  .settings-content {
+    display: grid;
+    gap: 22px;
+    padding-top: 20px;
+  }
+  .device-settings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 16px;
+  }
+  .setting-card {
+    min-width: 0;
+    padding: 20px;
+    background: #15161c;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .setting-card h3 {
+    margin: 0;
+    font-size: 15px;
+    color: var(--text);
+  }
+  .setting-card p {
+    margin: 0;
+    line-height: 1.65;
+  }
+  .setting-card .setting-hint {
+    font-size: 12px;
+    color: #a6a8b7;
+  }
+  .setting-card > label {
+    display: grid;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .local-sync select {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 36px 10px 12px;
+    border: 1px solid #4d5061;
+    border-radius: 9px;
+    background: #0e1016;
+    color: var(--text);
+    font: inherit;
+  }
+  .sync-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: auto;
+  }
+  .sync-actions .button {
+    flex: 1 1 auto;
+  }
+  .calibration {
     display: grid;
     gap: 12px;
   }
-  .local-sync summary {
-    font-weight: 650;
-  }
-  @media (max-width: 600px) {
-    .control-scope {
-      width: 100%;
-      margin-left: 0;
-    }
-  }
-  .player-mount,
-  .player-mount > div {
-    width: 100%;
-    height: 100%;
-  }
-  .local-sync {
-    margin-top: 12px;
-    color: var(--muted);
-    font-size: var(--tv-body, 13px);
-  }
-  .local-sync summary {
-    cursor: pointer;
-    color: inherit;
-  }
-  .local-sync label,
-  .sync-actions {
+  .calibration label {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    justify-content: space-between;
     gap: 12px;
-  }
-  .local-sync select {
-    max-width: 100%;
+    color: var(--text);
   }
   .calibration input {
     width: 100%;
@@ -771,6 +834,41 @@
   }
   .calibration output {
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .playback-diagnostics {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  .playback-diagnostics summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .playback-diagnostics p {
+    margin-block: 12px;
+  }
+  .playback-diagnostics pre {
+    max-width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding: 14px;
+    border-radius: 10px;
+    background: #0c0d11;
+    font-size: 12px;
+  }
+  @media (max-width: 600px) {
+    .control-scope {
+      width: 100%;
+      margin-left: 0;
+    }
+    .setting-card {
+      padding: 16px;
+    }
+  }
+  .player-mount,
+  .player-mount > div {
+    width: 100%;
+    height: 100%;
   }
   .exit-fullscreen {
     position: absolute;

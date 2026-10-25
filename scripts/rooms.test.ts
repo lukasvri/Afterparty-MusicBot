@@ -470,6 +470,37 @@ test("D1 radio refreshes old search metadata and excludes explicit non-music cat
     assert.equal(f.roomState().queue[0].music, true);
   } finally { f.close(); }
 });
+test("D1 House radio prepares a different artist at the start of playback", async (t) => {
+  const f = fixture();
+  t.mock.method(Date, "now", () => 1800000000000);
+  const original = { ...seed, title: "SAM WAITIN - AFTERMATH | House | NCS - Copyright Free Music", artist: "NoCopyrightSounds" };
+  const fresh = { ...next, title: "Other Artist - Synthetic Next | House" };
+  const queries: string[] = [];
+  try {
+    await f.save("TESTROOM", { current: original, queue: [], playing: true, position: 0 });
+    globalThis.fetch = async target => {
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search")) {
+        const query = url.searchParams.get("q") ?? "";
+        queries.push(query);
+        return Response.json({ items: query.startsWith("house audio") ? [{ id: { videoId: fresh.id } }] : [] });
+      }
+      return Response.json({ items: [{ id: fresh.id,
+        snippet: { title: fresh.title, channelTitle: fresh.artist, categoryId: "10" },
+        contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] });
+    };
+    const room = await publicRoom(f.request, f.roomRow());
+    assert.equal(room.current?.id, original.id);
+    assert.equal(room.position, 0);
+    assert.equal(room.playing, true);
+    assert.deepEqual(room.queue.map(song => song.id), [fresh.id]);
+    assert.equal(f.roomState().radioSeed?.id, original.id);
+    assert.equal(queries.length, 4);
+    await publicRoom(f.request, f.roomRow());
+    assert.equal(queries.length, 4, "a prepared song suppresses later refresh lookups");
+  } finally { f.close(); }
+});
 test("D1 starts the recommended video clock after its metadata lookup completes", async () => {
   const f = fixture(),
     now = Date.now;

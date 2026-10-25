@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TrackThumbnail from '#lib/ui/TrackThumbnail.svelte';
   import { roomQueueCapacity } from '../../../../../services/core/src/protocol.ts';
   import { onMount } from 'svelte';
   import { createDiscordClient, type ConcertView } from '#lib/concert/discord-client.ts';
@@ -360,9 +361,7 @@
                   </p>
                   {#if shownResults.length}<ul class="search-results">
                       {#each shownResults as video, index (`${video.id}:${index}`)}<li>
-                          <span class="track-number"
-                            >{String(resultPage * 10 + index + 1).padStart(2, '0')}</span
-                          >
+                          <TrackThumbnail image={video.image} />
                           <div class="track-info">
                             <strong>{video.title}</strong><span>{video.artist}</span>
                           </div>

@@ -27,3 +27,11 @@
 The screenshots use synthetic room and bot API responses and block external media requests. They show the welcome interface without real accounts, Discord IDs, credentials or listening data. They do not establish live production connectivity or playback.
 
 README images use repository-relative paths and GitHub-compatible HTML. The documentation banner is separate from the application icon. Use the existing vector files in `public/` for UI branding; do not duplicate or extract the logo from the raster banner. Font and glyph notices are in [third-party notices](../../THIRD_PARTY_NOTICES.md).
+
+### Animated stage follow-up, 25 October 2026
+
+`v3-stage-desktop-20261025.png` and `v3-stage-mobile-20261025.png` show the
+welcome screen in an isolated local built Worker at 1920×1080 and 390×1000.
+Animation was enabled for the capture; no room, provider audio or account was
+connected. The scene is native decorative SVG, with the controls oriented toward
+the DJ. See [UI review](../UI_REVIEW.md) for layout and animation checks.

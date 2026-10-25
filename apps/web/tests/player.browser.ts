@@ -28,6 +28,9 @@ const results = [
     'An equally long synthetic artist credit',
   ),
 ];
+// Same-origin fixtures exercise successful, broken and absent thumbnail metadata.
+results[0].image = '/afterparty-mark.svg';
+results[1].image = '/synthetic-missing-cover.jpg';
 type Write = { action: string; version: number; videoId?: string; position?: number; to?: number };
 
 async function fixtureBrowser(registerCleanup: (cleanup: () => Promise<void>) => void) {
@@ -503,6 +506,16 @@ for (const width of [1440, 390]) {
       assert.equal(await page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
       await find(page, 'night');
       await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
+      const thumbnails = page.locator('.search-results .track-thumbnail');
+      assert.equal(await thumbnails.count(), 3);
+      await page.waitForFunction(() => {
+        const image = document.querySelector<HTMLImageElement>('.track-thumbnail img');
+        return image?.complete && image.naturalWidth > 0;
+      });
+      await page.locator('.track-thumbnail[data-state="missing"]').nth(1).waitFor();
+      assert.equal(await thumbnails.locator('img').count(), 1);
+      assert.equal(await thumbnails.locator('img').getAttribute('referrerpolicy'), 'no-referrer');
+
       const input = page.getByRole('textbox', { name: 'Search songs or artists' });
       await input.focus();
       await page.keyboard.press('Tab');

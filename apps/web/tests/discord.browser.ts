@@ -219,7 +219,10 @@ for (const width of [1440, 390])
         scripts: string[] = [],
         writes: Array<{ path: string; body: Record<string, unknown> }> = [];
       const favorite = track('favorite001', 'Saved concert favorite');
-      const found = track('append00001', 'Website search result');
+      const found = {
+        ...track('append00001', 'Website search result'),
+        image: '/afterparty-mark.svg',
+      };
       const queued: ReturnType<typeof track>[] = [];
       let revision = 0,
         position = 20;
@@ -311,6 +314,13 @@ for (const width of [1440, 390])
       await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page.getByRole('textbox', { name: 'Search songs or artists' }).fill('festival');
       await page.getByRole('button', { name: 'Search music', exact: true }).click();
+      await page.waitForFunction(() => {
+        const image = document.querySelector<HTMLImageElement>(
+          '.concert-search .track-thumbnail img',
+        );
+        return image?.complete && image.naturalWidth > 0;
+      });
+
       await page
         .getByRole('button', { name: 'Add Website search result to queue', exact: true })
         .click();

@@ -268,6 +268,15 @@ for (const mode of ['room', 'discord'] as const) {
       await page
         .getByText(mode === 'room' ? 'Room settings' : 'Playback settings', { exact: true })
         .click();
+      await page.getByRole('heading', { name: 'Video & sound', exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'Device synchronization', exact: true }).waitFor();
+      assert(
+        await page
+          .getByRole('combobox', { name: 'Synchronization mode', exact: true })
+          .evaluate((node) => node.getBoundingClientRect().height >= 44),
+      );
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.screenshot({ path: `/tmp/afterparty-settings-${mode}-390.png`, fullPage: true });
       assert.equal(
         await page
           .getByRole('combobox', { name: 'Synchronization mode', exact: true })

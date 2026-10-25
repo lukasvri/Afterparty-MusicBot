@@ -1,5 +1,38 @@
 # Afterparty interface review
 
+## Animated stage and welcome layout, 2026-10-25
+
+The welcome layout gives the stage its own fluid column beside the introduction
+and create/join forms, with a 3200px readable maximum instead of the former 1280px
+welcome cap. On mobile the complete stage appears above the forms. The scene
+restores sweeping spots, two seven-ray laser fans, counter-rotating LED rings,
+a slow halo, screen levels and the stage ribbon. Both CDJ control surfaces and
+the mixer face the performer in the projected table plane. Jog wheels, displays,
+buttons and pitch controls have been redrawn; the hand layer remains in front.
+
+The animation button sits beside the stage and explains when system reduced
+motion is active. CSS transform/opacity animations pause when the scene leaves
+the viewport or the tab is hidden. System and saved reduced-motion preferences
+still suppress animation. No strobe, media request, audio analyser or frame loop
+is added. Active rooms retain the lazy scene boundary.
+
+Search results in browser rooms and public concerts share `TrackThumbnail.svelte`:
+16:9 lazy images, no referrer, stable dimensions and a music-icon fallback for
+missing or failed images. The metadata already supplied by search is reused.
+The native player settings have an explicit grid body and separate Video & sound,
+Device synchronization and room settings groups. The existing YouTube player
+manages adaptive quality; 4K depends on the source, device and connection. No
+unsupported quality-forcing API or duplicate playback controls are introduced.
+
+Synthetic Chromium journeys check actual changes to spot/laser/ring transforms,
+CDJ orientation, equipment bounds, reduced motion, saved toggle behavior and
+4K/QHD/1080p/mobile layout. Search checks cover loaded, broken and missing images
+while retaining keyboard queue actions. Settings checks preserve device-local
+preferences and the existing shared-command boundary. Captures:
+[desktop](assets/v3-stage-desktop-20261025.png),
+[mobile](assets/v3-stage-mobile-20261025.png).
+
+
 ## Native v3 familiar layout, 2026-10-25
 
 The unpublished `3.0.0-alpha.2` candidate follows the older visual composition in

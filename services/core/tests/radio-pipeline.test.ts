@@ -41,11 +41,11 @@ test("radio pipeline caps hydration and retains its reserved artist-catalog reco
 });
 
 test("untrusted search proof cannot inherit a vetted catalog candidate's relationship", async () => {
-  const broad = { ...seed, genres: ["house"] };
+  const broad = { ...seed, genres: ["pop"] };
   const descriptor = { title: "Vetted Song", artist: "Vetted Artist", duration: 210 };
-  const spoof = track("spoof000001", "Unrelated Artist - Unrelated", { genres: ["house"], radioRelatedTo: broad.id });
+  const spoof = track("spoof000001", "Unrelated Artist - Unrelated", { genres: ["pop"], radioRelatedTo: broad.id });
   const result = await selectRadio(input({ seed: broad,
-    similar: async () => [descriptor], match: async song => ({ ...matching(song), genres: ["house"] }),
+    similar: async () => [descriptor], match: async song => ({ ...matching(song), genres: ["pop"] }),
     search: async () => [spoof],
   }));
   assert.equal(result.track?.title, "Vetted Artist - Vetted Song");
@@ -82,9 +82,9 @@ test("all media hydration and discovery failures report provider-error without p
 });
 
 test("artist diagnostics retain earlier admission when the second same-source query is empty", async () => {
-  const broad = { ...seed, genres: ["house"] };
+  const broad = { ...seed, genres: ["pop"] };
   const result = await selectRadio(input({ seed: broad,
-    search: async query => query.includes('audio -"') ? [track("next0000001", "Aster - Evening")] : [],
+    search: async query => query.includes('audio -"') ? [track("next0000001", "Aster - Evening", { genres: ["pop"] })] : [],
   }));
   assert.equal(result.source, "artist");
   assert.equal(result.diagnostic.stages.artist, "selected");

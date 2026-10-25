@@ -1,5 +1,5 @@
 import { normalized, type CatalogSong } from './matching.ts';
-import { isRadioTitle, radioArtist, radioGenre, radioTitle, specificRadioGenre } from './radio.ts';
+import { isRadioTitle, radioArtist, radioDiscoveryGenre, radioGenre, radioTitle } from './radio.ts';
 import type { PublicTrack, Track } from './types.ts';
 import { metadataAiGenerated } from './music-content.ts';
 
@@ -38,7 +38,7 @@ export function copyRadioDescriptor(value: unknown): CatalogSong | null {
 }
 /** Ranking is preference only. Callers must apply recording, relationship and playback gates first. */
 export function createRecommendationRanking(seed: Track, recent: readonly PublicTrack[], favorites: readonly string[] = [], recordings: readonly FavoriteRecording[] = []) {
-  const seedArtist = normalized(radioArtist(seed)), genre = specificRadioGenre(seed);
+  const seedArtist = normalized(radioArtist(seed)), genre = radioDiscoveryGenre(seed);
   const artists = recent.slice(-5).map(track => normalized(radioArtist(track)));
   const counts = new Map<string, number>();
   for (const artist of artists) counts.set(artist, (counts.get(artist) ?? 0) + 1);

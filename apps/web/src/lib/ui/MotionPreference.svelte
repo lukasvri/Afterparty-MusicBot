@@ -3,14 +3,23 @@
   import { browserStorage } from '../../../../../lib/browser-storage.ts';
   import { motionEnabled, motionKey } from './motion.ts';
   let enabled = $state(true),
-    ready = $state(false);
+    ready = $state(false),
+    reduced = $state(false);
   onMount(() => {
     const read = () => {
       enabled = motionEnabled(browserStorage.get(motionKey));
     };
+    const media = matchMedia('(prefers-reduced-motion: reduce)');
+    const readSystem = () => (reduced = media.matches);
     read();
+    readSystem();
+    media.addEventListener('change', readSystem);
     ready = true;
-    return browserStorage.subscribe(motionKey, read);
+    const unsubscribe = browserStorage.subscribe(motionKey, read);
+    return () => {
+      unsubscribe();
+      media.removeEventListener('change', readSystem);
+    };
   });
 </script>
 
@@ -20,10 +29,12 @@
   aria-label="Page animations"
   aria-pressed={enabled}
   disabled={!ready}
-  title="Saved on this device. Your system’s reduced-motion preference always applies."
+  title={reduced
+    ? 'Your system requests reduced motion. Animations stay still; the saved preference applies when reduced motion is off.'
+    : 'Saved on this device. Your system’s reduced-motion preference always applies.'}
   onclick={() => browserStorage.set(motionKey, enabled ? 'off' : 'on')}
 >
-  Animations {enabled ? 'on' : 'off'}
+  {enabled && reduced ? 'Reduced motion' : `Animations ${enabled ? 'on' : 'off'}`}
 </button>
 
 <style>

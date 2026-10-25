@@ -30,7 +30,7 @@ owners. Classic is retired; there is no second frontend.
   festival browsing. This feature is loaded only after an explicit library action.
 - `apps/web/src/lib/admin/` owns server administration and the DJ desk.
 - `apps/web/src/lib/ui/` owns the shared theme, public-page frame, icons, decorative
-  concert scenery and local motion preference.
+  concert scenery, shared search thumbnails and local motion preference.
 - `lib/browser-api.ts`, `lib/playback-sync.ts` and `lib/youtube-player.ts` retain
   shared transport, clock rules and official player bootstrap.
 
