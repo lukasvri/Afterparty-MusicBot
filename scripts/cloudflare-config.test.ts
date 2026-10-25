@@ -35,10 +35,12 @@ test("generated config and artifact verification detect stale identities and esc
     mkdirSync(join(root, "dist/server"), { recursive: true });
     mkdirSync(join(root, "dist/client"));
     writeFileSync(join(root, "dist/server/index.js"), "export default {};");
-    const output = { ...expected, main: "index.js", assets: { directory: "../client" } };
+    const output = { ...expected, main: "index.js", assets: { directory: "../client", run_worker_first: false } };
     const save = (data: unknown) => writeFileSync(join(root, "dist/server/wrangler.json"), JSON.stringify(data));
     save(output);
     assert.equal(verifyCloudflareOutput(root, expected).name, env.CF_WORKER_NAME);
+    save({ ...output, assets: { ...output.assets, run_worker_first: true } });
+    assert.throws(() => verifyCloudflareOutput(root, expected));
     save({ ...output, keep_vars: false });
     assert.throws(() => verifyCloudflareOutput(root, expected));
     save({ ...output, name: "different-worker" });

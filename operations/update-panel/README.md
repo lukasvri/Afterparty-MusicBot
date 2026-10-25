@@ -64,12 +64,15 @@ An already deployed version cannot be started again through this adapter.
 
 GitHub rate limits are reported with a retry countdown and prevent repeated
 background checks until the provider permits them. The last deployed source
-and completed job remain visible if a new check fails. No token or extra
+remains visible if a new check fails. No token or extra
 GitHub permissions are introduced.
 
-The adapter reports safe progress derived from the current transaction and the
-last successful job. A status check does not erase completed progress. Private
-hosting identifiers, log contents and credentials are never returned to the UI.
+The progress section describes only the current publishing transaction. Before
+publishing starts, including during or after a status check and while dispatch
+is pending, every publishing step stays pending. Completed publishing remains
+visible until a new check starts. Historical deployment commit and time remain
+separate from current progress, including after a failed check. Private hosting
+identifiers, log contents and credentials are never returned to the UI.
 
 ## Validation
 

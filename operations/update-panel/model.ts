@@ -132,15 +132,20 @@ export function viewState(value: PanelState = {}) {
         : updated
           ? "Siste kontrollerte betaversjon er allerede på nett. Ingen oppdatering er nødvendig."
           : value.message || "Kontroller GitHub-versjonen før du oppdaterer.",
-    progressLabel: running
-      ? "Oppdatering pågår"
-      : value.progress_kind === "last"
-        ? "Siste fullførte oppdatering"
-        : failed
-          ? "Ikke fullført"
-          : value.stage === "done"
+    progressLabel:
+      checking || value.stage === "checking"
+      ? "Kontrollerer status. Ingen oppdatering er startet"
+      : checkFailed
+        ? "Statuskontrollen ble ikke fullført. Ingen oppdatering er startet"
+        : running
+          ? ["validate", "cloudflare", "verify"].includes(value.stage ?? "")
+            ? "Oppdatering pågår"
+            : "Oppdatering venter på oppstart"
+          : value.stage === "done" && value.operation !== "check"
             ? "Fullført"
-            : "Ingen oppdatering pågår",
+            : failed && value.operation === "publish"
+              ? "Ikke fullført"
+              : "Ingen oppdatering er startet",
     actionTitle: updated
       ? "Beta er oppdatert"
       : ready
@@ -167,4 +172,27 @@ export function frozenRequest(
   )
     return null;
   return Object.freeze({ commit, confirmation_id, confirm: true });
+}
+
+/** Old deployment receipts must never fill the steps of a new, unstarted job. */
+export function progressSteps(value: PanelState): PanelStep[] {
+  const publishing =
+    !value.checking &&
+    value.operation !== "check" &&
+    (["validate", "cloudflare", "verify"].includes(value.stage ?? "") ||
+      (value.stage === "done" && !value.running) ||
+      (["failed", "blocked"].includes(value.stage ?? "") &&
+        value.operation === "publish"));
+  if (publishing && value.steps?.length) return value.steps;
+  return stages.map(([name, label]) => ({
+    name,
+    label,
+    status: !publishing
+      ? "pending"
+      : value.stage === "done"
+        ? "done"
+        : value.running && name === value.stage
+          ? "running"
+          : "pending",
+  }));
 }

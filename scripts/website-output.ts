@@ -51,7 +51,7 @@ export function writeWebsiteConfig(root: string, config = localWebsiteConfig) {
   if (!existsSync(resolve(server, "index.js")) || !existsSync(resolve(root, "dist/client")))
     throw new Error("Package the native website before applying its deployment configuration.");
   writeFileSync(resolve(server, "wrangler.json"), JSON.stringify({ ...config,
-    main: "index.js", assets: { directory: "../client", binding: "ASSETS" },
+    main: "index.js", assets: { directory: "../client", binding: "ASSETS", run_worker_first: false },
     d1_databases: config.d1_databases.map(database => ({ ...database, migrations_dir: "../.openai/drizzle" })),
   }, null, 2) + "\n");
 

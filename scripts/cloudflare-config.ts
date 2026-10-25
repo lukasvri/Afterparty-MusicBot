@@ -40,6 +40,7 @@ export function verifyCloudflareOutput(root: string, expected: ReturnType<typeof
   const output = JSON.parse(readFileSync(path, "utf8"));
   if (
     output.keep_vars !== true ||
+    output.assets?.run_worker_first !== false ||
     output.name !== expected.name ||
     output.compatibility_date !== expected.compatibility_date ||
     !output.compatibility_flags?.includes("nodejs_compat") ||
