@@ -196,6 +196,8 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       return route.abort();
     }
     if (!url.pathname.startsWith('/api/')) return route.continue();
+    if (url.pathname === '/api/rooms' && request.method() === 'GET')
+      return route.fulfill({ json: { rooms: [] } });
     const headers = request.headers();
     assert.equal(headers['x-afterparty-visitor'], visitor);
     const input = request.method() === 'POST' ? request.postDataJSON() : null;
@@ -291,6 +293,26 @@ async function find(page: Page, query: string) {
   await input.fill(query);
   await input.press('Enter');
 }
+
+test('an explicit open-rooms bookmark stays in the directory after its saved room reconnects', async (t) => {
+  const f = await fixture(t, 390, true, true);
+  try {
+    await f.page.goto(`${origin}/?room=${code}&view=rooms`);
+    await f.page.waitForFunction(() =>
+      document.querySelector('.top-status')?.textContent?.includes('Connected'),
+    );
+    assert.equal(
+      await f.page.getByRole('heading', { name: 'Find your people.', exact: true }).isVisible(),
+      true,
+    );
+    assert.equal(new URL(f.page.url()).searchParams.get('view'), 'rooms');
+    assert.deepEqual(f.writes, []);
+    assert.equal(f.creates, 0);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
 
 test('a created room remains bookmarked after its first ownership read fails and polling recovers', async (t) => {
   const f = await fixture(t, 390);

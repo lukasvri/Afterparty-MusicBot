@@ -58,7 +58,11 @@
       view = value;
       // Initial reads can fail after creation. Keep the room recoverable when
       // polling eventually succeeds, even after the creating promise returned.
-      if (changedRoom) rememberRoom();
+      if (
+        changedRoom &&
+        new URL(location.href).searchParams.get('room')?.toUpperCase() !== value.room?.code
+      )
+        rememberRoom();
     });
     const initialUrl = new URL(location.href);
     tv = initialUrl.searchParams.get('tv') === '1';
