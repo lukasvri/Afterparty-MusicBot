@@ -23,7 +23,13 @@ test("native packaging preserves selected host identity, migrations and compiled
   const root = fixture();
   try {
     const selected = readFileSync(join(root, "private/hosting.local.json"), "utf8");
-    writeWebsiteOutput(root, { hostingConfigFile: "private/hosting.local.json" });
+    const panelAssets = {"manifest.json": '{"version":1}', "update-channel.0123456789ab.js": 'private panel fixture'};
+    writeWebsiteOutput(root, { hostingConfigFile: "private/hosting.local.json", updatePanelAssets: panelAssets });
+    for (const [name, bytes] of Object.entries(panelAssets)) {
+      assert.equal(readFileSync(join(root, "dist/.openai/update-panel", name), "utf8"), bytes);
+      assert.equal(existsSync(join(root, "dist/client", name)), false);
+    }
+    assert.equal(existsSync(join(root, "dist/client/.openai")), false);
     assert.equal(readFileSync(join(root, "dist/server/index.js"), "utf8"), readFileSync(join(root, "apps/web/.svelte-kit/v3-artifact/_worker.js"), "utf8"));
     assert.equal(readFileSync(join(root, "dist/client/app.js"), "utf8"), "native client fixture");
     assert.equal(existsSync(join(root, "dist/client/_worker.js")), false);

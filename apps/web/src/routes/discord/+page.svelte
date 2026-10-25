@@ -8,7 +8,6 @@
   import RoomSocial from '#lib/social/RoomSocial.svelte';
   import RoomSharing from '#lib/rooms/RoomSharing.svelte';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
-  import '../../app.css';
 
   let client: ReturnType<typeof createDiscordClient> | undefined;
   let view = $state<ConcertView>({

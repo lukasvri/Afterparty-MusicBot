@@ -5,13 +5,13 @@
       "entry": [
         "lib/api/**/route.ts",
         "scripts/**/*.{ts,mjs}",
-        "operations/update-panel/*.{js,mjs}"
+        "operations/update-panel/**/*.ts"
       ],
       "project": [
         "lib/**/*.ts",
         "db/**/*.ts",
         "scripts/**/*.{ts,mjs}",
-        "operations/update-panel/*.{js,mjs}"
+        "operations/update-panel/**/*.ts"
       ]
     },
     "apps/web": {

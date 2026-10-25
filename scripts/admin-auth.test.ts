@@ -2,7 +2,7 @@ import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import { registerHooks } from "node:module";
-import { transpileFixtureModule } from "./fixture-transpile.mjs";
+import { transpileFixtureModule } from "./fixture-transpile.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { pbkdf2Sync } from "node:crypto";
 

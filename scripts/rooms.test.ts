@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import { registerHooks } from "node:module";
-import { transpileFixtureModule } from "./fixture-transpile.mjs";
+import { transpileFixtureModule } from "./fixture-transpile.ts";
 import { readFileSync, readdirSync } from "node:fs";
 import type { RoomState } from "../lib/types.ts";
 

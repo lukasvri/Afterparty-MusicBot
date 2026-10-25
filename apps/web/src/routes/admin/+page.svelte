@@ -9,7 +9,6 @@
     type AdminState,
   } from '#lib/admin/admin-client.ts';
   import { time } from '../../../../../lib/types.ts';
-  import '../../app.css';
 
   let client: ReturnType<typeof createAdminClient> | undefined;
   let view = $state<AdminState>({

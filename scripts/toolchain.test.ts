@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import WebSocket, { WebSocketServer } from "ws";
 import { spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -37,9 +38,8 @@ ${result.stderr}`);
 });
 
 test("patched ws exchanges a message over an isolated loopback connection", { timeout: 15_000 }, async (context) => {
-  const { WebSocket, WebSocketServer } = require("ws");
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
-  let client;
+  let client: WebSocket | undefined;
   try {
     await once(server, "listening", { signal: context.signal });
     server.once("connection", (socket) => {
@@ -56,6 +56,6 @@ test("patched ws exchanges a message over an isolated loopback connection", { ti
   } finally {
     client?.terminate();
     for (const socket of server.clients) socket.terminate();
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });

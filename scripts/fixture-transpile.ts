@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 
-export function transpileFixtureModule(url) {
+export function transpileFixtureModule(url: URL | string) {
   const filename = new URL(url);
   const source = readFileSync(filename, "utf8");
   return ts.transpileModule(source, {

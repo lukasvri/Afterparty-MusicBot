@@ -70,9 +70,9 @@ The v3 feature folders keep each component beside its client and behavior helper
 | `social/` | Reactions, moments and host bingo |
 | `admin/` | Server-scoped administration client |
 | `server/` | Native API dispatch and host-transition guard |
-| `ui/` | Shared icons, public-page frame, saved motion preference and copyright form |
+| `ui/` | Root-rendered global theme, shared icons, public-page frame, saved motion preference and copyright form |
 
-Shared fluid TV sizing lives in `apps/web/src/app.css`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
+Shared fluid TV sizing lives in `apps/web/src/lib/ui/AppTheme.svelte`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 
 Routes compose these features and import individual modules. The optional library stays behind its dynamic import. Avoid an all-features barrel that would eagerly load unrelated code. Tests import the same canonical modules from the feature folders.
 

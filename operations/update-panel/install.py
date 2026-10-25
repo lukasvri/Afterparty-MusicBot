@@ -4,7 +4,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 import shutil
-from update_panel import integrate_html
+from update_panel import integrate_html, SOURCE_FILES
 
 
 def patch_server(text):
@@ -37,15 +37,18 @@ def patch_runner(text):
     return text
 
 
-def install(directory, *, apply=False):
+def install(directory, *, apply=False, assets_dir=None):
     source = Path(__file__).resolve().parent
+    if assets_dir is None:
+        raise ValueError('Pass --assets-dir from the verified matching website artifact. No changes were installed.')
+    assets_dir = Path(assets_dir).resolve()
     directory = directory.resolve()
     index = directory / 'web-dist/index.html'
     server = directory / 'server.py'
     adapter = directory / 'beta_adapter.py'
     if not all(p.is_file() for p in (index, server, adapter)):
         raise ValueError('An existing authenticated operations panel and beta adapter are required.')
-    page, assets = integrate_html(index.read_text(), source)
+    page, assets = integrate_html(index.read_text(), source, assets_dir)
     runner = directory.parent / 'site-runner/beta_update.py'
     runner_text = patch_runner(runner.read_text()) if runner.is_file() else None
     if runner_text is not None:
@@ -70,10 +73,12 @@ def install(directory, *, apply=False):
         shutil.copytree(directory / 'channel-ui-source', backup / 'channel-ui-source')
     maintained = directory / 'channel-ui-source'
     maintained.mkdir(exist_ok=True)
-    for name in ('channel.js', 'model.mjs', 'channel.css', 'panel.html', 'README.md'):
+    for name in (*SOURCE_FILES, 'README.md'):
         shutil.copy2(source / name, maintained / name)
+    shutil.copy2(Path(assets_dir) / 'manifest.json', maintained / 'manifest.json')
     for name, content in assets.items():
-        (directory / 'web-dist/_astro' / name).write_text(content)
+        (maintained / name).write_text(content, encoding='utf-8')
+        (directory / 'web-dist/_astro' / name).write_text(content, encoding='utf-8')
     shutil.copy2(source / 'update_panel.py', directory / 'update_panel.py')
     shutil.copy2(source / 'beta_adapter.py', adapter)
     if runner_text is not None:
@@ -89,6 +94,7 @@ def install(directory, *, apply=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--panel-dir', required=True, type=Path)
+    parser.add_argument('--assets-dir', required=True, type=Path, help='Private .openai/update-panel directory from the verified matching website artifact')
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args()
-    print(install(args.panel_dir, apply=args.apply))
+    print(install(args.panel_dir, apply=args.apply, assets_dir=args.assets_dir))

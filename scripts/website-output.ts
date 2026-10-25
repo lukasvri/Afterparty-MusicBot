@@ -12,13 +12,16 @@ export const localWebsiteConfig = {
 };
 
 /** Package already-built native bytes using the signed installer's stable layout. */
-export function writeWebsiteOutput(root: string, options: { config?: typeof localWebsiteConfig; hostingConfigFile?: string } = {}) {
+export function writeWebsiteOutput(root: string, options: { config?: typeof localWebsiteConfig; hostingConfigFile?: string; updatePanelAssets?: Record<string, string> } = {}) {
   const bundle = resolve(root, "apps/web/.svelte-kit/v3-artifact"), assets = resolve(root, "apps/web/.svelte-kit/cloudflare");
   if (!existsSync(resolve(bundle, "_worker.js")) || !existsSync(assets)) throw new Error("Build and bundle the native website before packaging.");
   const hosting = options.hostingConfigFile ?? (existsSync(resolve(root, ".openai/hosting.local.json")) ? ".openai/hosting.local.json" : ".openai/hosting.json");
   const hostingBytes = readFileSync(resolve(root, hosting));
   const selected = JSON.parse(hostingBytes.toString());
   if (selected.d1 !== "DB" || selected.r2 !== null) throw new Error("The native website requires the existing DB binding template.");
+  for (const name of Object.keys(options.updatePanelAssets ?? {})) {
+    if (!/^(?:manifest\.json|update-channel\.[a-f0-9]{12}\.(?:js|css))$/.test(name)) throw new Error("Invalid private panel asset name.");
+  }
   const output = resolve(root, "dist"), server = resolve(output, "server");
   rmSync(output, { recursive: true, force: true });
   mkdirSync(server, { recursive: true });
@@ -36,5 +39,12 @@ export function writeWebsiteOutput(root: string, options: { config?: typeof loca
   }, null, 2) + "\n");
   mkdirSync(resolve(output, ".openai"), { recursive: true });
   writeFileSync(resolve(output, ".openai/hosting.json"), hostingBytes);
+  if (options.updatePanelAssets) {
+    const panel = resolve(output, ".openai/update-panel");
+    mkdirSync(panel, { recursive: true });
+    for (const [name, content] of Object.entries(options.updatePanelAssets)) {
+      writeFileSync(resolve(panel, name), content);
+    }
+  }
   cpSync(resolve(root, "drizzle"), resolve(output, ".openai/drizzle"), { recursive: true });
 }

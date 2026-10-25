@@ -108,6 +108,10 @@ use em dashes. Keep global personal preferences out of repository instructions.
   website build. Preserve shared API URLs, stored data, authorization and playback
   contracts. Runtime promotion, production rollout and replacing Core remain
   separate decisions. Prior signed artifacts remain operator recovery material.
+- Consolidate Afterparty application and tooling code in TypeScript and Svelte.
+  Avoid adding another application language when an existing module can own the
+  work. Keep necessary host/runtime compatibility boundaries explicit; do not
+  rename files or hide them from GitHub language statistics instead of migrating.
 - Independent new projects choose their own fit-for-purpose stack, which could
   include Rust, Go, Python, TypeScript or other actively maintained technologies.
   Do not copy Afterparty's stack merely by habit, or introduce trendy tooling
