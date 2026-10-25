@@ -720,7 +720,7 @@ class SyntheticStream extends EventTarget {
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 function streamFixture() {
   let monotonic = 100;
-  let failedReadStatus = 0;
+  let failedReadStatus: number | 'network' = 0;
   let snapshot: Room = {
     ...room(),
     serverTime: 1000,
@@ -735,10 +735,12 @@ function streamFixture() {
   const sources: SyntheticStream[] = [];
   const streamUrls: string[] = [];
   const f = fixture(
-    async () =>
-      failedReadStatus
+    async () => {
+      if (failedReadStatus === 'network') throw new Error('Synthetic network failure');
+      return failedReadStatus
         ? json({ error: 'Synthetic read failure' }, failedReadStatus)
-        : json(snapshot),
+        : json(snapshot);
+    },
     {
       now: () => monotonic,
       eventSource: (url) => {
@@ -757,7 +759,7 @@ function streamFixture() {
     },
     sources,
     streamUrls,
-    failReads(status: number) {
+    failReads(status: number | 'network') {
       failedReadStatus = status;
     },
     get snapshot() {
@@ -1231,6 +1233,26 @@ for (const status of [401, 403, 404])
       f.sources[0].send({ ...f.snapshot, version: 3, serverTime: 1200 });
       assert.equal(f.state.room?.version, 2);
       assert.equal(f.state.connection, 'reconnecting');
+      for (const failure of [503, 'network', 500] as const) {
+        f.failReads(failure);
+        await f.client.refresh();
+        f.sources[0].send({ ...f.snapshot, version: 3, serverTime: 1300 });
+        assert.equal(
+          f.client.playback()?.playing,
+          false,
+          'access loss remains latched through later transient failures',
+        );
+        assert.equal(f.state.room?.version, 2, 'public frames cannot restore lost access');
+      }
+      f.failReads(0);
+      f.snapshot = { ...f.snapshot, version: 3, serverTime: 1400 };
+      await f.client.refresh();
+      assert.equal(f.state.connection, 'connected');
+      assert.equal(
+        f.client.playback()?.playing,
+        true,
+        'only a successful authenticated read restores playback',
+      );
     } finally {
       f.client.destroy();
     }

@@ -86,6 +86,7 @@ type Session = {
   realtime: Realtime | null;
   authority: { room: Room; receivedAt: number } | null;
   pollRecovering: boolean;
+  accessLost: boolean;
 };
 
 /** Browser rooms only. The existing website owns authorization, persistence and progression. */
@@ -172,6 +173,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       realtime: null,
       authority: null,
       pollRecovering: false,
+      accessLost: false,
     };
     session = target;
     publish({
@@ -201,6 +203,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     const next = compensateDelivery(room, now() - sent);
     target.authority = { room: next, receivedAt: now() };
     target.pollRecovering = false;
+    target.accessLost = false;
     const live = target.realtime;
     if (live && live.epoch !== next.syncEpoch) {
       live.epoch = next.syncEpoch ?? '';
@@ -386,7 +389,8 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     } catch (error) {
       if (current(target) && target.serial === serial) {
         const status = (error as { status?: number })?.status;
-        target.pollRecovering = !status || status >= 500;
+        if (status === 401 || status === 403 || status === 404) target.accessLost = true;
+        target.pollRecovering = !target.accessLost && (!status || status >= 500);
         publish({ connection: 'reconnecting', error: message(error) });
       }
     }

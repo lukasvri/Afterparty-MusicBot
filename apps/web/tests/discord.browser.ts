@@ -390,6 +390,8 @@ for (const canManage of [false, true])
         writes: Record<string, unknown>[] = [],
         external: string[] = [];
       let allowCommands = false;
+      let delayedSeekRead: Promise<void> | null = null;
+      let holdAfterSeek = false;
       page.on('pageerror', (error) => errors.push(error.message));
       await page.addInitScript(() => {
         if (window !== window.top) return;
@@ -563,6 +565,7 @@ for (const canManage of [false, true])
             assert.equal(input.command.playbackKey, snapshot.playbackKey);
             assert.equal(input.command.queueRevision, snapshot.queueRevision);
             snapshot.position = input.command.seconds;
+            if (delayedSeekRead) holdAfterSeek = true;
             return route.fulfill({ json: { id: input.commandId, status: 'done' } });
           }
           assert.equal(url.pathname, '/api/discord');
@@ -579,6 +582,17 @@ for (const canManage of [false, true])
           return;
         }
         if (url.pathname === '/api/discord/queue') {
+          if (holdAfterSeek && delayedSeekRead) {
+            holdAfterSeek = false;
+            const held = delayedSeekRead;
+            delayedSeekRead = null;
+            await page.evaluate(() =>
+              (window as unknown as { __calls: { action: string }[] }).__calls.push({
+                action: 'held-seek-read',
+              }),
+            );
+            await held;
+          }
           await route.fulfill({
             json: { canManage, state: { revision: 'queue-1', queue: [] } },
           });
@@ -635,16 +649,36 @@ for (const canManage of [false, true])
       assert(started !== undefined && started >= 25 && started < 27);
       await page.getByRole('button', { name: 'Theater mode', exact: true }).click();
       await page.locator('.concert-shell.theater-mode').waitFor();
-      const surface = await page.locator('.audio-stage').boundingBox();
-      const viewport = page.viewportSize()!;
-      assert(
-        surface &&
-          Math.abs(surface.x) <= 1 &&
-          Math.abs(surface.y) <= 1 &&
-          Math.abs(surface.width - viewport.width) <= 1 &&
-          Math.abs(surface.height - viewport.height) <= 1,
-        'concert theater fills the browser tab',
-      );
+      for (const [width, height] of [
+        [3840, 2160],
+        [2560, 1440],
+        [1920, 1080],
+        [390, 1000],
+      ]) {
+        await page.setViewportSize({ width, height });
+        const surface = await page.locator('.audio-stage').boundingBox();
+        assert(
+          surface &&
+            Math.abs(surface.x) <= 1 &&
+            Math.abs(surface.y) <= 1 &&
+            Math.abs(surface.width - width) <= 1 &&
+            Math.abs(surface.height - height) <= 1,
+          'concert theater fills the browser tab',
+        );
+        const covered = await page.evaluate(() => {
+          const surface = document.querySelector('.audio-stage')!;
+          return [0.1, 0.5, 0.9].every((x) =>
+            [0.25, 0.5, 0.75].every((y) =>
+              surface.contains(document.elementFromPoint(innerWidth * x, innerHeight * y)),
+            ),
+          );
+        });
+        assert(covered, `theater video stays above sibling panels at ${width}px`);
+        await page.screenshot({
+          path: `/tmp/afterparty-concert-theater-${canManage ? 'manager' : 'listener'}-${width}.png`,
+        });
+      }
+      await page.setViewportSize({ width: 390, height: 1000 });
       assert.equal(
         await page.evaluate(
           () =>
@@ -811,6 +845,103 @@ for (const canManage of [false, true])
             .locator('.player-status')
             .filter({ hasText: 'Shared playback is paused' })
             .waitFor();
+        }
+        // Hold the final read after the seek command is confirmed. The client
+        // is no longer busy, but RoomAudio still awaits its boolean receipt.
+        await page.evaluate(() => {
+          localStorage.setItem('afterparty-sync-offset', '0');
+          window.dispatchEvent(
+            new StorageEvent('storage', {
+              key: 'afterparty-sync-offset',
+              storageArea: localStorage,
+            }),
+          );
+        });
+        snapshot.playing = true;
+        snapshot.position = 40;
+        await emit(sequence++, true, 40);
+        await page.waitForTimeout(1100);
+        // Acknowledge the synthetic API resume before later deliberate gestures.
+        await native.getByRole('button', { name: 'Play video', exact: true }).click();
+        const gate = Promise.withResolvers<void>();
+        delayedSeekRead = gate.promise;
+        const beforePendingSeek = writes.length;
+        try {
+          await native
+            .getByRole('button', { name: 'Seek video', exact: true })
+            .evaluate((node) =>
+              node.setAttribute(
+                'onclick',
+                "parent.postMessage({type:'native-concert',action:'seek',position:60},'*')",
+              ),
+            );
+          await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+          await page.waitForFunction(
+            () =>
+              (window as unknown as { __calls: { action: string }[] }).__calls.some(
+                (call) => call.action === 'held-seek-read',
+              ),
+            undefined,
+            { timeout: 8000 },
+          );
+          await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+          await native.getByRole('button', { name: 'Play video', exact: true }).click();
+          assert.equal(writes.length, beforePendingSeek + 1);
+          snapshot.playing = false;
+          await emit(sequence++, false, 60);
+          gate.resolve();
+          await page.waitForTimeout(350);
+          assert.deepEqual(
+            writes
+              .slice(beforePendingSeek)
+              .map((write) =>
+                write.command ? (write.command as { action: string }).action : write.action,
+              ),
+            ['seek'],
+            'a queued native resume cannot override a newer concert pause',
+          );
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Shared playback is paused' })
+            .waitFor({ timeout: 5000 });
+          for (let heartbeat = 0; heartbeat < 2; heartbeat++) {
+            await emit(sequence++, false, 60);
+            await page.waitForTimeout(150);
+          }
+          assert.equal(
+            writes.length,
+            beforePendingSeek + 1,
+            'later paused heartbeats cannot release the retired resume',
+          );
+          // A new explicit gesture after retirement can still control playback.
+          await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+          const freshResume = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              response.request().postDataJSON()?.action === 'resume',
+          );
+          await native.getByRole('button', { name: 'Play video', exact: true }).click();
+          await freshResume;
+          await emit(sequence++, true, 60);
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Following the shared clock' })
+            .waitFor();
+          const freshPause = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              response.request().postDataJSON()?.action === 'pause',
+          );
+          await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+          await freshPause;
+          await emit(sequence++, false, 60);
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Shared playback is paused' })
+            .waitFor();
+        } finally {
+          delayedSeekRead = null;
+          gate.resolve();
         }
       } else {
         await native.getByRole('button', { name: 'Seek video', exact: true }).click();

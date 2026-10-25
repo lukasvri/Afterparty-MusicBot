@@ -216,6 +216,8 @@
     pausePinned: boolean;
     sharedPosition?: number;
     receiptVersion?: number;
+    sharedPlaying: boolean;
+    transportSuperseded: boolean;
   } | null>(null);
   const sourceIdentity = () => `${room.code}:${room.current?.id ?? ''}`;
   const identity = () => `${sourceIdentity()}:${room.playbackKey ?? ''}`;
@@ -293,7 +295,10 @@
     const needed =
       intent.action === 'seek' || (intent.action === 'play' ? !room.playing : room.playing);
     if (!shared || !needed) {
-      if (intent.action === 'play' && !playing) message = 'The host has paused shared playback.';
+      if (intent.action === 'play' && !playing)
+        message = room.playing
+          ? 'Waiting for the shared clock.'
+          : 'The host has paused shared playback.';
       sync(true);
       return;
     }
@@ -310,6 +315,8 @@
       issuedAt,
       pausePinned: false,
       sharedPosition,
+      sharedPlaying: room.playing,
+      transportSuperseded: false,
     };
     nativePending = pending;
     const epoch = generation;
@@ -379,6 +386,17 @@
     // or a newer shared pause arrives. Never let receipt waiting bypass safety.
     if (nativePending && (!playing || localPaused) && player.getPlayerState() === 1) pausePlayer();
     if (!canControl && !canSeek && queuedNative.length) queuedNative = [];
+    // Concert receipts do not identify an exact live sequence. A seek preserves
+    // playing/paused state, so a change here belongs to newer shared intent.
+    // Latch it before receipt completion can release an older queued resume.
+    if (
+      nativePending?.intent.action === 'seek' &&
+      room.mode === 'discord' &&
+      room.playing !== nativePending.sharedPlaying &&
+      !nativePending.transportSuperseded
+    )
+      nativePending = { ...nativePending, transportSuperseded: true };
+    if (nativePending?.transportSuperseded && queuedNative.length) queuedNative = [];
     if (failedSource === key) return;
     if (failedSource) {
       failedSource = '';
@@ -419,9 +437,10 @@
         return;
       }
       const superseded =
-        nativePending.receiptVersion !== undefined
+        nativePending.transportSuperseded ||
+        (nativePending.receiptVersion !== undefined
           ? room.version > nativePending.receiptVersion
-          : !confirmed && room.mode !== 'discord' && room.version > nativePending.version;
+          : !confirmed && room.mode !== 'discord' && room.version > nativePending.version);
       if (!confirmed && !superseded && performance.now() < nativePending.deadline) return;
       if (confirmed && nativePending.intent.action !== 'seek' && !nativePending.pausePinned)
         localPaused = false;

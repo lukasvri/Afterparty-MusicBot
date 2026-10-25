@@ -1,5 +1,24 @@
 # Afterparty interface review
 
+## Playback review corrections, 2026-10-25
+
+Authenticated room access failures (401/403/404) remain latched through later
+network and server errors. Fresh public frames cannot restore playback; a valid
+authenticated snapshot must restore access first.
+
+A concert seek preserves shared playing/paused intent. If that intent changes
+while the seek receipt is pending, the player retires older queued transport
+gestures, including a resume that would undo a newer pause. Concert buffering,
+voice readiness and connection availability gate local playback separately from
+shared intent, holding the local clock while unavailable.
+
+Concert theater removes its sticky parent stacking context, so the fixed video
+actually covers the sibling workspace. Browser checks probe hit-testing across
+the video at 4K, QHD, 1080p and mobile, rather than relying on dimensions alone.
+Each of these three review findings reproduced a test failure before correction.
+The concert fixture holds the final seek read, delivers a newer shared pause,
+and checks both retired queued gestures and subsequent explicit user controls.
+
 ## Advancing-clock stress follow-up, 2026-10-25
 
 A three-browser loopback test now models actual elapsed playback in each synthetic

@@ -135,7 +135,8 @@ export function createConcertAudio(
           const room = liveRoom(
             {
               ...safe,
-              playing: safe.playing && state.ready && state.connected && !state.buffering,
+              // Hold the local clock without rewriting the shared transport intent.
+              buffering: state.buffering || !state.ready || !state.connected,
             },
             age,
           );
@@ -181,7 +182,14 @@ export function createConcertAudio(
     playback() {
       if (closed || !view.room || !view.live) return { position: 0, playing: false, stale: true };
       const target = playbackTarget(view.room, receivedAt, monotonic());
-      return monotonic() >= expiresAt ? { ...target, playing: false, stale: true } : target;
+      return monotonic() >= expiresAt
+        ? { ...target, playing: false, stale: true }
+        : {
+            ...target,
+            playing:
+              target.playing &&
+              Boolean(view.state?.ready && view.state.connected && !view.state.buffering),
+          };
     },
     suspend,
     destroy() {

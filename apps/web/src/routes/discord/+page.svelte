@@ -787,7 +787,8 @@
   .current-track:has(:global(.fullscreen-fallback)) {
     z-index: 1000;
   }
-  .tv-mode .current-track {
+  .tv-mode .current-track,
+  .theater-mode .current-track {
     position: static;
   }
   .concert-workspace .concert-queue {
