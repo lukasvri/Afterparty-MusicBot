@@ -515,11 +515,21 @@ are identical at 1440px and 390px:
 
 | Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
 | --- | ---: | ---: |
-| Welcome / empty browser room, including the scene | 264,811 B | 97,681 B |
-| Active browser room, before audio consent | 248,745 B | 92,883 B |
-| Game entry | 148,186 B | 56,003 B |
+| Welcome / empty browser room, including the scene | 264,948 B | 97,726 B |
+| Active browser room, before audio consent | 248,882 B | 92,928 B |
+| Game entry | 148,186 B | 56,001 B |
 
-The active-room response total is 7,524 decoded bytes / 2,467 recomputed gzip bytes
+The active-room response total is 7,661 decoded bytes / 2,512 recomputed gzip bytes
 above the previous `b192b1e` candidate. The library still loads only after an
 explicit visit, and active rooms still exclude the optional scene. These bounded
 feature additions are not a bundle-size reduction or a field-performance claim.
+
+The native-control follow-up also inspects position discontinuities directly in
+player state callbacks. A synthetic Chromium fixture withholds every 250 ms
+sampling timer and holds pause/seek responses. In one controlled local run,
+callback-to-fetch dispatch measured 0.60 ms for pause and 0.20 ms for seek; the
+queue-next click dispatched in 0.20 ms, with the new player source loaded 1.90 ms
+after the synthetic response. The player was reused. These observations exclude
+iframe-provider event delivery, network, decoding and audible Discord output.
+They establish no zero-latency provider guarantee. Authorized seeks still wait for
+confirmation and a fresh shared timeline before synchronized playback continues.

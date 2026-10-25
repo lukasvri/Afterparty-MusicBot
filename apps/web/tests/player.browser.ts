@@ -76,7 +76,13 @@ test('fixture teardown closes its real browser after navigation setup fails', as
   }
 });
 
-async function fixture(t: TestContext, width: number, host = true, initial = false) {
+async function fixture(
+  t: TestContext,
+  width: number,
+  host = true,
+  initial = false,
+  manualSampling = false,
+) {
   const browser = await fixtureBrowser((cleanup) => t.after(cleanup));
   const page = await browser.newPage({
     viewport: { width, height: 1000 },
@@ -93,6 +99,7 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
     version = 1,
     playing = true,
     position = 12;
+  let nowPlaying = current;
   let queue = [
     video('queued00001', 'Stay a little longer', 'Common Ground'),
     video('queued00002', 'City after dark', 'Night Bus'),
@@ -102,7 +109,7 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
     code,
     version,
     name: 'Friday, after hours',
-    current,
+    current: nowPlaying,
     queue,
     playing,
     position,
@@ -115,14 +122,39 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
   });
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(
-    ({ code, token, visitor, initial, host }) => {
+    ({ code, token, visitor, initial, host, manualSampling }) => {
       if (window !== window.top) return;
       localStorage.setItem('afterparty-visitor', visitor);
       if (initial && host) localStorage.setItem(`afterparty-host:${code}`, token);
       // Synthetic official-player boundary with a local iframe for real focus/activation.
       // No provider requests or media are used.
-      const calls: { action: string; position?: number; videoId?: string }[] = [];
+      const calls: { action: string; position?: number; videoId?: string; at?: number }[] = [];
       (window as unknown as { __audioCalls: typeof calls }).__audioCalls = calls;
+      if (manualSampling) {
+        const interval = window.setInterval.bind(window),
+          ticks: (() => void)[] = [];
+        window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+          if (timeout !== 250 || typeof handler !== 'function')
+            return interval(handler, timeout, ...args);
+          ticks.push(() => handler(...args));
+          return interval(() => {}, timeout);
+        }) as typeof window.setInterval;
+        (window as typeof window & { samplePlayer: () => void }).samplePlayer = () =>
+          ticks.forEach((tick) => tick());
+        const fetch = window.fetch.bind(window);
+        window.fetch = (input, init) => {
+          let action: string | undefined;
+          if (init?.method === 'POST' && typeof init.body === 'string') {
+            const body = JSON.parse(init.body);
+            action = body.action;
+            calls.push({ action: `post-${body.action}`, at: performance.now() });
+          }
+          return fetch(input, init).then((response) => {
+            if (action === 'next') calls.push({ action: 'ack-next', at: performance.now() });
+            return response;
+          });
+        };
+      }
       window.YT = {
         Player: class {
           position = 0;
@@ -147,7 +179,12 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
             (
               window as unknown as { __nativeVideo: (action: string, position?: number) => void }
             ).__nativeVideo = (action, position) => {
-              if (action === 'seek') this.position = position ?? 42;
+              if (manualSampling) calls.push({ action: `native-${action}`, at: performance.now() });
+              if (action === 'seek-event') {
+                this.position = position ?? 42;
+                this.emit(3);
+                queueMicrotask(() => this.emit(1));
+              } else if (action === 'seek') this.position = position ?? 42;
               else this.emit(action === 'play' ? 1 : 2);
             };
             this.receive = (event) => {
@@ -172,7 +209,12 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
             this.videoId = value.videoId;
             this.position = value.startSeconds;
             this.state = 1;
-            calls.push({ action: 'load', videoId: value.videoId, position: value.startSeconds });
+            calls.push({
+              action: 'load',
+              videoId: value.videoId,
+              position: value.startSeconds,
+              ...(manualSampling ? { at: performance.now() } : {}),
+            });
             queueMicrotask(() => this.emit(1));
           }
           cueVideoById(value: { videoId: string; startSeconds: number }) {
@@ -233,7 +275,7 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
         },
       };
     },
-    { code, token, visitor, initial, host },
+    { code, token, visitor, initial, host, manualSampling },
   );
   await page.route('**/*', async (route) => {
     const request = route.request(),
@@ -279,7 +321,13 @@ async function fixture(t: TestContext, width: number, host = true, initial = fal
       } else if (input.action === 'pause') playing = false;
       else if (input.action === 'play') playing = true;
       else if (input.action === 'seek') position = input.position;
-      else if (input.action === 'move') {
+      else if (input.action === 'next') {
+        const selected = queue.shift();
+        assert(selected);
+        nowPlaying = selected;
+        position = 0;
+        playing = true;
+      } else if (input.action === 'move') {
         const index = queue.findIndex((item) => item.id === input.videoId);
         assert(index >= 0);
         const [selected] = queue.splice(index, 1);
@@ -988,6 +1036,129 @@ test('a completed queue action preserves focus when the host has moved to search
     assert.deepEqual(
       f.writes.map((write) => write.action),
       ['move'],
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('native pause, seek and queue-next dispatch without position polling or an acknowledgement delay', async (t) => {
+  const f = await fixture(t, 390, true, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Pause video', exact: true }).waitFor();
+    const releasePause = f.holdNextMutation();
+    await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'post-pause',
+      ),
+    );
+    assert.equal(
+      f.writes.at(-1)?.action,
+      'pause',
+      'pause is already submitted while its response is held',
+    );
+    const beforePauseRelease = await page.evaluate(
+      () =>
+        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+          (call) => call.action === 'play',
+        ).length,
+    );
+    await page.waitForTimeout(300);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'play',
+          ).length,
+      ),
+      beforePauseRelease,
+      'pending acknowledgement cannot undo a local pause',
+    );
+    releasePause();
+    await page.locator('.player-status').filter({ hasText: 'Shared playback is paused' }).waitFor();
+    await native.getByRole('button', { name: 'Play video', exact: true }).click();
+    await page
+      .locator('.player-status')
+      .filter({ hasText: 'Following the shared clock' })
+      .waitFor();
+    await page.evaluate(() =>
+      (window as typeof window & { samplePlayer: () => void }).samplePlayer(),
+    );
+    const releaseSeek = f.holdNextMutation();
+    await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((button) => {
+      button.setAttribute(
+        'onclick',
+        "parent.postMessage({type:'synthetic-native',action:'seek-event',position:42},'*')",
+      );
+    });
+    await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'post-seek',
+      ),
+    );
+    assert.equal(
+      f.writes.at(-1)?.position,
+      42,
+      'the native state event submits the seek before any later position poll',
+    );
+    releaseSeek();
+    await page
+      .getByRole('button', { name: 'Next track', exact: true })
+      .waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      () =>
+        !(document.querySelector('button[aria-label="Next track"]') as HTMLButtonElement)?.disabled,
+    );
+    const next = page.getByRole('button', { name: 'Next track', exact: true });
+    await next.evaluate((button) =>
+      button.addEventListener(
+        'click',
+        () => {
+          (
+            window as unknown as { __audioCalls: { action: string; at: number }[] }
+          ).__audioCalls.push({ action: 'queue-next-click', at: performance.now() });
+        },
+        { capture: true, once: true },
+      ),
+    );
+    await next.click();
+    await page.waitForFunction(() =>
+      (
+        window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+      ).__audioCalls.some((call) => call.action === 'load' && call.videoId === 'queued00001'),
+    );
+    const calls = await page.evaluate(
+      () =>
+        (window as unknown as { __audioCalls: { action: string; at?: number; videoId?: string }[] })
+          .__audioCalls,
+    );
+    const delay = (action: string) =>
+      calls.find((call) => call.action === `post-${action}`)!.at! -
+      calls.find((call) => call.action === `native-${action === 'seek' ? 'seek-event' : action}`)!
+        .at!;
+    const nextDispatch =
+      calls.find((call) => call.action === 'post-next')!.at! -
+      calls.find((call) => call.action === 'queue-next-click')!.at!;
+    const sourceSwitch =
+      calls.find((call) => call.action === 'load' && call.videoId === 'queued00001')!.at! -
+      calls.find((call) => call.action === 'ack-next')!.at!;
+    t.diagnostic(
+      `Synthetic iframe event to fetch dispatch: pause=${delay('pause').toFixed(2)}ms, seek=${delay('seek').toFixed(2)}ms; queue-next click to dispatch=${nextDispatch.toFixed(2)}ms, acknowledgement to player source switch=${sourceSwitch.toFixed(2)}ms. All 250ms sampling timers were withheld; no provider/network latency is included.`,
+    );
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['pause', 'play', 'seek', 'next'],
+    );
+    assert.equal(
+      calls.filter((call) => call.action === 'construct').length,
+      1,
+      'queue-next reuses the current player',
     );
     assert.deepEqual(f.errors, []);
   } finally {

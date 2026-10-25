@@ -442,7 +442,11 @@
             // Only a freshly activated, focused current iframe can issue a shared intent.
             const value = observation(event.data);
             if (player?.getPlayerState() === event.data) {
-              const intent = native.state(value);
+              // Native scrubbing usually emits BUFFERING/PLAYING before the next
+              // position sample. Use that event immediately; periodic sampling
+              // remains the fallback for seeks without a state transition.
+              const intent =
+                native.state(value) ?? (!nativePending && !controlBusy ? native.time(value) : null);
               if (intent) {
                 void nativeIntent(intent);
                 if (

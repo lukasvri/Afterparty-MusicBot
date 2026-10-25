@@ -21,7 +21,12 @@ Synthetic browser fixtures check 3840×2160, 2560×1440, 1920×1080 and 390px mo
 including overflow, horizontal navigation, player/workspace geometry and mobile
 quick access. TV fixtures also check 1280×720, QR scaling and fullscreen. Local
 YouTube fixtures verify authorized native transport and guest-local pause without
-requesting live media. These checks do not establish real-device audio or rollout.
+requesting live media. An additional held-acknowledgement fixture withholds all
+250 ms sampling ticks and checks native pause/seek dispatch plus queue-next source
+replacement without reconstructing the player. Its timing diagnostics measure
+local application dispatch only, excluding network, YouTube buffering and audible
+Discord output. Shared seek confirmation still precedes synchronized playback.
+These checks do not establish real-device audio or rollout.
 
 [Desktop fixture](assets/v3-familiar-desktop-20261025.png) ·
 [Mobile viewport](assets/v3-familiar-mobile-20261025.png)

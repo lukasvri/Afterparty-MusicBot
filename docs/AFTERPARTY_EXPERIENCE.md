@@ -67,6 +67,9 @@ live under Room settings (Playback settings for public concerts).
 YouTube supplies no explicit user-intent flag or seek event. Shared commands require
 a recent browser activation, focus in the current iframe, an identified current
 video, current transport permission and the existing command revision/receipt checks.
+State callbacks inspect native position changes immediately, including buffering
+after a scrub. The 250 ms position sampler remains a fallback for seeks without a
+state transition; pause and queue-next already dispatch from their events.
 Programmatic load/play/pause/seek writes are tracked and consumed rather than echoed.
 A native pause without provable activation can pause this device but cannot control
 the room. An unproven play event cannot resume deliberately paused audio.
