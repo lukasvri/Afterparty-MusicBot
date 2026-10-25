@@ -14,6 +14,17 @@
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
       font-size: 16px;
+      --app-background: #0c0d10;
+      --app-width: 3200px;
+      --app-space: clamp(20px, 2.5vw, 64px);
+      --page-title: clamp(30px, 2.6vw, 52px);
+      --control-height: 48px;
+      --control-radius: 12px;
+      --control-font: clamp(14px, 0.55vw, 18px);
+      --panel-radius: 20px;
+      --panel-space: clamp(20px, 1.5vw, 32px);
+      --panel-title: clamp(22px, 1.2vw, 30px);
+      --body-size: clamp(14px, 0.65vw, 18px);
       --red: #ff263e;
       --muted: #b0b1bd;
       --line: #2b2e37;
@@ -58,10 +69,10 @@
       select,
       textarea
     ) {
-      min-height: 46px;
+      min-height: var(--control-height);
       padding: 10px 12px;
       border: 1px solid #414550;
-      border-radius: 10px;
+      border-radius: var(--control-radius);
       background: #101115;
       color: var(--text);
       line-height: 1.5;
@@ -170,6 +181,34 @@
       background: var(--red);
       box-shadow: 0 0 0 4px #ff263e14;
     }
+    .app-page {
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      background: var(--app-background);
+    }
+    main.app-main {
+      flex: 1;
+      width: 100%;
+      max-width: var(--app-width);
+      margin-inline: auto;
+      padding: 36px var(--app-space) 56px;
+    }
+    .app-page.tv-mode main.app-main {
+      max-width: none;
+    }
+    @media (min-width: 2400px) {
+      :root {
+        --control-height: 56px;
+      }
+    }
+    .context-bar {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--panel-radius);
+      padding: 20px;
+      margin-bottom: 24px;
+    }
     main {
       width: 100%;
       max-width: 1800px;
@@ -242,15 +281,15 @@
       justify-content: space-between;
     }
     .button {
-      min-height: 48px;
+      min-height: var(--control-height);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
       border: 1px solid transparent;
-      border-radius: 12px;
+      border-radius: var(--control-radius);
       padding: 12px 18px;
-      font-size: 14px;
+      font-size: var(--control-font);
       font-weight: 650;
       line-height: 1.4;
       transition:

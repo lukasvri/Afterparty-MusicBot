@@ -7,7 +7,13 @@ import releases from '../../../lib/releases.json' with { type: 'json' };
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5174').origin;
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname));
 
-for (const width of [390, 1440]) {
+for (const [width, height] of [
+  [3840, 2160],
+  [2560, 1440],
+  [1920, 1080],
+  [1440, 1000],
+  [390, 1000],
+]) {
   test(
     `native public pages and private notice preparation at ${width}px`,
     { timeout: 45000 },
@@ -18,7 +24,7 @@ for (const width of [390, 1440]) {
         args: ['--no-sandbox'],
       });
       context.after(() => browser.close());
-      const page = await browser.newPage({ viewport: { width, height: 1000 } });
+      const page = await browser.newPage({ viewport: { width, height } });
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       await page.route('**/api/**', (route) =>
@@ -31,8 +37,12 @@ for (const width of [390, 1440]) {
           },
         }),
       );
+      let frame:
+        | { brand: number; menu: number; headingX: number; headingY: number; titleSize: string }
+        | undefined;
       for (const [path, active] of [
         ['/', 'Music'],
+        ['/?view=rooms', 'Open rooms'],
         ['/discord', 'Concerts'],
         ['/admin', 'DJ tools'],
         ['/games', 'Games'],
@@ -40,6 +50,29 @@ for (const width of [390, 1440]) {
         await page.goto(`${origin}${path}`);
         const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true });
         await navigation.waitFor();
+        await page.getByRole('heading', { level: 1, name: active, exact: true }).waitFor();
+        await page.evaluate(() => document.fonts.ready);
+        const geometry = await page.evaluate(() => {
+          const header = document.querySelector('.site-header')!;
+          const heading = document.querySelector('.page-toolbar h1')!;
+          return {
+            brand: header.querySelector('.site-brand')!.getBoundingClientRect().x,
+            menu: header.querySelector('nav')!.getBoundingClientRect().right,
+            headingX: heading.getBoundingClientRect().x,
+            headingY: heading.getBoundingClientRect().y,
+            titleSize: getComputedStyle(heading).fontSize,
+          };
+        });
+        if (!frame) frame = geometry;
+        assert.deepEqual(
+          geometry,
+          frame,
+          'all five sections share the same header and page-heading geometry',
+        );
+        assert.equal(await page.locator('.site-header').count(), 1);
+        assert.equal(await page.locator('.site-footer').count(), 1);
+        assert.equal(await page.getByRole('heading', { level: 1 }).count(), 1);
+
         assert.deepEqual(
           (await navigation.locator('.nav-link').allTextContents()).map((text) => text.trim()),
           ['Music', 'Open rooms', 'Concerts', 'DJ tools', 'Games'],

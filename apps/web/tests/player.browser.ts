@@ -438,7 +438,7 @@ test('an explicit open-rooms bookmark stays in the directory after its saved roo
     await f.page.goto(`${origin}/?room=${code}&view=rooms`);
     await reconnected;
     assert.equal(
-      await f.page.getByRole('heading', { name: 'Find your people.', exact: true }).isVisible(),
+      await f.page.getByRole('heading', { name: 'Open rooms', exact: true }).isVisible(),
       true,
     );
     assert.equal(new URL(f.page.url()).searchParams.get('view'), 'rooms');
@@ -791,7 +791,7 @@ test('familiar navigation and player workspace fit 4K, QHD, 1080p and mobile wit
       await page.setViewportSize({ width, height });
       await page.evaluate(() => document.fonts.ready);
       const rows = await page
-        .locator('.app-header nav .nav-link')
+        .locator('.site-header nav .nav-link')
         .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
       assert(Math.max(...rows) - Math.min(...rows) <= 1, 'main navigation stays in one row');
       assert.equal(await page.getByRole('slider', { name: 'Playback position' }).count(), 0);
@@ -912,7 +912,7 @@ test('room browsing returns to the existing host room without issuing commands o
       ),
     );
     await page.getByRole('button', { name: 'Open rooms', exact: true }).click();
-    await page.getByRole('heading', { name: 'Find your people.', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Open rooms', exact: true }).waitFor();
     assert.equal(new URL(page.url()).searchParams.get('view'), 'rooms');
     assert.equal(
       await page.locator('nav[aria-label="Main navigation"] [aria-current="page"]').count(),

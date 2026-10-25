@@ -1,5 +1,7 @@
 <script lang="ts">
-  import AppNavigation from '#lib/ui/AppNavigation.svelte';
+  import AppHeader from '#lib/ui/AppHeader.svelte';
+  import AppFooter from '#lib/ui/AppFooter.svelte';
+  import PageToolbar from '#lib/ui/PageToolbar.svelte';
   import TheaterToggle from '#lib/ui/TheaterToggle.svelte';
   import TrackThumbnail from '#lib/ui/TrackThumbnail.svelte';
   import { roomQueueCapacity } from '../../../../../services/core/src/protocol.ts';
@@ -11,7 +13,6 @@
   import RoomAudio from '#lib/rooms/RoomAudio.svelte';
   import RoomSocial from '#lib/social/RoomSocial.svelte';
   import RoomSharing from '#lib/rooms/RoomSharing.svelte';
-  import MotionPreference from '#lib/ui/MotionPreference.svelte';
   import MusicWorkspace from '#lib/ui/MusicWorkspace.svelte';
 
   let client: ReturnType<typeof createDiscordClient> | undefined;
@@ -38,6 +39,7 @@
     resultPage = $state(0);
   const shownResults = $derived(view.results.slice(resultPage * 10, (resultPage + 1) * 10));
   const resultPages = $derived(Math.max(1, Math.ceil(view.results.length / 10)));
+  let invitationExpanded = $state(false);
   let theater = $state(false);
   let tick = $state(0);
   let tv = $state(false);
@@ -82,6 +84,7 @@
     tv = new URL(location.href).searchParams.get('tv') === '1';
     client = createDiscordClient();
     const unsubscribe = client.subscribe((value) => {
+      if (value.guildId !== view.guildId) invitationExpanded = false;
       if (value.loading || value.guildId !== view.guildId) {
         playerFailed = false;
         panel = 'queue';
@@ -138,33 +141,33 @@
 
 <a class="skip-link" href="#concert">Skip to concert</a>
 <div
-  class="concert-shell"
+  class="concert-shell app-page"
   class:tv-mode={tv && Boolean(concert?.current)}
   class:theater-mode={theater && !tv && Boolean(concert?.current)}
 >
-  <header class="concert-header">
-    <a class="brand" href="/"
-      ><img src="/afterparty-mark.svg" width="36" height="36" alt="" />afterparty<span class="red"
-        >.</span
-      ></a
-    >
-    <AppNavigation active="concerts" guildId={view.guildId} />
-    {#if view.guildId}<button class="button secondary" aria-pressed={tv} onclick={toggleTV}
-        >{tv ? 'Exit TV mode' : 'TV mode'}</button
-      >{/if}
-  </header>
-  <main id="concert">
-    <div class="concert-title">
-      <div>
-        <p class="eyebrow red">THE DISCORD STAGE</p>
-        <h1>Bring your people.<br />We’ll bring the music<span class="red">.</span></h1>
-        <p class="intro">
-          Public concerts, one shared queue. Listen in Discord or enable synchronized audio here.
-        </p>
-      </div>
-      <Icon name="music" size={70} />
-    </div>
-    <section class="server-picker" aria-labelledby="server-heading">
+  <AppHeader active="concerts" guildId={view.guildId} hidden={tv && Boolean(concert?.current)} />
+  <main class="app-main" id="concert">
+    {#snippet concertPageActions()}
+      {#if concert?.current && !tv}<TheaterToggle
+          bind:active={theater}
+          controls="concert-player"
+        />{/if}
+      {#if view.guildId}<button class="button secondary" aria-pressed={tv} onclick={toggleTV}
+          >{tv ? 'Exit TV mode' : 'TV mode'}</button
+        >{/if}
+      {#if concert?.current}<button
+          class="button primary"
+          aria-expanded={invitationExpanded || tv}
+          onclick={() => (invitationExpanded = !invitationExpanded)}>Invite friends</button
+        >{/if}
+    {/snippet}
+    <PageToolbar
+      title="Concerts"
+      description="One shared queue. Listen in Discord or enable synchronized video here."
+      actions={concertPageActions}
+      compact={tv && Boolean(concert?.current)}
+    />
+    <section class="server-picker context-bar" aria-labelledby="server-heading">
       <h2 id="server-heading">Your stage</h2>
       <form
         onsubmit={(event) => {
@@ -201,9 +204,6 @@
 
     {#if view.loading}<p class="empty-stage" role="status">Connecting to the stage…</p>
     {:else}
-      {#if concert?.current && !tv}<div class="concert-display">
-          <TheaterToggle bind:active={theater} controls="concert-player" />
-        </div>{/if}
       <section class="concert-content" aria-label="Concert state">
         <div class="current-track" id="concert-player">
           <div class="section-heading">
@@ -310,11 +310,13 @@
           {/if}
           {#if view.notice}<p class="search-summary" role="status">{view.notice}</p>{/if}
         </div>
-        {#if view.guildId}<div class="concert-share">
+        {#if view.guildId && (invitationExpanded || tv)}<div class="concert-share">
             {#key view.guildId}<RoomSharing
                 code={concert?.roomCode ?? 'DISCORD1'}
                 guildId={view.guildId}
                 {tv}
+                bind:expanded={invitationExpanded}
+                showToggle={false}
               />{/key}
           </div>{/if}
         <section class="concert-workspace" aria-label="Concert music tools">
@@ -525,19 +527,10 @@
         >
       </div>{/if}
   </main>
-  <footer class="concert-footer">
-    <span>Music brings us here.</span><MotionPreference /><a href="/support">Need a hand?</a>
-  </footer>
+  <AppFooter hidden={tv && Boolean(concert?.current)} />
 </div>
 
 <style>
-  .concert-display {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-bottom: 18px;
-  }
   .concert-shell.theater-mode {
     max-width: 3200px;
   }
@@ -585,9 +578,7 @@
     grid-column: 1 / -1;
     grid-row: 2;
   }
-  .tv-mode .concert-title,
   .tv-mode .server-picker,
-  .tv-mode .concert-footer,
   .tv-mode .concert-queue {
     display: none;
   }
@@ -682,17 +673,8 @@
     margin-top: 14px;
   }
   .concert-shell {
-    max-width: 1380px;
-    margin: auto;
+    width: 100%;
     min-height: 100vh;
-  }
-  .concert-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 24px;
-    padding: 26px 44px;
-    border-bottom: 1px solid var(--line);
   }
   nav {
     display: flex;
@@ -702,32 +684,9 @@
   .server-picker a:hover {
     color: var(--red);
   }
-  .concert-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 32px;
-    margin: 20px 0 45px;
-  }
-  .concert-title > :global(svg) {
-    color: var(--red);
-    flex-shrink: 0;
-  }
-  h1 {
-    font-size: clamp(34px, 4.5vw, 64px);
-    letter-spacing: -2.5px;
-    line-height: 1.08;
-    margin: 18px 0 22px;
-  }
-  .server-picker {
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    padding: 26px 0;
-    margin-bottom: 34px;
-  }
   .server-picker h2 {
-    font-size: 17px;
-    margin-bottom: 18px;
+    font-size: var(--panel-title);
+    margin: 0 0 18px;
   }
   .server-picker form {
     display: flex;
@@ -736,23 +695,11 @@
     flex-wrap: wrap;
   }
   .server-picker label {
-    font-size: 12px;
+    font-size: var(--control-font);
     align-self: center;
   }
   .server-picker label span {
     color: var(--muted);
-  }
-  input,
-  select {
-    font: inherit;
-    min-height: 44px;
-    background: #19191d;
-    color: inherit;
-    border: 1px solid #3b3b42;
-    border-radius: 6px;
-    padding: 10px 14px;
-    max-width: 100%;
-    font-size: 12px;
   }
   .server-picker p {
     font-size: 11px;
@@ -827,32 +774,11 @@
     font-size: 13px;
     margin: 26px 0 14px;
   }
-  .concert-footer {
-    display: flex;
-    justify-content: space-between;
-    padding: 26px 44px;
-    border-top: 1px solid var(--line);
-    font-size: 11px;
-    color: var(--muted);
-  }
   select:focus-visible {
     outline: 2px solid var(--red);
     outline-offset: 4px;
   }
   @media (max-width: 800px) {
-    .concert-header {
-      padding: 20px 22px;
-      flex-wrap: wrap;
-    }
-    .concert-title > :global(svg) {
-      display: none;
-    }
-    .concert-title {
-      margin: 10px 0 30px;
-    }
-    h1 {
-      letter-spacing: -1.5px;
-    }
     .concert-content {
       grid-template-columns: 1fr;
       gap: 34px;
@@ -871,9 +797,6 @@
     .server-picker select {
       flex: 1;
       min-width: 0;
-    }
-    .concert-footer {
-      padding: 24px 22px;
     }
     .concert-queue .queue-list {
       max-height: none;

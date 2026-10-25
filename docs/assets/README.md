@@ -47,3 +47,13 @@ See [UI review](../UI_REVIEW.md) for behavior and viewport checks.
 `v3-ui-games-desktop-20261025.png` captures the 1920×1080 game entry
 walkthrough, additionally checked at 4K, QHD and 390px. It uses an empty local
 API fixture; no game or room is created by the capture.
+
+### Unified section frame, 25 October 2026
+
+`v3-unified-empty-desktop-20261025.png` (1920×1080) and
+`v3-unified-empty-mobile-20261025.png` (390×1000, full page) show the compact
+empty listening room and booth-integrated Choose a song action. Captured from
+the local built Worker with a fictional room, reduced motion and all external
+requests blocked. No provider audio or account was connected. The same walkthrough
+checked Music, Open rooms, Concerts, DJ tools and Games at 4K, QHD, 1080p and
+mobile; these images establish layout only. See [UI review](../UI_REVIEW.md).

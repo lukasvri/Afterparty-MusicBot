@@ -153,6 +153,20 @@ for (const [width, height] of [
         true,
       );
       const commandsBeforeTV = writes.length;
+      const invite = page.getByRole('button', { name: 'Invite friends', exact: true });
+      await invite.click();
+      await page.getByAltText('QR code to join this listening room').waitFor();
+      assert.equal(
+        await page.getByRole('textbox', { name: 'Public room invitation link' }).inputValue(),
+        `${origin}/discord?guildId=${guildId}`,
+      );
+      await invite.click();
+      await page.getByAltText('QR code to join this listening room').waitFor({ state: 'hidden' });
+      assert.equal(
+        writes.length,
+        commandsBeforeTV,
+        'toolbar invitations cannot issue concert commands',
+      );
       await page.getByRole('button', { name: 'TV mode', exact: true }).click();
       await page.getByAltText('QR code to join this listening room').waitFor();
       assert.equal(
