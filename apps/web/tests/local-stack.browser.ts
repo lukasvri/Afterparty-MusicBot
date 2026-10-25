@@ -163,7 +163,7 @@ for (const authority of [false, true])
           meta?: { rows_read?: number; rows_written?: number };
         }[];
       };
-      const rows = [`videos:v4:${track.id}`, 'search:v5:user:synthetic afterparty'];
+      const rows = [`videos:v5:${track.id}`, 'search:v6:user:synthetic afterparty'];
       const sql = rows
         .map(
           (key) =>
