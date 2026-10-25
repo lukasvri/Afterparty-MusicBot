@@ -21,9 +21,13 @@
   $effect(() => {
     if (active === 'library') libraryOpened = true;
   });
+  const scrollPositions: Record<typeof active, number> = { queue: 0, discover: 0, library: 0 };
   async function select(value: typeof active) {
+    const scroller = workspace.parentElement;
+    if (scroller) scrollPositions[active] = scroller.scrollTop;
     active = value;
     await tick();
+    if (scroller) scroller.scrollTop = scrollPositions[value];
     if (value === 'discover') document.getElementById(searchInputId)?.focus();
     else
       workspace
@@ -170,17 +174,15 @@
   .workspace-search :global(.section-heading) {
     display: none;
   }
-  .workspace-search :global(.search-results) {
-    max-height: min(54dvh, 620px);
-    overflow: auto;
-    scrollbar-width: thin;
-    scrollbar-gutter: stable;
-  }
-  .workspace-panel :global(.queue-list) {
-    max-height: min(54dvh, 620px);
+  .workspace-search :global(.search-results),
+  .workspace-panel :global(.queue-list),
+  .workspace-panel :global(.music-library ol),
+  .workspace-panel :global(.music-library ul) {
+    max-height: none;
+    overflow: visible;
   }
   .workspace-panel[data-panel='library'] {
-    padding: 14px;
+    padding: 0;
   }
   @media (max-width: 600px) {
     .workspace-nav button {

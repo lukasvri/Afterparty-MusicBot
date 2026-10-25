@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AppNavigation from '#lib/ui/AppNavigation.svelte';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
 
   import { onMount, tick as afterRender } from 'svelte';
@@ -309,9 +310,8 @@
       ><img src="/afterparty-mark.svg" width="34" height="34" alt="" /><span
         >afterparty<span class="red">.</span></span
       ></a
-    ><a class="back" href={scope?.scope === 'room' ? `/?room=${scope.scopeId}` : '/'}
-      >Back to music <Icon name="arrow" size={16} /></a
     >
+    <AppNavigation active="games" roomCode={scope?.scope === 'room' ? scope.scopeId : undefined} />
   </header>
   <main id="game">
     {#if !scope}
@@ -909,18 +909,7 @@
   .brand img {
     flex-shrink: 0;
   }
-  .back {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: clamp(13px, 0.5vw, 20px);
-    color: #d0d0dc;
-    min-height: 46px;
-    padding: 10px 14px;
-    border: 1px solid #3a3e49;
-    border-radius: 12px;
-    background: var(--surface);
-  }
+
   main {
     width: 100%;
     max-width: clamp(1440px, 80vw, 2400px);
@@ -1754,8 +1743,65 @@
       grid-column: 1/-1;
     }
   }
+  @media (min-width: 1200px) {
+    .welcome {
+      max-width: none;
+      min-height: calc(100svh - 260px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: clamp(32px, 4vw, 100px);
+      align-content: center;
+      padding-block: 32px;
+    }
+    .welcome > .eyebrow {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: end;
+    }
+    .welcome h1 {
+      grid-column: 1;
+      grid-row: 2;
+      font-size: clamp(64px, 4.7vw, 140px);
+    }
+    .welcome .intro {
+      grid-column: 1;
+      grid-row: 3;
+      font-size: clamp(18px, 0.7vw, 26px);
+    }
+    .welcome .how-it-works {
+      grid-column: 1;
+      grid-row: 4;
+      flex-wrap: wrap;
+      font-size: clamp(12px, 0.5vw, 18px);
+    }
+    .welcome > .notice {
+      grid-column: 1 / -1;
+    }
+    .entry-grid {
+      grid-column: 2;
+      grid-row: 1 / 5;
+      grid-template-columns: minmax(0, 1fr);
+      align-self: center;
+      justify-self: end;
+      width: 100%;
+      max-width: 800px;
+      margin: 0;
+      gap: 18px;
+    }
+    .entry-card h2 {
+      font-size: clamp(28px, 0.95vw, 36px);
+    }
+    .entry-card p {
+      max-width: 52ch;
+    }
+    .entry-card input {
+      font-size: clamp(16px, 0.65vw, 22px);
+      min-height: clamp(48px, 1.8vw, 64px);
+    }
+  }
   @media (max-width: 800px) {
     .game-header {
+      flex-wrap: wrap;
       padding: 18px 22px;
     }
     main {

@@ -78,7 +78,7 @@ The v3 feature folders keep each component beside its client and behavior helper
 | `social/` | Reactions, moments and host bingo |
 | `admin/` | Server-scoped administration client, DJ desk and pure cue/transition rules |
 | `server/` | Native API dispatch and host-transition guard |
-| `ui/` | Root-rendered global theme, persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery, shared search thumbnails and copyright form |
+| `ui/` | Root-rendered global theme, shared `AppNavigation.svelte`, device-local `TheaterToggle.svelte`, persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery, shared search thumbnails and copyright form |
 
 Shared surfaces, focus styles and fluid TV sizing live in `apps/web/src/lib/ui/AppTheme.svelte`; room and concert routes own their layouts. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 

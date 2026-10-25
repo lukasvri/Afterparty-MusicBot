@@ -1,4 +1,6 @@
 <script lang="ts">
+  import AppNavigation from '#lib/ui/AppNavigation.svelte';
+  import TheaterToggle from '#lib/ui/TheaterToggle.svelte';
   import { roomQueueCapacity } from '../../../../services/core/src/protocol.ts';
   import MotionPreference from '#lib/ui/MotionPreference.svelte';
   import TrackThumbnail from '#lib/ui/TrackThumbnail.svelte';
@@ -38,6 +40,7 @@
   let importing = $state(false),
     invitationLink = $state(''),
     invitationError = $state('');
+  let theater = $state(false);
   let tick = $state(0);
   let tv = $state(false);
   let welcomeScene = $state(false);
@@ -207,34 +210,23 @@
 </svelte:head>
 
 <a class="skip-link" href="#main">Skip to music</a>
-<div class="app-shell" class:tv-mode={tv && Boolean(room)}>
+<div
+  class="app-shell"
+  class:tv-mode={tv && Boolean(room)}
+  class:theater-mode={theater && !tv && Boolean(room?.current)}
+>
   <header class="app-header">
     <a class="brand" href="/" aria-label="Afterparty home" onclick={goHome}
       ><img src="/afterparty-mark.svg" width="42" height="42" alt="" /><span
         >afterparty<span class="red">.</span></span
       ></a
     >
-    <nav aria-label="Main navigation">
-      <a
-        class="nav-link"
-        class:active={!directory}
-        href={room ? `/?room=${room.code}` : '/'}
-        aria-current={directory ? undefined : 'page'}
-        onclick={goListening}><Icon name="headphones" />Music</a
-      >
-      <button
-        class="nav-link"
-        class:active={directory}
-        onclick={toggleDirectory}
-        aria-current={directory ? 'page' : undefined}
-        aria-pressed={directory}><Icon name="users" />Open rooms</button
-      >
-      <a class="nav-link" href="/discord"><Icon name="music" />Concerts</a>
-      <a class="nav-link" href="/admin" data-sveltekit-reload><Icon name="settings" />DJ tools</a>
-      <a class="nav-link" href={room ? `/games?room=${encodeURIComponent(room.code)}` : '/games'}
-        ><Icon name="users" />Games</a
-      >
-    </nav>
+    <AppNavigation
+      active={directory ? 'rooms' : 'music'}
+      roomCode={room?.code}
+      onMusic={goListening}
+      onRooms={toggleDirectory}
+    />
   </header>
 
   <div class="workspace">
@@ -334,6 +326,10 @@
             <h1>{room.name}</h1>
           </div>
           <div class="room-actions">
+            {#if room.current && !tv}<TheaterToggle
+                bind:active={theater}
+                controls="room-player"
+              />{/if}
             <button class="button secondary" aria-pressed={tv} onclick={toggleTV}
               >{tv ? 'Exit TV mode' : 'TV mode'}</button
             >
@@ -922,34 +918,34 @@
     padding: 18px 40px;
     border-bottom: 1px solid var(--line);
   }
-  .app-header nav {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .app-header .nav-link {
-    width: auto;
-    flex: 0 0 auto;
-    min-height: 44px;
-    margin: 0;
-    padding: 10px 12px;
-    font-size: 13px;
-    gap: 8px;
-    border-radius: 0;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-  }
-  .app-header .nav-link.active {
-    border-bottom-color: var(--red);
-    color: var(--text);
-  }
   .workspace {
     max-width: 2400px;
     margin-inline: auto;
   }
   .workspace > main {
     padding: clamp(20px, 2.8vw, 48px);
+  }
+  .theater-mode .workspace {
+    max-width: 3200px;
+  }
+  .theater-mode .workspace > main {
+    max-width: none;
+  }
+  .theater-mode .listening-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .theater-mode .room-side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    width: min(100%, 1440px);
+    margin-inline: auto;
+  }
+  @media (min-width: 1000px) {
+    .theater-mode .now-playing :global(.audio-stage:not(.fullscreen)) {
+      aspect-ratio: auto;
+      height: min(70svh, calc((100vw - 96px) * 9 / 16));
+    }
   }
   .room-heading {
     margin-bottom: 28px;
@@ -1162,20 +1158,16 @@
       background: #222227;
       box-shadow: inset 0 2px var(--red);
     }
+    .room-heading .room-actions {
+      gap: 8px;
+    }
+    .room-heading .room-actions .invite {
+      padding-inline: 12px;
+      gap: 8px;
+    }
     .app-header {
       display: block;
       padding: 16px 20px;
-    }
-    .app-header nav {
-      margin-top: 12px;
-      justify-content: space-between;
-    }
-    .app-header .nav-link {
-      font-size: 12px;
-      padding: 10px 5px;
-    }
-    .app-header .nav-link :global(svg) {
-      display: none;
     }
     .listening-grid {
       grid-template-columns: minmax(0, 1fr);

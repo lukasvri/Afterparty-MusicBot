@@ -21,6 +21,51 @@ for (const width of [390, 1440]) {
       const page = await browser.newPage({ viewport: { width, height: 1000 } });
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
+      await page.route('**/api/**', (route) =>
+        route.fulfill({
+          json: {
+            authenticated: false,
+            globalAdmin: false,
+            guilds: [],
+            rooms: [],
+          },
+        }),
+      );
+      for (const [path, active] of [
+        ['/', 'Music'],
+        ['/discord', 'Concerts'],
+        ['/admin', 'DJ tools'],
+        ['/games', 'Games'],
+      ]) {
+        await page.goto(`${origin}${path}`);
+        const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true });
+        await navigation.waitFor();
+        assert.deepEqual(
+          (await navigation.locator('.nav-link').allTextContents()).map((text) => text.trim()),
+          ['Music', 'Open rooms', 'Concerts', 'DJ tools', 'Games'],
+        );
+        assert.equal(
+          (await navigation.locator('[aria-current="page"]').innerText()).trim(),
+          active,
+        );
+        assert(
+          await navigation.locator('.nav-link').evaluateAll((items) =>
+            items.every((item) => {
+              const rect = item.getBoundingClientRect();
+              return rect.height >= 44 && rect.left >= 0 && rect.right <= innerWidth;
+            }),
+          ),
+          'consistent navigation keeps readable touch targets within the viewport',
+        );
+        await navigation.locator('a').first().focus();
+        assert(
+          await navigation
+            .locator('a')
+            .first()
+            .evaluate((item) => item === document.activeElement),
+        );
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      }
       const routes = {
         '/support': 'Support and privacy requests',
         '/install': 'Add Afterparty to your server',

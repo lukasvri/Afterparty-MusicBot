@@ -1394,6 +1394,103 @@ for (const [width, height] of [
     },
   );
 
+test('music tabs restore their own scroll position with a single workspace scrollbar', async (t) => {
+  const f = await fixture(t, 1440, true, true);
+  try {
+    const { page } = f;
+    const navigation = page.getByRole('navigation', { name: 'Music workspace', exact: true });
+    await navigation.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your collection', exact: true }).waitFor();
+    const scroller = page.locator('.room-side');
+    await scroller.evaluate((node) => {
+      node.scrollTop = 300;
+    });
+    assert.equal(await scroller.evaluate((node) => node.scrollTop), 300);
+    assert(
+      await page
+        .locator('.music-library ol, .music-library ul')
+        .evaluateAll((lists) =>
+          lists.every((node) => getComputedStyle(node).overflowY === 'visible'),
+        ),
+    );
+    await navigation.getByRole('button', { name: /^Queue/ }).click();
+    assert.equal(await scroller.evaluate((node) => node.scrollTop), 0);
+    await navigation.getByRole('button', { name: 'Library & playlists', exact: true }).click();
+    assert.equal(await scroller.evaluate((node) => node.scrollTop), 300);
+    await page.screenshot({ path: '/tmp/afterparty-ui-library-1440.png', fullPage: true });
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('theater mode widens video, keeps the iframe and search draft, and stays local', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'load',
+      ),
+    );
+    await find(page, 'night');
+    await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
+    for (const [width, height] of [
+      [3840, 2160],
+      [2560, 1440],
+      [1920, 1080],
+      [390, 844],
+    ]) {
+      await page.setViewportSize({ width, height });
+      const before = await page.locator('.now-playing').boundingBox();
+      await page.getByRole('button', { name: 'Theater mode', exact: true }).click();
+      const player = await page.locator('.now-playing').boundingBox();
+      const workspace = await page.locator('.room-side').boundingBox();
+      assert(before && player && workspace);
+      if (width >= 1000)
+        assert(player.width > before.width * 1.2, 'the video area uses the page width');
+      assert(workspace.y >= player.y + player.height - 1, 'music tools move below the video');
+      if (width >= 1000) {
+        const next = await page
+          .getByRole('button', { name: 'Next track', exact: true })
+          .boundingBox();
+        assert(
+          next && next.y >= 0 && next.y + next.height <= height,
+          'next-track control stays visible in theater mode',
+        );
+      }
+      assert.equal(
+        await page.getByRole('textbox', { name: 'Search songs or artists' }).inputValue(),
+        'night',
+      );
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (width === 1920)
+        await page.screenshot({ path: '/tmp/afterparty-ui-theater-1920.png', fullPage: true });
+      await page.getByRole('button', { name: 'Exit theater mode', exact: true }).click();
+    }
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'construct',
+          ).length,
+      ),
+      1,
+    );
+    assert.deepEqual(f.writes, [], 'layout changes cannot issue playback commands');
+    await page.getByRole('button', { name: 'Theater mode', exact: true }).click();
+    assert.equal(await page.evaluate(() => localStorage.getItem('afterparty-theater')), 'on');
+    await page.reload();
+    await page.locator('.app-shell.theater-mode').waitFor();
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).waitFor();
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
 test('saved motion preference and system reduced motion remain independent of audio and room control', async (t) => {
   const f = await fixture(t, 390, true, true);
   try {

@@ -1,5 +1,42 @@
 # Afterparty interface review
 
+## Navigation and theater follow-up, 2026-10-25
+
+The interactive Music, Open rooms, Concerts, DJ tools and Games links share one
+`AppNavigation.svelte` owner. Labels, active state, spacing and 44px touch targets
+stay consistent across rooms, concerts, administration and games. Existing room
+and selected-server context remain in their links. Public information pages keep
+their clear back link and legal/help footer. Generic form fields now have a
+readable baseline while feature-specific controls keep their own styles.
+
+The music workspace's column owns its scrolling. Search, queue and library lists
+no longer create nested scrolling areas inside it. Collection/import/festival
+sections share a flatter frame, smaller headings and consistent section spacing.
+The workspace tabs restore their own scroll position. On mobile the document
+scrolls naturally; the existing music shortcuts remain.
+Administration separates site navigation from its compact local Playback,
+Settings and Tools bar; Concerts in the site navigation replaces the duplicate
+Watch concert link. The game entry screen uses a wide-screen two-column
+composition with fluid type and vertically stacked room choices; narrow screens
+retain the existing stacked flow.
+
+Rooms and concerts offer a device-local theater mode. The video surface takes
+the page width and moves the music workspace below, with bounded height on wide
+screens and preserved video proportions inside the official player. Activating
+it brings the view control and player into view. The saved layout preference
+survives reload and does not enable audio, remount the player or send room/Discord
+commands. TV and native YouTube fullscreen retain their existing layouts.
+
+Synthetic Chromium checks cover navigation/active states, guild links, touch
+geometry, keyboard use, theater sizing at 4K/QHD/1080p/mobile, persistent preference,
+retained search draft and a single iframe across layout changes. Library jobs,
+selection and authorization remain covered by their existing journeys. Screenshots
+are isolated fixtures, not live music or server accounts.
+[Theater capture](assets/v3-ui-theater-desktop-20261025.png) and
+[mobile administration](assets/v3-ui-admin-mobile-20261025.png) and
+[game entry](assets/v3-ui-games-desktop-20261025.png) show this pass.
+
+
 ## Animated stage and welcome layout, 2026-10-25
 
 The welcome layout gives the stage its own fluid column beside the introduction

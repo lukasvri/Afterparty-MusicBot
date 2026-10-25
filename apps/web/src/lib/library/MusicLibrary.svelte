@@ -348,23 +348,25 @@
 <style>
   .music-library {
     display: grid;
-    gap: 24px;
-    margin-top: 28px;
+    gap: 0;
+    margin-top: 0;
     min-width: 0;
   }
   .library-nav {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    padding-bottom: 4px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    background: #111113;
   }
   .library-nav a {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    padding: 10px 16px;
+    padding: 8px 10px;
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: 8px;
     background: var(--surface);
     color: #d8d9e2;
     font-size: 13px;
@@ -376,18 +378,18 @@
     color: #fff;
   }
   .local-library {
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    padding: clamp(22px, 2.2vw, 36px);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 22px 20px;
     min-width: 0;
   }
   h2 {
-    font-size: clamp(25px, 2.2vw, 33px);
+    font-size: clamp(23px, 1.5vw, 28px);
     line-height: 1.2;
     letter-spacing: -0.045em;
     margin: 10px 0;
-    scroll-margin-top: 24px;
+    scroll-margin-top: 82px;
   }
   h3 {
     font-size: 20px;

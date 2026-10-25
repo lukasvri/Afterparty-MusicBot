@@ -51,6 +51,29 @@
     button {
       cursor: pointer;
     }
+    :where(
+      input:not([type='range']):not([type='checkbox']):not([type='radio']):not([type='file']):not(
+          [type='hidden']
+        ),
+      select,
+      textarea
+    ) {
+      min-height: 46px;
+      padding: 10px 12px;
+      border: 1px solid #414550;
+      border-radius: 10px;
+      background: #101115;
+      color: var(--text);
+      line-height: 1.5;
+      max-width: 100%;
+    }
+    :where(input, textarea)::placeholder {
+      color: #8e909e;
+      opacity: 1;
+    }
+    :where(summary) {
+      cursor: pointer;
+    }
     button:disabled {
       cursor: not-allowed;
       opacity: 0.5;
