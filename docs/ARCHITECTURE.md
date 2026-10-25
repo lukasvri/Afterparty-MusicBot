@@ -51,6 +51,7 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Device-local reaction expiry | `lib/social-reactions.ts` | Used by the native social client |
 | Discord/Core startup | `services/core/src/` | `main.ts`, `guilds.ts`, `server.ts` |
 | Playback and source extraction | `services/core/src/` | `engine.ts`, `audio.ts`, `providers.ts`, `extractor.ts` |
+| Shared room-radio queue selection and existence checks | `services/core/src/room-radio.ts` | One lazy selection policy for Core and website fallback; `room-state.ts` owns command/prefetch eligibility |
 | Core rooms, games and social authority | `services/core/src/` | `rooms.ts`, `guess-game.ts`, `social.ts` |
 | Website schema and migrations | `db/`, `drizzle/` | Existing D1 migration sequence |
 | Core schema and data | `services/core/src/` | `store.ts`, `migrate.ts`; private data stays outside Git |

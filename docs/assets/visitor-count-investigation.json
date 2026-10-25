@@ -1,0 +1,47 @@
+{
+  "scope": "Synthetic SQLite only; no D1 account, telemetry, migration or production access. Existing drizzle schema plus a temporary in-memory comparison index.",
+  "sqlite": "3.53.1",
+  "visitors": 10000,
+  "rooms": 100,
+  "results": [
+    {
+      "ephemeralIndex": false,
+      "queryPlan": [
+        [
+          3,
+          0,
+          216,
+          "SCAN visitors"
+        ]
+      ],
+      "sqliteVMSteps": 30281,
+      "returned": 67
+    },
+    {
+      "ephemeralIndex": true,
+      "queryPlan": [
+        [
+          3,
+          0,
+          47,
+          "SEARCH visitors USING COVERING INDEX synthetic_visitors_room_until (room=? AND until>?)"
+        ]
+      ],
+      "sqliteVMSteps": 222,
+      "returned": 67
+    }
+  ],
+  "fixture": {
+    "rows": "i from 0 through 9999",
+    "key": "synthetic-{i}",
+    "room": "R followed by i % 100 padded to seven digits",
+    "until": "20000 when i % 3 != 0, otherwise 5000",
+    "query": "SELECT count(*) AS n FROM visitors WHERE room=? AND until>?",
+    "bindings": [
+      "R0000001",
+      10000
+    ],
+    "progressCallbackInterval": 1,
+    "migrationInput": "all drizzle/*.sql in lexical order at main d9d38ee"
+  }
+}
