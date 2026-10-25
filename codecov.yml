@@ -1,0 +1,14 @@
+component_management:
+  individual_components:
+    - component_id: classic
+      name: Classic TypeScript unit scope
+      paths:
+        - lib/**
+    - component_id: core
+      name: Core TypeScript unit scope
+      paths:
+        - services/core/src/**
+    - component_id: v3
+      name: v3 TypeScript unit scope
+      paths:
+        - apps/web/src/lib/**

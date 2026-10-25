@@ -34,6 +34,8 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 
 ## Develop and release
 
+- [Optional observability and coverage](OBSERVABILITY.md): private-data filtering, disabled-by-default Sentry and scoped Codecov OIDC uploads.
+
 - [Student development tools](STUDENT_DEVELOPER_PACK.md): isolated Codespaces, Copilot instructions and student account setup.
 
 - [Contributing](../CONTRIBUTING.md): current source, code boundaries and PR validation.

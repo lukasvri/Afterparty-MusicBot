@@ -44,6 +44,7 @@ Start with the responsibility below rather than reading every file. There are tw
 | Website room persistence and catalog | `lib/` | `server.ts`, `concert-catalog.ts` |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` |
+| Optional browser error privacy and initialization | `lib/error-reporting.ts` | Classic `components/error-reporting.tsx`, v3 root layout; [policy](OBSERVABILITY.md) |
 | Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core, Classic and v3 |
 | Shared social messages and validation | `services/core/src/social-protocol.ts` | Browser-safe; no database, token signing or Node imports |
 | Device-local reaction expiry | `lib/social-reactions.ts` | Shared by both website implementations |
@@ -53,6 +54,7 @@ Start with the responsibility below rather than reading every file. There are tw
 | Website schema and migrations | `db/`, `drizzle/` | Existing D1 migration sequence |
 | Core schema and data | `services/core/src/` | `store.ts`, `migrate.ts`; private data stays outside Git |
 | Local checks, builds and browser fixtures | `scripts/`, `apps/web/scripts/`, `apps/web/tests/`, `services/core/tests/` | `npm run check:all` plus browser suites |
+| Scoped unit coverage and upload | `scripts/coverage.ts`, `.github/workflows/coverage.yml`, `codecov.yml` | `npm run coverage:unit`; account-gated OIDC upload |
 | Host update and recovery | `operations/`, `services/core/` | [Operations](../services/core/PUBLIC_RELEASE.md) |
 
 The v3 feature folders keep each component beside its client and behavior helpers:

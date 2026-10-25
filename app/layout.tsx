@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LanguageProvider } from "@/components/language";
+import { ErrorReporting } from "@/components/error-reporting";
 import "./globals.css";
 import "./concert.css";
 import "./party.css";
@@ -25,6 +26,7 @@ export default function RootLayout({
         <meta name="referrer" content="strict-origin-when-cross-origin" />
       </head>
       <body>
+        <ErrorReporting />
         <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
