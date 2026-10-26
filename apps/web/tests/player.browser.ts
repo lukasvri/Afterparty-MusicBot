@@ -1291,6 +1291,13 @@ test('a failed YouTube source does not lock the next valid recording or retry th
       .frameLocator('.audio-stage iframe')
       .getByRole('button', { name: 'Pause video' })
       .waitFor();
+    // Frame construction precedes the asynchronous ready/load callback. Inject
+    // failure only after the intended recording is actually loaded.
+    await page.waitForFunction(() =>
+      (
+        window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+      ).__audioCalls.some((call) => call.action === 'load' && call.videoId === 'current0001'),
+    );
     await page.evaluate(() =>
       (window as typeof window & { emitPlayerError: (code: number) => void }).emitPlayerError(150),
     );
