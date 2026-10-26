@@ -74,33 +74,32 @@ TypeScript files and are not claimed as covered. Core's audio checks require rea
 FFmpeg, but do not establish audible live Discord behavior. Report generation
 fails if a suite fails or produces no instrumented source records.
 
-The separate Unit coverage workflow is gated by repository variable
-`CODECOV_ENABLED=true`, after linking the repository to the free account. It
-grants `id-token: write` only to the coverage job and authenticates the official,
-immutable-SHA-pinned Codecov Action with GitHub OIDC. There is no long-lived
-upload token. Fork and Dependabot PRs skip this optional job and receive no OIDC
-grant. The normal validation workflow still runs independently.
+Coverage is an explicit `coverage_only=true` dispatch of the normal `core.yml`
+workflow. It runs the instrumented suites instead of the normal validation jobs;
+PRs and main pushes do not start another automatic coverage pass. GitHub OIDC
+`id-token: write` is scoped to that job. The official Codecov Action is pinned to
+an immutable SHA; there is no long-lived upload token and no PR OIDC grant.
 
-Exactly one upload includes all three LCOV files per eligible workflow run.
-`codecov.yml` defines separate path components without extra uploads. Automatic
-file discovery and Codecov uploader telemetry are disabled. Upload failures fail
-the job when enabled; no missing-report or failed-test result is concealed. No
-upload is attempted while the variable is absent/false. Manual `workflow_dispatch`
-can still generate and validate reports with uploads disabled. Its boolean
-`upload_coverage` input defaults to `false`; an explicit `true` additionally needs
-`CODECOV_ENABLED=true` before consuming one upload.
+Reports are generated and validated with uploads disabled by default. To request
+one upload containing all three LCOV files, set `upload_coverage=true` and the
+repository variable `CODECOV_ENABLED=true`. Automatic file discovery and uploader
+telemetry stay disabled. Missing reports and test/upload failures fail the job.
+Manual runs never publish release artifacts. Their regular-job check names are
+prefixed with `manual /`, so report-only runs cannot replace required PR checks.
 
-Coverage runs on `main` pushes and same-repository PRs ready for review, including
-the `ready_for_review` transition. Draft PRs keep the independent full validation
-but skip the additional instrumented suites and upload. Newer coverage runs cancel
-superseded runs for the same PR or `main`; release validation and release artifacts
-retain their existing concurrency policy. There is no scheduled or duplicate
-branch-push upload. Manual runs default to local report validation only.
-Keep this optional job outside required merge checks if drafts
-must remain eligible for full validation without Codecov.
+After the workflow is merged, a report-only run can be started with:
+
+```bash
+gh workflow run core.yml --ref main -f coverage_only=true -f upload_coverage=false
+```
+
+There are no automatic per-PR or per-merge coverage uploads. Badges and PR
+comparisons reflect only explicitly uploaded reports; a PR comparison requires
+reports for both its base and head. Required application validation remains
+independent of these optional reports.
 
 The free account's private-repository upload allowance is shared across projects.
-This policy reduces draft churn, but cannot enforce a global monthly allowance.
+Manual uploads avoid automatic churn but cannot enforce a global monthly allowance.
 Review the account's actual usage before requesting reruns, and set
 `CODECOV_ENABLED=false` if the allowance is nearly exhausted. Keep required
 application validation active. Reports for intermediate draft commits will be

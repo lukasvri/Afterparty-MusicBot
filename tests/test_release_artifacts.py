@@ -160,7 +160,7 @@ class Bundle(unittest.TestCase):
 
     def test_pending_failed_pr_wrong_commit_and_other_workflow_are_rejected(self):
         original=dict(self.run)
-        for change in ({'status':'in_progress'},{'conclusion':'failure'},{'event':'pull_request'},
+        for change in ({'status':'in_progress'},{'conclusion':'failure'},{'event':'pull_request'},{'event':'workflow_dispatch'},
                        {'head_sha':'b'*40},{'head_branch':'other'},{'path':'untrusted.yml'}):
             self.run={**original,**change}
             with self.assertRaises(artifacts.ReleaseError):
@@ -174,6 +174,15 @@ class Bundle(unittest.TestCase):
             self.jobs=jobs
             with self.assertRaises(artifacts.ReleaseError):
                 self.client.describe(COMMIT,self.destination)
+
+    def test_consolidated_optional_jobs_preserve_all_required_release_gates(self):
+        self.jobs['jobs'] += [{'name':'coverage','conclusion':'skipped'},
+                              {'name':'dependency-review','conclusion':'skipped'}]
+        self.jobs['total_count']=len(self.jobs['jobs'])
+        self.client.describe(COMMIT,self.destination)
+        self.jobs['jobs'][0]['conclusion']='skipped'
+        with self.assertRaises(artifacts.ReleaseError):
+            self.client.describe(COMMIT,self.destination)
 
     def test_release_target_and_duplicate_assets_cannot_substitute_a_build(self):
         self.release['target_commitish']='b'*40

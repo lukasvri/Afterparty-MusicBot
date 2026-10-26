@@ -33,8 +33,24 @@ release archives. Main pushes retain exact-image/archive validation, packaging,
 artifact uploads and the existing signed release gates. `core-probe` and
 `core-package` share the same runtime probe in `scripts/build_release.py`.
 
-Instrumented coverage runs on main pushes and explicit workflow dispatch, rather
-than repeating the three unit suites on PRs. Coverage requires FFmpeg, caches
+Normal validation and dependency review share `core.yml`. Instrumented coverage
+is an optional job in that same workflow, requested with `coverage_only=true`;
+it does not run automatically on PRs or main pushes. Manual coverage skips the
+regular validation jobs and publishes nothing unless `upload_coverage=true` and
+`CODECOV_ENABLED=true`. Manual jobs have distinct check names, so skipped manual
+jobs cannot satisfy the required PR checks. GitHub-managed CodeQL remains a
+separate security workflow.
+
+The website job reuses the pinned Playwright headless shell and avoids downloading
+the unused headed browser. `apps/web/scripts/browser-ci.ts` reads the canonical
+`test:browser` command. For a PR containing only explicitly recognized playback,
+presentation or documentation paths, it omits only the eight-round pack journey;
+all ordinary game, lobby and game-audio journeys remain. Game changes, dependency
+changes, shared/unknown paths, missing diff data and main/manual runs retain the
+full suite. Changed paths include both sides of renames. Workflow edits also
+retain the full suite. Local `npm run test:browser` remains the full command.
+
+Coverage requires FFmpeg, caches
 APT-verified package downloads, checks an existing executable first, and bounds
 installation to three minutes. Missing or broken tools fail the job. Main image
 packaging uses gzip level 1 and preserves the saved image bytes and digest checks.
