@@ -384,8 +384,9 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         signal: signal(target.controller),
       });
       if (!current(target) || target.serial !== serial) return;
+      const reconnecting = state.connection === 'reconnecting';
       accept(target, room, sent);
-      if (clearError || recovering) publish({ error: '' });
+      if (clearError || recovering || reconnecting) publish({ error: '' });
     } catch (error) {
       if (current(target) && target.serial === serial) {
         const status = (error as { status?: number })?.status;
