@@ -1458,6 +1458,61 @@ test('a short provider pause resumes itself without becoming a pinned local paus
   }
 });
 
+test('a newer media-key pause retires Play queued behind a delayed seek receipt', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  let release = () => {};
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    const native = page.frameLocator('.audio-stage iframe');
+    await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((button) => {
+      (button as HTMLElement).dataset.action = 'seek-event';
+    });
+    release = f.holdNextMutation();
+    await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+    await page.locator('.player-status').filter({ hasText: 'Updating shared playback' }).waitFor();
+    await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+    await native.getByRole('button', { name: 'Play video', exact: true }).click();
+    await page.getByText('Room settings', { exact: true }).click();
+    await page.evaluate(() =>
+      (window as unknown as { __nativeVideo: (action: string) => void }).__nativeVideo('pause'),
+    );
+    await page.waitForTimeout(1100);
+    const before = await page.evaluate(
+      () =>
+        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+          (call) => call.action === 'play',
+        ).length,
+    );
+    release();
+    await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    await page.waitForTimeout(500);
+    assert.equal(
+      await page.evaluate(() =>
+        (window as unknown as { __playerState: () => number }).__playerState(),
+      ),
+      2,
+    );
+    assert.equal(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'play',
+          ).length,
+      ),
+      before,
+    );
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['seek'],
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    release();
+    await f.close();
+  }
+});
+
 for (const [width, height] of [
   [3840, 2160],
   [2560, 1440],

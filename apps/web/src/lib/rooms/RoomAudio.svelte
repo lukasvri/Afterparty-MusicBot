@@ -231,6 +231,13 @@
     player.pauseVideo();
     lastPlaying = false;
   }
+  function pauseThisDevice() {
+    localPaused = true;
+    if (nativePending) nativePending = { ...nativePending, pausePinned: true };
+    // A later device pause wins over transport gestures waiting for an older
+    // seek receipt. Keep a queued position change without replaying old Play.
+    queuedNative = queuedNative.filter((item) => item.intent.action === 'seek');
+  }
   function observation(state = player?.getPlayerState() ?? -1) {
     let sourceMatches = false;
     try {
@@ -260,8 +267,7 @@
   async function nativeIntent(intent: PlayerIntent) {
     if (!ready || !player || failedSource || !room.current || loaded !== identity()) return;
     if (intent.action === 'pause') {
-      localPaused = true;
-      if (nativePending) nativePending = { ...nativePending, pausePinned: true };
+      pauseThisDevice();
     }
     if (intent.action === 'play') {
       localPaused = false;
@@ -402,7 +408,7 @@
     if (native.hasPendingLocalPause()) {
       if (loaded !== key) {
         // A new shared recording must not resume a possible device pause.
-        localPaused = true;
+        pauseThisDevice();
         native.reset(key);
       } else if (playing) {
         // The provider is already paused. Do not issue play/seek commands while
