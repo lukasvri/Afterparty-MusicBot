@@ -4,6 +4,14 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-alpha.3: Quicker room entry and clearer mobile controls
+
+2026-10-26
+
+- On phones, room creation and joining appear before the stage illustration. Welcome shortcuts take you directly to the room-name or room-code field.
+- Shared buttons respond clearly to presses. Touch inputs stay readable, and the interface respects screen cutouts, keyboard navigation and reduced-motion preferences.
+- Support, installation and policy pages have a more comfortable reading width and larger mobile text. Long release labels wrap on narrow screens.
+
 ## v3.0.0-alpha.2: A clearer music workspace, native controls and DJ tools
 
 2026-10-25

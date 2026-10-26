@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.0.0-alpha.3",
+    "date": "2026-10-26",
+    "title": "Quicker room entry and clearer mobile controls",
+    "items": [
+      "On phones, room creation and joining appear before the stage illustration. Welcome shortcuts take you directly to the room-name or room-code field.",
+      "Shared buttons respond clearly to presses. Touch inputs stay readable, and the interface respects screen cutouts, keyboard navigation and reduced-motion preferences.",
+      "Support, installation and policy pages have a more comfortable reading width and larger mobile text. Long release labels wrap on narrow screens."
+    ]
+  },
+  {
     "version": "3.0.0-alpha.2",
     "date": "2026-10-25",
     "title": "A clearer music workspace, native controls and DJ tools",
