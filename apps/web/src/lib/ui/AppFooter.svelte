@@ -28,6 +28,9 @@
     max-width: var(--app-width);
     margin-inline: auto;
     padding: 24px var(--app-space);
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    padding-left: max(var(--app-space), env(safe-area-inset-left));
+    padding-right: max(var(--app-space), env(safe-area-inset-right));
     display: flex;
     justify-content: space-between;
     align-items: center;

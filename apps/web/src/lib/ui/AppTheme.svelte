@@ -35,7 +35,7 @@
       --radius: 16px;
       --radius-lg: 24px;
       --page-space: clamp(20px, 2.3vw, 64px);
-      --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+      --ease: cubic-bezier(0.23, 1, 0.32, 1);
       color-scheme: dark;
     }
     * {
@@ -43,6 +43,7 @@
     }
     body {
       margin: 0;
+      -webkit-text-size-adjust: 100%;
     }
     a {
       color: inherit;
@@ -61,6 +62,18 @@
     }
     button {
       cursor: pointer;
+    }
+    :where(button, a, summary) {
+      touch-action: manipulation;
+    }
+    :where(button, summary) {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    @media (pointer: coarse) {
+      :where(input, select, textarea) {
+        font-size: max(16px, 1em) !important;
+      }
     }
     :where(
       input:not([type='range']):not([type='checkbox']):not([type='radio']):not([type='file']):not(
@@ -146,9 +159,11 @@
         color 160ms var(--ease),
         background 160ms var(--ease);
     }
-    .nav-link:hover {
-      background: var(--surface-raised);
-      color: #fff;
+    @media (hover: hover) and (pointer: fine) {
+      .nav-link:hover {
+        background: var(--surface-raised);
+        color: #fff;
+      }
     }
     .nav-link svg:last-child:not(:first-child) {
       margin-left: auto;
@@ -193,6 +208,8 @@
       max-width: var(--app-width);
       margin-inline: auto;
       padding: 36px var(--app-space) 56px;
+      padding-left: max(var(--app-space), env(safe-area-inset-left));
+      padding-right: max(var(--app-space), env(safe-area-inset-right));
     }
     .app-page.tv-mode main.app-main {
       max-width: none;
@@ -310,6 +327,7 @@
       font-weight: 650;
       line-height: 1.4;
       transition:
+        transform 120ms var(--ease),
         background 160ms var(--ease),
         border-color 160ms var(--ease),
         color 160ms var(--ease);
@@ -318,17 +336,33 @@
       background: var(--red);
       color: #0c0b0d;
     }
-    .primary:hover {
-      background: #ff6172;
+    @media (hover: hover) and (pointer: fine) {
+      .primary:hover:enabled,
+      a.primary:hover {
+        background: #ff6172;
+      }
     }
     .secondary {
       background: var(--surface-raised);
       color: #eeedf0;
       border-color: #3a3e49;
     }
-    .secondary:hover {
-      background: var(--surface-hover);
-      border-color: #686572;
+    @media (hover: hover) and (pointer: fine) {
+      .secondary:hover:enabled,
+      a.secondary:hover {
+        background: var(--surface-hover);
+        border-color: #686572;
+      }
+    }
+    .button:active:enabled,
+    a.button:active {
+      filter: brightness(0.88);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      html:not([data-motion='off']) .button:active:enabled:not(:focus-visible),
+      html:not([data-motion='off']) a.button:active:not(:focus-visible) {
+        transform: scale(0.97);
+      }
     }
     .welcome-foot {
       display: flex;

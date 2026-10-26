@@ -48,6 +48,8 @@
     padding: 32px 0;
   }
   .stamp {
+    min-width: 0;
+    overflow-wrap: anywhere;
     display: flex;
     align-items: flex-start;
     flex-direction: column;

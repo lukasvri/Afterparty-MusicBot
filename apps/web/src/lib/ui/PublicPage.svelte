@@ -49,7 +49,10 @@
 
 <style>
   .public-shell {
+    --public-gutter: max(var(--page-space), env(safe-area-inset-left), env(safe-area-inset-right));
     min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
     background: #0c0d10;
     color: var(--text);
     font:
@@ -62,6 +65,9 @@
     max-width: 1600px;
     margin: auto;
     padding: 28px var(--page-space);
+    padding-left: max(var(--page-space), env(safe-area-inset-left));
+    padding-right: max(var(--page-space), env(safe-area-inset-right));
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -69,6 +75,7 @@
     flex-wrap: wrap;
   }
   header {
+    padding-top: max(28px, env(safe-area-inset-top));
     border-bottom: 1px solid var(--line);
   }
   .brand {
@@ -103,7 +110,8 @@
     font-weight: 550;
   }
   main {
-    width: min(1000px, calc(100% - var(--page-space) * 2));
+    width: min(880px, calc(100% - var(--public-gutter) * 2));
+    min-width: 0;
     padding: 0;
     margin: clamp(40px, 5vw, 88px) auto clamp(56px, 6vw, 104px);
   }
@@ -122,6 +130,8 @@
     font-weight: 750;
   }
   .body {
+    min-width: 0;
+    overflow-wrap: anywhere;
     padding: clamp(24px, 4vw, 52px);
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
@@ -130,7 +140,7 @@
   }
   .body :global(p) {
     margin: 0 0 18px;
-    max-width: 76ch;
+    max-width: 65ch;
     overflow-wrap: anywhere;
   }
   .body :global(h2) {
@@ -160,14 +170,16 @@
     text-decoration-color: #77545d;
     text-underline-offset: 4px;
   }
-  .body :global(a:hover),
-  footer a:hover,
-  .back:hover {
-    color: #ff8493;
-  }
-  .back:hover {
-    border-color: #73525c;
-    background: #24191f;
+  @media (hover: hover) and (pointer: fine) {
+    .body :global(a:hover),
+    footer a:hover,
+    .back:hover {
+      color: #ff8493;
+    }
+    .back:hover {
+      border-color: #73525c;
+      background: #24191f;
+    }
   }
   .body :global(code) {
     color: #f4f3ef;
@@ -186,7 +198,7 @@
   .body :global(li) {
     padding-left: 4px;
     margin: 10px 0;
-    max-width: 76ch;
+    max-width: 65ch;
   }
   .body :global(.service-action) {
     display: inline-flex;
@@ -205,6 +217,8 @@
     color: var(--muted);
   }
   footer {
+    margin-top: auto;
+    padding-bottom: max(28px, env(safe-area-inset-bottom));
     border-top: 1px solid var(--line);
     color: var(--muted);
     font-size: 13px;
@@ -244,7 +258,10 @@
   @media (max-width: 600px) {
     header,
     footer {
-      padding: 20px;
+      padding: 20px max(20px, env(safe-area-inset-right)) 20px max(20px, env(safe-area-inset-left));
+    }
+    header {
+      padding-top: max(20px, env(safe-area-inset-top));
     }
     .brand {
       font-size: 20px;
@@ -262,9 +279,10 @@
     .body {
       padding: 24px 20px;
       border-radius: 18px;
-      font-size: 15px;
+      font-size: 16px;
     }
     footer {
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
       align-items: flex-start;
       flex-direction: column;
       gap: 12px;

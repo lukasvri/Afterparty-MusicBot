@@ -44,6 +44,11 @@
   let tick = $state(0);
   let tv = $state(false);
   let welcomeScene = $state(false);
+  function focusRoomField(id: 'room-name' | 'room-code') {
+    const field = document.getElementById(id);
+    field?.focus({ preventScroll: true });
+    field?.scrollIntoView({ block: 'center' });
+  }
   async function findMusic() {
     panel = 'discover';
     await afterRender();
@@ -249,6 +254,14 @@
               <p class="eyebrow red">GOOD MUSIC NEEDS GOOD COMPANY</p>
               <p class="welcome-wordmark">afterparty<span class="red">.</span></p>
               <p class="intro">Play music and video together. One room, one shared soundtrack.</p>
+              <div class="welcome-shortcuts" aria-label="Get to the music">
+                <button class="welcome-shortcut" onclick={() => focusRoomField('room-name')}
+                  >Start a room <Icon name="arrow" size={16} /></button
+                >
+                <button class="welcome-shortcut" onclick={() => focusRoomField('room-code')}
+                  >Have a code? Join room <Icon name="arrow" size={16} /></button
+                >
+              </div>
             </div>
             <div class="welcome-stage">
               <div class="stage-heading">
@@ -278,6 +291,7 @@
                   placeholder="The listening room"
                   maxlength="48"
                   autocomplete="off"
+                  enterkeyhint="go"
                 />
                 <label class="checkbox-label"
                   ><input type="checkbox" bind:checked={publicRoom} /> List this room in Open rooms</label
@@ -307,6 +321,7 @@
                   autocomplete="off"
                   autocapitalize="characters"
                   spellcheck="false"
+                  enterkeyhint="go"
                 />
                 <button
                   class="button secondary"
@@ -743,6 +758,38 @@
     grid-column: 1;
     align-self: end;
   }
+  .welcome-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 24px;
+    margin-top: 18px;
+  }
+  .welcome-shortcut {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    text-decoration: underline;
+    text-decoration-color: #64616d;
+    text-underline-offset: 5px;
+  }
+  .welcome-shortcut:active {
+    color: #ff8493;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .welcome-shortcut:hover {
+      color: #ff8493;
+      text-decoration-color: currentColor;
+    }
+  }
   .welcome-wordmark {
     font-size: clamp(64px, 5.9vw, 184px);
     font-weight: 750;
@@ -870,14 +917,14 @@
     }
     .welcome-stage {
       grid-column: 1;
-      grid-row: 2;
+      grid-row: 3;
       border-radius: 18px;
     }
     .stage-caption {
       display: none;
     }
     .room-forms {
-      grid-row: 3;
+      grid-row: 2;
       grid-template-columns: 1fr;
       gap: 16px;
     }
