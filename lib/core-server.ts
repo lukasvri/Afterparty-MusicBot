@@ -1,3 +1,6 @@
+import {readLiveState} from './live-room.ts';
+import { CORE_PRESENCE_DEADLINE_MS, validBridgeIntent } from '../services/core/src/bridge-checkpoint.ts';
+import type { DiscordState } from './types';
 import { GUESS_AUDIO_MAX_BYTES, guessWaveSeconds, readGuessBytes } from '../services/core/src/guess-audio-format.ts';
 import {env} from 'cloudflare:workers';
 export function coreUrl(){const value=(env as unknown as {GUTTA_CORE_PUBLIC_URL?:string}).GUTTA_CORE_PUBLIC_URL;if(!value)return null;const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password)throw new Error('Ugyldig sanntidsadresse.');return url.origin;}
@@ -31,4 +34,22 @@ export async function coreSocialStream(input: unknown, signal: AbortSignal) {
  if(!response.ok){const data=await response.json().catch(()=>({})) as {error?:string};throw Object.assign(new Error(data.error??'Concert extras are unavailable.'),{status:response.status});}
  if(!response.body)throw Object.assign(new Error('Concert extras are unavailable.'),{status:502});
  return new Response(response.body,{headers:{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store','X-Accel-Buffering':'no','X-Content-Type-Options':'nosniff'}});
+}
+
+/** Fresh, authenticated Core authority only; never redirects or caches presence. */
+export async function corePresence(guildId?: string, roomCode?: string, callerSignal?: AbortSignal): Promise<DiscordState & Record<string, unknown>> {
+ const query = new URLSearchParams({authority:'1', ...(guildId?{guildId}:{}), ...(!guildId&&roomCode?{room:roomCode}:{})});
+ const {state:raw} = await coreRequest<{state: DiscordState & Record<string, unknown>}>('/v1/state?'+query, 'GET', undefined, {}, callerSignal ? AbortSignal.any([callerSignal,AbortSignal.timeout(CORE_PRESENCE_DEADLINE_MS)]) : AbortSignal.timeout(CORE_PRESENCE_DEADLINE_MS));
+ const state=readLiveState(raw);
+ if (!state || !validBridgeIntent(state) || (guildId && state.guildId !== guildId) ||
+   (roomCode && state.roomCode !== roomCode) || state.online !== true ||
+   !Number.isFinite(state.position) || Number(state.position) < 0 || !Array.isArray(state.queue))
+   throw new Error('Core presence does not match the selected server.');
+ // The authority endpoint is public-concert state, still enforce its privacy
+ // boundary here before either direct room or Discord API responses use it.
+ const current=state.current?.concert===true?state.current:null;
+ return {...state,current,queue:state.queue.filter(video=>video.concert===true),playing:Boolean(current)&&state.playing,position:current?state.position:0,playbackKey:current?state.playbackKey:null};
+}
+export function legacyBridgeOverride() {
+ return (env as unknown as {GUTTA_CORE_BRIDGE_MODE?:string}).GUTTA_CORE_BRIDGE_MODE === 'legacy';
 }

@@ -1,0 +1,14 @@
+component_management:
+  individual_components:
+    - component_id: shared
+      name: Shared website TypeScript unit scope
+      paths:
+        - lib/**
+    - component_id: core
+      name: Core TypeScript unit scope
+      paths:
+        - services/core/src/**
+    - component_id: native
+      name: Native website TypeScript unit scope
+      paths:
+        - apps/web/src/lib/**

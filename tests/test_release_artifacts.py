@@ -160,7 +160,7 @@ class Bundle(unittest.TestCase):
 
     def test_pending_failed_pr_wrong_commit_and_other_workflow_are_rejected(self):
         original=dict(self.run)
-        for change in ({'status':'in_progress'},{'conclusion':'failure'},{'event':'pull_request'},
+        for change in ({'status':'in_progress'},{'conclusion':'failure'},{'event':'pull_request'},{'event':'workflow_dispatch'},
                        {'head_sha':'b'*40},{'head_branch':'other'},{'path':'untrusted.yml'}):
             self.run={**original,**change}
             with self.assertRaises(artifacts.ReleaseError):
@@ -174,6 +174,15 @@ class Bundle(unittest.TestCase):
             self.jobs=jobs
             with self.assertRaises(artifacts.ReleaseError):
                 self.client.describe(COMMIT,self.destination)
+
+    def test_consolidated_optional_jobs_preserve_all_required_release_gates(self):
+        self.jobs['jobs'] += [{'name':'coverage','conclusion':'skipped'},
+                              {'name':'dependency-review','conclusion':'skipped'}]
+        self.jobs['total_count']=len(self.jobs['jobs'])
+        self.client.describe(COMMIT,self.destination)
+        self.jobs['jobs'][0]['conclusion']='skipped'
+        with self.assertRaises(artifacts.ReleaseError):
+            self.client.describe(COMMIT,self.destination)
 
     def test_release_target_and_duplicate_assets_cannot_substitute_a_build(self):
         self.release['target_commitish']='b'*40
@@ -445,7 +454,26 @@ class CIProducer(unittest.TestCase):
         metadata=json.loads((output/'core.json').read_text())
         self.assertEqual(metadata,{key:self.fixture.manifest[key] for key in ('commit','image_tag','image_id','platform')})
         self.assertEqual(artifacts.validate_image(output/'core-image.tar.gz',metadata),{metadata['image_id']})
+        # Faster packaging must preserve every byte of the saved Docker archive.
+        import gzip
+        with gzip.open(self.fixture.root/'core-image.tar.gz','rb') as expected, \
+                gzip.open(output/'core-image.tar.gz','rb') as actual:
+            self.assertEqual(actual.read(),expected.read())
         self.assertFalse((output/'core-image.tar').exists())
+
+    def test_pr_probe_checks_the_loaded_image_without_saving_an_unused_archive(self):
+        with patch.object(self.producer.subprocess,'run') as calls, \
+                patch.object(self.producer,'run',return_value=json.dumps([{'Id':self.fixture.manifest['image_id']}])) as inspect:
+            metadata=self.producer.probe_core(COMMIT)
+        inspect.assert_called_once_with('docker','image','inspect',TAG)
+        commands=[call.args[0] for call in calls.call_args_list]
+        self.assertEqual([command[:2] for command in commands],[['docker','run']])
+        self.assertEqual(commands[0][commands[0].index('--network')+1],'none')
+        self.assertIn('--read-only',commands[0])
+        self.assertIn('Runtime must be unprivileged',commands[0][-1])
+        self.assertIn("await import('/app/src/data-import.ts')",commands[0][-1])
+        self.assertEqual(metadata,{key:self.fixture.manifest[key] for key in ('commit','image_tag','image_id','platform')})
+        self.assertFalse((self.fixture.root/'core-image.tar').exists())
 
     def test_existing_image_failure_never_falls_back_to_a_build(self):
         output=self.fixture.root/'producer'

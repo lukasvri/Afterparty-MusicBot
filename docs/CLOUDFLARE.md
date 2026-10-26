@@ -2,7 +2,7 @@
 
 [Installation](INSTALLATION.md) · [Configuration](CONFIGURATION.md)
 
-This source supports a separate Cloudflare Workers build of the existing Vinext
+This source supports a Cloudflare Workers build of the SvelteKit
 website. It is not Cloudflare Pages, a static export, or a Cloudflare Tunnel for
 Core. Core stays on its existing host. No account, database, DNS record, secret,
 production deployment or automatic deployment is created by this change.
@@ -15,6 +15,15 @@ Use Node.js 24.17 or newer and the locked dependencies:
 npm ci
 npm run build:cloudflare
 ```
+
+`build:cloudflare` installs the separate `apps/web/package-lock.json` with
+`npm ci`, including development and optional build dependencies, before building
+and packaging the website. Workers Builds' automatic root installation alone
+does not install that dependency tree. Installation failure stops the build;
+verification and deployment commands do not install dependencies or rebuild.
+This installs only the website tools, not Core, and adds no remote build retries.
+The website's global `sharp` override keeps the existing 0.35.5 lockfile usable
+with the build service's npm 10 as well as newer npm versions.
 
 Before the second command, supply the following through private local environment
 settings or the approved build service's settings. Do not commit their values:

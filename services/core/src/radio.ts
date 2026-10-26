@@ -26,7 +26,7 @@ export function radioStyleCompatible(seed: RadioTrack, track: RadioTrack) {
     candidate = radioGenre(track);
   // A broad House label is incomplete, not evidence against a named House
   // subgenre. This only removes a contradiction; radioRelated still requires
-  // the same artist, the same specific genre or a vetted recording relation.
+  // the same artist, a matching discovery genre or a vetted recording relation.
   // Two different specific subgenres remain incompatible.
   return (
     !genre || !candidate || genre === candidate ||
@@ -48,26 +48,29 @@ export function isRadioTitle(title: string) {
   const text = normalize(title);
   return (
     metadataAiGenerated(title, undefined) !== true &&
-    !/\b(reactions?|reacts|interviews?|tutorials?|howto|podcasts?|compilations?|playlist|full album|full set|dj set|live set|concert|hours?|best of|top \d+|karaoke|remake|recreation|recreated|bootleg|fanmade|sped up|slowed|lessons?|masterclass|walkthrough|walk through|step by step|sound design|production tips|production lesson|fl studio|ableton|logic pro|garageband|behind the scenes|making of|breakdown|explained|vlogs?|gameplay|unboxing|documentary|documentaries|studio tour|room tour|music news|album review|song review|track review|pranks?|challenge video|funny moments|memes?|trailer|teaser|shorts)\b/i.test(
+    !/\b(reactions?|reacts|interviews?|tutorials?|howto|podcasts?|compilations?|playlist|full album|full set|dj set|live set|concert|hours?|best of|top \d+|karaoke|remake|re\s?creat(?:ion|ed)|bootleg|fanmade|sped up|slowed|lessons?|masterclass|walkthrough|walk through|step by step|sound design|production tips|production lesson|fl studio|ableton|logic pro|garageband|behind the scenes|making of|breakdown|explained|vlogs?|vlogg(?:en|er)?|gameplay|unboxing|documentary|documentaries|studio tour|room tour|music news|album review|song review|track review|pranks?|challenge video|funny moments|memes?|trailer|teaser|shorts)\b/i.test(
       text,
     ) &&
+    // Explicit reconstruction labels describe another recording. Do not
+    // classify an ordinary title such as "Recreate Me" by its verb alone.
+    !/[[(][^\])]*\bre[\s-]?creat(?:e|ing)\b/i.test(title) &&
     // These words also occur inside ordinary studio song names. Reject
     // explicit upload-format positions and qualifiers, not every occurrence.
-    !/[\[(][^\])]*\b(?:live|covers?|demo)\b/i.test(title) &&
+    !/[[(][^\])]*\b(?:live|covers?|demo)\b/i.test(title) &&
     !/(?:\s[-|\u2013\u2014]\s*|\|)\s*(?:(?:hd|hq|4k|official|piano|guitar|drum|vocal|acoustic|instrumental)\s+)*(?:live|covers?|demo)\b/i.test(title) &&
-    !/\S+\s+demo(?:\s+version)?\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\S+\s+demo(?:\s+version)?\s*(?:[|[(]|$)/i.test(title) &&
     !/(?:^|\s[-|\u2013\u2014]\s*)\s*(?:live|covers?)\s*[:|-]/i.test(title) &&
-    !/\b(?:live|covers?)\s*(?:[|\[(]|$)/i.test(title) &&
-    !/\b(?:live|covers?)\s+(?:official|music|audio|video|hd|hq|4k)(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\b(?:live|covers?)\s*(?:[|[(]|$)/i.test(title) &&
+    !/\b(?:live|covers?)\s+(?:official|music|audio|video|hd|hq|4k)(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|[(]|$)/i.test(title) &&
     !/\b(?:live|covers?)\s+(?:at|from|in|on|by|session|performance|version|recording)\b/i.test(text) &&
     // Recognized venue/broadcast labels, not arbitrary words after "Live".
-    !/\blive\s+(?:wembley(?:\s+stadium)?|glastonbury(?:\s+festival)?|bbc\s+radio\s*1)\b(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|\[(]|$)/i.test(title) &&
+    !/\blive\s+(?:wembley(?:\s+stadium)?|glastonbury(?:\s+festival)?|bbc\s+radio\s*1)\b(?:\s+(?:official|music|audio|video|hd|hq|4k))*\s*(?:[|[(]|$)/i.test(title) &&
     !/\blive(?:\s+[\p{L}\p{N}]+){0,4}\s+(?:19|20)\d{2}\b/iu.test(title) &&
     !/^how to\s*:/i.test(title) &&
-    !/\bhow to$|\bhow (?:i|we) (?:made|make|produced|produce|remade|recreated|built)\b/i.test(
+    !/\bhow to$|\bhow (?:i|we) (?:made|make|produced|produce|remade|re\s?creat(?:e|ed|ing)|built)\b/i.test(
       text,
     ) &&
-    !/\bhow (?:to|do (?:i|you)) (?:make|play|create|produce|mix|master|remake|recreate|learn|write|use|get|sound|build|reproduce|sing|compose)\b/i.test(
+    !/\bhow (?:to|do (?:i|you)) (?:make|play|create|produce|mix|master|remake|re\s?create|learn|write|use|get|sound|build|reproduce|sing|compose)\b/i.test(
       text,
     )
   );
@@ -103,6 +106,14 @@ export function specificRadioGenre(track: RadioTrack) {
   const genre = radioGenre(track);
   return genre && !broadGenres.has(genre) ? genre : null;
 }
+/** Named House recordings can discover other explicitly House-tagged songs.
+ * Keep refinement separate: an exact recording may still reveal a subgenre.
+ * Other broad genres and unknown publisher uploads retain conservative fallback.
+ */
+export function radioDiscoveryGenre(track: RadioTrack) {
+  return specificRadioGenre(track) ??
+    (radioGenre(track) === "house" && radioArtist(track) ? "house" : null);
+}
 function artistTitleParts(track: RadioTrack) {
   const colon = track.title.match(/^([^:]+):\s+(.+)$/);
   const named = track.catalog?.artist || track.artist.replace(officialArtist, "").trim();
@@ -120,7 +131,7 @@ export function radioArtist(track: RadioTrack) {
   // Topic titles often append a recording label without naming the artist.
   // A normal Artist - Song title wins over a conflicting uploader, including
   // channels that happen to end in Topic or VEVO.
-  const versionSuffix = /^(?:(?:19|20)\d{2}\s+)?(?:re[ -]?master(?:ed)?|radio edit|single edit|original mix|extended(?: mix| version)?|official(?: music)? (?:audio|video)|instrumental(?: version)?|acoustic(?: version)?)(?:\s+(?:version|audio|(?:19|20)\d{2}))?\s*(?:[|\[(].*)?$/i.test(suffix);
+  const versionSuffix = /^(?:(?:19|20)\d{2}\s+)?(?:re[ -]?master(?:ed)?|radio edit|single edit|original mix|extended(?: mix| version)?|official(?: music)? (?:audio|video)|instrumental(?: version)?|acoustic(?: version)?)(?:\s+(?:version|audio|(?:19|20)\d{2}))?\s*(?:[|[(].*)?$/i.test(suffix);
   const artist =
     track.catalog?.artist ||
     (parts.length > 1 && !versionSuffix
@@ -255,7 +266,7 @@ export function metadataGenres(description: unknown, tags: unknown): string[] {
 export function radioQuery(track: RadioTrack) {
   const artist = radioArtist(track),
     song = radioTitle(track).replace(/"/g, "");
-  const genre = specificRadioGenre(track);
+  const genre = radioDiscoveryGenre(track);
   return `${genre ?? artist} audio${song ? ` -"${song}"` : ""}`;
 }
 export function songIdentity(track: RadioTrack) {
@@ -321,10 +332,10 @@ export function sameRadioSong(a: RadioTrack, b: RadioTrack) {
 /** A vetted catalog relationship may fill missing metadata, never a conflicting style. */
 export function radioRelated(seed: RadioTrack, track: RadioTrack, relatedRecording = false) {
   const artist = artistIdentity(seed);
-  const specific = specificRadioGenre(seed);
+  const genre = radioDiscoveryGenre(seed);
   return radioStyleCompatible(seed, track) && (
     Boolean(artist.artist && sameArtistIdentity(artist, artistIdentity(track))) ||
-    Boolean(specific && radioGenre(track) === specific) ||
+    Boolean(genre && radioGenre(track) === genre && (genre !== "house" || radioArtist(track))) ||
     relatedRecording
   );
 }

@@ -35,20 +35,36 @@ class StatusTests(unittest.TestCase):
         run.assert_not_called()
         self.assertFalse((self.adapter.root/'request.json').exists())
 
-    def test_check_preserves_last_completed_job(self):
+    def test_ready_preserves_history_without_completing_new_job(self):
         self.save('current.json', {'status':'succeeded', 'commit':COMMIT, 'account_id':'private'})
         status = self.adapter.status()
-        self.assertEqual(status['progress_kind'], 'last')
-        self.assertTrue(all(s['status']=='done' for s in status['steps']))
+        self.assertEqual(status['progress_kind'], 'none')
+        self.assertTrue(all(s['status']=='pending' for s in status['steps']))
         self.assertNotIn('private', json.dumps(status))
 
     def test_frontend_job_does_not_mark_unfinished_steps_done(self):
         self.state.update(running=True, stage='cloudflare', available=True)
         self.save('state.json', self.state)
-        self.save('rollback.json', {'active_worker':'afterparty-web-beta', 'completed_builds':{'afterparty-staging':{'status':'succeeded'}}})
+        self.save('rollback.json', {'commit':COMMIT, 'started_at':time.time(), 'active_worker':'afterparty-web-beta', 'completed_builds':{'afterparty-staging':{'status':'succeeded'}}})
         status = self.adapter.status()
         self.assertEqual([s['status'] for s in status['steps']], ['done','done','running','pending','pending'])
         self.assertNotIn('afterparty-staging', json.dumps(status))
+
+    def test_api_publish_and_failed_frontend_show_current_partial_evidence(self):
+        job = {'commit':COMMIT, 'started_at':time.time(),
+               'active_worker':'afterparty-staging'}
+        self.save('rollback.json', job)
+        self.state.update(running=True, stage='cloudflare', operation='publish')
+        self.save('state.json', self.state)
+        self.assertEqual([s['status'] for s in self.adapter.status()['steps']],
+                         ['done', 'running', 'pending', 'pending', 'pending'])
+        job.update(active_worker='afterparty-web-beta', completed_builds={
+                   'afterparty-staging':{'status':'succeeded'}})
+        self.save('rollback.json', job)
+        self.state.update(running=False, stage='failed')
+        self.save('state.json', self.state)
+        self.assertEqual([s['status'] for s in self.adapter.status()['steps']],
+                         ['done', 'done', 'failed', 'pending', 'pending'])
 
     def test_old_success_does_not_complete_new_validation(self):
         self.state.update(running=True, stage='validate', available=True)
@@ -63,14 +79,61 @@ class StatusTests(unittest.TestCase):
             self.assertFalse(self.adapter.request_check())
         run.assert_not_called()
 
-    def test_failed_check_keeps_last_deployment_and_completed_progress(self):
+    def test_failed_check_keeps_history_without_completing_new_job(self):
         self.state.update(stage='failed', operation='check', current_commit=None, commit=None)
         self.save('state.json', self.state)
         self.save('current.json', {'status':'succeeded', 'commit':COMMIT, 'time':1000})
         status = self.adapter.status()
         self.assertEqual(status['last_deployment_commit'], COMMIT)
-        self.assertEqual(status['progress_kind'], 'last')
-        self.assertTrue(all(s['status']=='done' for s in status['steps']))
+        self.assertEqual(status['progress_kind'], 'none')
+        self.assertTrue(all(s['status']=='pending' for s in status['steps']))
+
+    def test_idle_check_and_pending_dispatch_ignore_old_success_and_builds(self):
+        self.save('current.json', {'status':'succeeded', 'commit':COMMIT, 'time':1000})
+        self.save('rollback.json', {'commit':COMMIT, 'started_at':1000,
+                  'active_worker':'afterparty-web-beta', 'completed_builds':{
+                  'afterparty-staging':{'status':'succeeded'},
+                  'afterparty-web-beta':{'status':'succeeded'}}})
+        for phase in ('idle', 'ready', 'checking'):
+            with self.subTest(phase=phase):
+                self.state.update(stage=phase)
+                self.save('state.json', self.state)
+                status = self.adapter.status()
+                self.assertEqual(status['progress_kind'], 'none')
+                self.assertEqual(status['last_deployment_at'], 1000)
+                self.assertTrue(all(step['status'] == 'pending' for step in status['steps']))
+        self.save('request.json', {'commit':COMMIT})
+        self.assertTrue(self.adapter.status()['running'])
+        self.assertTrue(all(step['status'] == 'pending' for step in self.adapter.status()['steps']))
+
+    def test_completed_publish_resets_when_new_check_starts(self):
+        self.state.update(stage='done', operation='publish')
+        self.save('state.json', self.state)
+        self.assertEqual(self.adapter.status()['progress_kind'], 'completed')
+        self.assertTrue(all(step['status'] == 'done' for step in self.adapter.status()['steps']))
+        self.adapter.checking = True
+        self.assertTrue(all(step['status'] == 'pending' for step in self.adapter.status()['steps']))
+        self.adapter.checking = False
+        self.state.update(stage='checking', operation='check')
+        self.save('state.json', self.state)
+        self.assertTrue(all(step['status'] == 'pending' for step in self.adapter.status()['steps']))
+
+    def test_verify_and_publish_failure_preserve_only_current_job_receipts(self):
+        self.save('rollback.json', {'commit':COMMIT, 'started_at':time.time(),
+                  'active_worker':'afterparty-web-beta', 'completed_builds':{
+                  'afterparty-staging':{'status':'succeeded'},
+                  'afterparty-web-beta':{'status':'succeeded'}}})
+        self.state.update(stage='verify', operation='publish', running=True)
+        self.save('state.json', self.state)
+        self.assertEqual([s['status'] for s in self.adapter.status()['steps']],
+                         ['done', 'done', 'done', 'running', 'pending'])
+        self.state.update(stage='failed', running=False)
+        self.save('state.json', self.state)
+        self.assertEqual([s['status'] for s in self.adapter.status()['steps']],
+                         ['done', 'done', 'done', 'pending', 'pending'])
+        self.save('rollback.json', {'commit':COMMIT, 'started_at':1000,
+                  'completed_builds':{'afterparty-staging':{'status':'succeeded'}}})
+        self.assertTrue(all(step['status'] == 'pending' for step in self.adapter.status()['steps']))
 
     def test_stale_error_is_removed_after_successful_check(self):
         self.state['error'] = 'old error'

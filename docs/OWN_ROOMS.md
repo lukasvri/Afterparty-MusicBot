@@ -24,11 +24,28 @@ Early skips share an in-flight radio lookup instead of starting a duplicate sear
 
 ## Start video and sound
 
-The website uses the official YouTube embed. Opening the local player starts a video already playing in the room. Only a viewer with transport permission can resume a paused room for everyone.
+The website uses the official YouTube embed after you choose **Enable room audio**.
+Its own controls handle playback, volume, quality, captions and fullscreen. Once
+ready, the duplicate app play/seek controls disappear; **Next track** remains a
+queue action. If the player fails, the app transport becomes available again.
 
-If audible autoplay is blocked, the player tries muted playback and offers **Enable sound**. This temporary fallback does not overwrite saved volume or mute preferences. Browser policy, buffering and video availability still affect each viewer independently.
+Hosts can use native play/pause/seek to update the shared timeline. Shared commands
+still require current host authority and queue revisions. Native events without
+provable user activation cannot issue shared commands. Guest pause stays local;
+resuming returns to the host's timeline. A guest cannot resume a room paused by
+its host. Volume and mute always affect this device only.
 
-Local volume, synchronization preferences and saved evenings stay on the device. Shared playback commands change the room timeline. Saved evenings can be edited and imported/exported; they are not synchronized to an account. TV mode provides a larger playback layout with guest sharing controls.
+If browser autoplay is blocked, use **Enable audio** in the player message.
+Browser policy, buffering and video availability still affect each viewer.
+**Playback settings** groups device volume fallback, sync mode, resync, reload,
+fullscreen fallback and diagnostics. Public concerts also expose device timing
+calibration there. See [native player rules](AFTERPARTY_EXPERIENCE.md#native-player-and-the-shared-clock).
+
+Search stays available while the library, playlist preview or room settings are
+open. On wide screens these tools sit beside search. Saved evenings stay on this
+device and can be edited or imported/exported; they are not account-synchronized.
+TV mode gives video and guest QR sharing more space, with dynamic sizing for
+1080p, QHD and 4K.
 
 ## Persistence and updates
 

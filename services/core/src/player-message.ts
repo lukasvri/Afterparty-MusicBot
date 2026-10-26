@@ -2,6 +2,7 @@ import {isPlayerButton} from './player-compatibility.ts';
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, type Message } from 'discord.js';
 import {UserError} from './types.ts';
 import type { DiscordBot } from './discord.ts';
+import { concertLink } from './concert-links.ts';
 /** 16-position timeline, with bounded values for live and loading tracks. */
 export function progressBar(position:number,duration:number){
     const progress=duration>0&&Number.isFinite(position)?position/duration:0;
@@ -39,7 +40,8 @@ export function playerComponents(bot: DiscordBot) {
         control('loop','Loop',e.loop?ButtonStyle.Success:ButtonStyle.Secondary),
         control('shuffle','Shuffle queue'),control('favorite','Save favorite'),
     );
-    if(bot.site&&e.current?.concert)extras.addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Watch video · Afterparty').setURL(bot.site+'/?room='+(bot.roomCode??'DISCORD1')));
+    const concert = e.current?.concert ? concertLink(bot.site, bot.guildId) : '';
+    if(concert)extras.addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Watch video · Afterparty').setURL(concert));
     return [playback,extras];
 }
 /** Secondary actions are private to the person opening the menu. */

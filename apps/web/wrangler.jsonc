@@ -1,11 +1,22 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "afterparty-web-preview",
+  "name": "afterparty-web-local",
   "main": ".svelte-kit/cloudflare/_worker.js",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": ".svelte-kit/cloudflare", "binding": "ASSETS" },
-  "services": [{ "binding": "AFTERPARTY_API", "service": "afterparty-api-local" }],
+  "assets": {
+    "directory": ".svelte-kit/cloudflare",
+    "binding": "ASSETS",
+    "run_worker_first": false,
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "afterparty-web-local",
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "migrations_dir": "../../drizzle",
+    },
+  ],
   "workers_dev": false,
   "preview_urls": false,
 }

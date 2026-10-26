@@ -13,16 +13,17 @@
     "build": "node --import ./scripts/runtime.ts node_modules/vite/bin/vite.js build",
     "preview": "node --import ./scripts/runtime.ts node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --local --ip 127.0.0.1 --port 5174 --inspector-port 0",
     "check": "node --import ./scripts/runtime.ts node_modules/@sveltejs/kit/svelte-kit.js sync && node --import ./scripts/runtime.ts node_modules/svelte-check/bin/svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
-    "test": "node --test tests/*.test.ts",
-    "test:browser": "node --test --test-concurrency=1 --test-timeout=45000 --test-reporter=tap tests/player.browser.ts tests/live.browser.ts",
+    "test": "node --test --test-isolation=none tests/*.test.ts",
+    "test:browser": "node --test --test-concurrency=2 --test-reporter=tap tests/player.browser.ts tests/public-pages.browser.ts tests/library.browser.ts tests/discord.browser.ts tests/admin.browser.ts tests/games.browser.ts tests/room-stream.browser.ts tests/room-social.browser.ts tests/game-night.browser.ts tests/game-audio.browser.ts tests/game-pack.browser.ts tests/audio-settings.browser.ts tests/scenery.browser.ts tests/directory.browser.ts",
     "test:stack": "node --test tests/local-stack.browser.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "package:preview": "node scripts/package-preview.ts",
+    "measure:startup": "node scripts/measure-startup.ts --verify-lazy",
+    "sync": "node --import ./scripts/runtime.ts node_modules/@sveltejs/kit/svelte-kit.js sync"
   },
   "overrides": {
-    "miniflare": {
-      "sharp": "0.35.5"
-    },
+    "sharp": "0.35.5",
     "undici": "7.30.1"
   },
   "devDependencies": {
@@ -36,6 +37,6 @@
     "svelte-check": "4.7.7",
     "typescript": "6.0.3",
     "vite": "8.3.5",
-    "wrangler": "4.118.0"
+    "wrangler": "4.132.0"
   }
 }

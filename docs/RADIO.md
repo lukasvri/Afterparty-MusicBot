@@ -32,6 +32,35 @@ prefer a stored favorite and an official upload, with stable provider order as
 the final tie-breaker. No audio analysis or cross-server listening profile is
 introduced.
 
+Among artists equally eligible under that short cooldown, exposure in the last
+20 tracks breaks ties before favorites and provider order. Otherwise a fixed
+provider pool can repeatedly cycle its first six artists while later artists
+never get a turn. A deterministic 24-round fixture with eight eligible artists
+previously selected six; the updated policy selects all eight, including each
+in the first rotation, without another discovery request. This balances existing
+candidates; it does not replenish an exhausted provider pool or enlarge a finite
+station catalog.
+
+## User search relevance
+
+Manual search ranks the existing provider pool locally through
+`services/core/src/music-search.ts`, shared by Core and the Worker fallback.
+Complete title/artist matches and exact recording titles take precedence over
+provider position. Accents and punctuation normalize for comparison, while the
+original provider query, quoted terms and negative exclusions remain unchanged.
+Unrequested remixes, covers and spoken formats receive a lower preference among
+similarly relevant results; explicit version and festival/live-set requests keep
+their intent. A song named “Live Forever” is not automatically a request for a
+live performance. Unavailable embeds and declared AI are preferences rather than
+a ban on explicit manual choices.
+
+Ranking inspects at most 50 existing results, removes duplicate video IDs only
+and preserves provider order for ties. It makes no provider or metadata calls
+and does not merge distinct uploads by guessed recording identity. Music-only
+radio discovery bypasses this ordering and retains its stricter admission,
+recording and style rules. This policy improves observable result ordering;
+live-provider relevance and individual musical taste still require acceptance.
+
 ### NCS stations without a provider key
 
 An untagged `Janji - Heroes Tonight` or Lost Sky recording previously fell back
@@ -62,6 +91,10 @@ Automatic radio rejects explicit AI-generation, AI-cover, synthetic-vocal and
 Suno/Udio declarations from titles, artist/uploader names, descriptions and tags.
 The YouTube synthetic-media flag also counts as negative evidence. The bounded
 classifier is shared with provider ingestion and local search suggestions.
+Explicit production, composition, assistance and recreation declarations also
+count, including Norwegian KI wording. Re-created upload labels and Norwegian
+vlogg titles cannot enter automatic radio. Ordinary song titles such as “Recreate
+Me” remain eligible when they contain no reconstruction label or negative metadata.
 Negative evidence survives metadata caching, public recording copies and room
 persistence, so a clean title cannot erase a declaration in the description.
 Versioned caches require fresh metadata instead of reusing the older format.
@@ -126,7 +159,7 @@ Older browser rooms can recover the last explicitly marked manual song from hist
 ## Similarity evidence
 
 - A specific genre such as electro house or progressive house can support recommendations across artists. Conflicting explicit styles are rejected.
-- A broad tag such as pop, rock or house does not establish that another artist belongs in the station. Without specific metadata or a vetted recording relationship, selection stays with the original artist.
+- Broad pop/rock tags alone do not establish that another artist belongs in the station. A named-artist seed explicitly tagged House can also discover other named artists explicitly tagged House. Conflicting subgenres and all content/recording checks still apply. The existing two-search budget covers genre discovery and an artist fallback; the original station anchor remains fixed.
 - Browser rooms can refine a missing or broad House genre from another upload of the same recording. Artist, song identity, version labels and duration must agree. A tutorial, cover, conflicting style or alternate instrumental cannot supply that metadata. The accepted recommendation retains private proof tied to the original video ID, so reloading or advancing a prepared queue does not discard the learned relationship. That proof is removed from public snapshots.
 - Core can use Last.fm's similarity to the original song. Missing, malformed or weaker-than-0.2 similarity scores are discarded. The score is provider evidence, not a measured audio similarity guarantee. Matched playback videos still pass content, style, history and visibility checks.
 

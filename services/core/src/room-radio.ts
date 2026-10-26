@@ -27,29 +27,39 @@ export function roomRadioSeed(state: RoomRadioState) {
     state.radioHistory?.at(-1)
   );
 }
-export function playableRoomQueue(state: RoomRadioState) {
-  const seed = roomRadioSeed(state);
-  const recent = [
-    ...(state.radioHistory ?? []),
-    ...(state.history ?? []),
-    ...(state.radioExcludedSongs ?? []),
-    ...(state.current ? [state.current] : []),
-    ...state.queue.filter((video) => !video.radio),
-  ];
+/** One selection policy for complete queues and short-circuit existence checks. */
+function* playableEntries(state: RoomRadioState): Generator<RoomVideo> {
   let ranker: ReturnType<typeof createRadioRanker> | undefined;
-  return state.queue.filter((video, index) => {
-    if (!video.radio) return true;
-    if (state.radio === false || !seed || !video.embeddable) return false;
-    ranker ??= createRadioRanker(
-      { ...seed, entryId: seed.id }, recent, state.radioExcluded ?? [],
-    );
+  let seedId: string | undefined;
+  for (const [index, video] of state.queue.entries()) {
+    if (!video.radio) { yield video; continue; }
+    if (state.radio === false || !video.embeddable) continue;
+    if (!ranker) {
+      const seed = roomRadioSeed(state);
+      if (!seed) continue;
+      seedId = seed.id;
+      const recent = [
+        ...(state.radioHistory ?? []), ...(state.history ?? []),
+        ...(state.radioExcludedSongs ?? []), ...(state.current ? [state.current] : []),
+        ...state.queue.filter((track) => !track.radio),
+      ];
+      ranker = createRadioRanker(
+        { ...seed, entryId: seed.id }, recent, state.radioExcluded ?? [],
+      );
+    }
     const valid = ranker.rank(
       [{ ...video, entryId: video.id }],
-      video.radioRelatedTo === seed.id,
+      video.radioRelatedTo === seedId,
     ).length > 0;
+    if (valid) yield video;
     if (valid && index < state.queue.length - 1) ranker.remember(video);
-    return valid;
-  });
+  }
+}
+export function playableRoomQueue(state: RoomRadioState) {
+  return Array.from(playableEntries(state));
+}
+export function hasPlayableRoomQueue(state: RoomRadioState) {
+  return playableEntries(state).next().done === false;
 }
 export async function roomRecommendation(
   state: RoomRadioState,
@@ -57,7 +67,7 @@ export async function roomRecommendation(
   diagnose: (result: RoomRadioDiagnostic) => void = result => console.info("room-radio", JSON.stringify(result)),
 ): Promise<RoomVideo | null> {
   const seed = roomRadioSeed(state);
-  if (state.radio === false || !seed || seed.live || seed.music === false || playableRoomQueue(state).length) return null;
+  if (state.radio === false || !seed || seed.live || seed.music === false || hasPlayableRoomQueue(state)) return null;
   const result = await selectRadio({
     seed: { ...seed, entryId: seed.id, source: "youtube" },
     recent: [...(state.radioHistory ?? []), ...(state.history ?? []),

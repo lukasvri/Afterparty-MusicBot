@@ -89,12 +89,81 @@ See the [benchmark](../services/core/benchmarks/radio-queue.ts) and
 
 | Candidate | Priority | Risk / effort | Required evidence or constraint |
 | --- | --- | --- | --- |
-| D1 `visitors(room, until)` index | Next profiling pass | Medium / medium | Inspect real query plans and cardinality, measure read/write cost, then review a migration. No index added speculatively. |
+| D1 `visitors(room, until)` index | [Measured follow-up #135](https://github.com/lukasvri/Afterparty-MusicBot/issues/135) | Medium / medium | Synthetic plan/count comparison below confirms a full scan. Measure heartbeat write/space cost and directory behavior before reviewing a migration. |
 | Merge live room and Discord hooks | Low | High / medium | Their guild scope, epochs, leases, authentication and recovery differ. A shared abstraction needs explicit behavior tests before consolidation. |
 | Reduce the 100 ms client synchronization cadence | Profile first | High / medium | Measure browser work while preserving native scrub detection, buffering recovery, scheduled starts and stale-clock handling. |
 | Cache administrative permissions | Do not introduce without fresh authorization | High / medium | Never reuse a stale authorization decision to bypass Core's current guild-grant check. |
 | Decoder, codec or kernel replacement | Profile first | High / high | Measure whole-pipeline CPU, memory and scheduling on an isolated intended host. Faster isolated PCM mixing does not prove a Discord improvement. |
 | Broad component memoization | Low | Medium / medium | Capture a rendering profile first. Stable player identity and correct permission/state updates take precedence over speculative caching. |
+
+## Visitor index source candidate
+
+Measured follow-up to [issue #135](https://github.com/lukasvri/Afterparty-MusicBot/issues/135)
+on source base `d9d38ee`. Count, directory, heartbeat and deletion queries now
+have one canonical owner in `lib/room-visitors.ts`; callers retain D1 access and
+authorization. Query text and bindings are unchanged. The forward-only
+`0004_room_visitors.sql` migration adds one non-unique `(room, until)` index,
+with matching generated Drizzle schema, snapshot and journal. Existing data is
+not rewritten and old code remains compatible with the indexed database.
+
+### Read benefit, write cost and space
+
+`node scripts/measure-room-visitors.ts` creates two isolated in-memory databases
+from actual migrations, removing only the candidate index for the baseline.
+It seeds 1/10/100 rooms and 100/1,000/10,000 synthetic visitors, including expired,
+exact-boundary, private and guild cases. Each pair asserts result equality before
+three warmups and five alternating rounds of ten calls. Both databases roll back
+each measured write operation. This is elapsed synchronous time on Linux,
+Node 24.19.0 and the SQLite version in the raw result, not CPU accounting,
+production latency, durable-disk throughput or D1 billing.
+
+| Rooms / visitors | Count baseline / indexed ms | Directory baseline / indexed ms | Index space |
+| --- | ---: | ---: | ---: |
+| 1 / 100 | 0.00665 / 0.00255 | 0.00875 / 0.00433 | 4 KiB |
+| 10 / 1,000 | 0.03608 / 0.00320 | 0.26503 / 0.01651 | 28 KiB |
+| 100 / 10,000 | 0.28952 / 0.00316 | 22.17940 / 0.15488 | 224 KiB |
+
+At 10,000 visitors, median milliseconds per operation (writes include rollback):
+
+| Operation | Baseline ms | Indexed ms |
+| --- | ---: | ---: |
+| insert50 | 0.11567 | 0.17913 |
+| renew50 | 0.07566 | 0.12449 |
+| suppressed50 | 0.06208 | 0.07108 |
+| expire | 1.14875 | 1.75014 |
+| removeRoom | 0.39401 | 0.12752 |
+
+The 50-row batches are not single-heartbeat times. Index maintenance increases
+insert/renewal/expiry work; suppressed heartbeats still change zero rows. Room
+removal benefits from the leading room key. `until`-only expiry cleanup still
+scans visitors and is not claimed fixed. No second index was added. At 10,000
+rows, the index adds 224 KiB; total database pages rise from 306 to 362 at 4 KiB.
+
+Both the per-room count and directory's correlated count use the covering index.
+It replaces repeated whole-visitor scans while preserving fifteen-second renewal
+suppression and directory filters/order/limit. This measured read benefit
+justifies the bounded source candidate despite extra write/space cost. It does
+not establish production savings: index maintenance costs remain, local SQLite
+timings are not D1 charged rows, and real cardinality/traffic remain unknown.
+Existing rollout approval and backup requirements still apply.
+
+[Raw paired samples, query plans and storage measurements](assets/visitor-index-measurements.json)
+retain all scenarios. Tests upgrade populated old-schema data and compare saved
+visitors and rooms; verify exact count/cleanup boundaries, immutable visitor room
+binding, suppressed renewal and room-scoped deletion; compare private/guild/
+expired filtering and the sixty-room directory limit. The Worker/D1 suite also
+exercises the migration, indexed query plans and API/browser readback in native
+and service-binding topologies. Local Wrangler does not expose heartbeat
+`rows_written` in this test setup, so no measured D1 billing claim is made.
+
+### Rollback and migration boundary
+
+Apply this forward-only source migration through the existing migration ledger
+only in a separately approved rollout. Reverting the application does not need
+to drop the index: old SQL and schema columns remain valid, and visitor keys,
+expiry, ownership and room state are retained. Keep the applied ledger intact.
+No remote migration, host change, provider connection or production telemetry
+was used for these measurements.
 
 Rust measurements remain offline research on `dev`, with bounded synthetic
 workers, process cleanup and optional FFmpeg stages. Parent-only CPU excludes
@@ -331,3 +400,317 @@ rendered at both widths. [Desktop](assets/tv-layout-desktop-20261018.png) and
 the existing POSIX stalled-decoder executable on Windows. Required `check:all`
 stopped at the same four Windows `fcntl` imports. Final-head Linux CI is recorded
 in the PR rather than treating these local platform limits as passing tests.
+
+
+## Room-radio queue presence checks
+
+Source base: `d9d38ee51530cd577d5d8279aab00f38f3ebd31c`. Boolean queue
+checks previously enumerated every eligible recommendation, although callers
+only needed to know whether one playable entry existed. The shared
+`room-radio.ts` policy now supports both complete selection and a lazy existence
+check. Explicit requests can satisfy existence before radio history/ranking is
+prepared. Automatic entries retain identity, style, exclusion and diversity checks;
+complete snapshots and mutations still consume the full selection.
+
+`room-state.ts` also checks action, playback timing and radio cooldown before
+asking about the queue. Pauses, seeks, ordinary additions, insufficient/duplicate
+skip votes and ineligible prefetch ticks therefore do no queue-selection work in
+these eligibility checks. Mutation/snapshot validation remains mandatory.
+There is no cross-call cache, authorization cache, schema change or new dependency.
+
+### Paired local measurements
+
+The existing [queue harness](../services/core/benchmarks/radio-queue.ts) now also
+compares full enumeration plus a length check with `hasPlayableRoomQueue` on the
+same immutable fixture. Five alternating rounds of 30 calls follow ten warmups.
+Both return values are checked outside timing. Values are median milliseconds
+per **30 calls**, on Linux, Node 24.19.0, Intel Xeon Platinum 8573C. Full enumeration
+uses the current shared selector, isolating the benefit of stopping early; this
+is not an exact historical endpoint benchmark. Historical selection measurements
+above remain tied to their original source and host.
+
+| Synthetic queue | Full enumeration ms | First playable ms |
+| --- | ---: | ---: |
+| empty queue | 0.0239 | 0.0170 |
+| manual queue | 0.0906 | 0.0070 |
+| usual single suggestion, no history | 2.1659 | 2.2057 |
+| usual single suggestion, full history | 22.6022 | 22.5889 |
+| manual priority with one suggestion | 25.6274 | 0.0051 |
+| stress: twenty automatic suggestions, no history | 55.5948 | 3.1111 |
+| stress: twenty automatic suggestions, full history | 74.3603 | 21.6308 |
+
+[Raw samples and environment](../services/core/benchmarks/results/radio-queue-presence.json)
+include full-selection parity against the retained independent previous policy.
+Reproduce with `node services/core/benchmarks/radio-queue.ts`.
+One automatic suggestion still requires its history and ranking, so that common
+case has no meaningful speedup. Multiple suggestions and manual-priority queues
+avoid substantial work, but sub-millisecond results remain sensitive to host
+load and measurement noise. These are synchronous microbenchmarks, not page
+latency, provider availability, live Discord quality or production CPU savings.
+The full local application checks were running during this capture.
+
+Work-count and differential regressions cover early termination, unused history,
+rejected automatic choices, radio enabling, skip votes, prefetch cooldown,
+changing exclusions/history and independent room calls. Full selection still
+matches the independent sequential policy across 80 mixed fixtures. Live transport
+cadence, queue revisions and persistence remain unchanged.
+
+### Visitor-count investigation
+
+The exact current room-count query was run against the website schema after all
+existing `drizzle/*.sql` migrations, using in-memory SQLite 3.53.1 with 10,000
+synthetic visitors across 100 rooms. The current plan is `SCAN visitors`;
+a temporary covering `(room, until)` index changes it to an indexed range search.
+Both return 67 visitors. SQLite VM instructions fall from 30,281 to 222 in this
+fixture. VM instructions are not D1 billing rows or production latency.
+
+[Raw query plans and fixture description](assets/visitor-count-investigation.json)
+retain the isolated comparison. The temporary index was not added to the schema
+or migration history. [Issue #135](https://github.com/lukasvri/Afterparty-MusicBot/issues/135)
+tracks directory-query parity, insert/renewal/delete overhead, index space and a
+reviewable migration if justified. Expiry cleanup has an `until`-only predicate,
+so this composite index must not be claimed to solve that separate query.
+
+
+## Native workspace candidate, 25 October 2026
+
+The alpha.2 workspace adds native YouTube intent handling and shared controls,
+consolidates search with library/settings, and restores the decorative DJ stage.
+These product additions increase startup code relative to the earlier alpha.2
+candidate; this is not a claim that the complete redesign is smaller.
+
+The scene is an optional Svelte chunk and has no JavaScript animation loop.
+Active rooms skip it. The expanded built-Worker measurement verifies this against
+the actual manifest, and still checks that the larger music library stays lazy.
+Measurements were identical at 1440px and 390px:
+
+| Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
+| --- | ---: | ---: |
+| Welcome / empty browser room, including the scene | 256,842 B | 95,122 B |
+| Active browser room, before audio consent | 240,776 B | 90,324 B |
+| Game entry | 148,149 B | 55,982 B |
+
+The optional scene accounts for 16,066 decoded bytes / 4,798 recomputed gzip bytes
+between the first two scenarios. The benchmark makes no provider request or queue
+mutation; opening the library is an explicit separate step. These are local script
+response sizes, not measured wire transfer, field performance or audible quality.
+Run `npm --prefix apps/web run measure:startup` against the built local preview.
+
+Search result regions and saved collections have bounded scrolling; festival lists
+retain 20-set pages. The shared theme owns surfaces, typography and TV sizing. New
+player intent, DJ rules and decorative scenery remain with their feature owners in
+the [source map](ARCHITECTURE.md#source-map). No new runtime dependency, application
+language, remote font or second audio player was introduced.
+
+
+### Familiar layout and YouTube-only controls follow-up
+
+The follow-up restores horizontal navigation and one persistent tabbed workspace,
+adds room-directory filtering/recovery, and removes the app's duplicate transport,
+volume and seek controls. Dead sidebar, queue-action and removed-control styles
+are deleted. No runtime dependency or application language is added.
+
+[Built-Worker response measurements](assets/v3-familiar-startup-20261025.json)
+are identical at 1440px and 390px:
+
+| Scenario | Decoded successful JavaScript | Sum of individually recomputed gzip |
+| --- | ---: | ---: |
+| Welcome / empty browser room, including the scene | 266,366 B | 98,248 B |
+| Active browser room, before audio consent | 250,300 B | 93,450 B |
+| Game entry | 148,186 B | 56,001 B |
+
+The active-room response total is 9,079 decoded bytes / 3,034 recomputed gzip bytes
+above the previous `b192b1e` candidate. The library still loads only after an
+explicit visit, and active rooms still exclude the optional scene. These bounded
+feature additions are not a bundle-size reduction or a field-performance claim.
+
+The native-control follow-up also inspects position discontinuities directly in
+player state callbacks. A synthetic Chromium fixture withholds every 250 ms
+sampling timer and holds pause/seek responses. In one controlled local run,
+callback-to-fetch dispatch measured 0.60 ms for pause and 0.20 ms for seek; the
+queue-next click dispatched in 0.20 ms, with the new player source loaded 1.90 ms
+after the synthetic response. The player was reused. These observations exclude
+iframe-provider event delivery, network, decoding and audible Discord output.
+They establish no zero-latency provider guarantee. Authorized seeks still wait for
+confirmation and a fresh shared timeline before synchronized playback continues.
+
+
+### Stable alignment and effective Discord fade buffering
+
+`createPlaybackCorrection` in the existing shared sync module filters moderate
+one-off/alternating video readings before a hard seek. In a settled 30-second
+synthetic trace with one stale 0.8-second reading every 3 seconds, the previous
+threshold/cooldown predicate requests 11 seeks and the sustained policy requests 0.
+Persistent drift still corrects within 750 ms precise / 1500 ms stable once eligible;
+manual alignment, large drift and pause paths retain their fast behavior. This is
+a deterministic correction-decision trace, not measured real YouTube playback.
+
+The Discord mixer separates overlap readiness from its original bounded PCM
+reservoir. A controlled held-read fixture can start the ready 50-frame overlap
+while the next provider read remains pending. Background prefetch continues;
+the previous 12-second/600-frame reservoir and no-fade warm frame remain bounded.
+Tests retain 550 cached post-fade frames through provider delay and deliver ten
+individually paced handoff reads with maximum decoder-read concurrency 1. The
+promoted main source waits only for its single retiring read, not for 600 frames
+or EOF. Late invalidation, failures and disposal cannot lose/announce stale audio.
+An outgoing EOF during a partial fade retains consumed incoming frames and its
+original clock segment instead of resetting/announcing the same source again.
+
+The original reservoir is retained to protect playback after the handoff.
+
+Configured fades are now honored when the remaining tail can cover them, while
+shorter tails keep the prior quarter-tail fallback. With saved 6-second fade,
+real FFmpeg 24-second + 24-second sources decode to exactly 42 seconds; the new
+segment starts at frame 900 (18 seconds). An 8-second seeked tail uses the full
+300-frame/6-second overlap. An existing 1-second seek transition now decodes to
+exactly 260 PCM frames (5.2 seconds), matching 2.8+3.4-1 instead of the former
+quarter-capped overlap. Track IDs and extraction offsets remain protected.
+
+These are synthetic/locally decoded regression measurements, not proof of human
+Discord listening quality, provider delivery speed or zero network latency.
+
+## Advancing-player stress review, 25 October 2026
+
+The native room follow-up uses the existing Playwright/loopback SSE harness with
+three clients at 4K, QHD and mobile. Synthetic current time advances with actual
+elapsed playback, including pause/resume and buffering transitions. Three rapid
+scrubs and a 1200ms held reply reproduced one redundant programmatic seek on the
+originating player. The successful seek's completion callback no longer forces
+that second correction, and queued targets refresh from bounded observed progress.
+The new regression passes without an additional origin-player jump; three
+consecutive stress runs also pass. Guest-local pause survives a later host seek.
+
+Startup was measured with the existing built-Worker script and `--verify-lazy`.
+At both 1440px and 390px, active-room startup contains 203,657 decoded script
+bytes and 76,944 bytes when each successful response is separately gzipped.
+Welcome/empty-room startup contains 224,038 decoded / 82,897 recomputed gzip
+bytes; games contain 152,519 / 57,662. Optional library code stays deferred and
+active rooms omit decorative stage code. The measurement contacts no providers
+before audio consent and issues no queue mutations.
+
+[Raw startup results](assets/v3-playback-startup-20261025.json) record the base
+commit and application-file fingerprints. These are isolated response sizes,
+not wire-transfer totals, field performance, or a paired before/after claim.
+The three-player 750ms phase tolerance is likewise a synthetic acceptance bound,
+not measured production or YouTube latency.
+
+The same held-reply trace identifies a further protocol opportunity: a committed
+command's SSE state arrives while the client still waits for its HTTP receipt.
+[Issue #152](https://github.com/lukasvri/Afterparty-MusicBot/issues/152) tracks
+correlated acknowledgements with room/epoch/revision guards so a later gesture
+can be safely released sooner. That protocol change is not implemented here.
+
+
+## CI validation time, 2026-10-26
+
+The last successful sampled GitHub run
+[40239011597](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40239011597)
+spent 327 seconds in browser/startup/stack journeys and 136 seconds probing and
+packing the Core image. Dependency installation was already cached and was not
+the main bottleneck. A later coverage run spent 11 minutes 3 seconds installing FFmpeg, mostly
+downloading its dependencies;
+[40243082047](https://github.com/lukasvri/Afterparty-MusicBot/actions/runs/40243082047)
+also lost its Wrangler preview and continued until the eight-minute journey limit.
+
+On the same local built main candidate, all 88 browser cases passed with both
+one and two concurrent files: 327.539 seconds versus 172.258 seconds, about 47%
+less elapsed time in this sample. Tests within a file stay sequential, fixtures
+remain isolated, and the complete suite is retained. This is a local paired
+measurement, not a guaranteed GitHub runner improvement.
+
+One intervening two-file run lost its preview and failed. That result is retained
+in the [raw measurements](assets/ci-validation-20261026.json), not counted as a
+successful speed result. The blank error matches the symptom described in
+[upstream Wrangler issue 15451](https://github.com/cloudflare/workers-sdk/issues/15451).
+The pipeline now supervises the preview and validation process groups, fails on
+preview exit even with status zero, cleans up both groups on cancellation and
+preserves Wrangler debug logs. It does not restart the preview or retry failed
+tests. The upstream crash itself is not claimed fixed; the new logs allow its
+actual cause to be distinguished on subsequent failures.
+
+Core packaging now uses streaming gzip level 1 instead of the implicit level 9.
+A 204,544,000-byte local sample containing Core source/dependencies, the Node
+binary and FFmpeg binary compressed in 2.047 instead of 20.930 seconds, with
+68,252,470 instead of 59,377,384 output bytes (about 15% larger). Both outputs
+round-tripped to the same SHA-256. This sample is not a Docker image; actual
+GitHub packaging time and artifact transfer size remain CI measurements. Existing
+image probes, archive validation, signed digest checks and publication gates are
+preserved. The producer regression also compares the full saved archive bytes.
+
+Coverage caches downloaded FFmpeg `.deb` archives, leaving APT metadata and
+package checksum verification in charge of selecting valid versions. It reuses
+an available FFmpeg executable, otherwise bounds installation to three minutes with one download retry and 20-second network timeouts. An absent
+or broken tool fails validation. Actionlint 1.7.12 validates all three workflow
+files; lifecycle regressions execute the actual journey shell with controlled
+children for success, suite failure, preview exit and cancellation. The old shell
+reproduced waiting after preview death; the corrected shell completes those
+regressions. These changes are internal CI work, not public product release notes.
+
+
+Pull requests also stop producing release archives that no downstream PR job
+consumes. They run the shared Core runtime probe through `core-probe`, while
+main pushes retain `core-package`, website packaging, archive validation,
+uploads and the unchanged signed release dependency chain. Automated coverage
+is limited to main and explicit dispatch; all three ordinary unit suites still
+run on PRs. The active main ruleset requires `deployer`, `core`, `website` and
+`dependency-review`; those contexts are preserved.
+
+GitHub validation of the first candidate passed all jobs plus separately
+dispatched coverage. Against the same main source baseline, the combined
+startup/browser/stack step measured 203 seconds instead of 277, and Core probing
+plus packaging measured 29 seconds instead of 117. The sample Core artifact was
+322,909,801 bytes versus 290,899,179 in the earlier sampled playback candidate;
+source revisions and runner conditions differ, so these are observed samples,
+not a controlled transfer benchmark. PRs now omit that archive entirely.
+The FFmpeg installer completed in 20 seconds and saved 62,790,608 bytes of APT
+packages for reuse. Exact run/commit identifiers are retained in the raw results.
+
+
+## Consolidated checks and conservative browser scope, 2026-10-26
+
+Normal validation and dependency review now share `core.yml`; the separate
+coverage and dependency-review workflow files are retired. Coverage is requested
+explicitly through that workflow, rather than automatically repeating all unit
+suites on every merge. Its upload remains separately opt-in. Manual check names
+are namespaced so a skipped report-only job cannot replace a required PR check.
+The four regular required contexts and canonical signed-release workflow path
+remain unchanged. GitHub-managed default CodeQL stays separate.
+
+The website installs/caches only the pinned Chromium headless shell. The CI
+browser selector reads the existing `test:browser` manifest command and can omit
+only the extended eight-round pack for a narrow set of independent playback,
+presentation or documentation paths. All other browser journeys, including game
+and game-audio smoke tests, remain enabled. Shared/game/dependency/workflow or
+unknown changes, incomplete diffs, main pushes and manual validation retain the
+full suite. Renames are expanded into both old and new paths. Local browser
+commands remain full-suite commands.
+
+The [selection measurement](assets/ci-browser-scope-20261026.json) records a
+successful 95-case run in 164.963 seconds against the merged playback application.
+Only the unrelated pack journey was omitted. This is not a paired speed claim.
+Six selector regressions cover full-suite fallback, retained game smoke/audio,
+canonical flags, invalid diffs and game-to-playback renames. Existing lifecycle
+and producer tests also cover the consolidated job graph and release gates.
+
+
+A cold GitHub validation then exposed another independent setup bottleneck:
+`playwright install --with-deps` timed out fetching unused font families and
+upgrading already-installed libraries from a slow Ubuntu mirror. Browser setup
+now installs only the pinned headless shell, uses the hosted Ubuntu image's
+existing shared libraries and verifies an actual launch before running tests.
+FFmpeg cache/installer steps are shared with the manual report through YAML
+anchors; restore-prefix lookup reuses earlier APT-verified archives when the
+workflow key changes. Missing browser libraries or failed package verification
+still fail validation rather than concealing a broken environment.
+
+
+Main validation also reproduced the preview-process failure separately from the
+package-download timeout. Upstream fixed Wrangler's whole-server exit on a
+transient request failure in 4.129.1
+([15252](https://github.com/cloudflare/workers-sdk/pull/15252)), and fixed the
+empty error message in 4.132.0
+([14906](https://github.com/cloudflare/workers-sdk/pull/14906)). The website's
+preview/build SDK is pinned to 4.132.0, retaining the SvelteKit adapter's supported
+Wrangler range. The fix limits retries to safe GET/HEAD requests and keeps request
+failures from terminating the dev server; it does not retry mutation requests or
+failed tests. Application framework and Core runtime versions are unchanged.

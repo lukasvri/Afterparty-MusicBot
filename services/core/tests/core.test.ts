@@ -180,6 +180,23 @@ test('clock and recovery avoid snapshots while preserving position and revision'
  }finally{t.close();}
 });
 
+test('pause and resume durably replace recovery intent before a clock tick or state notification',()=>{
+ for(const paused of [true,false]){
+  const t=setup();let reopened:Store|undefined;
+  try{
+   clearInterval(t.engine.timer);t.engine.connected=true;t.engine.current=track();
+   t.engine.segments=[{track:t.engine.current,startFrame:0,offset:10}];t.sink.ms=2000;
+   t.engine.paused=!paused;t.engine.checkpoint();
+   t.engine.on('state',()=>assert.equal(t.store.get<{paused:boolean}>('recovery',{paused:!paused}).paused,paused,'intent is durable before publishing its state change'));
+   if(paused)t.engine.pause();else t.engine.resume();
+   const file=String(t.store.db.prepare('PRAGMA database_list').get()!.file);
+   reopened=new Store(file);
+   const recovery=reopened.get<{paused:boolean;position:number;track:Track}|null>('recovery',null);
+   assert.equal(recovery?.paused,paused);assert.equal(recovery?.position,12);assert.equal(recovery?.track.entryId,t.engine.current.entryId);
+  }finally{t.engine.removeAllListeners('state');reopened?.close();t.close();}
+ }
+});
+
 test('a superseded paused seek cannot pause its replacement or reject after stop',async()=>{
  for(const action of ['replace','stop']){
   const t=setup(),pending=deferred<Prepared>(),replacement=deferred<Prepared>();let newer:Promise<void>|undefined;
@@ -206,6 +223,106 @@ test('pause state remains visible during seek and accepts newer pause or resume 
    await seek;assert.equal(t.engine.paused,paused);assert.equal(t.sink.playing,!paused);
   }finally{t.close();}
  }
+});
+
+test('a pending seek publishes and durably retains its intended offset without advancing during extraction',async()=>{
+ const t=setup(),pending=deferred<Prepared>();let seek:Promise<void>|undefined;
+ try{
+  clearInterval(t.engine.timer);t.engine.connected=true;t.engine.current={...track(),concert:true};
+  t.engine.segments=[{track:t.engine.current,startFrame:0,offset:12}];t.sink.ms=2000;
+  const playback=t.engine.snapshot().playbackKey,revision=t.engine.revision();
+  t.engine.prepare=()=>pending.promise;seek=t.engine.seek(42.75);
+  assert.equal(t.engine.snapshot().position,42.75);assert.equal(t.engine.snapshot().buffering,true);
+  assert.equal(t.engine.snapshot().playbackKey,playback);assert.equal(t.engine.revision(),revision);
+  assert.equal(t.store.get<{position:number}>('recovery',{position:-1}).position,42.75,'seek is durable before a periodic tick');
+  t.sink.ms=5000;t.engine.tick();assert.equal(t.engine.snapshot().position,42.75,'an old sink clock cannot advance pending extraction');
+  t.engine.pause();
+  assert.deepEqual(t.store.get<{position:number;paused:boolean}>('recovery',{position:-1,paused:false}).position,42.75);
+  assert.equal(t.store.get<{paused:boolean}>('recovery',{paused:false}).paused,true);
+  const reopened=new Store(String(t.store.db.prepare('PRAGMA database_list').get()!.file));
+  try{const recovery=reopened.get<{position:number;paused:boolean;track:Track}>('recovery',null!);
+   assert.equal(recovery.position,42.75);assert.equal(recovery.paused,true);assert.equal(recovery.track.entryId,t.engine.current.entryId);
+  }finally{reopened.close();}
+ }finally{t.engine.stop();pending.reject(Error('test cleanup'));await seek;t.close();}
+});
+
+test('pause checkpoints pair the consumed crossfade entry with its offset before the next clock tick',()=>{
+ const t=setup();let restored:Engine|undefined;
+ try{
+  clearInterval(t.engine.timer);
+  const outgoing=track('outgoing000'),incoming=track('incoming000'),later=track('later000000');
+  t.engine.connected=true;t.engine.current=outgoing;t.engine.queue=[incoming,later];
+  t.engine.segments=[{track:outgoing,startFrame:0,offset:30},{track:incoming,startFrame:500,offset:7}];t.sink.ms=12000;
+  t.engine.persist();t.engine.pause();
+  const checkpoint=t.store.get<{track:Track;position:number;paused:boolean}>('recovery',null!);
+  assert.equal(checkpoint.track.entryId,incoming.entryId);assert.equal(checkpoint.position,9);assert.equal(checkpoint.paused,true);
+  restored=new Engine(t.store,t.providers,new FakeSink());clearInterval(restored.timer);
+  assert.deepEqual(restored.queue.map(item=>item.entryId),[incoming.entryId,later.entryId]);
+  assert.equal(restored.queue[0].offset,9,'an already queued active entry must retain the checkpoint offset');
+  assert.equal(restored.connected,false,'reading recovery does not start audio');
+ }finally{restored?.close();t.close();}
+});
+
+for(const consumed of [9980,10000,12000])test(`seek targets the consumed recording at crossfade boundary ${consumed} ms`,async()=>{
+ const t=setup(),pending=deferred<Prepared>();let seeking:Promise<void>|undefined;
+ try{
+  clearInterval(t.engine.timer);
+  const outgoing=track('outgoing000'),incoming=track('incoming000'),later=track('later000000');
+  t.engine.connected=true;t.engine.current=outgoing;t.engine.queue=[incoming,later];t.engine.paused=true;
+  t.engine.segments=[{track:outgoing,startFrame:0,offset:30},{track:incoming,startFrame:500,offset:7}];t.sink.ms=consumed;
+  const expected=consumed<10000?outgoing:incoming;
+  t.engine.prepare=(song,offset)=>{assert.equal(song.entryId,expected.entryId);assert.equal(offset,42);return pending.promise;};
+  seeking=t.engine.seek(42);
+  assert.equal(t.engine.current?.entryId,expected.entryId);assert.equal(t.engine.snapshot().position,42);
+  assert.deepEqual(t.engine.queue.map(item=>item.entryId),consumed<10000?[incoming.entryId,later.entryId]:[later.entryId]);
+  assert.equal(t.engine.paused,true);
+ }finally{t.engine.stop();pending.reject(Error('test cleanup'));await seeking;t.close();}
+});
+
+for(const count of [1,2])test(`numbered skip ${count} cannot restart the already consumed incoming crossfade entry`,async()=>{
+ const t=setup();
+ try{
+  clearInterval(t.engine.timer);
+  const outgoing=track('outgoing000'),incoming=track('incoming000'),later=track('later000000'),last=track('last0000000');
+  t.engine.connected=true;t.engine.current=outgoing;t.engine.queue=[incoming,later,last];
+  t.engine.segments=[{track:outgoing,startFrame:0,offset:30},{track:incoming,startFrame:500,offset:7}];t.sink.ms=12000;
+  assert.deepEqual(t.engine.snapshot().queue.map(item=>item.id),[later.id,last.id]);
+  const before=structuredClone({current:t.engine.current,queue:t.engine.queue});
+  await assert.rejects(t.engine.skip(4),/Invalid number/);
+  assert.deepEqual({current:t.engine.current,queue:t.engine.queue},before,'invalid counts cannot consume an entry');
+  const starts:Track[]=[];t.engine.startTrack=async song=>{starts.push(song);};
+  await t.engine.skip(count);
+  assert.deepEqual(starts.map(item=>item.entryId),[count===1?later.entryId:last.entryId]);
+  assert.deepEqual(t.engine.queue.map(item=>item.entryId),count===1?[last.entryId]:[]);
+ }finally{t.close();}
+});
+
+test('natural radio completion preserves a pause received while discovery was pending',async()=>{
+ const t=setup(),pending=deferred<void>();
+ try{
+  clearInterval(t.engine.timer);t.engine.connected=true;t.engine.current=track();
+  t.engine.ensureRadio=()=>pending.promise;
+  const started:{track:Track;paused:boolean}[]=[];
+  t.engine.startTrack=async(song,_offset,paused=false)=>{started.push({track:song,paused});};
+  const completion=t.engine.naturalNext();
+  t.engine.pause();t.engine.queue.push(track('bcdefghijkl'));
+  pending.resolve();await completion;
+  assert.equal(started.length,1);assert.equal(started[0].paused,true);
+  assert.equal(started[0].track.id,'bcdefghijkl');
+ }finally{pending.resolve();t.close();}
+});
+
+test('failed preparation keeps the latest pause intent when cueing the next queued song',async()=>{
+ const t=setup(),first=deferred<Prepared>(),next=deferred<Prepared>();let seek:Promise<void>|undefined;
+ try{
+  clearInterval(t.engine.timer);t.engine.connected=true;t.engine.current=track();
+  t.engine.queue=[track('bcdefghijkl')];
+  t.engine.prepare=song=>song.id==='abcdefghijk'?first.promise:next.promise;
+  seek=t.engine.seek(30);t.engine.pause();first.reject(Error('synthetic extraction failure'));await seek;
+  assert.equal(t.engine.current?.id,'bcdefghijkl');assert.equal(t.engine.paused,true);assert.equal(t.sink.playing,false);
+  assert.equal(t.store.get<{paused:boolean;track:Track}>('recovery',null!).paused,true);
+  assert.equal(t.store.get<{track:Track}>('recovery',null!).track.id,'bcdefghijkl');
+ }finally{t.engine.stop();first.reject(Error('test cleanup'));next.reject(Error('test cleanup'));await seek;await Promise.resolve();t.close();}
 });
 
 test('closing an engine rejects delayed adds and cannot restart playback',async()=>{

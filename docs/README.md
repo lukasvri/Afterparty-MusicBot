@@ -10,7 +10,7 @@
 | --- | --- |
 | Install your own bot and website | [Installation](INSTALLATION.md) |
 | Find a variable or hosting requirement | [Configuration](CONFIGURATION.md) |
-| Understand the two services and their data | [Architecture](ARCHITECTURE.md) |
+| Understand the two services and find code by feature | [Architecture and source map](ARCHITECTURE.md#source-map) |
 | Run, update or recover Core | [Operations and recovery](../services/core/PUBLIC_RELEASE.md) |
 
 ## Run a host
@@ -34,6 +34,10 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 
 ## Develop and release
 
+- [Optional observability and coverage](OBSERVABILITY.md): private-data filtering, disabled-by-default Sentry and scoped Codecov OIDC uploads.
+
+- [Student development tools](STUDENT_DEVELOPER_PACK.md): isolated Codespaces, Copilot instructions and student account setup.
+
 - [Contributing](../CONTRIBUTING.md): current source, code boundaries and PR validation.
 - [Cloud development](CLOUD_DEVELOPMENT.md): source-only cloud development and the local production boundary.
 - [TypeScript conventions](TYPESCRIPT.md): application code, Node tooling and incremental consolidation.
@@ -46,6 +50,8 @@ Core must stay online for Discord playback. The website needs its own Workers/D1
 [Security reporting](../SECURITY.md) · [Privacy](PRIVACY_POLICY.md) · [Terms](TERMS_OF_SERVICE.md) · [Copyright requests](COPYRIGHT_REQUESTS.md) · [MIT license](../LICENSE) · [Third-party notices](../THIRD_PARTY_NOTICES.md)
 
 ## Engineering records
+
+- [D1 bridge write budget](D1_WRITE_BUDGET.md): measured write sources, unchanged snapshot handling and validation boundaries.
 
 - [Music source investigation](MUSIC_SOURCE_INVESTIGATION.md): verified Jockie features, independently documented source architecture and current quiz scope.
 
@@ -68,3 +74,8 @@ The [asset notes](assets/README.md) identify the generated brand banner and synt
 
 - [AI collaboration workflow](AI_WORKFLOW.md): ChatGPT Chat coordination, Codex implementation, shared context and practical handoff prompts; Dot is temporarily paused and Work is excluded.
 - [Shared AI project context](AI_CONTEXT.md): durable product decisions, source-of-truth rules and important architecture boundaries.
+
+## Repository maintenance and performance
+
+- [Frontend startup measurements and checks](FRONTEND_PERFORMANCE.md)
+- [Verified branch and file cleanup, 24 October 2026](REPOSITORY_CLEANUP_2026-10-24.md)

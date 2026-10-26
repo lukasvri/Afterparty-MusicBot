@@ -4,6 +4,66 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-alpha.3: Quicker room entry and clearer mobile controls
+
+2026-10-26
+
+- On phones, room creation and joining appear before the stage illustration. Welcome shortcuts take you directly to the room-name or room-code field.
+- Shared buttons respond clearly to presses. Touch inputs stay readable, and the interface respects screen cutouts, keyboard navigation and reduced-motion preferences.
+- Support, installation and policy pages have a more comfortable reading width and larger mobile text. Long release labels wrap on narrow screens.
+
+## v3.0.0-alpha.2: A clearer music workspace, native controls and DJ tools
+
+2026-10-25
+
+- Listening rooms, library, games, server administration and public pages share a refreshed dark interface with clearer grouping, larger controls and fluid layouts for mobile, 1080p, QHD and 4K.
+- The familiar horizontal navigation and single player surface return in Svelte. Queue, search and library share one tabbed panel beside the player on wide screens. Switching tabs keeps searches, playlist previews and unfinished library fields; room and device settings stay together below the player. Mobile shortcuts return directly to player, search, queue and library, and one invitation panel groups QR and link copying.
+- Open rooms can be filtered by name or code, show matching counts and retain their last good list through a refresh error. Queue track options support keyboard reorder, removal and Escape without interrupting a new search.
+- Music, concerts, DJ tools and games use consistent navigation and clearer form controls. The library has flatter sections and fewer nested scroll areas, and server administration has a compact local toolbar. Theater mode fills the entire browser tab with the existing room or concert video, provides an exit button, and remembers the layout on this device without restarting playback. Concert theater stays above the queue workspace.
+- All five main sections share the same header, page title, action row and footer, with matching controls and screen margins. Create, invite, sign in and server settings actions stay beside the page title. Empty listening rooms put Choose a song directly on the DJ booth, removing the oversized panel underneath.
+- Playing room videos no longer wait through a new 1.5-second start barrier when you scrub. Rapid native scrubs retain the latest target through a delayed reply, and brief pause/buffer transitions during scrubbing no longer become separate pause commands. Deliberately paused rooms stay paused. Successful delayed seek replies no longer force another local seek, and queued scrubs retain valid observed playback progress.
+- Short room-status read outages keep a fresh live video stream running while authenticated controls reconnect. Expired streams and access failures still stop playback. Access failures stay stopped through further network errors until an authenticated read restores access. A control rejected because only the queue changed can refresh and try once without rejoining; newer playback changes remain protected.
+- The empty-room DJ scene grows with the available player area instead of staying in a small fixed-size island, keeping the song-selection button on the booth.
+- Seeking within a playing video no longer leaves it paused waiting for another Play press. Seeks keep the current video view when the shared clock changes, while deliberately paused videos stay paused.
+- Use the official YouTube controls for playback, volume, quality, captions and fullscreen after enabling audio. The app no longer adds its own play/pause buttons, volume slider or seek bar around the video, including before audio activation. Authorized native playback follows the shared clock; guest pause and device volume remain local. The app retains one action for the shared queue’s next track. Native seeks can use player state events immediately instead of waiting for the periodic position check.
+- The welcome screen gives the DJ stage more space beside create/join controls. Sweeping spotlights, laser fans, rotating light rings and animated stage levels return, with redrawn CDJs facing the performer. Animation respects device preferences and pauses off screen.
+- The server player includes a DJ desk for crossfade and radio, explicit repeat controls, previous song, fractional cue points, 15-second jumps and a recording-scoped marked cue. Transition changes require Apply and preserve other server settings.
+- Room and concert search results show video thumbnails, with a stable fallback for unavailable images. Player settings separate video quality guidance, device synchronization and room controls into readable groups.
+- Radio started from a named House recording can discover other explicitly House-tagged artists instead of repeatedly falling back to the seed artist. Discord begins preparing radio while the current source is still loading, giving the next track more time to reach the queue.
+- Automatic video alignment ignores isolated short-lived timing errors before seeking, while persistent drift, larger desynchronization and explicit synchronization remain corrected. New tracks start with their own correction state.
+- Discord crossfades can begin once the required overlap has enough decoded audio, while bounded background buffering preserves the following track’s audio reserve. This avoids waiting for the entire reserve before a ready transition and protects playback after the handoff. An outgoing recording that ends early no longer resets incoming progress or announces the same transition twice.
+- Eligible transitions honor the configured crossfade, including the 6-second default, when enough audio remains after seeking. Shorter tails retain an adapted overlap, and saved settings remain separate for each server.
+- Playback recovery keeps a requested seek position while its source loads, preserves pause choices across radio discovery and source failures, and checkpoints the recording actually consumed during a crossfade. Browser rooms and their website fallback use the same agreed start clock.
+- An unavailable YouTube recording no longer locks the following track. Native seeks near the start or end confirm against the achievable shared position, including device timing calibration. Public concerts offer a collapsed Discord pause/resume recovery control when browser playback is unavailable. A newer shared pause retires older resume gestures queued behind a concert seek.
+- Music searches use title, artist and recording-format relevance to order the existing results. Exact songs take priority over incidental matches, while explicit remix, cover and live-set searches remain available.
+- Radio gives less recently exposed artists a turn among equally suitable candidates, reducing repeated loops through the first artists returned by a source. The original station anchor, style checks and independent room histories remain in place.
+- Automatic radio catches more declared AI production and song-recreation labels, including Norwegian KI and vlogg wording. Matching music videos remain preferred without replacing the chosen song with another recording.
+- Festival browsing expands from 49 to 290 source-backed sets, including every linked recording in the checked EDC 2023, 2025 and 2026 indexes and all matching-year links in the checked Creamfields 2024 index. Artist and stage search, pages of 20 and explicit capacity-sized batches keep larger years usable.
+- Each existing Tomorrowland year can open its source playlist in the metadata preview before you choose tracks. Other festival archives remain partial where their complete source inventory could not be verified.
+- Join or host Guess the Song without entering a nickname. A default player name is supplied, while incorrect guesses remain selected for quick correction.
+- Unsaved game settings survive guests arriving and song preparation updates. Changes made by another host still require you to review the latest settings before saving.
+- Playlist previews retry temporary connection failures with a bounded delay. Starting an import and adding music are never automatically repeated.
+- Library and festival tools show remaining queue capacity and account for tracks already queued or awaiting approval. Explicitly retrying a partial addition skips tracks already present and retains the original room or concert.
+- Concert controls check their own command confirmation and report failed commands without claiming success. Temporary concert disconnections clear after a successful read without replaying music commands.
+- A newly created room keeps its address after a temporary connection failure, so reloading can return to it with saved host access.
+- This alpha source candidate still requires live provider, real-device audio and Discord listening acceptance before a stable release.
+
+## v3.0.0-alpha.1: Afterparty 3 website preview
+
+2026-10-24
+
+- The expanded v3 interface brings open and private listening rooms, host and co-host invitations, shared queue editing, voting, guest request approval and radio into one responsive music workspace.
+- Use your existing saved evenings and favorites, back up or import your library, preview YouTube and Spotify playlists before adding songs, and browse official festival sets by event and year.
+- Server administration, public concerts with opt-in synchronized browser audio, Guess the Song, installation, support and policy pages now have native v3 views. Server selection and permissions continue to scope controls to the intended Discord server.
+- Guess the Song has a dedicated game-night lobby with private hosting and invite links, recording-aware pace presets, one-step start, clearer live points and hints, focused reveals and final standings that recognize ties. Game audio can follow new rounds after explicit activation, with separate local volume and safe stop/cancel controls.
+- Room playback adds local volume, mute and fullscreen controls, and follows the shared timeline with stream leases and read-only reconnection. This is an alpha review build; live provider playback, Discord listening and production login still require acceptance testing.
+- The listening room loads library, playlist and festival tools when you open them, reducing the initial JavaScript payload while keeping those tools available. Game hosting code also loads on demand.
+- The native v3 source now provides the sole interface at the home address, with public concerts at /discord. Existing v3 bookmarks keep working; the Classic interface and its fallback have been retired while APIs and saved data retain their existing contracts.
+- TV mode scales video, QR invitations and controls dynamically from 1080p through QHD and 4K. Local QR invitations and keyboard fullscreen/mute controls now use the native player. Switching views retains the active player; public invitation links exclude private host credentials.
+- Reconnect game can rejoin after Core loses its in-memory game membership. Existing games retain their scores; lost games return to a lobby without replaying guesses or starting a round automatically.
+- Core saves pause and resume choices immediately for restart recovery, closing the gap before the next playback clock tick.
+- Optional Core-authoritative concert rooms show a saved checkpoint as offline when Core cannot be reached, keeping stale playback paused until fresh state is available.
+
 ## v2.4.0-alpha.15: Prepare an opt-in Cloudflare website build
 
 2026-10-21

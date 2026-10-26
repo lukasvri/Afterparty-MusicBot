@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { Store } from "./store.ts";
 import { UserError } from "./types.ts";
 import {
-  ROOM_START_LEAD_MS,
   ROOM_LEASE_MS,
   readRoomTimeline,
   type RoomTimeline,
@@ -17,6 +16,7 @@ import {
   finished,
   prefetchDue,
   publicPlayback,
+  roomPlaybackPosition,
   type RoomPlayback,
 } from "./room-state.ts";
 
@@ -141,16 +141,7 @@ export class Rooms extends EventEmitter {
     };
   }
   private position(room: Saved, now: number) {
-    return (
-      room.state.position +
-      (room.state.playing
-        ? Math.max(
-            0,
-            now -
-              Math.max(room.updatedAt, room.state.startsAt ?? room.updatedAt),
-          ) / 1000
-        : 0)
-    );
+    return roomPlaybackPosition(room.state, room.updatedAt, now);
   }
   async control(code: string, input: Record<string, unknown>) {
     const room = this.load(code);
@@ -227,8 +218,7 @@ export class Rooms extends EventEmitter {
     const room = this.load(code);
     if (input.version !== room.version)
       throw new UserError("The room has changed. Try again.", 409);
-    const now = this.now(),
-      previousKey = room.state.playbackKey;
+    const now = this.now();
     const state = changeRoom(
       room.state,
       { ...input, now },
@@ -236,13 +226,6 @@ export class Rooms extends EventEmitter {
       this.position(room, now),
       recommended,
     );
-    if (
-      state.playing &&
-      (state.playbackKey !== previousKey ||
-        ["play", "seek"].includes(String(input.action)))
-    )
-      state.startsAt = now + ROOM_START_LEAD_MS;
-    else if (!state.playing) delete state.startsAt;
     room.state = state;
     room.updatedAt = now;
     room.version++;

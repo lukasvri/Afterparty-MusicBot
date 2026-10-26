@@ -1,6 +1,6 @@
 import { UserError } from "./types.ts";
-import type { RoomVideo } from "./protocol.ts";
-import { roomRadioSeed, playableRoomQueue, roomRadioHistory } from "./room-radio.ts";
+import { ROOM_QUEUE_LIMIT, ROOM_START_LEAD_MS, roomQueueCapacity, roomSeekPosition, type RoomVideo } from "./protocol.ts";
+import { roomRadioSeed, playableRoomQueue, hasPlayableRoomQueue, roomRadioHistory } from "./room-radio.ts";
 import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
 
 /** Durable room state, shared by Core and the Worker fallback. Never publish vote identities. */
@@ -52,21 +52,25 @@ export function publicPlayback(state: RoomPlayback) {
     skipVotes: state.skipVoters?.length ?? 0,
   };
 }
+/** One room clock for Core and the Worker, including an agreed future start. */
+export function roomPlaybackPosition(state: RoomPlayback, updatedAt: number, now: number) {
+  return state.position + (state.playing
+    ? Math.max(0, now - Math.max(updatedAt, state.startsAt ?? updatedAt)) / 1000
+    : 0);
+}
 export function finished(state: RoomPlayback, updatedAt: number, now: number) {
   return Boolean(
     state.playing &&
     state.current &&
     !state.current.live &&
     state.current.duration > 0 &&
-    state.position +
-      Math.max(0, now - Math.max(updatedAt, state.startsAt ?? updatedAt)) /
-        1000 >=
+    roomPlaybackPosition(state, updatedAt, now) >=
       state.current.duration,
   );
 }
 export function prefetchDue(state:RoomPlayback,updatedAt:number,now:number){
- const remaining=(state.current?.duration??0)-state.position-Math.max(0,now-Math.max(updatedAt,state.startsAt??updatedAt))/1000;
- return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && !playableRoomQueue(state).length && remaining>0 && now>=(state.radioRetryAt??0));
+ const remaining=(state.current?.duration??0)-roomPlaybackPosition(state,updatedAt,now);
+ return Boolean(state.playing && state.current && !state.current.live && state.radio!==false && remaining>0 && now>=(state.radioRetryAt??0) && !hasPlayableRoomQueue(state));
 }
 export function needsRecommendation(
   state: RoomPlayback,
@@ -75,9 +79,9 @@ export function needsRecommendation(
   // A queued track already wins over radio. Avoid allocating a shared lookup
   // and yielding the revision to concurrent commands when no search is needed.
   const enabling = input.action === "radio" && input.enabled === true;
-  if (playableRoomQueue(state).length || (state.radio === false && !enabling)) return false;
+  if (state.radio === false && !enabling) return false;
   const actor = String(input.participantHash ?? "");
-  return (
+  const eligible = (
     input.action === "next" || input.action === "radio-prefetch" ||
     (input.action === "radio" && input.enabled === true) ||
     Boolean(
@@ -88,6 +92,7 @@ export function needsRecommendation(
       !state.skipVoters.includes(actor),
     )
   );
+  return eligible && !hasPlayableRoomQueue(state);
 }
 export function changeRoom(
   previous: RoomPlayback,
@@ -171,8 +176,8 @@ export function changeRoom(
       state.playbackKey = crypto.randomUUID();
       state.skipVoters = [];
     } else {
-      if (state.queue.length + (state.requests?.length ?? 0) >= 50)
-        throw new UserError("The queue holds up to 50 songs.");
+      if (!roomQueueCapacity(state.queue.length, state.requests?.length))
+        throw new UserError(`The queue holds up to ${ROOM_QUEUE_LIMIT} songs.`);
       if (
         state.current?.id === track.id ||
         [...state.queue, ...(state.requests ?? [])].some(
@@ -198,14 +203,12 @@ export function changeRoom(
     if (
       !state.current ||
       state.current.live ||
+      state.current.duration <= 0 ||
       typeof input.position !== "number" ||
       !Number.isFinite(input.position)
     )
       throw new UserError("This video does not support seeking.");
-    state.position = Math.max(
-      0,
-      Math.min(Math.max(0, state.current.duration - 1), input.position),
-    );
+    state.position = roomSeekPosition(input.position, state.current.duration);
   } else if (action === "radio-prefetch") {
     if (!state.queue.length && state.radio !== false && recommended) state.queue.push({ ...recommended, radio: true });
     state.radioRetryAt = Number(input.now ?? 0) + 15000;
@@ -230,7 +233,7 @@ export function changeRoom(
     const i = index(items);
     const [track] = items.splice(i, 1);
     if (action === "approve") {
-      if (state.queue.length >= 50) throw new UserError("The queue is full.");
+      if (!roomQueueCapacity(state.queue.length)) throw new UserError("The queue is full.");
       if (!state.current) {
         state.current = track;
         state.radioSeed = structuredClone(track);
@@ -273,7 +276,7 @@ export function changeRoom(
     const additions = state.queue.filter(
       (v) => !restored.some((saved) => saved.id === v.id),
     );
-    if (restored.length + additions.length + (state.requests?.length ?? 0) > 50)
+    if (restored.length + additions.length + (state.requests?.length ?? 0) > ROOM_QUEUE_LIMIT)
       throw new UserError(
         "The queue is too full to undo. Remove some songs first.",
       );
@@ -315,5 +318,11 @@ export function changeRoom(
     for (const id of Object.keys(state.votes))
       if (!retained.has(id)) delete state.votes[id];
   }
+  if (!state.playing) delete state.startsAt;
+  else if (typeof input.now === 'number' && Number.isFinite(input.now) &&
+    (state.playbackKey !== previous.playbackKey || !previous.playing || action === 'seek'))
+    // A native scrub is already in progress. Re-anchor its clock immediately;
+    // reserving another start barrier would pause every device for 1.5 seconds.
+    state.startsAt = action === 'seek' && previous.playing ? input.now : input.now + ROOM_START_LEAD_MS;
   return state;
 }

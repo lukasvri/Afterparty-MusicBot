@@ -1,0 +1,459 @@
+{
+  "scope": "Synthetic queue selection only; no network, audio or production data.",
+  "baseline": "Previous per-entry queue selection using current radio helpers",
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "linux",
+    "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+  },
+  "workload": {
+    "iterations": 30,
+    "rounds": 5,
+    "warmup": 10
+  },
+  "results": [
+    {
+      "name": "empty queue",
+      "automatic": 0,
+      "manual": 0,
+      "history": 100,
+      "selected": 0,
+      "checksum": 0,
+      "measurements": [
+        {
+          "name": "repeatedHistory",
+          "medianMs": 0.30125000000001023,
+          "samplesMs": [
+            1.3293689999999856,
+            0.30125000000001023,
+            0.19259999999999877,
+            0.18083000000001448,
+            0.3436889999999835
+          ]
+        },
+        {
+          "name": "sharedHistory",
+          "medianMs": 0.03413699999998698,
+          "samplesMs": [
+            0.03413699999998698,
+            0.05794700000001285,
+            0.030433000000016364,
+            0.02587599999998247,
+            0.03694300000000794
+          ]
+        }
+      ]
+    },
+    {
+      "name": "manual queue",
+      "automatic": 0,
+      "manual": 20,
+      "history": 100,
+      "selected": 20,
+      "checksum": 6000,
+      "measurements": [
+        {
+          "name": "repeatedHistory",
+          "medianMs": 0.2948999999999842,
+          "samplesMs": [
+            0.5095929999999953,
+            0.28736200000000167,
+            0.28104999999999336,
+            0.4105220000000145,
+            0.2948999999999842
+          ]
+        },
+        {
+          "name": "sharedHistory",
+          "medianMs": 0.1668109999999956,
+          "samplesMs": [
+            0.2881399999999985,
+            0.6260010000000023,
+            0.0912710000000061,
+            0.15069900000000302,
+            0.1668109999999956
+          ]
+        }
+      ]
+    },
+    {
+      "name": "usual single suggestion, no history",
+      "automatic": 1,
+      "manual": 0,
+      "history": 0,
+      "selected": 1,
+      "checksum": 300,
+      "measurements": [
+        {
+          "name": "repeatedHistory",
+          "medianMs": 2.404639000000003,
+          "samplesMs": [
+            2.5499060000000213,
+            2.342283000000009,
+            3.359437000000014,
+            2.404639000000003,
+            2.1756420000000105
+          ]
+        },
+        {
+          "name": "sharedHistory",
+          "medianMs": 2.5548980000000086,
+          "samplesMs": [
+            2.4086250000000007,
+            3.283190999999988,
+            2.5548980000000086,
+            2.5917189999999835,
+            2.3832380000000057
+          ]
+        }
+      ]
+    },
+    {
+      "name": "usual single suggestion, full history",
+      "automatic": 1,
+      "manual": 0,
+      "history": 100,
+      "selected": 1,
+      "checksum": 300,
+      "measurements": [
+        {
+          "name": "repeatedHistory",
+          "medianMs": 14.741034000000013,
+          "samplesMs": [
+            14.741034000000013,
+            14.537079000000006,
+            18.809632000000022,
+            13.42668500000002,
+            22.22378200000003
+          ]
+        },
+        {
+          "name": "sharedHistory",
+          "medianMs": 15.694214999999986,
+          "samplesMs": [
+            18.31755100000001,
+            15.694214999999986,
+            13.344628999999998,
+            13.556849999999997,
+            22.37679700000001
+          ]
+        }
+      ]
+    },
+    {
+      "name": "manual priority with one suggestion",
+      "automatic": 1,
+      "manual": 20,
+      "history": 100,
+      "selected": 21,
+      "checksum": 6300,
+      "measurements": [
+        {
+          "name": "repeatedHistory",
+          "medianMs": 26.262851999999953,
+          "samplesMs": [
+            22.203895999999986,
+            26.377800999999977,
+            26.282320000000027,
+            26.142461000000026,
+            26.262851999999953
+          ]
+        },
+        {
+          "name": "sharedHistory",
+          "medianMs": 26.38866500000006,
+          "samplesMs": [
+            24.287458000000015,
+            26.80992500000002,
+            26.38866500000006,
+            26.36673899999994,
+            26.50870800000007
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stress: twenty automatic suggestions, no history",
+      "automatic": 20,
+      "manual": 0,
+      "history": 0,
+      "selected": 20,
+      "checksum": 6000,
+      "measurements": [
+        {
+          "name": "repeatedHistory",
+          "medianMs": 96.01264800000013,
+          "samplesMs": [
+            104.23443099999986,
+            93.54943200000002,
+            96.01264800000013,
+            94.83628799999997,
+            102.75822700000003
+          ]
+        },
+        {
+          "name": "sharedHistory",
+          "medianMs": 57.76393800000005,
+          "samplesMs": [
+            58.197271,
+            54.258749999999964,
+            58.145217,
+            57.76393800000005,
+            55.89499799999999
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stress: twenty automatic suggestions, full history",
+      "automatic": 20,
+      "manual": 0,
+      "history": 100,
+      "selected": 20,
+      "checksum": 6000,
+      "measurements": [
+        {
+          "name": "repeatedHistory",
+          "medianMs": 461.94008399999984,
+          "samplesMs": [
+            435.667426,
+            461.94008399999984,
+            468.4896749999998,
+            456.1452139999992,
+            471.198985
+          ]
+        },
+        {
+          "name": "sharedHistory",
+          "medianMs": 74.51527800000031,
+          "samplesMs": [
+            73.12759199999982,
+            74.51527800000031,
+            76.57855400000017,
+            75.5407350000005,
+            48.694924000000356
+          ]
+        }
+      ]
+    }
+  ],
+  "presenceResults": [
+    {
+      "name": "empty queue",
+      "automatic": 0,
+      "manual": 0,
+      "history": 100,
+      "exists": false,
+      "measurements": [
+        {
+          "name": "fullEnumeration",
+          "medianMs": 0.023883999999981143,
+          "samplesMs": [
+            0.024379000000010365,
+            0.024047000000024354,
+            0.023883999999981143,
+            0.023083000000013953,
+            0.02299500000000876
+          ]
+        },
+        {
+          "name": "firstPlayable",
+          "medianMs": 0.01695200000000341,
+          "samplesMs": [
+            0.01695200000000341,
+            0.017249000000020942,
+            0.016193000000015445,
+            0.017084999999980255,
+            0.01388600000001361
+          ]
+        }
+      ]
+    },
+    {
+      "name": "manual queue",
+      "automatic": 0,
+      "manual": 20,
+      "history": 100,
+      "exists": true,
+      "measurements": [
+        {
+          "name": "fullEnumeration",
+          "medianMs": 0.09057699999999613,
+          "samplesMs": [
+            0.5022240000000124,
+            0.09057699999999613,
+            0.07208700000001045,
+            0.10920600000000036,
+            0.07776000000001204
+          ]
+        },
+        {
+          "name": "firstPlayable",
+          "medianMs": 0.006996999999984155,
+          "samplesMs": [
+            0.0075029999999856045,
+            0.00714800000000082,
+            0.006996999999984155,
+            0.0061070000000142954,
+            0.006415000000004056
+          ]
+        }
+      ]
+    },
+    {
+      "name": "usual single suggestion, no history",
+      "automatic": 1,
+      "manual": 0,
+      "history": 0,
+      "exists": true,
+      "measurements": [
+        {
+          "name": "fullEnumeration",
+          "medianMs": 2.165852000000001,
+          "samplesMs": [
+            2.1102929999999844,
+            2.1684999999999945,
+            3.0111770000000035,
+            2.165852000000001,
+            1.892563999999993
+          ]
+        },
+        {
+          "name": "firstPlayable",
+          "medianMs": 2.205730999999986,
+          "samplesMs": [
+            2.0970140000000015,
+            2.6607170000000053,
+            3.6739959999999883,
+            2.205730999999986,
+            1.9418019999999956
+          ]
+        }
+      ]
+    },
+    {
+      "name": "usual single suggestion, full history",
+      "automatic": 1,
+      "manual": 0,
+      "history": 100,
+      "exists": true,
+      "measurements": [
+        {
+          "name": "fullEnumeration",
+          "medianMs": 22.602232000000015,
+          "samplesMs": [
+            23.993160999999986,
+            23.913549999999987,
+            22.602232000000015,
+            22.110697999999957,
+            22.241843000000017
+          ]
+        },
+        {
+          "name": "firstPlayable",
+          "medianMs": 22.588885000000005,
+          "samplesMs": [
+            20.42912899999999,
+            24.303731999999968,
+            22.67121899999995,
+            22.588885000000005,
+            22.57793300000003
+          ]
+        }
+      ]
+    },
+    {
+      "name": "manual priority with one suggestion",
+      "automatic": 1,
+      "manual": 20,
+      "history": 100,
+      "exists": true,
+      "measurements": [
+        {
+          "name": "fullEnumeration",
+          "medianMs": 25.627377999999908,
+          "samplesMs": [
+            25.627377999999908,
+            25.09231299999999,
+            24.934776000000056,
+            25.77718799999991,
+            27.12471800000003
+          ]
+        },
+        {
+          "name": "firstPlayable",
+          "medianMs": 0.00507700000002842,
+          "samplesMs": [
+            0.0051799999999957436,
+            0.004397999999923741,
+            0.00507700000002842,
+            0.011231999999949949,
+            0.004807999999911772
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stress: twenty automatic suggestions, no history",
+      "automatic": 20,
+      "manual": 0,
+      "history": 0,
+      "exists": true,
+      "measurements": [
+        {
+          "name": "fullEnumeration",
+          "medianMs": 55.5948249999999,
+          "samplesMs": [
+            55.111381000000165,
+            55.5948249999999,
+            57.88513799999987,
+            55.837512999999944,
+            53.32138199999963
+          ]
+        },
+        {
+          "name": "firstPlayable",
+          "medianMs": 3.111116999999922,
+          "samplesMs": [
+            3.120913999999857,
+            2.914752000000135,
+            3.291037999999844,
+            2.9671760000001086,
+            3.111116999999922
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stress: twenty automatic suggestions, full history",
+      "automatic": 20,
+      "manual": 0,
+      "history": 100,
+      "exists": true,
+      "measurements": [
+        {
+          "name": "fullEnumeration",
+          "medianMs": 74.36034999999993,
+          "samplesMs": [
+            59.47860800000035,
+            74.36034999999993,
+            69.57853799999975,
+            75.29441700000007,
+            75.12815799999953
+          ]
+        },
+        {
+          "name": "firstPlayable",
+          "medianMs": 21.630755999999565,
+          "samplesMs": [
+            21.777259000000413,
+            21.630755999999565,
+            19.805843000000095,
+            21.59767600000032,
+            22.125334999999723
+          ]
+        }
+      ]
+    }
+  ]
+}

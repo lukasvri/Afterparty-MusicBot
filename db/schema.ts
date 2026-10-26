@@ -1,4 +1,4 @@
-import {sqliteTable, text, integer} from 'drizzle-orm/sqlite-core';
+import {sqliteTable, text, integer, index} from 'drizzle-orm/sqlite-core';
 export const rooms = sqliteTable('rooms', {
   code: text('code').primaryKey(), name: text('name').notNull(), ownerHash: text('owner_hash').notNull(),
   state: text('state').notNull(), version: integer('version').notNull().default(1),
@@ -6,7 +6,7 @@ export const rooms = sqliteTable('rooms', {
 });
 export const cached = sqliteTable('cached', {key: text('key').primaryKey(), data: text('data').notNull(), expiresAt: integer('expires_at').notNull()});
 export const limits = sqliteTable('limits', {key: text('key').primaryKey(), count: integer('count').notNull(), until: integer('until').notNull()});
-export const visitors = sqliteTable('visitors', {key: text('key').primaryKey(), room: text('room').notNull(), until: integer('until').notNull()});
+export const visitors = sqliteTable('visitors', {key: text('key').primaryKey(), room: text('room').notNull(), until: integer('until').notNull()}, (table) => [index('visitors_room_until').on(table.room, table.until)]);
 export const adminSessions=sqliteTable('admin_sessions',{tokenHash:text('token_hash').primaryKey(),passwordRevision:text('password_revision').notNull(),expiresAt:integer('expires_at').notNull()});
 export const playbackHistory=sqliteTable('playback_history',{eventId:text('event_id').primaryKey(),videoId:text('video_id').notNull(),video:text('video').notNull(),source:text('source').notNull(),guildId:text('guild_id'),playedAt:integer('played_at').notNull()});
 export const botState=sqliteTable('bot_state',{key:text('key').primaryKey(),state:text('state').notNull(),updatedAt:integer('updated_at').notNull()});

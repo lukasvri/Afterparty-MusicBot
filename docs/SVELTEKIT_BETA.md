@@ -1,4 +1,4 @@
-# Deploy the Classic beta with the existing test bot
+# Deploy the SvelteKit beta with the existing test bot
 
 This runbook targets the owner-requested `https://ap.beta.openworks.no` beta.
 It does not authorize a production update, merge or replacement of the existing
@@ -16,7 +16,7 @@ database are separate resources and must not be used for this beta.
 The target topology is:
 
 ```text
-ap.beta.openworks.no -> afterparty-web-beta (gateway, optional /v3 prototype)
+ap.beta.openworks.no -> afterparty-web-beta (SvelteKit)
   AFTERPARTY_API -> existing beta API Worker -> existing beta D1
                                           -> test Core on the laptop
                                           -> Afterparty test Discord bot
@@ -56,19 +56,12 @@ any necessary service recreation; preserve mounts and environment-file reference
 
 Use a separate checkout of the reviewed candidate ref on the laptop, preserving
 the running installation. Install locked dependencies and validate as described
-in [the migration guide](SVELTEKIT_MIGRATION.md#validation). This candidate
-introduces no Core protocol or D1 schema change. Classic's UI assets belong to the
-API Worker, so **build and deploy both the beta API and the frontend gateway**
-from the same candidate ref. A gateway-only deployment will restore the older
-Classic UI without the design improvements. Build the API separately with its
-verified beta-only identity using [the Cloudflare instructions](CLOUDFLARE.md).
-Preserve its existing beta D1 binding, runtime settings and secrets. Never deploy
-the default Sites build or production configuration to obtain the API binding.
-No Core restart is needed for this UI change.
-
-Confirm `AFTERPARTY_BETA_ENTRY` is `"0"` in the host's private gateway
-configuration as well as the checked-in template. Keep previous Worker versions
-and back up the existing beta configuration before publication.
+in [the migration guide](SVELTEKIT_MIGRATION.md#validation). The Svelte frontend
+introduces no Core protocol or D1 schema change. Verify compatibility with the
+installed beta Core before choosing any separate update. If the existing beta API
+needs a source update, build it separately with its verified beta-only identity using
+[the Cloudflare instructions](CLOUDFLARE.md). Never deploy the default Sites build
+or production configuration to obtain the API binding.
 
 From the candidate checkout:
 
@@ -95,25 +88,21 @@ until its ownership and purpose are established. No CI auto-deployment is added.
 
 ## Verify and roll back
 
-The template uses `AFTERPARTY_BETA_ENTRY=0`, serving the improved Classic interface
-at `/`, including Discord controls, library, games and settings. The optional
-`/v3` Svelte interface currently supports private browser
-rooms; it does not implement Discord controls. API routes, OAuth callbacks and
-Classic pages continue through the existing beta API Worker. An older deployed
-configuration with `AFTERPARTY_BETA_ENTRY=1` still redirects `/` to `/v3`, with
-room query parameters preserved; `/?classic=1` bypasses that redirect.
+The beta-only `AFTERPARTY_BETA_ENTRY=1` setting redirects `/` to `/v3` with room
+query parameters preserved. `/?classic=1` opens the existing interface, including
+Discord controls. The Svelte interface now includes browser rooms, library/playlists, public
+concert controls, administration, games and public information pages. Bridge mode
+keeps API routes and OAuth callbacks on the existing beta API Worker. Native API
+mode is a separate reviewed option described in the migration guide; do not
+enable it on the beta without supplying its existing D1/Core configuration.
 
-Check HTTPS and assets, Classic at `/` without a redirect, the optional `/v3`
-route, private-room host/guest
+Check HTTPS and assets, the root redirect, Classic, private-room host/guest
 permissions and persistence, search, playback controls, login/logout and the test
 bot's selected-server isolation. Verify actual Discord voice playback separately
 with the test bot. Synthetic tests do not establish audible playback. Record the
-deployed commit, both Worker versions and test outcomes without private identifiers.
-Check desktop/mobile search, empty-result recovery, queue counts, keyboard focus,
-Discord login/logout and selected-server controls. Preserve the test bot and its
-existing rooms throughout the update.
+deployed commit, Worker version and test outcomes without private identifiers.
 
-For rollback, restore the previous versions of both beta Workers/domain route and beta
+For rollback, restore the previous beta Worker version/domain route and beta
 configuration. Disabling `AFTERPARTY_BETA_ENTRY` restores the Classic root while
 retaining `/v3`. No database rollback or ownership-storage deletion is needed.
 Do not change production, merge the draft PR or enable automatic updates as part

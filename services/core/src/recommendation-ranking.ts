@@ -1,5 +1,5 @@
 import { normalized, type CatalogSong } from './matching.ts';
-import { isRadioTitle, radioArtist, radioGenre, radioTitle, specificRadioGenre } from './radio.ts';
+import { isRadioTitle, radioArtist, radioDiscoveryGenre, radioGenre, radioTitle } from './radio.ts';
 import type { PublicTrack, Track } from './types.ts';
 import { metadataAiGenerated } from './music-content.ts';
 
@@ -38,10 +38,19 @@ export function copyRadioDescriptor(value: unknown): CatalogSong | null {
 }
 /** Ranking is preference only. Callers must apply recording, relationship and playback gates first. */
 export function createRecommendationRanking(seed: Track, recent: readonly PublicTrack[], favorites: readonly string[] = [], recordings: readonly FavoriteRecording[] = []) {
-  const seedArtist = normalized(radioArtist(seed)), genre = specificRadioGenre(seed);
+  const seedArtist = normalized(radioArtist(seed)), genre = radioDiscoveryGenre(seed);
   const artists = recent.slice(-5).map(track => normalized(radioArtist(track)));
   const counts = new Map<string, number>();
   for (const artist of artists) counts.set(artist, (counts.get(artist) ?? 0) + 1);
+  // A five-song cooldown alone can cycle the provider's first six artists
+  // forever. Among equally cooled-down artists, give less exposed artists a
+  // turn before falling back to favorites and stable provider order. This is
+  // bounded local preference, never an admission gate or another lookup.
+  const exposure = new Map<string, number>();
+  for (const track of recent.slice(-20)) {
+    const artist = normalized(radioArtist(track));
+    exposure.set(artist, (exposure.get(artist) ?? 0) + 1);
+  }
   const preferred = new Set(favorites.slice(0, 1000).filter(name => typeof name === 'string' && name.length <= 1000).map(normalized));
   // Full artist/title identity prevents a favorite named "Night" from promoting "Midnight" or another artist.
   const favorite = (artist: string, title: string) => Boolean(normalized(artist) && normalized(title)) && preferred.has(normalized(`${artist} - ${title}`));
@@ -61,7 +70,8 @@ export function createRecommendationRanking(seed: Track, recent: readonly Public
     const name = normalized(artist);
     return Number(Boolean(name) && artists.at(-1) === name) * 2 + Number(Boolean(name) && artists.at(-2) === name);
   };
-  const compareArtists = (a: string, b: string) => diversity(a) - diversity(b) || cooldown(a) - cooldown(b);
+  const compareArtists = (a: string, b: string) => diversity(a) - diversity(b) || cooldown(a) - cooldown(b) ||
+    (exposure.get(normalized(a)) ?? 0) - (exposure.get(normalized(b)) ?? 0);
   return {
     /** Spread the existing bounded hydration budget across artists before trying another song by one artist. */
     descriptors(songs: readonly CatalogSong[]): CatalogSong[] {

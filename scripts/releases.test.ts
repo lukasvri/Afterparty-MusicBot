@@ -19,9 +19,9 @@ test('website and Core manifests, locks and generated changelog agree',()=>{
  assert(changelog().includes(releaseNotes(latest)));
  assert(releaseNotes(latest).includes(`## v${latest.version}: ${latest.title}`));
  for(const item of latest.items)assert(releaseNotes(latest).includes(`- ${item}\n`));
- const page=readFileSync(new URL('../app/patch-notes/page.tsx',import.meta.url),'utf8');
- assert(page.includes("import releases from '@/lib/releases.json'"));
- assert(page.includes('[...releases,...legacyUpdates]'));
+ const page=readFileSync(new URL('../apps/web/src/routes/patch-notes/+page.svelte',import.meta.url),'utf8');
+ assert(page.includes("lib/releases.json"));
+ assert(page.includes('[...releases, ...legacyUpdates]'));
 });
 test('all historical entries retain their labels, dates and content in the changelog',()=>{
  assert.equal(createHash('sha256').update(JSON.stringify(legacyUpdates)).digest('hex'),'4006b79c002167cd5f2457d2c89a5233e7324503d3ba1566d77dc1278ca8ba25');

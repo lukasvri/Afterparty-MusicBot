@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import { registerHooks } from "node:module";
-import { transpileFixtureModule } from "./fixture-transpile.mjs";
+import { transpileFixtureModule } from "./fixture-transpile.ts";
 import { readFileSync, readdirSync } from "node:fs";
 import type { RoomState } from "../lib/types.ts";
 
@@ -17,6 +17,8 @@ type FixtureEnvironment = {
     };
   };
   YOUTUBE_API_KEY?: string;
+  GUTTA_CORE_PUBLIC_URL?: string;
+  ADMIN_BRIDGE_KEY?: string;
 };
 const syntheticEnv: FixtureEnvironment = {};
 const globals = globalThis as typeof globalThis & { __roomTestEnv: FixtureEnvironment };
@@ -65,8 +67,69 @@ const hooks = registerHooks({
     return next(url, context);
   },
 });
-const { mutate: mutateHandler, hash, publicRoom, search: searchHandler } = await import("../lib/server.ts");
+const { mutate: mutateHandler, hash, publicRoom, search: searchHandler, body } = await import("../lib/server.ts");
 hooks.deregister();
+test("foreign-origin JSON is fully discarded and remains forbidden", async () => {
+  const request = new Request("https://afterparty.test/api/rooms/TESTROOM", {
+    method: "POST",
+    headers: { Origin: "https://foreign.invalid", "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "radio", enabled: false }),
+  });
+  await assert.rejects(() => body(request), { status: 403 });
+  assert.equal(request.bodyUsed, true);
+  assert.equal(request.body?.locked, false);
+});
+
+test('D1 fallback shares the future-start clock and duplicate-play behavior with Core', async () => {
+  const previousNow = Date.now;
+  let now = 1000000;
+  Date.now = () => now;
+  const f = fixture();
+  try {
+    await f.save('TESTROOM', { current: seed, queue: [], playing: false, position: 20, radio: false, playbackKey: 'same-track' });
+    let state = (await mutate(f.request, 'TESTROOM', { action: 'play', version: 1 })).room;
+    assert.equal(state.playing, true); assert.equal(state.position, 20); assert.equal(state.startsAt, now + 1500);
+    const startsAt = state.startsAt;
+    now += 1000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 20);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'play', version: state.version })).room;
+    assert.equal(state.startsAt, startsAt); assert.equal(state.position, 20);
+    now += 1000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 20.5);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 50, version: state.version })).room;
+    assert.equal(state.playing, true); assert.equal(state.position, 50); assert.equal(state.startsAt, now);
+    now += 250;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 50.25);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'pause', version: state.version })).room;
+    assert.equal(state.playing, false); assert.equal(state.startsAt, undefined);
+    state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 100, version: state.version })).room;
+    assert.equal(state.position, 100); assert.equal(state.playing, false); assert.equal(state.playbackKey, 'same-track');
+    now += 5000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 100);
+    assert.equal(f.calls(), 0, 'clock controls do not search for music');
+  } finally { f.close(); Date.now = previousNow; }
+});
+test("discarding an untrusted origin stops at the body limit and cancels the stream", async () => {
+  let chunks = 0;
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      chunks++;
+      controller.enqueue(new Uint8Array([1]));
+    },
+    cancel() { cancelled = true; },
+  }, { highWaterMark: 0 });
+  const request = new Request("https://afterparty.test/api/rooms/TESTROOM", {
+    method: "POST",
+    headers: { Origin: "https://foreign.invalid", "Content-Type": "application/json" },
+    body: stream,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+  await assert.rejects(() => body(request, 2), { status: 403 });
+  assert.equal(cancelled, true);
+  assert(chunks <= 3, "A rejected stream must not be drained without a bound");
+  assert.equal(request.body?.locked, false);
+});
 const mutate = async (...args: Parameters<typeof mutateHandler>) => {
   const result = await mutateHandler(...args);
   assert(result.room, "The tested room mutation must return the resulting room");
@@ -176,6 +239,108 @@ function fixture() {
     },
   };
 }
+test("Discord room presence follows its guild heartbeat independently of the saved snapshot", async (t) => {
+  const f = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    await f.save("D0123456", { current: seed, queue: [], playing: false, position: 25 });
+    f.sqlite.prepare("UPDATE rooms SET guild_id=?,updated_at=? WHERE code='D0123456'")
+      .run("111111111111111", now - 3600000);
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,'{}',?)")
+      .run("discord:111111111111111", now);
+    const initial = f.roomRow("D0123456");
+    const online = await publicRoom(f.request, initial, false);
+    assert.equal(online.discordOnline, true);
+    assert.equal(online.syncValidForMs, 12000);
+    assert.equal(online.playing, false);
+    assert.equal(online.position, 25);
+    assert.deepEqual(f.roomRow("D0123456"), initial, "Reading heartbeat presence does not write the room");
+    now += 14999;
+    assert.equal((await publicRoom(f.request, initial, false)).discordOnline, true);
+    now += 1;
+    const offline = await publicRoom(f.request, initial, false);
+    assert.equal(offline.discordOnline, false);
+    assert.equal(offline.syncValidForMs, 0);
+    f.sqlite.prepare("UPDATE bot_state SET updated_at=? WHERE key=?")
+      .run(now, "discord:111111111111111");
+    assert.equal((await publicRoom(f.request, initial, false)).discordOnline, true);
+  } finally {
+    f.close();
+  }
+});
+
+test("Discord heartbeat lookup preserves guild isolation and legacy room-only fallback", async (t) => {
+  const f = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, "now", () => now);
+  try {
+    await f.save("DISCORD1", { current: seed, queue: [], playing: false, position: 25 });
+    const saved = f.roomRow("DISCORD1");
+    assert.equal((await publicRoom(f.request, saved, false)).discordOnline, true);
+    now += 20000;
+    assert.equal((await publicRoom(f.request, saved, false)).discordOnline, false);
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES('discord','{}',?)").run(now);
+    assert.equal((await publicRoom(f.request, saved, false)).discordOnline, true);
+    f.sqlite.prepare("UPDATE rooms SET guild_id=? WHERE code='DISCORD1'").run("111111111111111");
+    const scoped = f.roomRow("DISCORD1");
+    assert.equal((await publicRoom(f.request, scoped, false)).discordOnline, false,
+      "A scoped default room must not reuse the legacy unscoped heartbeat");
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,'{}',?)")
+      .run("discord:222222222222222", now);
+    assert.equal((await publicRoom(f.request, scoped, false)).discordOnline, false,
+      "Another guild's fresh heartbeat cannot keep this room online");
+    f.sqlite.prepare("INSERT INTO bot_state(key,state,updated_at) VALUES(?,'{}',?)")
+      .run("discord:111111111111111", now - 20000);
+    assert.equal((await publicRoom(f.request, { ...scoped, updated_at: now }, false)).discordOnline, false,
+      "An existing expired heartbeat takes precedence over a fresh room-only snapshot");
+  } finally {
+    f.close();
+  }
+});
+
+test("checkpointed Discord rooms use only their canonical transient clock and stop across outage and paused reconnect", async (t) => {
+  const f = fixture();
+  let now = 1800000000000;
+  t.mock.method(Date, 'now', () => now);
+  const guildId = '111111111111111', roomCode = 'D0123456';
+  const concert = { ...seed, concert: true };
+  try {
+    await f.save(roomCode, { current: concert, queue: [], playing: true, position: 0 });
+    f.sqlite.prepare('UPDATE rooms SET guild_id=?,updated_at=? WHERE code=?').run(guildId, now - 45000, roomCode);
+    const snapshot = f.roomRow(roomCode);
+    const heartbeat = (extra: Record<string, unknown> = {}) => f.sqlite.prepare('INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at').run(
+      `discord:${guildId}`, JSON.stringify({ guildId, roomCode, bridgeRevision: 10, checkpointRevision: 1, current: concert, queue: [], playing: true, position: 60, ...extra }), now,
+    );
+    heartbeat();
+    now += 2000;
+    const first = await publicRoom(f.request, snapshot, false);
+    assert.equal(first.position, 62, 'the old room checkpoint does not freeze an advancing guild clock at twelve seconds');
+    assert.equal(first.playing, true);
+    assert.equal(first.isHost, false);
+    assert.equal(first.syncValidForMs, 10000);
+    heartbeat({ bridgeRevision: 11, checkpointRevision: 11, playing: false, position: 42, queue: [concert, { ...next, concert: false }] });
+    const paused = await publicRoom(f.request, snapshot, false);
+    assert.equal(paused.position, 42);
+    assert.equal(paused.playing, false);
+    assert.deepEqual(paused.queue.map(video => video.id), [concert.id], 'private music stays out of fallback concert responses');
+    now += 14999;
+    assert.equal((await publicRoom(f.request, snapshot, false)).discordOnline, true);
+    now++;
+    const offline = await publicRoom(f.request, snapshot, false);
+    assert.equal(offline.discordOnline, false);
+    assert.equal(offline.playing, false);
+    assert.equal(offline.syncValidForMs, 0);
+    heartbeat({ bridgeRevision: 12, checkpointRevision: 11, playing: false, position: 42 });
+    const reconnected = await publicRoom(f.request, snapshot, false);
+    assert.equal(reconnected.discordOnline, true);
+    assert.equal(reconnected.playing, false, 'a read-only browser reconnect cannot resume a deliberately paused song');
+    heartbeat({ guildId: '222222222222222', position: 99 });
+    assert.equal((await publicRoom(f.request, snapshot, false)).position, 12, 'mismatched guild payloads cannot supply another room clock');
+    assert.deepEqual(f.roomRow(roomCode), snapshot, 'repeated reads never write the durable checkpoint');
+  } finally { f.close(); }
+});
+
 test("D1 own-room radio advances the queue, keeps manual priority and hides its bounded history", async () => {
   const f = fixture();
   try {
@@ -305,6 +470,37 @@ test("D1 radio refreshes old search metadata and excludes explicit non-music cat
     assert.equal(room.queue[0].music, true);
     assert(!JSON.stringify(room).includes("radioRelatedTo"));
     assert.equal(f.roomState().queue[0].music, true);
+  } finally { f.close(); }
+});
+test("D1 House radio prepares a different artist at the start of playback", async (t) => {
+  const f = fixture();
+  t.mock.method(Date, "now", () => 1800000000000);
+  const original = { ...seed, title: "SAM WAITIN - AFTERMATH | House | NCS - Copyright Free Music", artist: "NoCopyrightSounds" };
+  const fresh = { ...next, title: "Other Artist - Synthetic Next | House" };
+  const queries: string[] = [];
+  try {
+    await f.save("TESTROOM", { current: original, queue: [], playing: true, position: 0 });
+    globalThis.fetch = async target => {
+      const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      assert.equal(url.origin, "https://www.googleapis.com");
+      if (url.pathname.endsWith("/search")) {
+        const query = url.searchParams.get("q") ?? "";
+        queries.push(query);
+        return Response.json({ items: query.startsWith("house audio") ? [{ id: { videoId: fresh.id } }] : [] });
+      }
+      return Response.json({ items: [{ id: fresh.id,
+        snippet: { title: fresh.title, channelTitle: fresh.artist, categoryId: "10" },
+        contentDetails: { duration: "PT3M20S" }, status: { embeddable: true } }] });
+    };
+    const room = await publicRoom(f.request, f.roomRow());
+    assert.equal(room.current?.id, original.id);
+    assert.equal(room.position, 0);
+    assert.equal(room.playing, true);
+    assert.deepEqual(room.queue.map(song => song.id), [fresh.id]);
+    assert.equal(f.roomState().radioSeed?.id, original.id);
+    assert.equal(queries.length, 4);
+    await publicRoom(f.request, f.roomRow());
+    assert.equal(queries.length, 4, "a prepared song suppresses later refresh lookups");
   } finally { f.close(); }
 });
 test("D1 starts the recommended video clock after its metadata lookup completes", async () => {
@@ -918,5 +1114,93 @@ for (const example of [
     assert(lookups <= 5, `Station discovery must stay bounded, used ${lookups}`);
     assert.equal(f.roomState().radioSeed?.id, original.id);
     assert(!JSON.stringify(room).includes('radioRelatedTo'));
+  } finally { f.close(); }
+});
+
+test('negotiated room reads require bounded authenticated Core and immediately stop on outage or configuration loss',async(t)=>{
+ const f=fixture();
+ const guildId='111111111111111',code='D0123456';
+ const concert={...seed,concert:true};
+ const checkpoint={current:concert,queue:[],playing:true,position:12,presenceCapability:'core-authority-v1'};
+ try{
+  await f.save(code,checkpoint);
+  f.sqlite.prepare('UPDATE rooms SET guild_id=? WHERE code=?').run(guildId,code);
+  f.sqlite.prepare('INSERT INTO bot_state(key,state,updated_at) VALUES(?,?,?)').run('discord:'+guildId,JSON.stringify({...checkpoint,guildId,roomCode:code,bridgeRevision:20,checkpointRevision:20,presenceCapability:'core-authority-v1'}),Date.now());
+  const original=f.roomRow(code);
+  syntheticEnv.GUTTA_CORE_PUBLIC_URL='https://synthetic-core.invalid';syntheticEnv.ADMIN_BRIDGE_KEY='synthetic-key';
+  let mode='live';
+  const calls:Array<{url:string,signal:AbortSignal|null|undefined}>=[];
+  t.mock.method(globalThis,'fetch',async(url:unknown,init:RequestInit)=>{
+   calls.push({url:String(url),signal:init.signal});
+   assert.equal(init.headers&&new Headers(init.headers).get('Authorization'),'Bearer synthetic-key');
+   assert.equal(init.redirect,'manual');
+   if(mode==='outage')throw Error('Offline');
+   if(mode==='timeout')return await new Promise<Response>((_resolve,reject)=>init.signal!.addEventListener('abort',()=>reject(init.signal!.reason),{once:true}));
+   return Response.json({state:{...checkpoint,queue:[concert,{...next,concert:false}],current:concert,position:77,ready:true,connected:true,playing:mode!=='paused',volume:100,queueRevision:'queue',buffering:false,playbackKey:'core:test',epoch:'epoch-current',sequence:5,engine:'gutta-krutt-core',serverTime:Date.now(),online:true,guildId:mode==='wrong-guild'?'222222222222222':guildId,roomCode:code}});
+  });
+  const live=await publicRoom(f.request,original,false);
+  assert.equal(live.position,77);assert.equal(live.playing,true);assert.equal(live.discordOnline,true);
+  assert.equal(live.syncSource,'live');assert.equal(live.isHost,false);assert.equal(live.queue.length,1);
+  assert.equal(new URL(calls[0].url).searchParams.get('authority'),'1');
+  mode='paused';assert.equal((await publicRoom(f.request,original,false)).playing,false);
+  for(const failure of ['outage','wrong-guild','timeout']){
+   mode=failure;
+   const start=performance.now();
+   const offline=await publicRoom(f.request,original,false);
+   assert(performance.now()-start<2500,'Core fallback is bounded to its short presence deadline');
+   assert.equal(offline.discordOnline,false);assert.equal(offline.playing,false);assert.equal(offline.position,12);assert.equal(offline.syncValidForMs,0);
+  }
+  delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;
+  const offline=await publicRoom(f.request,original,false);
+  assert.equal(offline.discordOnline,false);assert.equal(offline.position,12);assert.equal(offline.playing,false);
+  f.sqlite.prepare('DELETE FROM bot_state').run();
+  assert.equal((await publicRoom(f.request,original,false)).discordOnline,false,'the room also persists authority mode if its heartbeat is missing');
+  assert.deepEqual(f.roomRow(code),original,'presence reads do not update the checkpoint');
+ }finally{delete syntheticEnv.GUTTA_CORE_PUBLIC_URL;delete syntheticEnv.ADMIN_BRIDGE_KEY;f.close();}
+});
+
+test('D1 user search shares title and artist ranking without extra provider requests', async () => {
+  const f = fixture();
+  try {
+    const ids = ['remix000001', 'original001', 'unrelated01'];
+    let calls = 0;
+    globalThis.fetch = async target => {
+      calls++;
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      if (url.pathname.endsWith('/search'))
+        return Response.json({ items: ids.map(videoId => ({ id: { videoId } })) });
+      return Response.json({ items: ids.map((id, i) => ({ id,
+        snippet: { title: ['Janji - Heroes Tonight (Remix)', 'Janji - Heroes Tonight (Official Audio)', 'Unrelated'][i], channelTitle: 'Janji', categoryId: '10' },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true },
+      })) });
+    };
+    assert.deepEqual((await searchHandler(f.request, 'Janji Heroes Tonight')).videos.map(video => video.id), [ids[1], ids[0], ids[2]]);
+    await searchHandler(f.request, 'Janji Heroes Tonight');
+    assert.equal(calls, 2, 'one discovery and one metadata batch, reused on subsequent reads');
+  } finally { f.close(); }
+});
+
+test('D1 bypasses old metadata when newer declared-AI evidence is only in the description', async () => {
+  const f = fixture();
+  try {
+    const id = 'declared001';
+    const previous = { ...next, id, title: 'Artist - Original', artist: 'Artist', aiGenerated: undefined };
+    f.sqlite.prepare('INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)')
+      .run(`videos:v4:${id}`, JSON.stringify([previous]), Date.now() + 3600000);
+    let metadataReads = 0;
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      if (url.pathname.endsWith('/search')) return Response.json({ items: [{ id: { videoId: id } }] });
+      metadataReads++;
+      return Response.json({ items: [{ id,
+        snippet: { title: previous.title, channelTitle: previous.artist, categoryId: '10', description: 'AI-produced music' },
+        contentDetails: { duration: 'PT3M' }, status: { embeddable: true },
+      }] });
+    };
+    const result = await searchHandler(f.request, 'new classification');
+    assert.equal(metadataReads, 1);
+    assert.equal(result.videos[0].aiGenerated, true);
   } finally { f.close(); }
 });

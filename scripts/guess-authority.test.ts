@@ -119,6 +119,8 @@ test('skip votes retain fresh room authority and strip forged vote totals, parti
 
 async function audioProxy(fetcher: typeof fetch) {
   const format = await import('../services/core/src/guess-audio-format.ts');
+  const liveRoom = await import('../lib/live-room.ts');
+  const bridgeCheckpoint = await import('../services/core/src/bridge-checkpoint.ts');
   const source = ts.transpileModule(readFileSync(new URL('../lib/core-server.ts', import.meta.url), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
@@ -126,6 +128,8 @@ async function audioProxy(fetcher: typeof fetch) {
   runInNewContext(source, { exports, URL, Response, AbortSignal, fetch: fetcher, require: (name: string) => {
     if (name === 'cloudflare:workers') return { env: { GUTTA_CORE_PUBLIC_URL: 'https://core.example', ADMIN_BRIDGE_KEY: 'synthetic-bridge-key' } };
     if (name.endsWith('guess-audio-format.ts')) return format;
+    if (name.endsWith('live-room.ts')) return liveRoom;
+    if (name.endsWith('bridge-checkpoint.ts')) return bridgeCheckpoint;
     throw Error('Unexpected audio proxy dependency: ' + name);
   } });
   return exports.coreGuessAudio as (input: unknown, signal: AbortSignal) => Promise<Response>;
