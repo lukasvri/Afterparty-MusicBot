@@ -29,12 +29,14 @@ These commands install the locked website and Core dependency trees, run deploym
 
 | Area | Location |
 | --- | --- |
-| Website pages and API routes | `app/` |
-| Player and room interface | `components/`, `hooks/` |
+| Website pages and API routes | `apps/web/src/routes/`, `lib/api/` |
+| Native routes and feature modules | `apps/web/src/routes/`, `apps/web/src/lib/{rooms,concert,games,library,social,admin,server,ui}/` |
+| Shared settings and social contracts | `services/core/src/settings.ts`, `services/core/src/social-protocol.ts` |
+| Player and room interface | `apps/web/src/lib/rooms/`, `apps/web/src/lib/concert/` |
 | Website permissions, storage and transport | `lib/` |
 | D1 schema and migrations | `db/`, `drizzle/` |
 | Discord, audio engine and server storage | `services/core/src/` |
-| Build and preview integration | `build/`, `scripts/` |
+| Build and preview integration | `scripts/`, `apps/web/scripts/` |
 | Installation, operations and design references | `docs/`, `services/core/docs/` |
 
 ## Preserve the contracts
@@ -46,6 +48,8 @@ These commands install the locked website and Core dependency trees, run deploym
 - Keep existing host mounts and private configuration files intact. Production updates happen separately on the deployment host after review and backup.
 
 ## Make the change reviewable
+
+Apply the [source organization rules](AGENTS.md#keep-every-change-organized) to every change: reuse canonical definitions, keep related feature code together, remove verified duplication and update the source map when ownership changes.
 
 Keep the change focused, update the relevant guide and describe the resulting behavior. Public documentation is English. Use TypeScript for new application code and first-party Node tooling; see [TypeScript conventions](docs/TYPESCRIPT.md).
 

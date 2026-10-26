@@ -42,6 +42,20 @@ export class Store {
       "INSERT INTO kv VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
     ).run(key, JSON.stringify(value));
   }
+  /** One durable order across requests, publisher instances and process restarts. */
+  nextBridgeRevision(): number {
+    const row = this.prepare(
+      `INSERT INTO kv(key,value) VALUES('bridge-publication-revision','1')
+       ON CONFLICT(key) DO UPDATE SET value=CAST(json_extract(kv.value,'$')+1 AS TEXT)
+       WHERE json_valid(kv.value) AND json_type(kv.value,'$')='integer'
+         AND json_extract(kv.value,'$')>=1 AND json_extract(kv.value,'$')<9007199254740991
+       RETURNING value`,
+    ).get();
+    const revision = Number(row?.value);
+    if (!Number.isSafeInteger(revision) || revision < 1)
+      throw new Error('The durable bridge publication counter is invalid or exhausted.');
+    return revision;
+  }
   transaction(fn: () => void) {
     this.db.exec("SAVEPOINT core_write");
     try {

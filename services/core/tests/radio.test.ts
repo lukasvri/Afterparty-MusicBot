@@ -21,7 +21,7 @@ test('real NCS naming variants cannot recommend the same song again',()=>{
  assert.equal(radioArtist(original),'Cartoon, Jéja');assert.deepEqual(rankRadio(original,[duplicate],[],[]),[]);
 });
 
-test('radio search excludes the seed song before ranking',()=>{assert.equal(radioQuery(seed),'Cartoon audio -\"On & On\"');});
+test('radio search excludes the seed song before ranking',()=>{assert.equal(radioQuery(seed),'Cartoon audio -"On & On"');});
 
 test('Topic song titles containing a dash do not become the radio artist',()=>{
  const topic=track('seed','Example Song - 2020 Remaster','Artist - Topic');

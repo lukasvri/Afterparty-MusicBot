@@ -175,6 +175,40 @@ test("empty selections retry after 15 seconds and stop after three attempts", as
   } finally { engine.close(); store.close(); }
 });
 
+test("Discord discovers during source startup before audible frames and preserves a later pause", async () => {
+  const { Engine } = await import("../src/engine.ts");
+  const store = new Store(":memory:"), providers = new Providers(store, {});
+  let resumes = 0, calls = 0;
+  const engine = new Engine(store, providers, {
+    onIdle: null, onError: null, play() {}, pause() {}, resume() { resumes++; }, stop() {},
+    duration: () => 0, advancing: () => false, buffering: () => true,
+  });
+  clearInterval(engine.timer);
+  let release!: (track: Track) => void;
+  providers.radio = async () => { calls++; return new Promise(resolve => { release = resolve; }); };
+  try {
+    engine.connected = true;
+    engine.current = seed;
+    engine.loading = true;
+    engine.paused = true;
+    engine.tick();
+    assert.equal(calls, 0, "automatic discovery respects explicit pause");
+    engine.paused = false;
+    engine.tick();
+    assert.equal(calls, 1, "discovery starts before the sink advances");
+    const pending = engine.ensureRadio();
+    engine.tick();
+    assert.equal(calls, 1, "buffering ticks share the same lookup");
+    engine.pause();
+    release(positive);
+    await pending;
+    assert.deepEqual(engine.queue.map(track => track.id), [positive.id]);
+    assert.equal(engine.current.id, seed.id);
+    assert.equal(engine.paused, true);
+    assert.equal(resumes, 0);
+  } finally { engine.close(); store.close(); }
+});
+
 test("successful YouTube search can lose unavailable IDs at metadata hydration", async (t) => {
   const store = new Store(":memory:");
   const p = new Providers(store, {});

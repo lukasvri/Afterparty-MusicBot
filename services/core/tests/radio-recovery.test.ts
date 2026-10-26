@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { radioStyleCompatible, rankRadio } from "../src/radio.ts";
+import { radioArtist, radioQuery, radioTitle, radioStyleCompatible, rankRadio } from "../src/radio.ts";
 import { playableRoomQueue, roomRecommendation, type RoomRadioDiagnostic } from "../src/room-radio.ts";
 import type { RoomVideo } from "../src/protocol.ts";
 import type { Track } from "../src/types.ts";
@@ -24,6 +24,35 @@ const diagnosticSummary = (value: unknown) => {
   return { outcome, seedGenre, artistKnown, metadata, searches, failedSearches, candidates };
 };
 
+test("Sam Waitin Aftermath discovers exact House across artists within the existing budget", async () => {
+  const original = video("samwaitin01", "SAM WAITIN - AFTERMATH | House | NCS - Copyright Free Music");
+  const own = video("samwaitin02", "SAM WAITIN - Another Song | House");
+  const fresh = video("freshhouse1", "Another Artist - Fresh Song | House");
+  const queries: string[] = [];
+  assert.equal(radioArtist(track(original)), "SAM WAITIN");
+  assert.equal(radioTitle(track(original)), "AFTERMATH");
+  assert.equal(radioQuery(track(original)), 'house audio -"AFTERMATH"');
+  const state = { current: original, radioSeed: original, queue: [], radio: true };
+  const next = await roomRecommendation(state, async query => {
+    queries.push(query);
+    if (query === 'SAM WAITIN "AFTERMATH"') return [];
+    if (query.endsWith("official music video")) return [];
+    return [own,
+      { ...fresh, id: "repeat00001", title: "SAM WAITIN - AFTERMATH (Official Audio) | House" },
+      { ...fresh, id: "untagged001", title: "Another Artist - Untagged" },
+      { ...fresh, id: "wrongstyle1", title: "Another Artist - Wrong | Tech House" },
+      { ...fresh, id: "vlog0000001", title: "Another Artist - Fresh vlog | House" },
+      { ...fresh, id: "recreate001", title: "Another Artist - Fresh (Recreation) | House" },
+      { ...fresh, id: "aigenerated", aiGenerated: true }, fresh];
+  });
+  assert.equal(next?.id, fresh.id);
+  assert.equal(next?.radioRelatedTo, original.id);
+  assert.deepEqual(queries, ['SAM WAITIN "AFTERMATH"', 'house audio -"AFTERMATH"',
+    'SAM WAITIN music audio', 'Another Artist "Fresh Song" official music video']);
+  assert.deepEqual(playableRoomQueue({ ...state, queue: [{ ...next!, radio: true }] }).map(song => song.id), [fresh.id]);
+  assert.equal(state.current.id, original.id);
+});
+
 test("broad house metadata can be refined by the exact recording", async () => {
   const queries: string[] = [];
   const state = { current: seed, radioSeed: seed, queue: [], radio: true };
@@ -39,9 +68,10 @@ test("broad house metadata can be refined by the exact recording", async () => {
   assert.deepEqual(playableRoomQueue({ ...state, queue: [{ ...next!, radio: true }] }).map(v => v.id), [suggestion.id]);
 });
 
-test("broad house labels are not evidence for another artist by themselves", () => {
+test("named House seeds admit exact House labels but require more evidence for a subgenre", () => {
   const broad = video("broadnext01", "Another Artist - Other Song | House");
-  assert.deepEqual(rankRadio(track(seed), [track(broad), track(suggestion)], [], []), []);
+  const unknown = video("unknown0001", "Unidentified Song | House");
+  assert.deepEqual(rankRadio(track(seed), [track(broad), track(suggestion), track(unknown)], [], []).map(song => song.id), [broad.id]);
 });
 
 test("a house family label does not conflict with its explicitly named subgenre", () => {

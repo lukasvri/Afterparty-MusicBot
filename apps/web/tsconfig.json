@@ -1,6 +1,6 @@
 {
   "extends": "$app/tsconfig",
-  "include": ["src", "tests", "scripts", "*.ts"],
+  "include": ["src", "tests", "scripts", "*.ts", "../../cloudflare-env.d.ts"],
   "exclude": ["src/service-worker"],
   "compilerOptions": {
     "allowJs": true,
@@ -12,6 +12,9 @@
     "strict": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "types": ["$app/types", "node"]
+    "types": ["$app/types", "node", "@cloudflare/workers-types"],
+    "paths": {
+      "@/*": ["../../*"]
+    }
   }
 }

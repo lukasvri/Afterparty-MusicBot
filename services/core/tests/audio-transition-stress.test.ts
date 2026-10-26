@@ -79,8 +79,8 @@ test('real FFmpeg transition after seek and queue replacement plays only the int
     const decoded = spawnSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0',
       '-ac', '2', '-ar', '48000', '-f', 's16le', 'pipe:1'], { input: Buffer.concat(chunks), maxBuffer: 2 * 1024 * 1024 });
     assert.equal(decoded.status, 0, String(decoded.stderr));
-    const seconds = decoded.stdout.length / (48000 * 2 * 2);
-    assert(seconds >= 5.4 && seconds <= 5.6, `unexpected transition length ${seconds}`);
+    // Remaining tails 2.8s + 3.4s honor the saved 1s overlap: 5.2s, or 260 frames.
+    assert.equal(decoded.stdout.length, 260 * FRAME_BYTES);
     assert.deepEqual(segments, [{ id: 'first', offset: 1.2 }, { id: 'wanted', offset: 0.6 }]);
     assert(decoded.stdout.some(byte => byte !== 0));
   } finally { mixer?.destroy(); abort.abort(); await Promise.all(decoders.map(decoder => decoder.closed)); rmSync(dir, { recursive: true, force: true }); }

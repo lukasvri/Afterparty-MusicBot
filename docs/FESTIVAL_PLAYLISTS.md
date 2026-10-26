@@ -1,97 +1,104 @@
 # Festival concert playlists
 
-The evening library includes 49 curated official uploads across five event
-families. Open **Evenings**, choose **Festival concerts**, then select an event
-and performance year. Add one set or all listed sets from that year. Existing
-saved evenings and favorites remain on the device.
+The library contains **290 source-backed recordings across five event families
+and 17 event/year groups**. Open **Library & playlists**, choose **Festival
+concerts**, then select the festival and performance year. Search by artist,
+recording title or stage, and browse 20 sets per page. Every indexed set remains
+reachable; the page limit is not an inventory limit.
 
-Twenty-five sets are from 2026, including 21 from Tomorrowland Belgium.
-Ultra Miami and EDC Las Vegas each contribute two more. Newest available years
-appear first. Creamfields 2026 is omitted where an official full-set source
-could not be confirmed.
+[The canonical catalog](../lib/concert-catalog.ts) owns recording links,
+performance years, attribution and evidence. This document records source
+coverage instead of duplicating the full recording inventory.
 
-The supplied [Tomorrowland Belgium 2026 playlist](https://www.youtube.com/playlist?list=PLeeZgE3_zp1w)
-returns that playlist title, but its contents were not exposed during inspection.
-The 19 additional Tomorrowland sets were verified individually against official
-festival or artist uploads and the festival's full-set announcement. This is
-not a complete import of that playlist. Distinct weekend performances remain
-separate; alternate uploads of the same set are excluded.
+## Source coverage checked on 25 October 2026
 
-To browse the full live playlist instead, use [playlist import](PLAYLIST_IMPORT.md)
-and paste its URL. This loads the provider's available entries on demand without
-claiming that every item belongs in the curated official-source catalog.
+| Festival | Year | Catalog recordings | Coverage |
+| --- | --- | ---: | --- |
+| EDC Las Vegas | 2026 | 116 | All 116 video links in the [official source index](https://lasvegas.edc.com/2026-sets/) |
+| EDC Las Vegas | 2025 | 86 | All 86 video links in the [official source index](https://lasvegas.edc.com/2025-sets/) |
+| EDC Las Vegas | 2023 | 26 | All 26 embedded videos in the [official source index](https://lasvegas.edc.com/2023-sets/) |
+| Creamfields | 2024 | 24 | All 23 matching-year videos in the [24-entry official index](https://creamfields.com/2024_live/all-streams/), plus the official Beatport CAMELPHAT upload |
+| Tomorrowland Belgium | 2026 | 21 | Curated selection; source playlist contents not enumerated |
+| Tomorrowland Belgium | 2025 | 1 | Curated selection; source playlist contents not enumerated |
+| Tomorrowland Belgium | 2024 | 2 | Curated selection; source playlist contents not enumerated |
+| Tomorrowland Belgium | 2023 | 3 | Curated selection; source playlist contents not enumerated |
+| Tomorrowland Belgium | 2022 | 1 | Curated selection; source playlist contents not enumerated |
+| Ultra Miami | 2026 | 2 | Curated selection; full official inventory not enumerated |
+| Ultra Miami | 2025 | 2 | Curated selection; full official inventory not enumerated |
+| Ultra Miami | 2024 | 1 | Curated selection; full official inventory not enumerated |
+| Ultra Miami | 2023 | 1 | Curated selection; full official inventory not enumerated |
+| Ultra Miami | 2019 | 1 | Curated selection; full official inventory not enumerated |
+| Amsterdam RAI | 2023 | 1 | Official Martin Garrix IDEM recording; not a complete event archive |
+| Amsterdam RAI | 2019 | 1 | Official Martin Garrix THE ETHER recording; not a complete event archive |
+| Amsterdam RAI | 2018 | 1 | Official Martin Garrix ANIMA recording; not a complete event archive |
 
-The published source and performance year were checked on 21 October 2026.
-The table is a finite selection, not a complete archive of every festival year.
-An artist channel, the festival itself or its official broadcaster published
-each linked recording. Runtime metadata determines current availability and
-browser embedding. No duration or playable status is inferred from this list.
+A checked source index is a bounded snapshot of that publisher's linked videos,
+not every performance at the festival or every official upload elsewhere.
+Named uploaders remain explicit where individually checked. New festival-index
+records identify the festival that links the recording, without inventing the
+YouTube uploader's identity. Distinct performances are retained; repeated links
+to the same recording are deduplicated within an event/year.
 
-Playlist additions append sequentially through the existing room or Discord
-authorization and revision checks. They keep the current playback. Duplicates
-already in the active queue are skipped. A failed addition reports a partial
-result; leaving or switching the room stops further additions, and an old reply
-cannot replace the newly selected room. Discord additions read its current queue
-revision before each command. No background download or autoplay is introduced. Adding to an empty connected
-Discord queue retains its existing behavior of starting the requested music.
+Creamfields' [Eli Brown 2024 page](https://creamfields.com/2024_live/friday/steel-yard/eli-brown/)
+embeds [a recording identifying 2023](https://www.youtube.com/watch?v=Bz3StgzmGos).
+It is excluded from the 2024 inventory. The additional
+[CAMELPHAT recording](https://www.youtube.com/watch?v=bVF_7IiTAsI) is published by
+Beatport and describes its Creamfields 2024 Steel Yard performance. Source-count
+and sorted-video-ID digest tests protect all four enumerated indexes against
+accidental lost, replaced or misplaced links.
 
-The game pack is separate: see [private quiz setup](GUESS_CATALOG_SOURCES.md#prepared-edm-festival-hits-pack).
+## Browse the larger Tomorrowland source playlists
 
-| Event | Performance year | Artist / set | Official uploader | Primary evidence |
-| --- | --- | --- | --- | --- |
-| Amsterdam RAI | 2023 | [MARTIN GARRIX LIVE @ IDEM (Amsterdam RAI 2023)](https://www.youtube.com/watch?v=cWJV0DgMqEA) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=cWJV0DgMqEA) |
-| Amsterdam RAI | 2019 | [MARTIN GARRIX LIVE @ THE ETHER (Amsterdam RAI 2019)](https://www.youtube.com/watch?v=lGCo8ILvauI) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=lGCo8ILvauI) |
-| Amsterdam RAI | 2018 | [Martin Garrix Presents: ANIMA (Live @ Amsterdam RAI 2018)](https://www.youtube.com/watch?v=CwE-haZR2fc) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=CwE-haZR2fc) |
-| Creamfields | 2024 | [Eric Prydz LIVE @ Rockstar Energy presents Creamfields 2024  /  @beatport live](https://www.youtube.com/watch?v=nbh7HouhSdI) | Beatport | [Source 1](https://www.youtube.com/watch?v=nbh7HouhSdI) · [Source 2](https://creamfields.com/2024_live/saturday/steel-yard/eric-prydz/) · [Source 3](https://www.beatportal.com/videos/606590-eric-prydz-live-rockstar-energy-presents-creamfields-2024) |
-| Creamfields | 2024 | [Example Live  /  Rockstar Energy presents @creamfields 2024  /  @beatport Live](https://www.youtube.com/watch?v=n8lQjIr3BUA) | Beatport | [Source 1](https://www.youtube.com/watch?v=n8lQjIr3BUA) · [Source 2](https://www.beatportal.com/articles/594895-beatport-livestream-creamfields-2024) |
-| Creamfields | 2024 | [Solomun B2B Patrick Topping Live  /  Rockstar Energy presents @creamfields 2024  /  @beatport Live](https://www.youtube.com/watch?v=XlJxlEtRkEY) | Beatport | [Source 1](https://www.youtube.com/watch?v=XlJxlEtRkEY) · [Source 2](https://www.beatportal.com/videos/607957-solomun-b2b-patrick-topping-live-from-the-steel-yard-stage-for-rockstar-energy-presents-creamfields-2024-on-beatport) |
-| Creamfields | 2024 | [Third Party Live  /  Rockstar Energy presents @creamfields 2024  /  @beatport Live](https://www.youtube.com/watch?v=UI9VLsqmH9w) | Beatport | [Source 1](https://www.youtube.com/watch?v=UI9VLsqmH9w) · [Source 2](https://www.beatportal.com/articles/594895-beatport-livestream-creamfields-2024) |
-| EDC Las Vegas | 2026 | [Above & Beyond: Live from EDC Las Vegas 2026 (Official Full Set)](https://www.youtube.com/watch?v=OI02QgEA1Zw) | Above & Beyond | [Source 1](https://www.youtube.com/watch?v=OI02QgEA1Zw) · [Source 2](https://lasvegas.edc.com/2026-sets/) |
-| EDC Las Vegas | 2026 | [Tiësto Live at EDC Las Vegas 2026](https://www.youtube.com/watch?v=kG0SVvz9e-g) | Tiësto | [Source 1](https://www.youtube.com/watch?v=kG0SVvz9e-g) · [Source 2](https://lasvegas.edc.com/2026-sets/) |
-| EDC Las Vegas | 2025 | [Alesso Live at EDC Las Vegas 2025 (Kinetic Field Full DJ Set)](https://www.youtube.com/watch?v=-qBlYtNdm1I) | Alesso | [Source 1](https://www.youtube.com/watch?v=-qBlYtNdm1I) · [Source 2](https://lasvegas.edc.com/2025-sets/) |
-| EDC Las Vegas | 2025 | [Armin van Buuren live at EDC Las Vegas 2025](https://www.youtube.com/watch?v=Dp7AwrAKckQ) | Armin van Buuren | [Source 1](https://www.youtube.com/watch?v=Dp7AwrAKckQ) · [Source 2](https://lasvegas.edc.com/2025-sets/) |
-| EDC Las Vegas | 2023 | [Above & Beyond: Live at EDC Las Vegas 2023 (Official Set)](https://www.youtube.com/watch?v=hi1gXtzdKhQ) | Above & Beyond | [Source 1](https://www.youtube.com/watch?v=hi1gXtzdKhQ) · [Source 2](https://lasvegas.edc.com/2023-sets/) |
-| EDC Las Vegas | 2023 | [Armin van Buuren live at EDC Las Vegas 2023](https://www.youtube.com/watch?v=GMm0MheUdBA) | Armin van Buuren | [Source 1](https://www.youtube.com/watch?v=GMm0MheUdBA) · [Source 2](https://lasvegas.edc.com/2023-sets/) |
-| EDC Las Vegas | 2023 | [Tiësto - Live from EDC Las Vegas 2023](https://www.youtube.com/watch?v=yU4yrbUQYlU) | Tiësto | [Source 1](https://www.youtube.com/watch?v=yU4yrbUQYlU) · [Source 2](https://lasvegas.edc.com/2023-sets/) |
-| Tomorrowland Belgium | 2026 | [David Guetta live @ Tomorrowland 2026  /  MainStage WE1](https://www.youtube.com/watch?v=GSnPwle4FOE) | David Guetta | [Source 1](https://www.youtube.com/watch?v=GSnPwle4FOE) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [MARTIN GARRIX LIVE @ TOMORROWLAND 2026 (W2)](https://www.youtube.com/watch?v=sqxFW3RXGdo) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=sqxFW3RXGdo) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Alesso  /  Tomorrowland 2026 (Freedom Stage Weekend 2) [Full DJ Live Set]](https://www.youtube.com/watch?v=fhiZ1Rj9o-A) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=fhiZ1Rj9o-A) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Boris Brejcha WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=NpL_bT5vgmU) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=NpL_bT5vgmU) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Charlotte de Witte WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=uMgz40hvySQ) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=uMgz40hvySQ) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Chase & Status (DJ set) WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=jSJEkiV3cCs) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=jSJEkiV3cCs) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Fisher WE 1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=Tj8NbfUMS-0) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=Tj8NbfUMS-0) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [HARDWELL - Tomorrowland 2026 [FULL MAINSTAGE CLOSING SHOW]](https://www.youtube.com/watch?v=Py-GG74lLU8) | Hardwell | [Source 1](https://www.youtube.com/watch?v=Py-GG74lLU8) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Lost Frequencies - Live at Tomorrowland 2026 (Mainstage) (Full Set HD)](https://www.youtube.com/watch?v=KLyeLMJuIOY) | Lost Frequencies | [Source 1](https://www.youtube.com/watch?v=KLyeLMJuIOY) · [Source 2](https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter) |
-| Tomorrowland Belgium | 2026 | [NERVO WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=JKM0Gy0lxYE) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=JKM0Gy0lxYE) · [Source 2](https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter) |
-| Tomorrowland Belgium | 2026 | [Nicky Romero WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=TsyGMhx8izw) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=TsyGMhx8izw) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Oliver Heldens WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=2i3XOxbp54U) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=2i3XOxbp54U) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Sara Landry WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=EuqrehK1XFw) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=EuqrehK1XFw) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Sara Landry WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=aDAWctObTvI) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=aDAWctObTvI) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Sebastian Ingrosso WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=jXEtB43exs0) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=jXEtB43exs0) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Sebastian Ingrosso WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=g4vR2VlhNtk) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=g4vR2VlhNtk) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Steve Angello WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=eir5Sh_gHbo) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=eir5Sh_gHbo) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Steve Angello WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=5AdQy7lCbN0) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=5AdQy7lCbN0) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Steve Aoki WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=8-J01-hcHfA) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=8-J01-hcHfA) · [Source 2](https://press.belgium.tomorrowland.com/millions-of-beats-and-millions-of-views-tomorrowland-closes-the-gates-of-the-belgian-consciencia-chapter) |
-| Tomorrowland Belgium | 2026 | [The Chainsmokers WE1  /  Tomorrowland 2026](https://www.youtube.com/watch?v=1lqmFLr-SkA) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=1lqmFLr-SkA) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2026 | [Timmy Trumpet WE2  /  Tomorrowland 2026](https://www.youtube.com/watch?v=QcvGuOhSVlc) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=QcvGuOhSVlc) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2026-relive/) |
-| Tomorrowland Belgium | 2025 | [MARTIN GARRIX LIVE @ TOMORROWLAND 2025 (W2)](https://www.youtube.com/watch?v=RmxWqo83MO4) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=RmxWqo83MO4) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2025-full-sets/) |
-| Tomorrowland Belgium | 2024 | [Alesso  /  Tomorrowland 2024 (Freedom Stage Weekend 2) [Full DJ Live Set]](https://www.youtube.com/watch?v=_KWuiCtWyNA) | Alesso | [Source 1](https://www.youtube.com/watch?v=_KWuiCtWyNA) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2024-full-sets/) |
-| Tomorrowland Belgium | 2024 | [Swedish House Mafia WE2  /  Tomorrowland 2024](https://www.youtube.com/watch?v=dSK13X9oGi8) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=dSK13X9oGi8) · [Source 2](https://www.tomorrowland.com/article/tomorrowland-belgium-2024-full-sets/) |
-| Tomorrowland Belgium | 2023 | [Alesso  /  Tomorrowland 2023  /  Mainstage Weekend 1](https://www.youtube.com/watch?v=2WJoKYs4xnk) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=2WJoKYs4xnk) · [Source 2](https://press.belgium.tomorrowland.com/relive-the-magic-of-tomorrowland-2023) |
-| Tomorrowland Belgium | 2023 | [Hardwell  /  Tomorrowland 2023](https://www.youtube.com/watch?v=1MelBcPuHXU) | Tomorrowland | [Source 1](https://www.youtube.com/watch?v=1MelBcPuHXU) · [Source 2](https://press.belgium.tomorrowland.com/relive-the-magic-of-tomorrowland-2023) |
-| Tomorrowland Belgium | 2023 | [MARTIN GARRIX B2B ALESSO LIVE @ TOMORROWLAND 2023](https://www.youtube.com/watch?v=raOVXUB13vw) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=raOVXUB13vw) · [Source 2](https://press.belgium.tomorrowland.com/relive-the-magic-of-tomorrowland-2023) |
-| Tomorrowland Belgium | 2022 | [Alesso Live at Tomorrowland 2022 (Weekend 1 Mainstage Full DJ Set)](https://www.youtube.com/watch?v=9cWsoVKpNjw) | Alesso | [Source 1](https://www.youtube.com/watch?v=9cWsoVKpNjw) · [Source 2](https://press.belgium.tomorrowland.com/tomorrowland-2022-full-sets-now-available) |
-| Ultra Miami | 2026 | [HARDWELL - LIVE @ ULTRA MUSIC FESTIVAL MIAMI 2026](https://www.youtube.com/watch?v=i_BPdQ-FidY) | Hardwell | [Source 1](https://www.youtube.com/watch?v=i_BPdQ-FidY) · [Source 2](https://ultramusicfestival.com/) |
-| Ultra Miami | 2026 | [MARTIN GARRIX B2B ALESSO LIVE @ ULTRA MUSIC FESTIVAL MIAMI 2026](https://www.youtube.com/watch?v=vBvZaydcCzc) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=vBvZaydcCzc) · [Source 2](https://ultramusicfestival.com/) |
-| Ultra Miami | 2025 | [ALESSO LIVE @ ULTRA MUSIC FESTIVAL MIAMI 2025 (FULL DJ SET)](https://www.youtube.com/watch?v=hQ6k0_Iura0) | Alesso | [Source 1](https://www.youtube.com/watch?v=hQ6k0_Iura0) |
-| Ultra Miami | 2025 | [MARTIN GARRIX LIVE @ ULTRA MUSIC FESTIVAL MIAMI 2025](https://www.youtube.com/watch?v=3-ELBiUkUWc) | Martin Garrix | [Source 1](https://www.youtube.com/watch?v=3-ELBiUkUWc) |
-| Ultra Miami | 2024 | [HARDWELL LIVE AT ULTRA MUSIC FESTIVAL MIAMI 2024](https://www.youtube.com/watch?v=w3zCxh-70Ms) | Hardwell | [Source 1](https://www.youtube.com/watch?v=w3zCxh-70Ms) |
-| Ultra Miami | 2023 | [HARDWELL LIVE @ ULTRA MUSIC FESTIVAL MIAMI 2023](https://www.youtube.com/watch?v=uPhsq1msjl8) | Hardwell | [Source 1](https://www.youtube.com/watch?v=uPhsq1msjl8) |
-| Ultra Miami | 2019 | [David Guetta  /  Miami Ultra Music Festival 2019](https://www.youtube.com/watch?v=fz-3arJT8fc) | David Guetta | [Source 1](https://www.youtube.com/watch?v=fz-3arJT8fc) · [Source 2](https://ultramusicfestival.com/news/ultra-music-festival-reveals-phase-two-lineup-ahead-of-historic-virginia-key-beach-park-and-miami-marine-stadium-debut) |
+Each existing Tomorrowland year has **Preview source playlist** in the festival
+browser. It starts the existing [metadata importer](PLAYLIST_IMPORT.md), fills
+its URL and moves focus to the import form. Loading never enqueues or autoplays.
+Choose available entries explicitly after the preview completes.
 
-Amsterdam RAI **IDEM** belongs to 2023, although its official video was
-published in 2024. Upload dates never substitute for performance years.
+| Year | Playlist reference | Discovery evidence |
+| --- | --- | --- |
+| 2026 | [Supplied playlist](https://www.youtube.com/playlist?list=PLeeZgE3_zp1w) | Owner-supplied URL; matching playlist title exposed by YouTube |
+| 2025 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoN-uoi-Bn6R4JA8C4beRJsU) | [EDM Identity's embedded reference](https://edmidentity.com/2025/07/31/tomorrowland-2025-livesets/), matching YouTube title |
+| 2024 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoO6Y2EaUcVcBXQm7pkkY0n3) | [EDMTunes' playlist reference](https://www.edmtunes.com/2024/07/tomorrowland-over-100-liveset-videos-youtube/), matching YouTube title |
+| 2023 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoOZSSYZtdmZzagDK9kNfUsu) | [Guettapen's embedded reference](https://www.guettapen.com/2023/07/31/tomorrowland-publie-45-sets-de-son-edition-2023-sur-sa-chaine-youtube/) |
+| 2022 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoNFQ1nzaPy90MAt94vqJDb4) | [Official Tomorrowland press announcement](https://press.belgium.tomorrowland.com/tomorrowland-2022-full-sets-now-available), whose Livesets link resolves to this matching-year playlist |
 
-Metadata-only checks do not establish audible device playback, regional access
-or continued provider availability. Test the selected videos on the intended
-installation before a live event.
+These references do not establish every playlist entry, ownership, total count,
+recording eligibility or continued availability. The source reader exposed titles
+or embed URLs, not complete contents. The importer requests up to 500 entries
+through bounded pagination, shows 20 per page and labels partial results. It does
+not silently promote imported entries into the curated catalog.
+
+## Queue and playback behavior
+
+Add one set, the complete listed year when it fits, or an explicitly labeled
+capacity-sized batch. Existing current, queued and pending tracks are skipped.
+Browser rooms reserve their 50-entry capacity for queued tracks and pending
+requests. Website additions retain a 50-track selection budget; Discord also
+enforces the selected server's configured playlist limit. Larger festival
+inventories remain available for later batches.
+
+Additions preserve current playback and saved evenings, use fresh queue revisions
+and stop on errors or a room/server switch. A partial result is visible; retrying
+is explicit. Adding to an empty connected Discord queue retains its existing
+behavior of starting the requested music.
+
+Amsterdam RAI IDEM belongs to 2023 although its official upload appeared in 2024.
+Upload dates never substitute for performance years. No duration, embedding,
+regional access or audible playback guarantee is inferred from a source link.
+The game pack remains separate: see [private quiz setup](GUESS_CATALOG_SOURCES.md#prepared-edm-festival-hits-pack).
+
+## Remaining inventory work
+
+The 13 non-indexed groups above remain incomplete as festival archives. Ultra's
+[current official live-set page](https://ultramusicfestival.com/live-sets) exposes
+artist cards through the available reader, but did not provide the complete
+canonical recording links and historical-year mapping needed for an inventory.
+Discovered third-party playlists and an unverified 2026 playlist reference are
+not treated as an official full archive. Tomorrowland playlist contents still
+need enumeration and comparison against individually eligible recordings.
+Amsterdam RAI has verified named full shows, without a complete archive of every
+performer or separate all-ages performance.
+
+Complete those source inventories before claiming every set from every existing
+festival/year. Metadata checks and synthetic browser tests do not establish
+provider/CDN reachability or real-device listening on the intended installation.

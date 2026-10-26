@@ -178,8 +178,9 @@ Always use fresh GitHub source as the source of truth. Follow AGENTS.md,
 docs/AI_CONTEXT.md, docs/AI_WORKFLOW.md and current issues/PRs. Evaluate
 languages, frameworks and tooling based on actual requirements, maintenance,
 compatibility, performance and security rather than automatically choosing
-JavaScript or the newest release. SvelteKit/Svelte 5 is under evaluation, not
-a verified completed migration.
+JavaScript or the newest release. The owner has retired Classic; SvelteKit 3,
+Svelte 5 and TypeScript 6 are the sole website source stack. Preserve shared
+contracts and verify source, review and deployment status separately.
 
 Coordinate investigation, design, GitHub tracking and reviews. Delegate coding,
 debugging and executable validation to Codex when supported, and use subagents

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
+import {sharedSeekPosition,createPlaybackCorrection,canCorrectPlayback,isDuplicateSnapshot,isOlderSnapshot,roomPollUpdate,transportChanged,compensateDelivery,playbackTarget,calibratedPlaybackPosition,readSyncOffset,shouldCorrect,readSyncMode,syncRecoveryMs,roomPollMs} from '../lib/playback-sync.ts';
 import {acceptsLiveState,DISCORD_LIVE_LEASE_MS,liveRoom,readLiveState,type LiveState} from '../lib/live-room.ts';
 import type {Room} from '../lib/types.ts';
 const room: Room={version:1,viewers:1,isHost:true,expiresAt:999999,code:'DISCORD1',mode:'discord',name:'Discord',current:{id:'abcdefghijk',title:'Test',artist:'Test',image:'',embeddable:true,duration:200,live:false},queue:[],playing:true,position:50,serverTime:100000,syncValidForMs:10000};
@@ -9,6 +9,15 @@ test('paused snapshots never advance even after transport delay',()=>{const next
 test('stale bot state freezes the video instead of inventing minutes of playback',()=>{const target=playbackTarget(room,1000,40000);assert.equal(target.position,60);assert.equal(target.playing,false);assert.equal(target.stale,true);});
 test('normal rooms keep advancing and positions stay within the video',()=>{assert.equal(playbackTarget({...room,mode:undefined},1000,210000).position,199.9);});
 test('local offset affects only Discord video and clamps below zero',()=>{assert.equal(playbackTarget(room,1000,1000,-1.3).position,48.7);assert.equal(playbackTarget({...room,mode:undefined},1000,1000,-1.3).position,50);assert.equal(playbackTarget({...room,position:1},1000,1000,-5).position,0);});
+test('saved local calibration retains finite values, bounds and legacy defaults',()=>{
+ for(const [saved,expected] of [[null,0],['',0],['1.2',1.2],['-2.5',-2.5],['20',5],['-20',-5],['Infinity',0],['invalid',0]] as const)assert.equal(readSyncOffset(saved),expected);
+ const original=structuredClone(room);
+ assert.equal(calibratedPlaybackPosition(room,50,1.2),51.2);
+ assert.equal(calibratedPlaybackPosition({...room,mode:undefined},50,5),50);
+ assert.equal(calibratedPlaybackPosition(room,1,-5),0);
+ assert.equal(calibratedPlaybackPosition(room,199,5),199.9);
+ assert.deepEqual(room,original,'local calibration never updates the shared snapshot');
+});
 test('stable mode tolerates jitter and spaces automatic corrections',()=>{const correct=(a: number,b: number,c: number,d: number)=>shouldCorrect(a,b,c,d,false,'stable');assert.equal(correct(50,49.7,9000,0),false);assert.equal(correct(50,48.6,9000,0),false);assert.equal(correct(50,48,5000,0),false);assert.equal(correct(50,48,6000,0),true);});
 test('precise mode remains available without changing manual correction',()=>{assert.equal(shouldCorrect(50,49,3000,0,false,'precise'),true);assert.equal(shouldCorrect(50,49,2999,0,false,'precise'),false);assert.equal(shouldCorrect(50,49.7,200,0,true),true);assert.equal(shouldCorrect(50,NaN,200,0,true),false);});
 test('buffering never triggers seeks, including manual synchronization',()=>{assert.equal(canCorrectPlayback(3,true,10000,0),false);assert.equal(canCorrectPlayback(3,true,10000,0,true),false);});
@@ -132,4 +141,56 @@ test('scheduled starts remain stationary during transit before the agreed time',
  assert.equal(playbackTarget(scheduled,1000,1500).position,50);
  assert.equal(playbackTarget(scheduled,1000,1500).playing,false);
  assert.equal(playbackTarget(scheduled,1000,2500).position,50.5);
+});
+
+
+test('isolated and alternating iframe jitter does not cause automatic hard seeks',()=>{
+ const correction=createPlaybackCorrection();
+ let previous=-Infinity,oldPrevious=-Infinity,filtered=0,old=0;
+ for(let now=0;now<=30000;now+=250){
+  const target=10+now/1000,drift=now%3000===0?.8:0;
+  if(shouldCorrect(target,target-drift,now,oldPrevious)){old++;oldPrevious=now;}
+  if(correction.shouldCorrect(target,target-drift,now,previous)){filtered++;previous=now;}
+ }
+ assert.equal(old,11,'single stale readings repeatedly interrupt the old policy');
+ assert.equal(filtered,0,'healthy readings between spikes retain the player buffer');
+ for(let now=0;now<5000;now+=250)
+  assert.equal(correction.shouldCorrect(50,now%500===0?49.2:50.8,now,-Infinity),false);
+});
+test('persistent drift aligns after a bounded observation window in both modes',()=>{
+ for(const [mode,drift,window] of [['precise',.8,750],['stable',2,1500]] as const){
+  const correction=createPlaybackCorrection();
+  for(let now=0;now<window;now+=250)assert.equal(correction.shouldCorrect(50,50-drift,now,-Infinity,false,mode),false);
+  assert.equal(correction.shouldCorrect(50,50-drift,window,-Infinity,false,mode),true);
+ }
+});
+test('manual alignment and large desynchronization keep their fast path',()=>{
+ const correction=createPlaybackCorrection();
+ assert.equal(correction.shouldCorrect(50,49.7,1,0,true),true);
+ assert.equal(correction.shouldCorrect(50,47,3000,0),true);
+ assert.equal(correction.shouldCorrect(50,45,6000,0,false,'stable'),true);
+ assert.equal(correction.shouldCorrect(50,47,2999,0),false,'automatic cooldown remains enforced');
+});
+test('stale samples, invalid readings, source resets and preference changes retire drift evidence',()=>{
+ const correction=createPlaybackCorrection();
+ assert.equal(correction.shouldCorrect(50,49,0,-Infinity),false);
+ assert.equal(correction.shouldCorrect(50,49,1500,-Infinity),false,'a background gap starts a fresh window');
+ assert.equal(correction.shouldCorrect(50,NaN,2000,-Infinity),false);
+ assert.equal(correction.shouldCorrect(50,49,2250,-Infinity),false);
+ correction.reset();
+ assert.equal(correction.shouldCorrect(50,49,3000,-Infinity),false);
+ assert.equal(correction.shouldCorrect(50,48,3500,-Infinity,false,'stable'),false);
+ assert.equal(correction.shouldCorrect(50,48,4500,-Infinity,false,'stable'),false);
+ assert.equal(correction.shouldCorrect(50,48,5000,-Infinity,false,'stable'),true);
+});
+
+test('shared seek conversion matches achievable calibration and browser-room authority bounds',()=>{
+ const discord={...room,current:{...room.current!,duration:180}};
+ assert.equal(sharedSeekPosition(discord,0,5),0);
+ assert.equal(calibratedPlaybackPosition(discord,sharedSeekPosition(discord,0,5),5),5);
+ assert.equal(sharedSeekPosition(discord,179,-5),179.9);
+ assert.equal(calibratedPlaybackPosition(discord,sharedSeekPosition(discord,179,-5),-5),174.9);
+ const browser={...discord,mode:undefined};
+ assert.equal(sharedSeekPosition(browser,179.9),179);
+ assert.equal(sharedSeekPosition({...browser,current:{...browser.current!,duration:.5}},.4),0);
 });

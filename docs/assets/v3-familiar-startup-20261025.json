@@ -1,0 +1,62 @@
+{
+  "label": "local-built-worker",
+  "metric": "Decoded successful script responses; gzip is recomputed per response, not measured wire transfer or field performance.",
+  "results": [
+    {
+      "viewport": 1440,
+      "scenario": "welcome",
+      "scriptRequests": 23,
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
+    },
+    {
+      "viewport": 1440,
+      "scenario": "joined-room",
+      "scriptRequests": 23,
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
+    },
+    {
+      "viewport": 1440,
+      "scenario": "playing-room",
+      "scriptRequests": 22,
+      "decodedJavaScriptBytes": 250300,
+      "sumIndividualGzipBytes": 93450
+    },
+    {
+      "viewport": 1440,
+      "scenario": "games",
+      "scriptRequests": 16,
+      "decodedJavaScriptBytes": 148186,
+      "sumIndividualGzipBytes": 56001
+    },
+    {
+      "viewport": 390,
+      "scenario": "welcome",
+      "scriptRequests": 23,
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
+    },
+    {
+      "viewport": 390,
+      "scenario": "joined-room",
+      "scriptRequests": 23,
+      "decodedJavaScriptBytes": 266366,
+      "sumIndividualGzipBytes": 98248
+    },
+    {
+      "viewport": 390,
+      "scenario": "playing-room",
+      "scriptRequests": 22,
+      "decodedJavaScriptBytes": 250300,
+      "sumIndividualGzipBytes": 93450
+    },
+    {
+      "viewport": 390,
+      "scenario": "games",
+      "scriptRequests": 16,
+      "decodedJavaScriptBytes": 148186,
+      "sumIndividualGzipBytes": 56001
+    }
+  ]
+}

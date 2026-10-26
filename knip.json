@@ -1,0 +1,42 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "lib/api/**/route.ts",
+        "scripts/**/*.{ts,mjs}",
+        "operations/update-panel/**/*.ts"
+      ],
+      "project": [
+        "lib/**/*.ts",
+        "db/**/*.ts",
+        "scripts/**/*.{ts,mjs}",
+        "operations/update-panel/**/*.ts"
+      ]
+    },
+    "apps/web": {
+      "entry": [
+        "src/routes/**/*.{svelte,ts}",
+        "scripts/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.{svelte,ts}",
+        "scripts/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "services/core": {
+      "entry": [
+        "src/migrate.ts",
+        "tests/**/*.ts",
+        "benchmarks/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts",
+        "benchmarks/**/*.ts"
+      ]
+    }
+  }
+}

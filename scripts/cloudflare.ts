@@ -2,11 +2,12 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { cloudflareConfig, projectRoot, verifyCloudflareOutput, writeCloudflareConfig } from "./cloudflare-config.ts";
 
+import { writeWebsiteConfig } from "./website-output.ts";
+
 const command = process.argv[2];
 if (!["build", "deploy", "verify"].includes(command) || process.argv.length !== 3) throw new Error("Expected build, verify or deploy without extra arguments.");
 const env = {
   ...process.env,
-  AFTERPARTY_DEPLOY_TARGET: "cloudflare",
   WRANGLER_SEND_METRICS: "false",
   WRANGLER_WRITE_LOGS: "false",
   WRANGLER_LOG_PATH: ".wrangler/logs",
@@ -18,6 +19,17 @@ function run(script: string, args: string[]) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
-if (command === "build") run("node_modules/vinext/dist/cli.js", ["build"]);
+if (command === "build") {
+  if (!process.env.npm_execpath) throw new Error("Run this build with npm run build:cloudflare.");
+  // Workers Builds installs only the root lockfile. The native website owns a
+  // separate lockfile, including Vite, the adapter and its packaging tools.
+  const install = spawnSync(process.execPath, [process.env.npm_execpath, "ci", "--prefix", "apps/web",
+    "--include=dev", "--include=optional", "--no-audit", "--no-fund"],
+    { cwd: projectRoot, env, stdio: "inherit", timeout: 8 * 60_000, killSignal: "SIGTERM" });
+  if (install.error) throw install.error;
+  if (install.status !== 0) process.exit(install.status ?? 1);
+  run("scripts/build-website.ts", []);
+  writeWebsiteConfig(projectRoot, config);
+}
 verifyCloudflareOutput(projectRoot, config);
-if (command === "deploy") run("node_modules/wrangler/bin/wrangler.js", ["deploy", "--config", "dist/server/wrangler.json"]);
+if (command === "deploy") run("apps/web/node_modules/wrangler/bin/wrangler.js", ["deploy", "--config", "dist/server/wrangler.json"]);

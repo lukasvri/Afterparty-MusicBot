@@ -1,3 +1,4 @@
+import {CORE_PRESENCE_CAPABILITY} from './bridge-checkpoint.ts';
 import {importPreviousData} from './data-import.ts';
 import {GuessSourceManager} from './guess-source-manager.ts';
 import {join} from 'node:path';
@@ -17,7 +18,7 @@ async function ensure(id:string){if(guilds.sessions.has(id))return;if(starting.h
  bot.musicChannelId=data.get('music-channel',bot.musicChannelId);
  bot.admitVoice=()=>{const active=[...guilds.sessions.values()].filter(s=>(s.engine.connected||s.bot.joining)&&s.id!==id).length;if(active>=Number(env.MAX_ACTIVE_VOICE_SESSIONS??8))throw new UserError('The server is busy. Try again shortly.');};
  guilds.register({id,name:guild.name,roomCode:guilds.roomCode(id),engine:player,commands:controls,bot});
- try{await bot.start('');publishers.set(id,new Publisher(player,controls,site,key,{guildId:id,roomCode:guilds.roomCode(id),guildName:guild.name}));}catch(error){guilds.remove(id);await bot.close();controls.close();player.close();if(!own)data.close();throw error;}
+ try{await bot.start('');publishers.set(id,new Publisher(player,controls,site,key,{guildId:id,roomCode:guilds.roomCode(id),guildName:guild.name,...env.CORE_BRIDGE_PRESENCE==='authority'?{presenceCapability:CORE_PRESENCE_CAPABILITY}:{}}));}catch(error){guilds.remove(id);await bot.close();controls.close();player.close();if(!own)data.close();throw error;}
  })().finally(()=>starting.delete(id));starting.set(id,job);return job;
 }
 client.on(Events.InteractionCreate,i=>{const s=i.guildId?guilds.sessions.get(i.guildId):null;if(s)s.bot.handleInteraction(i);});

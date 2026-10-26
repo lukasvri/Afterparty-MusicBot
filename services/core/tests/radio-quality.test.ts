@@ -114,6 +114,33 @@ test("song names Music and How To Love remain playable while instructional and v
   assert.equal(isRadioMusic(song(next.id, "The Trailer Park Troubadours - New Song (Official Audio)", { artist: "Publisher" })), true, "artist names are not video classifications");
 });
 
+test('radio rejects explicit recreated uploads and Norwegian vlogs while retaining ordinary song titles', async () => {
+  const original = { ...seed, title: 'Aster - Opening', genres: ['deep house'] };
+  const bad = ['Evening (Re-created)', 'Evening (Re-creation)', 'Evening (Recreating)',
+    'Evening (Recreate)', 'How I re-create Evening', 'En dag i Oslo vlogg',
+    'Sommer vloggen', 'Evening tutorial (Official Music Video)', 'Evening',
+    'Evening (AI-produced)', 'Evening (KI-assistert musikk)']
+    .map((title, index) => song(`unsafe${String(index).padStart(5, '0')}`, `Aster - ${title}`, {
+      music: index === 8 ? false : true, genres: ['deep house'],
+    }));
+  const safe = song('safe0000001', 'Aster - Recreate Me (Official Audio)', { music: true, genres: ['deep house'] });
+  for (const track of bad) assert.equal(isRadioMusic(track), false, track.title);
+  for (const title of ['Live Forever', 'The Sound of Silence', 'Recreate Me', 'Recreating Memories'])
+    assert.equal(isRadioMusic(song('good0000001', `Aster - ${title}`, { music: true })), true, title);
+  assert.equal(isRadioMusic(song('artist00001', 'Vlogg - Another Song (Official Audio)', { music: true })), true,
+    'a named artist is not a video classification');
+  const search = async () => [...bad, safe];
+  const f = fixture();
+  try {
+    f.providers.search = search;
+    assert.equal((await f.providers.radio(original, []))?.id, safe.id);
+    assert.equal((await roomRecommendation({ current: original, queue: [], radio: true }, search, () => {}))?.id, safe.id);
+    assert.deepEqual(playableRoomQueue({ current: original, radioSeed: original, queue: bad.map(track => ({ ...track, radio: true })) }), []);
+    assert.deepEqual(playableRoomQueue({ current: original, radioSeed: original, queue: bad.map(track => ({ ...track, radio: false })) }), bad.map(track => ({ ...track, radio: false })),
+      'explicit manual playback retains the user’s choice');
+  } finally { f.close(); }
+});
+
 test("remasters, alternate edits and named remixes cannot reintroduce the same radio song", () => {
   const original = song(seed.id, "Original");
   const variants = [

@@ -1,5 +1,6 @@
 import { Engine } from "./engine.ts";
 import { Commands } from "./commands.ts";
+import { BRIDGE_CHECKPOINT_MS, CORE_PRESENCE_CAPABILITY, BRIDGE_RECONCILIATION_REQUIRED } from "./bridge-checkpoint.ts";
 
 const HEARTBEAT_MS = 5000;
 const CHANGE_DELAY_MS = 50;
@@ -51,6 +52,9 @@ export class Publisher {
   private retryAt = 0;
   private failures = 0;
   private request: AbortController | null = null;
+  private checkpointRevision = 0;
+  private checkpointIntent = '';
+  private checkpointAt = -Infinity;
 
   constructor(
     engine: Engine,
@@ -69,7 +73,7 @@ export class Publisher {
   }
 
   private schedule(delay: number) {
-    if (this.closed) return;
+    if (this.closed || this.engine.store.get('bridge-reconciliation-block', false)) return;
     const at = performance.now() + delay;
     if (this.timer && this.scheduledAt <= at) return;
     clearTimeout(this.timer);
@@ -88,7 +92,7 @@ export class Publisher {
   };
 
   async sync() {
-    if (this.running || this.closed) return;
+    if (this.running || this.closed || this.engine.store.get('bridge-reconciliation-block', false)) return;
     const retryIn = this.retryAt - performance.now();
     if (retryIn > 0) {
       this.schedule(retryIn);
@@ -113,6 +117,17 @@ export class Publisher {
             : null,
         queue: state.queue.filter((track) => /^[\w-]{11}$/.test(track.id)),
       };
+      const bridgeRevision = this.engine.store.nextBridgeRevision();
+      // Engine state revisions include explicit pause/seek/queue changes. Buffering
+      // can change between those events, so it also participates in the intent key.
+      // Advancing position and presence do not create a durable room checkpoint.
+      const intent = JSON.stringify([state.epoch, state.sequence, state.buffering]);
+      const checkpointInterval = state.playing ? BRIDGE_CHECKPOINT_MS : 86400000;
+      if (intent !== this.checkpointIntent || started - this.checkpointAt >= checkpointInterval) {
+        this.checkpointRevision = bridgeRevision;
+        this.checkpointIntent = intent;
+        this.checkpointAt = started;
+      }
       const response = await fetch(new URL("/api/bridge", this.url), {
         method: "POST",
         redirect: "error",
@@ -122,6 +137,9 @@ export class Publisher {
         },
         body: JSON.stringify({
           ...this.context,
+          bridgeRevision,
+          checkpointRevision: this.checkpointRevision,
+          ...(this.context.presenceCapability === CORE_PRESENCE_CAPABILITY ? { presenceCapability: CORE_PRESENCE_CAPABILITY } : {}),
           state: publicState,
           sampledAt: state.serverTime + this.offset,
           events: events.filter((event) => event.video.concert),
@@ -133,7 +151,19 @@ export class Publisher {
         ]),
       });
       if (this.closed) return;
-      if (!response.ok) throw new Error("The audience bridge did not respond.");
+      if (!response.ok) {
+        const error = await response.json().catch(() => null) as { code?: string } | null;
+        if (this.closed) return;
+        if (response.status === 409 && error?.code === BRIDGE_RECONCILIATION_REQUIRED) {
+          // Never advance a restored counter until it eventually overtakes current
+          // durable state. The operator must reconcile the complete per-guild data.
+          this.engine.store.set('bridge-reconciliation-block', true);
+          this.engine.emit('state', this.engine.websiteSnapshot());
+          console.warn('The audience bridge requires manual state reconciliation. Publishing is blocked.');
+          return;
+        }
+        throw new Error("The audience bridge did not respond.");
+      }
       // A 200 response alone cannot acknowledge durable data or supply a clock.
       const data = readReply(await response.json());
       if (this.closed) return;

@@ -26,7 +26,8 @@ export async function enterFullscreen(element: HTMLElement): Promise<boolean> {
 
 export async function leaveFullscreen(element: HTMLElement): Promise<void> {
   const doc = element.ownerDocument;
-  if (fullscreenElement(doc) !== element) return;
+  const active = fullscreenElement(doc);
+  if (active !== element && (!active || !element.contains?.(active))) return;
   if (typeof doc.exitFullscreen === 'function') await doc.exitFullscreen();
   else (doc as SafariDocument).webkitExitFullscreen?.();
 }

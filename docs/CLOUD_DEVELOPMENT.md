@@ -19,6 +19,50 @@ Keep production secrets and private-network access outside the environment. Do n
 
 The check command runs isolated automated suites. Integration scripts such as `smoke.ts`, `open-rooms.test.ts` and `discord-transport.test.ts` require an explicitly configured test service. They are not production release evidence from cloud validation.
 
+## CI validation timing and failures
+
+`npm run test:browser` runs at most two browser test files concurrently. Tests
+within each file keep their existing sequencing and isolated fixtures. The CI
+website job supervises its local preview and validation process groups; a preview
+exit fails validation immediately, and failure/cancellation retires both trees.
+Failure artifacts retain the preview output and Wrangler diagnostic log. The
+pinned preview SDK includes the upstream fix for transient requests terminating
+the dev server; [toolchain guidance](TOOLCHAIN.md#local-worker-preview-stability)
+records its source and supported version.
+
+Pull requests run the required `deployer`, `core`, `website` and dependency
+checks, including the final Core image probe. They do not create or upload
+release archives. Main pushes retain exact-image/archive validation, packaging,
+artifact uploads and the existing signed release gates. `core-probe` and
+`core-package` share the same runtime probe in `scripts/build_release.py`.
+
+Normal validation and dependency review share `core.yml`. Instrumented coverage
+is an optional job in that same workflow, requested with `coverage_only=true`;
+it does not run automatically on PRs or main pushes. Manual coverage skips the
+regular validation jobs and publishes nothing unless `upload_coverage=true` and
+`CODECOV_ENABLED=true`. Manual jobs have distinct check names, so skipped manual
+jobs cannot satisfy the required PR checks. GitHub-managed CodeQL remains a
+separate security workflow.
+
+The website job reuses the pinned Playwright headless shell and avoids downloading
+the unused headed browser and bulk font packages. It uses the Ubuntu runner
+shared libraries and verifies an actual headless launch before the journeys.
+Website and coverage jobs share the same APT-verified FFmpeg download cache. `apps/web/scripts/browser-ci.ts` reads the canonical
+`test:browser` command. For a PR containing only explicitly recognized playback,
+presentation or documentation paths, it omits only the eight-round pack journey;
+all ordinary game, lobby and game-audio journeys remain. Game changes, dependency
+changes, shared/unknown paths, missing diff data and main/manual runs retain the
+full suite. Changed paths include both sides of renames. Workflow edits also
+retain the full suite. Local `npm run test:browser` remains the full command.
+
+Coverage requires FFmpeg, caches
+APT-verified package downloads, checks an existing executable first, and bounds
+installation to three minutes. Missing or broken tools fail the job. Main image
+packaging uses gzip level 1 and preserves the saved image bytes and digest checks.
+See the [measured validation review](OPTIMIZATION_REVIEW.md#ci-validation-time-2026-10-26)
+for baseline timings and the compression size tradeoff. CI-only changes do not
+belong in public product patch notes.
+
 ## Keep existing configuration local
 
 For an existing installation, keep its private Compose configuration outside Git and link it as `services/core/compose.local.yml`. Preserve the existing build context, environment file, production `/data` binding and any read-only legacy binding. `core-control.sh` automatically selects this file; `CORE_COMPOSE_FILE` can select another file explicitly. Plain `docker compose` uses the public template, so use the control script or explicitly pass the private file on an existing host.

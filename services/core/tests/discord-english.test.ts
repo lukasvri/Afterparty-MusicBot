@@ -48,6 +48,18 @@ test('canonical concert url and legacy concert link retain the same public-conce
   }
 });
 
+test('concert sharing commands publish the selected guild native page without accessing voice', async () => {
+  for (const guildId of ['111111111111111', '222222222222222']) {
+    for (const command of ['concert', 'konsert']) {
+      const call = interaction(command);
+      const bot = { engine: {}, site: 'https://site.example', guildId, roomCode: 'D0ABC123',
+        sameVoice: async () => { throw Error('Sharing never changes playback'); } };
+      await DiscordBot.prototype.interaction.call(bot as never, call as never);
+      assert.deepEqual(call.replies, [`Watch the shared concert in Afterparty: https://site.example/discord?guildId=${guildId}`]);
+    }
+  }
+});
+
 test('English history count and stale legacy count select the requested bounded history', async () => {
   for (const option of ['count', 'antall']) {
     let count = 0;

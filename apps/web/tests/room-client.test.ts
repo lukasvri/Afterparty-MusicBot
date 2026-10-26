@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
 import type { Room } from '../../../lib/types.ts';
-import type { RoomClientOptions, RoomClientState } from '../src/lib/room-client.ts';
-import type { RoomLiveOptions } from '../src/lib/room-live.ts';
+import type { RoomClientOptions, RoomClientState } from '../src/lib/rooms/room-client.ts';
 
 // The shared browser helper predates Node's explicit TypeScript extensions.
 const hook = registerHooks({
@@ -13,7 +12,7 @@ const hook = registerHooks({
     return next(specifier, context);
   },
 });
-const { createRoomClient } = await import('../src/lib/room-client.ts');
+const { createRoomClient } = await import('../src/lib/rooms/room-client.ts');
 hook.deregister();
 
 const room = (code = 'ROOM0001', version = 1, isHost = true): Room => ({
@@ -46,11 +45,12 @@ function deferred<T>() {
 }
 function fixture(
   fetcher: (path: string, init: RequestInit) => Promise<Response>,
-  options: Partial<RoomClientOptions> = {},
+  options: RoomClientOptions = {},
 ) {
   const data = new Map<string, string>([['afterparty-visitor', 'a'.repeat(32)]]);
   const calls: { path: string; init: RequestInit }[] = [];
   const scheduled: (() => void)[] = [];
+  const delays: (number | undefined)[] = [];
   const client = createRoomClient({
     request: async <T>(path: string, init: RequestInit = {}): Promise<T> => {
       calls.push({ path, init });
@@ -67,8 +67,9 @@ function fixture(
       },
     },
     now: () => 100,
-    setTimeout: ((callback: () => void) => {
+    setTimeout: ((callback: () => void, delay?: number) => {
       scheduled.push(callback);
+      delays.push(delay);
       return scheduled.length;
     }) as unknown as typeof setTimeout,
     clearTimeout: (() => {}) as typeof clearTimeout,
@@ -83,12 +84,96 @@ function fixture(
     data,
     calls,
     scheduled,
+    delays,
     get state() {
       return state;
     },
   };
 }
 const json = (value: unknown, status = 200) => Response.json(value, { status });
+
+test('library retry skips confirmed tracks and uses each new room revision', async () => {
+  let snapshot = room(),
+    fail = true;
+  const f = fixture(async (_path, init) => {
+    if (init.method !== 'POST') return json(snapshot);
+    const input = JSON.parse(String(init.body));
+    assert.equal(input.version, snapshot.version);
+    if (input.videoId === 'newtrack002' && fail) return json({ error: 'Temporary failure' }, 503);
+    snapshot = {
+      ...snapshot,
+      version: snapshot.version + 1,
+      queue: [...snapshot.queue, { ...snapshot.current!, id: input.videoId }],
+    };
+    return json({ room: snapshot });
+  });
+  try {
+    await f.client.join('ROOM0001');
+    await assert.rejects(
+      f.client.append(['current0001', 'newtrack001', 'newtrack002']),
+      /1 tracks added/,
+    );
+    fail = false;
+    await f.client.append(['current0001', 'newtrack001', 'newtrack002']);
+    assert.deepEqual(
+      snapshot.queue.map((video) => video.id),
+      ['newtrack001', 'newtrack002'],
+    );
+    const writes = f.calls.filter((call) => call.init.method === 'POST');
+    assert.deepEqual(
+      writes.map((call) => JSON.parse(String(call.init.body)).videoId),
+      ['newtrack001', 'newtrack002', 'newtrack002'],
+    );
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('library additions preflight the full queue including pending requests without partial writes', async () => {
+  const snapshot = room();
+  snapshot.queue = Array.from({ length: 48 }, (_, index) => ({
+    ...snapshot.current!,
+    id: `q${String(index).padStart(10, '0')}`,
+  }));
+  snapshot.requests = [{ ...snapshot.current!, id: 'requested01' }];
+  const f = fixture(async () => json(snapshot));
+  try {
+    await f.client.join('ROOM0001');
+    await assert.rejects(f.client.append(['newtrack001', 'newtrack002']), /room for 1 more/);
+    assert.equal(
+      f.calls.some((call) => call.init.method === 'POST'),
+      false,
+    );
+    await f.client.append(['current0001', 'requested01']);
+    assert.equal(
+      f.calls.some((call) => call.init.method === 'POST'),
+      false,
+    );
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('a library batch cannot continue after leaving and rejoining the same room', async () => {
+  const command = deferred<Response>();
+  const f = fixture(async (_path, init) =>
+    init.method === 'POST' ? command.promise : json(room()),
+  );
+  try {
+    await f.client.join('ROOM0001');
+    const adding = f.client.append(['newtrack001', 'newtrack002']);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const rejected = assert.rejects(adding, /room changed/);
+    f.client.leave();
+    await f.client.join('ROOM0001');
+    command.resolve(json({ room: room('ROOM0001', 2) }));
+    await rejected;
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
+    assert.equal(f.state.room?.version, 1);
+  } finally {
+    f.client.destroy();
+  }
+});
 
 test('a delayed room response cannot cross a room switch, even when transport ignores abort', async () => {
   const slow = deferred<Response>();
@@ -128,6 +213,7 @@ test('guests may add but cannot issue host transport commands; Discord snapshots
         action: 'add',
         version: 1,
         videoId: 'newtrack001',
+        displayName: 'Guest',
       });
       return json({ room: room('ROOM0001', 2, false) });
     }
@@ -306,7 +392,6 @@ test('leave cancels reads, searches and polling, clears the view and preserves o
   assert.deepEqual(f.state, {
     room: null,
     connection: 'idle',
-    live: false,
     busy: false,
     error: '',
     searching: false,
@@ -375,278 +460,843 @@ test('disconnected clients reject next and additions without POST, then a new jo
   f.client.destroy();
 });
 
-function liveHarness() {
-  const sources: { options: RoomLiveOptions; fresh: boolean; closed: number }[] = [];
+test('queue moderation uses entry identities and the latest accepted room revision', async () => {
+  const commands: unknown[] = [];
+  let version = 10;
+  const f = fixture(async (_path, init) => {
+    if (init.method === 'POST') {
+      commands.push(JSON.parse(String(init.body)));
+      return json({ room: room('ROOM0001', ++version) });
+    }
+    return json(room('ROOM0001', version));
+  });
+  await f.client.join('ROOM0001');
+  assert.equal(await f.client.move('entry-duplicate-2', 0), true);
+  assert.equal(await f.client.remove('entry-duplicate-1'), true);
+  assert.equal(await f.client.action('approval', { enabled: true }), true);
+  assert.equal(await f.client.action('approve', { videoId: 'pending-entry-1' }), true);
+  assert.equal(await f.client.action('reject', { videoId: 'pending-entry-2' }), true);
+  assert.equal(await f.client.action('clear'), true);
+  assert.equal(await f.client.action('undo'), true);
+  assert.deepEqual(commands, [
+    { action: 'move', version: 10, videoId: 'entry-duplicate-2', to: 0 },
+    { action: 'remove', version: 11, videoId: 'entry-duplicate-1' },
+    { action: 'approval', version: 12, enabled: true },
+    { action: 'approve', version: 13, videoId: 'pending-entry-1' },
+    { action: 'reject', version: 14, videoId: 'pending-entry-2' },
+    { action: 'clear', version: 15 },
+    { action: 'undo', version: 16 },
+  ]);
+  f.client.destroy();
+});
+
+test('guest voting is permitted while queue edits, moderation and radio stay host-only', async () => {
+  let version = 1;
+  const commands: unknown[] = [];
+  const f = fixture(async (_path, init) => {
+    if (init.method === 'POST') {
+      commands.push(JSON.parse(String(init.body)));
+      return json({ room: room('ROOM0001', ++version, false) });
+    }
+    return json(room('ROOM0001', version, false));
+  });
+  await f.client.join('ROOM0001');
+  assert.equal(await f.client.action('vote', { videoId: 'entry-1' }), true);
+  assert.equal(await f.client.action('skip-vote'), true);
+  assert.equal(await f.client.remove('entry-1'), false);
+  assert.equal(await f.client.move('entry-1', 0), false);
+  assert.equal(await f.client.action('approval', { enabled: true }), false);
+  assert.equal(await f.client.action('approve', { videoId: 'entry-1' }), false);
+  assert.equal(await f.client.action('clear'), false);
+  assert.equal(await f.client.action('undo'), false);
+  assert.equal(await f.client.action('radio', { enabled: true }), false);
+  assert.equal(await f.client.playVideo('newtrack001'), false);
+  assert.equal(await f.client.setVisibility(true), false);
+  assert.deepEqual(commands, [
+    { action: 'vote', version: 1, videoId: 'entry-1' },
+    { action: 'skip-vote', version: 2 },
+  ]);
+  f.client.destroy();
+});
+
+test('cohosts cannot list a room publicly, while owners retain the existing visibility contract', async () => {
+  let owner = false;
+  const commands: unknown[] = [];
+  const f = fixture(async (_path, init) => {
+    if (init.method === 'POST') {
+      commands.push(JSON.parse(String(init.body)));
+      return json({ room: { ...room(), isOwner: owner, isPublic: true } });
+    }
+    return json({ ...room(), isOwner: owner });
+  });
+  await f.client.join('ROOM0001');
+  assert.equal(await f.client.setVisibility(true), false);
+  assert.equal(commands.length, 0);
+  assert.match(f.state.error, /owner/);
+  owner = true;
+  await f.client.refresh();
+  assert.equal(await f.client.setVisibility(true), true);
+  assert.deepEqual(commands, [{ action: 'visibility', version: 1, isPublic: true }]);
+  assert.equal(f.state.room?.isPublic, true);
+  f.client.destroy();
+});
+
+test('public creation is explicit and additions use the saved, bounded participant name', async () => {
+  const commands: unknown[] = [];
+  const token = 'd'.repeat(64);
+  const f = fixture(async (path, init) => {
+    if (path === '/api/rooms') {
+      assert.deepEqual(JSON.parse(String(init.body)), { name: 'Public evening', isPublic: true });
+      return json({ room: room('ROOM0001', 1, false), token });
+    }
+    if (init.method === 'POST') {
+      commands.push(JSON.parse(String(init.body)));
+      return json({ room: room('ROOM0001', 2) });
+    }
+    return json(room());
+  });
+  f.data.set('afterparty-display-name', `  ${'N'.repeat(40)}  `);
+  assert.equal(await f.client.create(' Public evening ', true), true);
+  assert.equal(await f.client.add('newtrack001'), true);
+  assert.deepEqual(commands, [
+    { action: 'add', version: 1, videoId: 'newtrack001', displayName: 'N'.repeat(32) },
+  ]);
+  f.client.destroy();
+});
+
+test('action callers cannot replace the room revision or selected action through fields', async () => {
+  const commands: unknown[] = [];
+  const f = fixture(async (_path, init) => {
+    if (init.method === 'POST') {
+      commands.push(JSON.parse(String(init.body)));
+      return json({ room: room('ROOM0001', 2) });
+    }
+    return json(room());
+  });
+  await f.client.join('ROOM0001');
+  const fields = { enabled: false, version: 999, action: 'play' };
+  assert.equal(await f.client.action('radio', fields), true);
+  assert.deepEqual(commands, [{ action: 'radio', version: 1, enabled: false }]);
+  f.client.destroy();
+});
+
+test('only owners can create invitations or revoke cohosts and invitations do not replace their credential', async () => {
+  const credential = 'a'.repeat(64),
+    invitation = 'b'.repeat(64);
+  let owner = false,
+    version = 1;
+  const commands: unknown[] = [];
+  const f = fixture(async (_path, init) => {
+    if (init.method === 'POST') {
+      assert.equal(new Headers(init.headers).get('Authorization'), `Bearer ${credential}`);
+      const input = JSON.parse(String(init.body));
+      commands.push(input);
+      return json({
+        room: { ...room('ROOM0001', ++version), isOwner: owner },
+        ...(input.action !== 'revoke-hosts' ? { token: invitation } : {}),
+      });
+    }
+    return json({ ...room('ROOM0001', version), isOwner: owner });
+  });
+  f.data.set('afterparty-host:ROOM0001', credential);
+  await f.client.join('ROOM0001');
+  assert.equal(await f.client.createInvitation(), null);
+  assert.equal(await f.client.createInvitation('transfer'), null);
+  assert.equal(await f.client.revokeHosts(), false);
+  assert.equal(commands.length, 0);
+  owner = true;
+  await f.client.refresh();
+  assert.equal(await f.client.createInvitation(), invitation);
+  assert.equal(await f.client.createInvitation('transfer'), invitation);
+  assert.equal(await f.client.revokeHosts(), true);
+  assert.deepEqual(commands, [
+    { action: 'invite', version: 1 },
+    { action: 'transfer-invite', version: 2 },
+    { action: 'revoke-hosts', version: 3 },
+  ]);
+  assert.equal(f.data.get('afterparty-host:ROOM0001'), credential);
+  assert.equal(f.state.room?.version, 4);
+  assert.equal(f.state.error, '');
+  f.client.destroy();
+});
+
+test('a one-use invitation is exchanged before reading room permissions with the new credential', async () => {
+  const invitation = 'b'.repeat(64),
+    credential = 'c'.repeat(64);
+  const f = fixture(async (path, init) => {
+    assert.equal(path, '/api/rooms/ROOM0001');
+    if (init.method === 'POST') {
+      assert.equal(new Headers(init.headers).get('Authorization'), null);
+      assert.deepEqual(JSON.parse(String(init.body)), { action: 'claim-host', token: invitation });
+      return json({ token: credential, room: room('ROOM0001', 1, false) });
+    }
+    assert.equal(new Headers(init.headers).get('Authorization'), `Bearer ${credential}`);
+    return json({ ...room('ROOM0001', 2), isOwner: true });
+  });
+  assert.equal(await f.client.join('room0001', invitation), true);
+  assert.equal(f.data.get('afterparty-host:ROOM0001'), credential);
+  assert.equal(f.state.room?.isHost, true);
+  assert.equal(f.state.room?.isOwner, true);
+  assert.equal(f.state.busy, false);
+  assert.equal(f.calls.length, 2);
+  f.client.destroy();
+});
+
+test('invalid and used invitations cannot silently join or overwrite a saved credential', async () => {
+  const invitation = 'e'.repeat(64),
+    credential = 'f'.repeat(64);
+  const f = fixture(async () =>
+    json({ error: `This invitation ${invitation} is no longer valid.` }, 403),
+  );
+  f.data.set('afterparty-host:ROOM0001', credential);
+  assert.equal(await f.client.join('ROOM0001', 'not-a-token'), false);
+  assert.equal(f.calls.length, 0);
+  assert.equal(await f.client.join('ROOM0001', invitation), false);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.state.room, null);
+  assert.equal(f.state.busy, false);
+  assert.equal(f.state.connection, 'idle');
+  assert.equal(f.state.error.includes(invitation), false);
+  assert.equal(f.data.get('afterparty-host:ROOM0001'), credential);
+  f.client.destroy();
+});
+
+test('a late invitation claim cannot persist credentials after leaving or crossing a room switch', async () => {
+  const pending = deferred<Response>();
+  const invitation = 'b'.repeat(64),
+    credential = 'c'.repeat(64);
+  const f = fixture(async (path, init) =>
+    init.method === 'POST' ? pending.promise : json(room('ROOM0002')),
+  );
+  const oldJoin = f.client.join('ROOM0001', invitation);
+  const signal = f.calls[0].init.signal;
+  assert.equal(await f.client.join('ROOM0002'), true);
+  assert.equal(signal?.aborted, true);
+  pending.resolve(json({ token: credential }));
+  assert.equal(await oldJoin, false);
+  assert.equal(f.data.get('afterparty-host:ROOM0001'), undefined);
+  assert.equal(f.state.room?.code, 'ROOM0002');
+  assert.equal(f.state.busy, false);
+  f.client.destroy();
+});
+
+test('an invitation conflict refreshes permissions without recreating a one-use token', async () => {
+  let reads = 0;
+  const f = fixture(async (_path, init) =>
+    init.method === 'POST'
+      ? json({ error: 'The room changed. Try again.' }, 409)
+      : json({ ...room('ROOM0001', ++reads), isOwner: reads === 1 }),
+  );
+  await f.client.join('ROOM0001');
+  assert.equal(await f.client.createInvitation(), null);
+  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
+  assert.equal(f.state.room?.version, 2);
+  assert.equal(f.state.room?.isOwner, false);
+  assert.equal(f.state.error, 'The room changed. Try again.');
+  f.client.destroy();
+});
+
+class SyntheticStream extends EventTarget {
+  readyState = 0;
+  closed = false;
+  close() {
+    this.closed = true;
+    this.readyState = 2;
+  }
+  open() {
+    this.readyState = 1;
+    this.dispatchEvent(new Event('open'));
+  }
+  send(value: unknown) {
+    this.dispatchEvent(
+      new MessageEvent('message', { data: JSON.stringify({ type: 'room', room: value }) }),
+    );
+  }
+  fail(closed = false) {
+    this.readyState = closed ? 2 : 0;
+    this.dispatchEvent(new Event('error'));
+  }
+}
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+function streamFixture() {
+  let monotonic = 100;
+  let failedReadStatus: number | 'network' = 0;
+  let snapshot: Room = {
+    ...room(),
+    serverTime: 1000,
+    playing: true,
+    isOwner: true,
+    isPublic: false,
+    viewers: 4,
+    syncSource: 'live',
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
+  const sources: SyntheticStream[] = [];
+  const streamUrls: string[] = [];
+  const f = fixture(
+    async () => {
+      if (failedReadStatus === 'network') throw new Error('Synthetic network failure');
+      return failedReadStatus
+        ? json({ error: 'Synthetic read failure' }, failedReadStatus)
+        : json(snapshot);
+    },
+    {
+      now: () => monotonic,
+      eventSource: (url) => {
+        streamUrls.push(url);
+        const source = new SyntheticStream();
+        sources.push(source);
+        return source as unknown as EventSource;
+      },
+      clockRequest: async () => json({ serverTime: 1000 + monotonic - 100 }),
+    },
+  );
   return {
+    ...f,
+    get state() {
+      return f.state;
+    },
     sources,
-    live: ((options: RoomLiveOptions) => {
-      const source = { options, fresh: false, closed: 0 };
-      sources.push(source);
-      return {
-        isFresh: () => source.fresh,
-        destroy() {
-          source.closed++;
-        },
-      };
-    }) as NonNullable<RoomClientOptions['live']>,
-    send(snapshot: Room, index = sources.length - 1) {
-      const source = sources[index];
-      if (!source.options.onSnapshot(snapshot)) return false;
-      source.fresh = true;
-      source.options.onFresh(true);
-      return true;
+    streamUrls,
+    failReads(status: number | 'network') {
+      failedReadStatus = status;
+    },
+    get snapshot() {
+      return snapshot;
+    },
+    set snapshot(value: Room) {
+      snapshot = value;
+    },
+    get now() {
+      return monotonic;
+    },
+    set now(value: number) {
+      monotonic = value;
     },
   };
 }
-const liveRoom = (version: number, code = 'ROOM0001'): Room => ({
-  ...room(code, version),
-  syncSource: 'live',
-  syncEpoch: 'synthetic-core',
-  syncValidForMs: 5000,
-  syncSampledAt: 1000 + version,
-});
 
-test('live updates retain authenticated permissions and old polls update rights without replacing the live clock', async () => {
-  const live = liveHarness();
-  let reads = 0;
-  const f = fixture(
-    async (_path, init) =>
-      init.method === 'POST'
-        ? json({ room: liveRoom(6) })
-        : json({ ...room('ROOM0001', 1, ++reads === 1), isOwner: reads === 1 }),
-    { live: live.live },
-  );
+test('live streaming needs a calibrated clock and retains authenticated permissions and presence', async () => {
+  const f = streamFixture();
   await f.client.join('ROOM0001');
-  assert.equal(
-    live.send({ ...liveRoom(5), isHost: false, isOwner: false, viewers: 0, position: 42 }),
-    true,
-  );
-  assert.equal(f.state.live, true);
+  assert.deepEqual(f.streamUrls, ['/api/realtime/stream?room=ROOM0001']);
+  const source = f.sources[0];
+  const next = {
+    ...f.snapshot,
+    version: 2,
+    serverTime: 1100,
+    isHost: false,
+    isOwner: false,
+    isPublic: true,
+    viewers: 999,
+  };
+  source.send(next);
+  assert.equal(f.state.room?.version, 1, 'frames before clock calibration are ignored');
+  source.open();
+  await flush();
+  f.now = 200;
+  source.send(next);
+  assert.equal(f.state.room?.version, 2);
   assert.equal(f.state.room?.isHost, true);
   assert.equal(f.state.room?.isOwner, true);
-  assert.equal(f.state.room?.viewers, 1, 'Core stream counts do not overwrite room presence');
+  assert.equal(f.state.room?.isPublic, false);
+  assert.equal(f.state.room?.viewers, 4);
+  f.snapshot = {
+    ...f.snapshot,
+    version: 2,
+    isHost: false,
+    isOwner: false,
+    isPublic: true,
+    viewers: 7,
+  };
   await f.client.refresh();
-  assert.equal(f.state.room?.version, 5);
-  assert.equal(f.state.room?.position, 42);
+  assert.equal(f.state.room?.serverTime, 1100, 'an older poll cannot replace the live timeline');
   assert.equal(f.state.room?.isHost, false);
   assert.equal(f.state.room?.isOwner, false);
-  assert.equal(
-    live.send({ ...liveRoom(5), isHost: true }),
-    false,
-    'duplicates do not renew a lease',
-  );
-  assert.equal(live.send({ ...liveRoom(6), isHost: true, isOwner: true }), true);
-  assert.equal(f.state.room?.isHost, false, 'a public stream cannot promote a guest');
+  assert.equal(f.state.room?.isPublic, true);
+  assert.equal(f.state.room?.viewers, 7);
+  source.send({ ...next, version: 3, serverTime: 1200, isHost: true, isOwner: true });
+  assert.equal(f.state.room?.version, 3);
+  assert.equal(f.state.room?.isHost, false, 'public frames cannot restore revoked access');
   assert.equal(f.state.room?.isOwner, false);
-  assert.equal(await f.client.control('play'), false);
-  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
   f.client.destroy();
 });
 
-test('a newer live timeline wins over a pending command reply without replaying the command', async () => {
-  const live = liveHarness(),
-    pending = deferred<Response>();
-  const f = fixture(
-    async (_path, init) => (init.method === 'POST' ? pending.promise : json(liveRoom(1))),
-    { live: live.live },
-  );
+test('stream errors pause a newer timeline until an authenticated poll reconciles current intent', async () => {
+  const f = streamFixture();
   await f.client.join('ROOM0001');
-  const command = f.client.control('pause');
-  assert.equal(f.state.busy, true);
-  live.send({ ...liveRoom(7), position: 90, playing: false });
-  pending.resolve(json({ room: { ...liveRoom(2), position: 15, playing: true } }));
-  assert.equal(await command, true);
-  assert.equal(f.state.room?.version, 7);
-  assert.equal(f.state.room?.position, 90);
-  assert.equal(f.state.room?.playing, false);
-  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
-  f.client.destroy();
-});
-
-test('live messages cannot restore failed authenticated reads or resume playback during reconnect', async () => {
-  const live = liveHarness();
-  let reads = 0;
-  const f = fixture(
-    async () =>
-      ++reads === 2
-        ? json({ error: 'Synthetic unavailable room' }, 503)
-        : json(liveRoom(reads === 1 ? 1 : 3)),
-    { live: live.live },
-  );
-  await f.client.join('ROOM0001');
-  await f.client.refresh();
-  live.send({ ...liveRoom(2), playing: true });
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  source.send({ ...f.snapshot, version: 2, serverTime: 1100 });
+  source.fail();
   assert.equal(f.state.connection, 'reconnecting');
   assert.equal(f.client.playback()?.playing, false);
-  assert.equal(await f.client.control('next'), false);
-  assert.equal(await f.client.add('newtrack001'), false);
+  source.send({ ...f.snapshot, version: 99, serverTime: 1200 });
+  assert.equal(
+    f.state.room?.version,
+    2,
+    'an unauthenticated stream cannot recover a disconnected session',
+  );
+  f.snapshot = { ...f.snapshot, version: 3, serverTime: 1200, playing: false };
   await f.client.refresh();
   assert.equal(f.state.connection, 'connected');
-  assert.equal(f.state.room?.version, 3);
+  assert.equal(f.client.playback()?.playing, false);
   assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
   f.client.destroy();
 });
 
-test('leaving closes live transport and late stream callbacks cannot cross a room switch', async () => {
-  const live = liveHarness();
-  const f = fixture(async (path) => json(room(path.slice(-8))), { live: live.live });
+test('a fresh matching authoritative poll sustains playback during a stream outage without extending its lease', async () => {
+  const f = streamFixture();
   await f.client.join('ROOM0001');
-  live.send(liveRoom(2));
-  assert.equal(f.state.live, true);
-  f.client.leave();
-  assert.equal(live.sources[0].closed, 1);
-  assert.equal(live.sources[0].options.signal.aborted, true);
-  assert.equal(f.state.live, false);
-  await f.client.join('ROOM0002');
-  assert.equal(live.send(liveRoom(99), 0), false);
-  live.sources[0].options.onFresh(true);
-  assert.equal(f.state.room?.code, 'ROOM0002');
-  assert.equal(f.state.live, false);
-  f.client.destroy();
-  assert.equal(live.sources[1].closed, 1);
-});
-
-test('an expired live lease blocks writes until an authoritative read restores the clock', async () => {
-  let now = 0;
-  const f = fixture(
-    async (_path, init) =>
-      json(
-        init.method === 'POST'
-          ? { room: { ...liveRoom(2), serverTime: 1000 + now, syncSampledAt: 1000 + now } }
-          : { ...liveRoom(1), serverTime: 1000 + now, syncSampledAt: 1000 + now },
-      ),
-    { now: () => now },
-  );
-  await f.client.join('ROOM0001');
-  now = 5001;
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  f.now = 200;
+  source.send({ ...f.snapshot, serverTime: 1100 });
+  source.fail();
+  assert.equal(f.state.connection, 'connected');
+  assert.equal(f.state.receivedAt, 100);
+  assert.equal(f.client.playback()?.playing, true);
+  f.now = 5101;
+  assert.equal(f.client.playback()?.playing, false);
   assert.equal(f.client.playback()?.stale, true);
-  assert.equal(await f.client.control('play'), false);
-  assert.equal(await f.client.add('newtrack001'), false);
-  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
-  await f.client.refresh();
-  assert.equal(f.client.playback()?.stale, false);
-  assert.equal(await f.client.control('play'), true);
   f.client.destroy();
 });
 
-test('a new Core epoch learned by polling fences old live frames even before the stream sees the restart', async () => {
-  const live = liveHarness();
-  let reads = 0;
+test('a live lease expires locally even without a browser error or a responsive poll', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  source.send({ ...f.snapshot, version: 2, serverTime: 1000 });
+  const leaseIndex = f.delays.findLastIndex((delay) => delay === 5000);
+  assert(leaseIndex >= 0);
+  f.now = 5101;
+  assert.equal(
+    f.client.playback()?.playing,
+    false,
+    'the playback projection expires without a timer callback',
+  );
+  f.scheduled[leaseIndex]();
+  assert.equal(f.state.connection, 'reconnecting');
+  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  f.client.destroy();
+});
+
+test('fresh stream pauses cross pending commands and older receipts cannot restore playback', async () => {
+  const pending = deferred<Response>();
+  const source = new SyntheticStream();
+  const snapshot: Room = {
+    ...room(),
+    playing: true,
+    syncSource: 'live',
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
   const f = fixture(
-    async () => json({ ...liveRoom(++reads), syncEpoch: reads === 1 ? 'old-core' : 'new-core' }),
-    { live: live.live },
+    async (_path, init) => (init.method === 'POST' ? pending.promise : json(snapshot)),
+    {
+      eventSource: () => source as unknown as EventSource,
+      clockRequest: async () => json({ serverTime: 1001 }),
+    },
   );
   await f.client.join('ROOM0001');
-  live.send({ ...liveRoom(2), syncEpoch: 'old-core' });
-  live.sources[0].fresh = false;
-  live.sources[0].options.onFresh(false);
-  await f.client.refresh();
-  assert.equal(f.state.room?.syncEpoch, 'new-core');
-  assert.equal(live.send({ ...liveRoom(99), syncEpoch: 'old-core' }), false);
-  assert.equal(f.state.room?.syncEpoch, 'new-core');
+  source.open();
+  await flush();
+  const command = f.client.controlNative('seek', 42);
+  source.send({ ...snapshot, version: 3, playing: false, serverTime: 1200 });
+  assert.equal(f.state.room?.version, 3);
+  assert.equal(f.client.playback()?.playing, false);
+  pending.resolve(
+    json({ room: { ...snapshot, version: 2, playing: true, position: 42, serverTime: 1300 } }),
+  );
+  assert.deepEqual(await command, { accepted: true, version: 2 });
+  source.send({ ...snapshot, version: 2, serverTime: 1400 });
+  assert.equal(f.state.room?.version, 3);
+  assert.equal(f.client.playback()?.playing, false);
   f.client.destroy();
 });
 
-test('a poll from a retired Core epoch cannot replace a newer stream after its lease expires', async () => {
-  const live = liveHarness(),
-    pending = deferred<Response>();
-  let reads = 0;
-  const f = fixture(async () => (++reads === 1 ? json(liveRoom(1)) : pending.promise), {
-    live: live.live,
-  });
+test('new stream epochs require authoritative confirmation and old epoch frames remain retired', async () => {
+  const f = streamFixture();
   await f.client.join('ROOM0001');
-  const refreshing = f.client.refresh();
-  live.send({ ...liveRoom(1), syncEpoch: 'new-core', position: 80 });
-  live.sources[0].fresh = false;
-  live.sources[0].options.onFresh(false);
-  pending.resolve(json({ ...liveRoom(99), isHost: false, isOwner: false, viewers: 3 }));
-  await refreshing;
-  assert.equal(f.state.room?.syncEpoch, 'new-core');
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  source.send({ ...f.snapshot, version: 2, syncEpoch: 'unconfirmed-epoch' });
   assert.equal(f.state.room?.version, 1);
-  assert.equal(f.state.room?.position, 80);
-  assert.equal(f.state.room?.isHost, false);
-  assert.equal(f.state.room?.viewers, 3);
+  f.snapshot = {
+    ...f.snapshot,
+    version: 1,
+    serverTime: 1200,
+    syncEpoch: 'epoch-two',
+    playing: false,
+  };
+  await f.client.refresh();
+  await flush();
+  source.send({ ...f.snapshot, version: 99, syncEpoch: 'epoch-one', playing: true });
+  assert.equal(f.state.room?.syncEpoch, 'epoch-two');
+  assert.equal(f.state.room?.version, 1);
+  assert.equal(f.client.playback()?.playing, false);
+  source.send({ ...f.snapshot, version: 2, serverTime: 1300 });
+  assert.equal(f.state.room?.version, 2);
+  assert.equal(f.state.room?.syncEpoch, 'epoch-two');
   f.client.destroy();
 });
 
-test('stream flapping cannot postpone authenticated reads or create parallel read loops', async () => {
-  let now = 0,
-    nextTimer = 0;
-  const timers = new Map<number, { at: number; callback: () => void }>();
-  const live = liveHarness(),
-    pending = deferred<Response>();
-  let reads = 0;
-  const f = fixture(async () => (++reads === 1 ? json(room()) : pending.promise), {
-    live: live.live,
-    now: () => now,
-    setTimeout: ((callback: () => void, delay: number) => {
-      const id = ++nextTimer;
-      timers.set(id, { at: now + delay, callback });
-      return id;
-    }) as unknown as typeof setTimeout,
-    clearTimeout: ((id: number) => timers.delete(id)) as unknown as typeof clearTimeout,
-  });
-  const scheduledAt = () => {
-    assert.equal(timers.size, 1, 'there is only one scheduled read');
-    return [...timers.values()][0].at;
-  };
-  const fire = () => {
-    const [id, timer] = [...timers.entries()][0];
-    timers.delete(id);
-    now = timer.at;
-    timer.callback();
-  };
+test('room changes close streams and late frames cannot affect the replacement room', async () => {
+  const f = streamFixture();
   await f.client.join('ROOM0001');
-  live.send(liveRoom(2));
-  assert.equal(scheduledAt(), 10000);
-  now = 9000;
-  live.sources[0].fresh = false;
-  live.sources[0].options.onFresh(false);
-  now = 9100;
-  live.send(liveRoom(3));
-  assert.equal(scheduledAt(), 10000);
-  now = 9900;
-  live.sources[0].fresh = false;
-  live.sources[0].options.onFresh(false);
-  now = 9950;
-  live.send(liveRoom(4));
-  assert.equal(scheduledAt(), 10000, 'recovery retains the original permission-read deadline');
-  fire();
-  assert.equal(reads, 2);
-  live.sources[0].fresh = false;
-  live.sources[0].options.onFresh(false);
-  live.send(liveRoom(5));
-  assert.equal(scheduledAt(), 11000, 'a pending read uses a bounded retry interval');
-  fire();
-  assert.equal(reads, 2, 'a stream transition cannot start another pending read');
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(scheduledAt(), 12000, 'pending reads cannot spin zero-delay timers');
-  pending.resolve(json({ ...room('ROOM0001', 6, false), isOwner: false }));
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(f.state.room?.isHost, false);
-  assert.equal(f.state.room?.version, 5, 'permission reads preserve the live timeline');
-  assert.equal(scheduledAt(), 21000);
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  f.snapshot = { ...f.snapshot, code: 'ROOM0002' };
+  await f.client.join('ROOM0002');
+  assert.equal(source.closed, true);
+  source.send({ ...f.snapshot, code: 'ROOM0001', version: 999 });
+  assert.equal(f.state.room?.code, 'ROOM0002');
+  assert.equal(f.state.room?.version, 1);
+  f.client.leave();
+  assert.equal(f.sources[1].closed, true);
+  const calls = f.calls.length;
+  f.scheduled.forEach((callback) => callback());
+  assert.equal(f.calls.length, calls);
+  assert.equal(f.sources.length, 2, 'retired retries cannot create another stream');
   f.client.destroy();
-  assert.equal(timers.size, 0);
 });
 
-test('a revision conflict cancels an older pending read and refreshes without replaying the command', async () => {
+test('invalid, wrong-room, expired and Discord stream frames never replace a validated browser timeline', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  source.send({ ...f.snapshot, version: 2, code: 'ROOM0002' });
+  source.send({ ...f.snapshot, version: 2, mode: 'discord', guildId: '111111111111111111' });
+  source.send({ ...f.snapshot, version: 2, position: Number.NaN });
+  source.send({ ...f.snapshot, version: 2, syncValidForMs: 6000 });
+  assert.equal(f.state.room?.version, 1);
+  f.now = 2000;
+  source.send({ ...f.snapshot, version: 2, serverTime: -5000 });
+  assert.equal(f.state.room?.version, 1);
+  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  f.client.destroy();
+});
+
+test('a failed clock resample retires live playback and a closed stream retries without transport mutations', async () => {
+  let now = 100,
+    failClock = false;
+  const snapshot: Room = {
+    ...room(),
+    playing: true,
+    syncSource: 'live',
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
+  const sources: SyntheticStream[] = [];
+  const f = fixture(async () => json(snapshot), {
+    now: () => now,
+    eventSource: () => {
+      const source = new SyntheticStream();
+      sources.push(source);
+      return source as unknown as EventSource;
+    },
+    clockRequest: async () =>
+      failClock ? json({ error: 'Clock unavailable' }, 503) : json({ serverTime: 1001 }),
+  });
+  await f.client.join('ROOM0001');
+  sources[0].open();
+  await flush();
+  sources[0].send({ ...snapshot, version: 2, serverTime: 1100 });
+  failClock = true;
+  now = 10101;
+  f.scheduled[f.delays.findIndex((delay) => delay === 10000)]();
+  await flush();
+  assert.equal(f.state.connection, 'reconnecting');
+  assert.equal(f.client.playback()?.playing, false);
+  sources[0].fail(true);
+  assert.equal(sources[0].closed, true);
+  f.scheduled[f.delays.findLastIndex((delay) => delay === 10000)]();
+  assert.equal(sources.length, 2);
+  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  f.client.destroy();
+  assert.equal(sources[1].closed, true);
+});
+
+test('two clients follow a shared live revision while independently retaining their room roles', async () => {
+  let snapshot: Room = {
+    ...room(),
+    playing: true,
+    syncSource: 'live',
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
+  const hostStream = new SyntheticStream(),
+    guestStream = new SyntheticStream();
+  const host = fixture(
+    async (_path, init) => {
+      if (init.method === 'POST') {
+        const input = JSON.parse(String(init.body));
+        assert.deepEqual(input, { action: 'pause', version: 1 });
+        snapshot = { ...snapshot, version: 2, serverTime: 1100, playing: false };
+        hostStream.send(snapshot);
+        guestStream.send(snapshot);
+        return json({ room: snapshot });
+      }
+      return json(snapshot);
+    },
+    {
+      eventSource: () => hostStream as unknown as EventSource,
+      clockRequest: async () => json({ serverTime: 1001 }),
+    },
+  );
+  const guest = fixture(async () => json({ ...snapshot, isHost: false, isOwner: false }), {
+    eventSource: () => guestStream as unknown as EventSource,
+    clockRequest: async () => json({ serverTime: 1001 }),
+  });
+  await host.client.join('ROOM0001');
+  await guest.client.join('ROOM0001');
+  hostStream.open();
+  guestStream.open();
+  await flush();
+  assert.equal(await host.client.control('pause'), true);
+  assert.equal(host.state.room?.version, 2);
+  assert.equal(guest.state.room?.version, 2);
+  assert.equal(host.client.playback()?.playing, false);
+  assert.equal(guest.client.playback()?.playing, false);
+  assert.equal(host.state.room?.isHost, true);
+  assert.equal(guest.state.room?.isHost, false);
+  assert.equal(await guest.client.control('play'), false);
+  assert.equal(guest.calls.filter((call) => call.init.method === 'POST').length, 0);
+  host.client.destroy();
+  guest.client.destroy();
+});
+
+test('healthy calibrated SSE reduces redundant reads but refreshes authenticated roles within five seconds', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  const source = f.sources[0];
+  source.open();
+  await flush();
+  source.send({ ...f.snapshot, version: 2, serverTime: 1100 });
+  const runPoll = async () => {
+    f.scheduled[f.delays.findLastIndex((delay) => delay === 1000)]();
+    await flush();
+  };
+  for (const time of [1100, 2100, 3100, 4100]) {
+    f.now = time;
+    source.send({ ...f.snapshot, version: 2, serverTime: time + 900 });
+    await runPoll();
+  }
+  assert.equal(f.calls.length, 1, 'fresh SSE frames replace four redundant network snapshots');
+  f.snapshot = { ...f.snapshot, isHost: false, isOwner: false, viewers: 7 };
+  f.now = 5100;
+  source.send({ ...f.snapshot, version: 2, serverTime: 6000 });
+  await runPoll();
+  assert.equal(
+    f.calls.length,
+    2,
+    'authenticated state still refreshes at the five-second boundary',
+  );
+  assert.equal(f.state.room?.isHost, false);
+  assert.equal(f.state.room?.viewers, 7);
+  f.client.destroy();
+});
+
+test('a broken stream immediately restores the existing one-second authority poll', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  f.sources[0].open();
+  await flush();
+  f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100 });
+  f.now = 1100;
+  f.sources[0].fail();
+  f.scheduled[f.delays.findLastIndex((delay) => delay === 1000)]();
+  await flush();
+  assert.equal(f.calls.length, 2, 'stream failure does not wait for the five-second refresh');
+  f.client.destroy();
+});
+
+test('an expired live lease does not suppress an authenticated room read', async () => {
+  const f = streamFixture();
+  await f.client.join('ROOM0001');
+  f.sources[0].open();
+  await flush();
+  f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100, syncValidForMs: 500 });
+  f.now = 1100;
+  f.scheduled[f.delays.findLastIndex((delay) => delay === 1000)]();
+  await flush();
+  assert.equal(f.calls.length, 2, 'a healthy transport alone cannot replace an expired timeline');
+  f.client.destroy();
+});
+
+test('transport refreshes and retries one queue-only revision conflict without rejoining', async () => {
+  let reads = 0;
+  const sent: { action: string; version: number }[] = [];
+  const f = fixture(async (_path, init) => {
+    if (init.method !== 'POST') return json({ ...room('ROOM0001', ++reads), playing: true });
+    const input = JSON.parse(String(init.body));
+    sent.push(input);
+    if (sent.length === 1) return json({ error: 'The room changed.' }, 409);
+    return json({ room: { ...room('ROOM0001', 3), playing: false } });
+  });
+  try {
+    await f.client.join('ROOM0001');
+    assert.equal(await f.client.control('pause'), true);
+    assert.deepEqual(sent, [
+      { action: 'pause', version: 1 },
+      { action: 'pause', version: 2 },
+    ]);
+    assert.equal(f.state.room?.playing, false);
+    assert.equal(f.state.error, '');
+    assert.equal(f.state.connection, 'connected');
+  } finally {
+    f.client.destroy();
+  }
+});
+
+for (const [name, change] of Object.entries({
+  pause: { playing: false },
+  seek: { position: 90 },
+  source: { current: { ...room().current!, id: 'another0001' } },
+  instance: { playbackKey: 'another-playback' },
+  authority: { isHost: false },
+  epoch: { syncEpoch: 'another-epoch' },
+}))
+  test(`transport never retries over a concurrent ${name} change`, async () => {
+    let reads = 0,
+      posts = 0;
+    const f = fixture(async (_path, init) => {
+      if (init.method === 'POST') {
+        posts++;
+        return json({ error: 'The room changed.' }, 409);
+      }
+      return json({ ...room('ROOM0001', ++reads), playing: true, ...(reads > 1 ? change : {}) });
+    });
+    try {
+      await f.client.join('ROOM0001');
+      assert.equal(await f.client.control('seek', 42), false);
+      assert.equal(posts, 1);
+      assert.equal(f.state.room?.version, 2);
+    } finally {
+      f.client.destroy();
+    }
+  });
+
+test('a transient poll failure retains the fresh SSE player while controls await authenticated recovery', async () => {
+  const f = streamFixture();
+  try {
+    await f.client.join('ROOM0001');
+    f.sources[0].open();
+    await flush();
+    f.now = 200;
+    f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100 });
+    f.failReads(503);
+    await f.client.refresh();
+    assert.equal(f.state.connection, 'reconnecting');
+    assert.equal(f.client.playback()?.playing, true);
+    assert.equal(await f.client.control('pause'), false, 'old roles cannot dispatch controls');
+    f.now = 300;
+    f.sources[0].send({ ...f.snapshot, version: 3, playing: false, serverTime: 1200 });
+    assert.equal(f.state.room?.version, 3);
+    assert.equal(f.client.playback()?.playing, false, 'fresh shared pause is still applied');
+    assert.equal(
+      f.state.connection,
+      'reconnecting',
+      'public data cannot restore authenticated access',
+    );
+    f.failReads(0);
+    f.snapshot = { ...f.snapshot, version: 3, playing: false, serverTime: 1200 };
+    await f.client.refresh();
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.state.error, '');
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+for (const status of [401, 403, 404])
+  test(`a ${status} poll failure cannot be sustained or recovered by public frames`, async () => {
+    const f = streamFixture();
+    try {
+      await f.client.join('ROOM0001');
+      f.sources[0].open();
+      await flush();
+      f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1100 });
+      f.failReads(status);
+      await f.client.refresh();
+      assert.equal(f.client.playback()?.playing, false);
+      f.sources[0].send({ ...f.snapshot, version: 3, serverTime: 1200 });
+      assert.equal(f.state.room?.version, 2);
+      assert.equal(f.state.connection, 'reconnecting');
+      for (const failure of [503, 'network', 500] as const) {
+        f.failReads(failure);
+        await f.client.refresh();
+        f.sources[0].send({ ...f.snapshot, version: 3, serverTime: 1300 });
+        assert.equal(
+          f.client.playback()?.playing,
+          false,
+          'access loss remains latched through later transient failures',
+        );
+        assert.equal(f.state.room?.version, 2, 'public frames cannot restore lost access');
+      }
+      f.failReads(0);
+      f.snapshot = { ...f.snapshot, version: 3, serverTime: 1400 };
+      await f.client.refresh();
+      assert.equal(f.state.connection, 'connected');
+      assert.equal(
+        f.client.playback()?.playing,
+        true,
+        'only a successful authenticated read restores playback',
+      );
+    } finally {
+      f.client.destroy();
+    }
+  });
+
+test('transport retries at most one explicit conflict and never retries an uncertain receipt', async () => {
+  for (const status of [409, 503]) {
+    let reads = 0,
+      posts = 0;
+    const f = fixture(async (_path, init) => {
+      if (init.method !== 'POST') return json({ ...room('ROOM0001', ++reads), playing: true });
+      posts++;
+      return json({ error: 'Synthetic command failure' }, status);
+    });
+    try {
+      await f.client.join('ROOM0001');
+      assert.equal(await f.client.control('seek', 42), false);
+      assert.equal(posts, status === 409 ? 2 : 1);
+    } finally {
+      f.client.destroy();
+    }
+  }
+});
+
+test('leaving during conflict reconciliation cannot replay a control or change the replacement room', async () => {
   const pending = deferred<Response>();
   let reads = 0;
-  const f = fixture(async (_path, init) => {
-    if (init.method === 'POST') return json({ error: 'The room changed.' }, 409);
-    return ++reads === 2 ? pending.promise : json(room('ROOM0001', reads));
+  const f = fixture(async (path, init) => {
+    if (init.method === 'POST') return json({ error: 'Old room conflict' }, 409);
+    if (path.endsWith('ROOM0002')) return json(room('ROOM0002'));
+    return ++reads === 1 ? json(room()) : pending.promise;
   });
-  await f.client.join('ROOM0001');
-  const retiredRead = f.client.refresh();
-  const oldSignal = f.calls.at(-1)?.init.signal;
-  assert.equal(await f.client.control('pause'), false);
-  assert.equal(oldSignal?.aborted, true);
-  assert.equal(f.state.room?.version, 3);
-  assert.equal(f.state.error, 'The room changed.');
-  assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
-  pending.resolve(json(room('ROOM0001', 2)));
-  await retiredRead;
-  assert.equal(f.state.room?.version, 3);
-  f.client.destroy();
+  try {
+    await f.client.join('ROOM0001');
+    const changing = f.client.control('seek', 42);
+    await flush();
+    await f.client.join('ROOM0002');
+    pending.resolve(json(room('ROOM0001', 2)));
+    assert.equal(await changing, false);
+    assert.equal(f.state.room?.code, 'ROOM0002');
+    assert.equal(f.state.error, '');
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 1);
+  } finally {
+    pending.resolve(json(room()));
+    f.client.destroy();
+  }
 });

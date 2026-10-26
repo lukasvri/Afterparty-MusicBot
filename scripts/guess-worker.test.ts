@@ -7,7 +7,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { build } from 'esbuild';
-import { Miniflare, Response as WorkerResponse } from 'miniflare';
+import { Miniflare, Response as WorkerResponse, type Request as WorkerRequest } from 'miniflare';
 import { Store } from '../services/core/src/store.ts';
 import { Engine } from '../services/core/src/engine.ts';
 import { Commands } from '../services/core/src/commands.ts';
@@ -40,8 +40,8 @@ test('Worker media proxy serves authorized synthetic WAV and rejects redirects w
       prepareSource: async () => { preparations++; return true; }, sourceState: () => 'ready' });
     const core = `http://127.0.0.1:${(server.publicServer.address() as { port: number }).port}`;
     const bundle = await build({
-      stdin: { contents: `import { POST as game } from './app/api/guess/route.ts';
-        import { POST as media } from './app/api/guess/media/route.ts';
+      stdin: { contents: `import { POST as game } from './lib/api/guess/route.ts';
+        import { POST as media } from './lib/api/guess/media/route.ts';
         export default { fetch(request) { return new URL(request.url).pathname === '/api/guess/media' ? media(request) : game(request); } };`, resolveDir: root, loader: 'ts' },
       bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers'],
     });
@@ -50,7 +50,7 @@ test('Worker media proxy serves authorized synthetic WAV and rejects redirects w
     for (const flags of [['nodejs_compat'], ['nodejs_compat', 'enable_request_signal']]) {
       worker = new Miniflare({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: flags,
         d1Databases: ['DB'], bindings: { GUTTA_CORE_PUBLIC_URL: 'https://core.example', ADMIN_BRIDGE_KEY: key },
-        outboundService: async request => {
+        outboundService: async (request: WorkerRequest) => {
           assert.equal(request.url, 'https://core.example/v1/guess', 'no redirect destination or other upstream route is allowed');
           assert.equal(request.method, 'POST');
           assert.equal(request.headers.get('authorization'), 'Bearer ' + key);

@@ -187,6 +187,10 @@ export class Mixer extends Readable {
   mainFrames: Buffer[] = [];
   nextFrames: Buffer[] = [];
   nextRead: Promise<void> | null = null;
+  private nextReady: Promise<void> | null = null;
+  private nextReadError: Error | null = null;
+  private mainRead: Promise<void> | null = null;
+  private mainReadError: Error | null = null;
   nextFailed = false;
   options: MixerOptions;
   main: Prepared;
@@ -210,7 +214,7 @@ export class Mixer extends Readable {
     options.onSegment(this.main.track, 0, this.offset);
   }
   prepare() {
-    if (this.preparing || this.nextPrepared || this.endedPreparation) return;
+    if (this.disposed || this.preparing || this.nextPrepared || this.endedPreparation) return;
     const generation = this.preparationGeneration;
     this.preparing = this.options
       .next(this.main.track)
@@ -231,34 +235,96 @@ export class Mixer extends Readable {
         this.preparing = null;
       });
   }
+  private fadeSeconds() {
+    if (this.main.track.live) return 0;
+    const configured = this.options.crossfade(),
+      available = Math.max(0, this.main.track.duration - this.offset);
+    // Honor the configured overlap whenever the remaining source can cover it.
+    // Preserve the conservative short-tail fallback when it cannot.
+    return available >= configured ? configured : available / 4;
+  }
   bufferNext() {
-    if (!this.nextPrepared || this.nextRead || this.nextFailed) return;
+    if (this.disposed || !this.nextPrepared || this.nextRead || this.nextFailed) return;
     const prepared = this.nextPrepared,
-      generation = this.preparationGeneration;
-    // At most 12 seconds of stereo PCM, 2.3 MiB. A fade never waits for I/O.
+      generation = this.preparationGeneration,
+      buffered = this.nextFrames;
+    // Keep the original bounded reservoir after fade readiness. Short tails may
+    // start fading as soon as enough frames are ready without losing jitter cover.
     const frames = Math.min(
       600,
       Math.max(1, Math.round(this.options.crossfade() * 50)),
     );
-    this.nextRead = (async () => {
+    let ready!: () => void;
+    this.nextReady = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const owned = () =>
+      !this.disposed &&
+      (this.main === prepared ||
+        (generation === this.preparationGeneration && this.nextPrepared === prepared));
+    const task = (async () => {
       try {
-        while (this.nextFrames.length < frames) {
+        while (
+          this.nextPrepared === prepared &&
+          generation === this.preparationGeneration &&
+          buffered.length < frames
+        ) {
           const frame = await prepared.decoder.frame();
-          if (this.disposed || generation !== this.preparationGeneration)
-            return;
+          if (!owned()) return;
           if (!frame) break;
-          this.nextFrames.push(frame);
+          // Capture the queue: promotion transfers this same array to mainFrames.
+          // An in-flight read then appends exactly once before this pump retires.
+          buffered.push(frame);
+          ready();
         }
-      } catch {
-        if (generation === this.preparationGeneration && !this.disposed) {
-          this.nextFailed = true;
+      } catch (cause) {
+        if (owned()) {
+          const error = cause instanceof Error
+            ? cause
+            : new Error("Audio decoding stopped.");
           prepared.decoder.stop();
-          this.options.onDiagnostic?.("crossfade-unavailable");
+          if (this.main === prepared) this.mainReadError = error;
+          else {
+            this.nextFailed = true;
+            this.nextReadError = error;
+            this.options.onDiagnostic?.("crossfade-unavailable");
+          }
         }
       }
     })().finally(() => {
-      if (generation === this.preparationGeneration) this.nextRead = null;
+      ready();
+      if (this.nextRead === task) this.nextRead = null;
+      if (this.mainRead === task) this.mainRead = null;
     });
+    this.nextRead = task;
+  }
+  private async readMainFrame(): Promise<Buffer | null> {
+    if (this.disposed) return null;
+    const buffered = this.mainFrames.shift();
+    if (buffered) return buffered;
+    // A promoted source can still have one prefetch read in flight. Never race
+    // that read with a second decoder.frame() call or discard its resulting frame.
+    if (this.mainRead) await this.mainRead;
+    if (this.disposed) return null;
+    if (this.mainReadError) throw this.mainReadError;
+    return this.mainFrames.shift() ?? (await this.main.decoder.frame());
+  }
+  private promoteNext(consumedFrames: number) {
+    this.main.decoder.stop();
+    this.main = this.nextPrepared!;
+    this.mainFrames = this.nextFrames;
+    this.mainRead = this.nextRead;
+    this.mainReadError = this.nextReadError;
+    this.nextPrepared = null;
+    this.nextFrames = [];
+    this.nextRead = null;
+    this.nextReady = null;
+    this.nextReadError = null;
+    this.nextFailed = false;
+    this.offset = this.main.track.offset ?? 0;
+    this.trackFrame = consumedFrames;
+    this.fadeFrame = 0;
+    this.endedPreparation = false;
   }
   invalidateNext() {
     if (this.fadeFrame) return;
@@ -267,6 +333,8 @@ export class Mixer extends Readable {
     this.nextPrepared = null;
     this.nextFrames = [];
     this.nextRead = null;
+    this.nextReady = null;
+    this.nextReadError = null;
     this.nextFailed = false;
     this.endedPreparation = false;
   }
@@ -284,42 +352,33 @@ export class Mixer extends Readable {
       });
   }
   async produce(): Promise<Buffer | null> {
+    if (this.disposed) return null;
     const remaining =
       this.main.track.duration - this.offset - this.trackFrame / 50;
-    const fadeSeconds = this.main.track.live
-      ? 0
-      : Math.min(
-          this.options.crossfade(),
-          Math.max(0, (this.main.track.duration - this.offset) / 4),
-        );
+    const fadeSeconds = this.fadeSeconds();
     if (remaining < fadeSeconds + 20 && !this.main.track.live) this.prepare();
-    let a = this.mainFrames.shift() ?? (await this.main.decoder.frame());
+    let a = await this.readMainFrame();
+    if (this.disposed) return null;
     if (!a) {
       if (this.preparing) await this.preparing;
       if (!this.nextPrepared) {
         this.prepare();
         if (this.preparing) await this.preparing;
       }
-      if (this.nextRead) await this.nextRead;
-      if (!this.nextPrepared || this.nextFailed) return null;
-      this.main.decoder.stop();
-      this.main = this.nextPrepared;
-      this.nextPrepared = null;
-      this.mainFrames = this.nextFrames;
-      this.nextFrames = [];
-      this.offset = this.main.track.offset ?? 0;
-      this.trackFrame = 0;
-      this.fadeFrame = 0;
-      this.endedPreparation = false;
-      this.options.onSegment(this.main.track, this.frameIndex, this.offset);
-      a = this.mainFrames.shift() ?? (await this.main.decoder.frame());
-      if (!a) return null;
+      if (!this.nextFrames.length && this.nextReady) await this.nextReady;
+      if (this.disposed || !this.nextPrepared || this.nextFailed) return null;
+      const consumed = this.fadeFrame ? this.fadeFrame - 1 : 0;
+      this.promoteNext(consumed);
+      // An early outgoing EOF can interrupt an announced fade. Keep the
+      // incoming frames already heard and its original clock segment.
+      if (!consumed) this.options.onSegment(this.main.track, this.frameIndex, this.offset);
+      a = await this.readMainFrame();
+      if (this.disposed || !a) return null;
     }
     let b: Buffer | null = null;
     if (
       !this.fadeFrame &&
       this.nextPrepared &&
-      !this.nextRead &&
       !this.nextFailed &&
       this.nextFrames.length >= Math.round(fadeSeconds * 50) &&
       fadeSeconds > 0 &&
@@ -345,15 +404,7 @@ export class Mixer extends Readable {
     if (this.fadeFrame) {
       this.fadeFrame++;
       if (this.fadeFrame > this.fadeLength) {
-        this.main.decoder.stop();
-        this.main = this.nextPrepared!;
-        this.nextPrepared = null;
-        this.mainFrames = this.nextFrames;
-        this.nextFrames = [];
-        this.offset = this.main.track.offset ?? 0;
-        this.trackFrame = this.fadeLength;
-        this.fadeFrame = 0;
-        this.endedPreparation = false;
+        this.promoteNext(this.fadeLength);
       }
     }
     return packet;

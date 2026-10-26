@@ -71,16 +71,19 @@ keeps the reveal and next-round controls. See the [two-client test guide](docs/G
 
 ## Stable and experimental channels
 
-The opt-in [SvelteKit listening-room candidate](docs/SVELTEKIT_MIGRATION.md) starts
-the Afterparty 3.0 frontend migration with private rooms, search, queues and host
-transport at `/v3` in local preview. It is separate from the current release and
-does not change the production website or restart the Activity/Rust experiments.
+The [native Afterparty 3 website](docs/SVELTEKIT_MIGRATION.md) is the sole
+website implementation, with listening rooms at `/`, public concerts at `/discord`,
+and native administration, games and library tools. Existing `/v3` bookmarks
+redirect to the matching native page. The source uses SvelteKit/Svelte 5 and
+TypeScript 6; Core's source image targets qualified Node 26.12.1. Actual LTS and
+host rollout remain separate acceptance requirements, and review builds do not
+establish production deployment or restart Activity/Rust experiments.
 
 Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
 
 ## Concert extras preview
 
-The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The combined `2.4.0-alpha.3` preparation candidate remains review source with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
+The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The `3.0.0-alpha.1` candidate includes native opt-in extras with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
 
 ## Run your own Afterparty
 
@@ -146,6 +149,8 @@ Back up the complete `/data` volume, including `guilds/`, before an update. `doc
 
 ## Work on the project
 
+Use the [source map](docs/ARCHITECTURE.md#source-map) to find a feature, its shared rules and its tests. Native features group rooms, concerts, games, library, social tools and administration in `apps/web/src/lib/`; `lib/api/` holds the existing API handlers and Core supplies shared settings and social contracts.
+
 With Node.js 24.17+, Python 3.11+ and FFmpeg installed:
 
 ```bash
@@ -153,16 +158,16 @@ npm run setup:cloud
 npm run check:all
 ```
 
-`setup:cloud` installs both locked dependency trees. `check:all` runs lint, deployment recovery tests, website unit tests, both TypeScript checks, Core tests and a website production build. Audio tests use real FFmpeg with synthetic tones. Separate Playwright browser suites, such as `npm run test:party` and `npm run test:sync`, use simulated playback and isolated fixtures; `check:all` does not launch them. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
+`setup:cloud` installs the root, Core and native website locked dependency trees. `check:all` runs lint, deployment recovery tests, website unit tests, both TypeScript checks, Core tests and a website production build. Audio tests use real FFmpeg with synthetic tones. Separate Playwright browser suites, through `npm run test:browser` and `npm run test:stack`, use simulated playback and isolated fixtures; `check:all` does not launch them. See [contributing](CONTRIBUTING.md) and the [cloud workflow](docs/CLOUD_DEVELOPMENT.md).
 
 The validation command requires repository-wide lint with zero warnings. Automated checks do not establish live Discord audio quality or multi-server production capacity; the [release review](docs/RELEASE_REVIEW.md) records the remaining live checks.
 
 ## TypeScript and project status
 
-The website (`app/`, `components/`, `hooks/`, `lib/`), Core
+The website (`apps/web/`, `lib/`), Core
 (`services/core/src/`), tests and maintained Node scripts are written in
-TypeScript. Node.js 24.17+ runs the Node scripts directly using native type
-stripping. ESLint and PostCSS load typechecked TypeScript configuration through
+TypeScript 6. Node.js 24.17+ runs the Node scripts directly using native type
+stripping. ESLint loads typechecked TypeScript configuration through
 small `.mjs` adapters. Existing installer adapters remain compatible with older
 configured entry points. See [TypeScript boundaries](docs/TYPESCRIPT.md) for the
 retired legacy dashboard and retained Python, shell and container tooling.

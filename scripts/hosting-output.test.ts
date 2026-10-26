@@ -1,51 +1,73 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm, access } from "node:fs/promises";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ResolvedConfig } from "vite";
-import { sites } from "../build/sites-vite-plugin.ts";
+import { writeWebsiteOutput, writeWebsiteConfig, localWebsiteConfig } from "./website-output.ts";
 
-function hooks(root: string, config: string, command: "build" | "serve") {
-  const plugin = sites({ hostingConfigFile: config });
-  assert.equal(typeof plugin.configResolved, "function");
-  assert.equal(typeof plugin.closeBundle, "function");
-  if (typeof plugin.configResolved !== "function" || typeof plugin.closeBundle !== "function") throw Error("Missing build hooks");
-  plugin.configResolved.call({} as never, { root, command } as ResolvedConfig);
-  return () => {
-    if (typeof plugin.closeBundle !== "function") throw Error("Missing build hook");
-    return plugin.closeBundle.call({} as never);
-  };
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), "afterparty-native-output-"));
+  for (const path of ["drizzle", "private", "apps/web/.svelte-kit/v3-artifact", "apps/web/.svelte-kit/cloudflare", "dist/client"])
+    mkdirSync(join(root, path), { recursive: true });
+  writeFileSync(join(root, "apps/web/.svelte-kit/v3-artifact/_worker.js"), "export default {fetch(){return new Response('native')}};");
+  writeFileSync(join(root, "apps/web/.svelte-kit/v3-artifact/README.md"), "review metadata");
+  writeFileSync(join(root, "apps/web/.svelte-kit/cloudflare/_worker.js"), "unbundled private Worker source");
+  writeFileSync(join(root, "apps/web/.svelte-kit/cloudflare/app.js"), "native client fixture");
+  writeFileSync(join(root, "dist/client/stale.js"), "retired UI");
+  writeFileSync(join(root, "private/hosting.local.json"), JSON.stringify({ d1: "DB", r2: null, project_id: "synthetic-private-project" }));
+  for (const name of ["0000.sql", "0001.sql"]) writeFileSync(join(root, "drizzle", name), "-- synthetic migration\n");
+  return root;
 }
 
-test("website build retains selected host bindings and every migration", async () => {
-  const root = await mkdtemp(join(tmpdir(), "afterparty-hosting-"));
+test("native packaging preserves selected host identity, migrations and compiled bytes", () => {
+  const root = fixture();
   try {
-    await mkdir(join(root, "drizzle"));
-    await mkdir(join(root, "private"));
-    await mkdir(join(root, "dist/.openai/drizzle"), { recursive: true });
-    await writeFile(join(root, "dist/.openai/drizzle/stale.sql"), "outdated");
-    const configuration = JSON.stringify({ d1: "DB", r2: null });
-    await writeFile(join(root, "private/hosting.local.json"), configuration);
-    await writeFile(join(root, "drizzle/0000.sql"), "CREATE TABLE synthetic(id TEXT);");
-    await writeFile(join(root, "drizzle/0001.sql"), "ALTER TABLE synthetic ADD COLUMN title TEXT;");
-    await hooks(root, "private/hosting.local.json", "build")();
-    assert.equal(await readFile(join(root, "dist/.openai/hosting.json"), "utf8"), configuration);
-    for (const name of ["0000.sql", "0001.sql"]) assert.equal(
-      await readFile(join(root, "dist/.openai/drizzle", name), "utf8"),
-      await readFile(join(root, "drizzle", name), "utf8"),
-    );
-    await assert.rejects(access(join(root, "dist/.openai/drizzle/stale.sql")));
-    assert.equal(await readFile(join(root, "private/hosting.local.json"), "utf8"), configuration);
-  } finally { await rm(root, { recursive: true, force: true }); }
+    const selected = readFileSync(join(root, "private/hosting.local.json"), "utf8");
+    const panelAssets = {"manifest.json": '{"version":1}', "update-channel.0123456789ab.js": 'private panel fixture'};
+    writeWebsiteOutput(root, { hostingConfigFile: "private/hosting.local.json", updatePanelAssets: panelAssets });
+    for (const [name, bytes] of Object.entries(panelAssets)) {
+      assert.equal(readFileSync(join(root, "dist/.openai/update-panel", name), "utf8"), bytes);
+      assert.equal(existsSync(join(root, "dist/client", name)), false);
+    }
+    assert.equal(existsSync(join(root, "dist/client/.openai")), false);
+    assert.equal(readFileSync(join(root, "dist/server/index.js"), "utf8"), readFileSync(join(root, "apps/web/.svelte-kit/v3-artifact/_worker.js"), "utf8"));
+    assert.equal(readFileSync(join(root, "dist/client/app.js"), "utf8"), "native client fixture");
+    assert.equal(existsSync(join(root, "dist/client/_worker.js")), false);
+    assert.equal(existsSync(join(root, "dist/client/stale.js")), false);
+    assert.equal(existsSync(join(root, "dist/server/README.md")), false);
+    assert.equal(readFileSync(join(root, "dist/.openai/hosting.json"), "utf8"), selected);
+    assert.equal(readFileSync(join(root, "private/hosting.local.json"), "utf8"), selected);
+    for (const name of ["0000.sql", "0001.sql"]) assert.equal(readFileSync(join(root, "dist/.openai/drizzle", name), "utf8"), readFileSync(join(root, "drizzle", name), "utf8"));
+    const config = JSON.parse(readFileSync(join(root, "dist/server/wrangler.json"), "utf8"));
+    assert.equal(config.main, "index.js");
+    assert.equal(config.assets.directory, "../client");
+    assert.equal(config.assets.run_worker_first, false);
+    assert.equal(config.d1_databases[0].migrations_dir, "../.openai/drizzle");
+    assert.equal(config.keep_vars, true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("development previews leave existing deployment output untouched", async () => {
-  const root = await mkdtemp(join(tmpdir(), "afterparty-preview-"));
+test("an incomplete native bundle leaves existing deployment output intact", () => {
+  const root = fixture();
   try {
-    await mkdir(join(root, "dist/.openai"), { recursive: true });
-    await writeFile(join(root, "dist/.openai/hosting.json"), "synthetic previous output");
-    await hooks(root, "missing-config.json", "serve")();
-    assert.equal(await readFile(join(root, "dist/.openai/hosting.json"), "utf8"), "synthetic previous output");
-  } finally { await rm(root, { recursive: true, force: true }); }
+    rmSync(join(root, "apps/web/.svelte-kit/v3-artifact/_worker.js"));
+    assert.throws(() => writeWebsiteOutput(root));
+    assert.equal(readFileSync(join(root, "dist/client/stale.js"), "utf8"), "retired UI");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("binding Cloudflare configuration preserves compiled panel, Worker, identity and migrations", () => {
+  const root = fixture();
+  try {
+    const panel = {"manifest.json": '{"version":1}', "update-channel.0123456789ab.js": "private panel fixture"};
+    writeWebsiteOutput(root, { hostingConfigFile: "private/hosting.local.json", updatePanelAssets: panel });
+    const paths = ["server/index.js", "client/app.js", ".openai/hosting.json", ".openai/drizzle/0000.sql", ...Object.keys(panel).map(name => ".openai/update-panel/" + name)];
+    const before = paths.map(path => readFileSync(join(root, "dist", path), "utf8"));
+    writeWebsiteConfig(root, {...localWebsiteConfig, name: "synthetic-cloudflare-target"});
+    assert.deepEqual(paths.map(path => readFileSync(join(root, "dist", path), "utf8")), before);
+    const config = JSON.parse(readFileSync(join(root, "dist/server/wrangler.json"), "utf8"));
+    assert.equal(config.name, "synthetic-cloudflare-target");
+    assert.equal(config.assets.directory, "../client");
+    assert.equal(config.assets.run_worker_first, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

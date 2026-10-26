@@ -13,7 +13,7 @@ import { deferred } from './deferred.ts';
 const id = (index: number) => 'result'+String(index).padStart(5, '0');
 const track = (index: number): Track => ({ id: id(index), entryId: 'private-entry-'+index, title: 'Synthetic Song '+index, artist: 'Synthetic Artist', duration: 180,
   image: '', live: false, embeddable: true, source: 'youtube', requestedBy: 'private-member', genres: ['house'] });
-const key = (query: string, count: number, musicOnly: boolean) => 'search:v6:'+JSON.stringify([query.trim().normalize('NFKC').toLowerCase(), count, musicOnly]);
+const key = (query: string, count: number, musicOnly: boolean) => 'search:v7:'+JSON.stringify([query.trim().normalize('NFKC').toLowerCase(), count, musicOnly]);
 
 test('authenticated catalog separates thirty public search results from twenty music-only radio candidates', async () => {
   const store = new Store(':memory:'), providers = new Providers(store, {});
@@ -103,8 +103,8 @@ test('sixty-four distinct pending searches bound provider work while shared join
 test('fresh API and extractor metadata preserve explicit AI evidence while old cache namespaces are ignored', async () => {
   for (const fallback of [false, true]) {
     const store = new Store(':memory:'), p = new Providers(store, {}); let hydrated = 0;
-    store.set('metadata:v4:'+id(0), { at: Date.now(), track: track(0) });
-    store.set('search:v5:'+JSON.stringify(['evidence', 30, false]), { at: Date.now(), tracks: [track(0)] });
+    store.set('metadata:v5:'+id(0), { at: Date.now(), track: track(0) });
+    store.set('search:v6:'+JSON.stringify(['evidence', 30, false]), { at: Date.now(), tracks: [track(0)] });
     p.youtube = async <K extends keyof YouTubeResponses>(path: K) => {
       if (path === 'search') return { items: [{ id: { videoId: id(0) } }] } as YouTubeResponses[K];
       hydrated++; if (fallback) throw Error('synthetic unavailable');
@@ -113,4 +113,25 @@ test('fresh API and extractor metadata preserve explicit AI evidence while old c
     p.extract = async () => ({ id: id(0), title: 'Synthetic song', uploader: 'Artist', description: 'Created using Suno', duration: 180, playable_in_embed: true });
     try { const [result] = await p.search('Evidence', 30); assert.equal(result.aiGenerated, true); assert.equal(hydrated, 1); } finally { store.close(); }
   }
+});
+
+test('user discovery ranks hydrated title/artist relevance once while radio retains its provider pool', async () => {
+  const store = new Store(':memory:'), p = new Providers(store, {});
+  let calls = 0;
+  const pool: Track[] = [
+    { ...track(0), title: 'Janji - Heroes Tonight (Remix)', artist: 'Janji' },
+    { ...track(1), title: 'Janji - Heroes Tonight (Official Audio)', artist: 'Janji - Topic' },
+    { ...track(2), title: 'Unrelated video', artist: 'Other Artist' },
+  ];
+  p.youtube = async <K extends keyof YouTubeResponses>() => {
+    calls++; return { items: pool.map(track => ({ id: { videoId: track.id } })) } as YouTubeResponses[K];
+  };
+  p.video = async () => pool;
+  try {
+    assert.deepEqual((await p.search('Janji Heroes Tonight')).map(track => track.id), [id(1), id(0), id(2)]);
+    assert.deepEqual((await p.search('Janji Heroes Tonight')).map(track => track.id), [id(1), id(0), id(2)]);
+    assert.equal(calls, 1, 'local ranking does not make extra discovery or metadata requests');
+    assert.deepEqual((await p.search('Janji Heroes Tonight', 20, true)).map(track => track.id), pool.map(track => track.id));
+    assert.equal(calls, 2, 'radio keeps its own fixed pool and cache identity');
+  } finally { store.close(); }
 });

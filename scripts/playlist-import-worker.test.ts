@@ -6,7 +6,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { Miniflare, Response as WorkerResponse } from 'miniflare';
+import { Miniflare, Response as WorkerResponse, type Request as WorkerRequest } from 'miniflare';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const key = 'synthetic-playlist-worker-bridge', site = 'https://site.example';
@@ -17,7 +17,7 @@ type Job = { id: string; token: string; url: string; status: string; source: str
 type Payload = { id: string; token?: string; status: string; source: string; videos: { id: string; title: string; artist: string }[]; total?: number; skipped: number; limited: boolean; error?: string };
 
 test('playlist Worker preserves public metadata jobs, private capabilities and bounded transport', { timeout: 20000 }, async t => {
-  const bundle = await build({ stdin: { contents: `import { POST } from './app/api/playlists/route.ts';
+  const bundle = await build({ stdin: { contents: `import { POST } from './lib/api/playlists/route.ts';
     export default { fetch(request) { return POST(request); } };`, resolveDir: root, loader: 'ts' },
     bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', external: ['cloudflare:workers'] });
   const calls: Record<string, unknown>[] = [], jobs = new Map<string, Job>();
@@ -26,7 +26,7 @@ test('playlist Worker preserves public metadata jobs, private capabilities and b
   let redirect = 0;
   const worker = new Miniflare({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
     d1Databases: ['DB'], bindings: { GUTTA_CORE_PUBLIC_URL: 'https://core.example', ADMIN_BRIDGE_KEY: key },
-    outboundService: async request => {
+    outboundService: async (request: WorkerRequest) => {
       const url = new URL(request.url);
       assert.equal(url.origin, 'https://core.example'); assert.equal(url.pathname, '/v1/playlists'); assert.equal(url.search, '');
       assert.equal(request.method, 'POST'); assert.equal(request.headers.get('authorization'), 'Bearer ' + key);

@@ -18,16 +18,16 @@ case "${1:-check}" in
     ;;
   check)
     npm run lint
+    npm run audit:unused
     python3 -m unittest discover -s tests -v
     node node_modules/typescript/bin/tsc --noEmit --incremental false
     npm run test:unit
     npm --prefix services/core run check
     npm --prefix services/core test
-    npm run build
     npm --prefix apps/web run format:check
     npm --prefix apps/web run check
     npm --prefix apps/web test
-    npm --prefix apps/web run build
+    npm run build
     ;;
   *) printf 'Usage: %s setup|check\n' "$0" >&2; exit 2 ;;
 esac
