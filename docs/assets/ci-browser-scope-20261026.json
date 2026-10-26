@@ -1,0 +1,11 @@
+{
+  "base": "5e13800c26c7ec67ce3f6d65b7e495215416d4fb",
+  "head": "f04cb17d2de28f41fa8c27ffd982930482256ca3",
+  "seconds": 164.96257057900002,
+  "status": 0,
+  "application_commit": "a5271d7d7af093e0b2452f99c9972fdbe32f382a",
+  "browser_cases": 95,
+  "omitted": "tests/game-pack.browser.ts",
+  "selector_sha256": "aeeb68078ec0cec0746f49c8c9a4b207c432c5d70fb4978f3d1b1aacfa7d8c1c",
+  "note": "Successful synthetic loopback selection run against the merged playback application. Not a paired speedup or provider latency measurement."
+}

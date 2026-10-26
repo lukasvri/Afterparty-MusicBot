@@ -21,7 +21,9 @@ class ValidationLifecycle(unittest.TestCase):
             root = Path(tmp)
             script = script.replace('/tmp/afterparty-web-preview.log', str(root / 'preview.log'))
             (root / 'check.sh').write_text(script)
-            (root / 'node').write_text('#!/bin/sh\nexit 0\n')
+            (root / 'node').write_text(
+                '#!/bin/sh\ncase "$1" in *browser-ci.ts) exec "$CI_FIXTURE_ROOT/npm" run test:browser;; esac\nexit 0\n'
+            )
             (root / 'npm').write_text(f'#!{sys.executable}\n' + textwrap.dedent('''
                 import os,sys,time,signal
                 from pathlib import Path

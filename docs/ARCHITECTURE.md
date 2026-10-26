@@ -65,7 +65,7 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Core rooms, games and social authority | `services/core/src/` | `rooms.ts`, `guess-game.ts`, `social.ts` |
 | Website schema and migrations | `db/`, `drizzle/` | Existing D1 migration sequence |
 | Core schema and data | `services/core/src/` | `store.ts`, `migrate.ts`; private data stays outside Git |
-| Local checks, builds and browser fixtures | `scripts/`, `apps/web/scripts/`, `apps/web/tests/`, `services/core/tests/` | `npm run check:all` plus browser suites |
+| Local checks, builds and browser fixtures | `scripts/`, `apps/web/scripts/`, `apps/web/tests/`, `services/core/tests/` | `npm run check:all` plus browser suites; `apps/web/scripts/browser-ci.ts` owns conservative PR selection from the canonical browser command |
 | Host update and recovery | `operations/`, `services/core/` | [Operations](../services/core/PUBLIC_RELEASE.md) |
 
 The v3 feature folders keep each component beside its client and behavior helpers:

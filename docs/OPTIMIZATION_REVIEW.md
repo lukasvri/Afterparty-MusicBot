@@ -664,3 +664,53 @@ source revisions and runner conditions differ, so these are observed samples,
 not a controlled transfer benchmark. PRs now omit that archive entirely.
 The FFmpeg installer completed in 20 seconds and saved 62,790,608 bytes of APT
 packages for reuse. Exact run/commit identifiers are retained in the raw results.
+
+
+## Consolidated checks and conservative browser scope, 2026-10-26
+
+Normal validation and dependency review now share `core.yml`; the separate
+coverage and dependency-review workflow files are retired. Coverage is requested
+explicitly through that workflow, rather than automatically repeating all unit
+suites on every merge. Its upload remains separately opt-in. Manual check names
+are namespaced so a skipped report-only job cannot replace a required PR check.
+The four regular required contexts and canonical signed-release workflow path
+remain unchanged. GitHub-managed default CodeQL stays separate.
+
+The website installs/caches only the pinned Chromium headless shell. The CI
+browser selector reads the existing `test:browser` manifest command and can omit
+only the extended eight-round pack for a narrow set of independent playback,
+presentation or documentation paths. All other browser journeys, including game
+and game-audio smoke tests, remain enabled. Shared/game/dependency/workflow or
+unknown changes, incomplete diffs, main pushes and manual validation retain the
+full suite. Renames are expanded into both old and new paths. Local browser
+commands remain full-suite commands.
+
+The [selection measurement](assets/ci-browser-scope-20261026.json) records a
+successful 95-case run in 164.963 seconds against the merged playback application.
+Only the unrelated pack journey was omitted. This is not a paired speed claim.
+Six selector regressions cover full-suite fallback, retained game smoke/audio,
+canonical flags, invalid diffs and game-to-playback renames. Existing lifecycle
+and producer tests also cover the consolidated job graph and release gates.
+
+
+A cold GitHub validation then exposed another independent setup bottleneck:
+`playwright install --with-deps` timed out fetching unused font families and
+upgrading already-installed libraries from a slow Ubuntu mirror. Browser setup
+now installs only the pinned headless shell, uses the hosted Ubuntu image's
+existing shared libraries and verifies an actual launch before running tests.
+FFmpeg cache/installer steps are shared with the manual report through YAML
+anchors; restore-prefix lookup reuses earlier APT-verified archives when the
+workflow key changes. Missing browser libraries or failed package verification
+still fail validation rather than concealing a broken environment.
+
+
+Main validation also reproduced the preview-process failure separately from the
+package-download timeout. Upstream fixed Wrangler's whole-server exit on a
+transient request failure in 4.129.1
+([15252](https://github.com/cloudflare/workers-sdk/pull/15252)), and fixed the
+empty error message in 4.132.0
+([14906](https://github.com/cloudflare/workers-sdk/pull/14906)). The website's
+preview/build SDK is pinned to 4.132.0, retaining the SvelteKit adapter's supported
+Wrangler range. The fix limits retries to safe GET/HEAD requests and keeps request
+failures from terminating the dev server; it does not retry mutation requests or
+failed tests. Application framework and Core runtime versions are unchanged.

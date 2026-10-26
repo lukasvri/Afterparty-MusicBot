@@ -3,6 +3,16 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      coverage_only:
+        description: Run instrumented coverage instead of normal validation
+        type: boolean
+        default: false
+      upload_coverage:
+        description: Upload the manual coverage reports to Codecov
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -11,6 +21,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   deployer:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'manual / deployer' || 'deployer' }}
+    if: github.event_name != 'workflow_dispatch' || !inputs.coverage_only
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -25,6 +37,8 @@ jobs:
           python3 -m unittest discover -s tests -v
           python3 -m unittest discover -s operations/update-panel -p 'test_*.py' -v
   core:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'manual / core' || 'core' }}
+    if: github.event_name != 'workflow_dispatch' || !inputs.coverage_only
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -37,6 +51,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           DOCKER_BUILD_RECORD_UPLOAD: 'false'
+          DOCKER_BUILD_SUMMARY: 'false'
         with:
           context: services/core
           target: final
@@ -51,7 +66,7 @@ jobs:
           provenance: false
           sbom: false
       - name: Probe the tested final image without creating unused PR archives
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: python3 scripts/build_release.py core-probe
       - name: Probe and package the tested final image without rebuilding
         if: github.event_name == 'push'
@@ -69,6 +84,8 @@ jobs:
           archive: true
           overwrite: true
   website:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'manual / website' || 'website' }}
+    if: github.event_name != 'workflow_dispatch' || !inputs.coverage_only
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     # Public build configuration, never Sentry authentication/upload tokens.
@@ -76,10 +93,15 @@ jobs:
       VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
       WRANGLER_WRITE_LOGS: 'true'
       WRANGLER_LOG_PATH: /tmp/afterparty-wrangler
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/afterparty-playwright
+      CI_EVENT_NAME: ${{ github.event_name }}
+      CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26'
@@ -108,12 +130,35 @@ jobs:
           npm --prefix apps/web test
       - name: Build and package the sole native release artifact without publishing
         run: npm run build
+      - name: Reuse the pinned Playwright headless browser
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-shell-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - &ffmpeg_cache
+        name: Reuse downloaded FFmpeg packages
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ runner.temp }}/afterparty-ffmpeg/*.deb
+          key: ffmpeg-ubuntu-24.04-${{ runner.arch }}-${{ hashFiles('.github/workflows/core.yml') }}
+          restore-keys: ffmpeg-ubuntu-24.04-${{ runner.arch }}-
+      - &ensure_ffmpeg
+        name: Ensure FFmpeg is available for real audio tests
+        timeout-minutes: 3
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+            mkdir -p "$RUNNER_TEMP/afterparty-ffmpeg"
+            sudo apt-get -o Dir::Cache::archives="$RUNNER_TEMP/afterparty-ffmpeg" -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
       - name: Install native browser journey dependencies
         timeout-minutes: 3
         run: |
-          npx playwright install --with-deps chromium
-          sudo apt-get install -y --no-install-recommends ffmpeg
-          ffmpeg -version
+          # Ubuntu's hosted image already provides Chromium's shared libraries.
+          # Avoid install-deps: it downloads large unused font families and upgrades.
+          npx playwright install --only-shell chromium
+          node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({headless:true,args:["--no-sandbox"]}); await browser.close();'
       - name: Check native release desktop and mobile journeys with synthetic data
         timeout-minutes: 8
         run: |
@@ -136,7 +181,7 @@ jobs:
           node --input-type=module -e 'for(let n=0;n<60;n++){try{if((await fetch("http://127.0.0.1:5174/v3")).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)'
           setsid bash -e -c '
             npm --prefix apps/web run measure:startup
-            npm --prefix apps/web run test:browser
+            node apps/web/scripts/browser-ci.ts
             npm --prefix apps/web run test:stack
           ' &
           validation_pid=$!
@@ -171,7 +216,58 @@ jobs:
           compression-level: 0
           archive: true
           overwrite: true
+  dependency-review:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'manual / dependency-review' || 'dependency-review' }}
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Compare GitHub dependency snapshots without checking out or executing PR code.
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime, development, unknown
+          license-check: false
+          comment-summary-in-pr: never
+          show-openssf-scorecard: false
+  coverage:
+    # Coverage is an explicit report, never another automatic pass over the unit suites.
+    if: github.event_name == 'workflow_dispatch' && inputs.coverage_only && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            services/core/package-lock.json
+            apps/web/package-lock.json
+      - *ffmpeg_cache
+      - *ensure_ffmpeg
+      - run: npm ci --no-audit --no-fund
+      - run: npm --prefix services/core ci --omit=peer --ignore-scripts --no-audit --no-fund
+      - run: npm --prefix apps/web ci --no-audit --no-fund
+      - run: npm run coverage:unit
+      - name: Upload the three scoped reports once, without a long-lived token
+        if: vars.CODECOV_ENABLED == 'true' && inputs.upload_coverage
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: coverage/shared.lcov,coverage/core.lcov,coverage/native.lcov
+          disable_search: true
+          disable_telem: true
+          fail_ci_if_error: true
+          handle_no_reports_found: false
   release:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'manual / release' || 'release' }}
     needs: [deployer, core, website]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'lukasvri/Afterparty-MusicBot'
     runs-on: ubuntu-24.04

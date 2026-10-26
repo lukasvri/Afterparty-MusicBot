@@ -68,6 +68,15 @@ Practical standards:
 7. Require explicit approval for merge, auto-merge, publication, production
    deployments, access/secrets/DNS changes, destructive work or costs.
 
+## Local Worker preview stability
+
+The website pins Wrangler 4.132.0 in `apps/web/package.json` and its lockfile.
+This includes the upstream transient-request dev-server fix from 4.129.1 and the
+original-cause error reporting fix from 4.132.0. The SvelteKit adapter peer range
+remains satisfied. See the [CI investigation](OPTIMIZATION_REVIEW.md#consolidated-checks-and-conservative-browser-scope-2026-10-26)
+for evidence and the distinct package-download bottleneck. This tooling update
+is separate from application-framework or production-host runtime promotion.
+
 ## Official website addresses
 
 - OpenWorks project portal: **https://openworks.no**
