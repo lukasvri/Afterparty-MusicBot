@@ -1125,7 +1125,12 @@ test('a successful poll clears a reconnect error raised while the read was in fl
   const sources: SyntheticStream[] = [];
   let reads = 0;
   let monotonic = 100;
-  const snapshot = { ...room(), syncSource: 'live' as const, syncEpoch: 'epoch-one', syncValidForMs: 5000 };
+  const snapshot = {
+    ...room(),
+    syncSource: 'live' as const,
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
   const f = fixture(async () => (++reads === 1 ? json(snapshot) : pending.promise), {
     now: () => monotonic,
     eventSource: () => {
@@ -1146,7 +1151,9 @@ test('a successful poll clears a reconnect error raised while the read was in fl
     sources[0].fail();
     assert.equal(f.state.connection, 'reconnecting');
     assert.match(f.state.error, /reconnecting/);
-    pending.resolve(json({ ...snapshot, version: 3, current: null, playing: false, serverTime: 6100 }));
+    pending.resolve(
+      json({ ...snapshot, version: 3, current: null, playing: false, serverTime: 6100 }),
+    );
     await flush();
     assert.equal(f.state.connection, 'connected');
     assert.equal(f.state.room?.version, 3);
