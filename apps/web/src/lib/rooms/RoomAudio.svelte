@@ -6,6 +6,7 @@
     sharedSeekPosition,
     canCorrectPlayback,
     MAX_SYNC_OFFSET_SECONDS,
+    DEFAULT_SYNC_MODE,
     readSyncMode,
     readSyncOffset,
     createPlaybackCorrection,
@@ -51,7 +52,7 @@
   } from '../../../../../lib/audio-preferences.ts';
   let audio = $state({ ...defaultAudio });
   let syncOffset = $state(0),
-    syncMode = $state<SyncMode>('precise'),
+    syncMode = $state<SyncMode>(DEFAULT_SYNC_MODE),
     playerEpoch = $state(0);
   let stage: HTMLDivElement;
   let fullscreen = $state(false);
@@ -796,14 +797,14 @@
             aria-label="Synchronization mode"
             value={syncMode}
             onchange={(event) => browserStorage.set(SYNC_MODE_KEY, event.currentTarget.value)}
-            ><option value="precise">Precise alignment</option><option value="stable"
-              >Stable connection</option
+            ><option value="stable">Stable connection</option><option value="precise"
+              >Precise alignment</option
             ></select
           ></label
         >
         <p>
-          Precise follows the shared clock closely. Stable makes fewer adjustments on uneven
-          connections.
+          Stable favors uninterrupted video with fewer small jumps. Precise follows the shared clock
+          more closely and may adjust the video more often.
         </p>
         {#if room.mode === 'discord'}<div class="calibration">
             <label for="local-sync-offset"

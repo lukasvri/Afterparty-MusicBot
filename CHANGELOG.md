@@ -4,6 +4,12 @@ Generated from `lib/releases.json` and `lib/legacy-updates.ts`. Do not edit by h
 Release entries describe source versions, not production deployment status.
 See [release policy](docs/RELEASING.md).
 
+## v3.0.0-alpha.4: Smoother shared video playback
+
+2026-10-26
+
+- New devices use Stable connection by default to avoid repeated small video jumps and buffering. Saved synchronization choices are preserved, and Precise alignment remains available in playback settings. Explicit synchronization and protection against stale connections remain unchanged.
+
 ## v3.0.0-alpha.3: Quicker room entry and clearer mobile controls
 
 2026-10-26

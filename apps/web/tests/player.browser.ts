@@ -28,6 +28,25 @@ const results = [
     'An equally long synthetic artist credit',
   ),
 ];
+
+test('new devices favor stable playback and retain an explicit precise preference', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    await page.getByText('Room settings', { exact: true }).click();
+    const mode = page.getByRole('combobox', { name: 'Synchronization mode', exact: true });
+    assert.equal(await mode.inputValue(), 'stable');
+    await mode.selectOption('precise');
+    await page.reload();
+    await page.getByText('Room settings', { exact: true }).click();
+    assert.equal(await mode.inputValue(), 'precise');
+    assert.deepEqual(f.writes, [], 'device preferences never change the shared room');
+    assert.deepEqual(f.external, [], 'opening settings does not load provider media');
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
 // Same-origin fixtures exercise successful, broken and absent thumbnail metadata.
 results[0].image = '/afterparty-mark.svg';
 results[1].image = '/synthetic-missing-cover.jpg';
