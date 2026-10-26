@@ -664,6 +664,9 @@ for (const change of ['pause', 'lease'])
         } else {
           fixture.hold();
           fixture.silence();
+          // Native scrubbing can briefly pause before its receipt settles.
+          // Observe actual lease expiry before releasing that receipt.
+          await host.page.getByText('Reconnecting…', { exact: true }).waitFor();
         }
         await host.page.waitForFunction(
           () =>
