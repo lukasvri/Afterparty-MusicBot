@@ -214,7 +214,7 @@ async function fixture(
             window.addEventListener('message', this.receive);
             const fixtureNonce =
               document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce ?? '';
-            this.iframe.srcdoc = `<style nonce="${fixtureNonce}">body{margin:0;background:#101216;color:white;display:flex;align-items:end;gap:12px;height:100vh}button{padding:10px;background:#242832;color:white;border:0}</style><button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'synthetic-native',action:button.dataset.action,position:42},'*')));</script>`;
+            this.iframe.srcdoc = `<style nonce="${fixtureNonce}">body{margin:0;background:#101216;color:white;display:flex;align-items:end;gap:12px;height:100vh}button{padding:10px;background:#242832;color:white;border:0}</style><button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'synthetic-native',action:button.dataset.action,position:Number(button.dataset.position??42)},'*')));</script>`;
             container.replaceWith(this.iframe);
             // Retain the callback after destroy to model a delayed iframe event.
             (window as unknown as { __emitLastPlayerEnded: () => void }).__emitLastPlayerEnded =
@@ -1102,10 +1102,7 @@ for (const [scheduled, wasPlaying] of [
         await native
           .getByRole('button', { name: 'Seek video', exact: true })
           .evaluate((button, event) => {
-            button.setAttribute(
-              'onclick',
-              `parent.postMessage({type:'synthetic-native',action:'${event}',position:42},'*')`,
-            );
+            Object.assign((button as HTMLElement).dataset, { action: event, position: String(42) });
           }, seekEvent);
         await native.getByRole('button', { name: 'Seek video', exact: true }).click();
         await page.waitForFunction(() =>
@@ -1210,10 +1207,10 @@ test('native pause, seek and queue-next dispatch without position polling or an 
     );
     const releaseSeek = f.holdNextMutation();
     await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((button) => {
-      button.setAttribute(
-        'onclick',
-        "parent.postMessage({type:'synthetic-native',action:'seek-event',position:42},'*')",
-      );
+      Object.assign((button as HTMLElement).dataset, {
+        action: 'seek-event',
+        position: String(42),
+      });
     });
     await native.getByRole('button', { name: 'Seek video', exact: true }).click();
     await page.waitForFunction(() =>
@@ -1673,10 +1670,10 @@ test('two rapid native scrubs retain the last target through a delayed receipt w
     for (const position of [42, 80]) {
       await seek.evaluate(
         (node, target) =>
-          node.setAttribute(
-            'onclick',
-            `parent.postMessage({type:'synthetic-native',action:'seek-event',position:${target}},'*')`,
-          ),
+          Object.assign((node as HTMLElement).dataset, {
+            action: 'seek-event',
+            position: String(target),
+          }),
         position,
       );
       await seek.click();

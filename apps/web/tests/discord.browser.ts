@@ -464,7 +464,7 @@ for (const canManage of [false, true])
                 window.addEventListener('message', this.receive);
                 const fixtureNonce =
                   document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce ?? '';
-                this.iframe.srcdoc = `<button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'native-concert',action:button.dataset.action,position:42},'*')));</script>`;
+                this.iframe.srcdoc = `<button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'native-concert',action:button.dataset.action,position:Number(button.dataset.position??60)},'*')));</script>`;
                 container.replaceWith(this.iframe);
                 scope.__calls.push({ action: 'construct' });
                 setTimeout(() => options.events.onReady(), 0);
@@ -800,16 +800,14 @@ for (const canManage of [false, true])
           }, offset);
           await emit(sequence++, false, snapshot.position);
           await page.waitForTimeout(1100);
-          await native
-            .getByRole('button', { name: 'Seek video', exact: true })
-            .evaluate(
-              (button, position) =>
-                button.setAttribute(
-                  'onclick',
-                  `parent.postMessage({type:'native-concert',action:'seek',position:${position}},'*')`,
-                ),
-              local,
-            );
+          await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate(
+            (button, position) =>
+              Object.assign((button as HTMLElement).dataset, {
+                action: 'seek',
+                position: String(position),
+              }),
+            local,
+          );
           const confirmed = page.waitForResponse(
             (response) =>
               response.request().method() === 'POST' &&
@@ -869,14 +867,12 @@ for (const canManage of [false, true])
         delayedSeekRead = gate.promise;
         const beforePendingSeek = writes.length;
         try {
-          await native
-            .getByRole('button', { name: 'Seek video', exact: true })
-            .evaluate((node) =>
-              node.setAttribute(
-                'onclick',
-                "parent.postMessage({type:'native-concert',action:'seek',position:60},'*')",
-              ),
-            );
+          await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((node) =>
+            Object.assign((node as HTMLElement).dataset, {
+              action: 'seek',
+              position: String(60),
+            }),
+          );
           await native.getByRole('button', { name: 'Seek video', exact: true }).click();
           await page.waitForFunction(
             () =>

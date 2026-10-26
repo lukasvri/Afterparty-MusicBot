@@ -299,7 +299,7 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
               window.addEventListener('message', this.receive);
               const fixtureNonce =
                 document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce ?? '';
-              this.iframe.srcdoc = `<button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'stream-native',action:button.dataset.action,position:42},'*')));</script>`;
+              this.iframe.srcdoc = `<button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'stream-native',action:button.dataset.action,position:Number(button.dataset.position??42)},'*')));</script>`;
               element.replaceWith(this.iframe);
               Object.assign(window, { __streamPlayer: this });
               setTimeout(() => options.events.onReady(), 0);
@@ -766,10 +766,10 @@ test(
       for (const target of [42, 80, 120]) {
         await seek.evaluate(
           (node, position) =>
-            node.setAttribute(
-              'onclick',
-              `parent.postMessage({type:'stream-native',action:'seek',position:${position}},'*')`,
-            ),
+            Object.assign((node as HTMLElement).dataset, {
+              action: 'seek',
+              position: String(position),
+            }),
           target,
         );
         await seek.click();
@@ -811,10 +811,7 @@ test(
         .waitFor();
       await host.page.bringToFront();
       await seek.evaluate((node) =>
-        node.setAttribute(
-          'onclick',
-          "parent.postMessage({type:'stream-native',action:'seek',position:180},'*')",
-        ),
+        Object.assign((node as HTMLElement).dataset, { action: 'seek', position: String(180) }),
       );
       await seek.click();
       await waitFor(() => fixture.writes.length === 3, 'host seek after guest pause');
