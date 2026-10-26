@@ -212,7 +212,9 @@ async function fixture(
               ).__nativeVideo(event.data.action, event.data.position);
             };
             window.addEventListener('message', this.receive);
-            this.iframe.srcdoc = `<style>body{margin:0;background:#101216;color:white;display:flex;align-items:end;gap:12px;height:100vh}button{padding:10px;background:#242832;color:white;border:0}</style><button onclick="parent.postMessage({type:'synthetic-native',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'synthetic-native',action:'pause'},'*')">Pause video</button><button onclick="parent.postMessage({type:'synthetic-native',action:'seek',position:42},'*')">Seek video</button>`;
+            const fixtureNonce =
+              document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce ?? '';
+            this.iframe.srcdoc = `<style nonce="${fixtureNonce}">body{margin:0;background:#101216;color:white;display:flex;align-items:end;gap:12px;height:100vh}button{padding:10px;background:#242832;color:white;border:0}</style><button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'synthetic-native',action:button.dataset.action,position:42},'*')));</script>`;
             container.replaceWith(this.iframe);
             // Retain the callback after destroy to model a delayed iframe event.
             (window as unknown as { __emitLastPlayerEnded: () => void }).__emitLastPlayerEnded =
@@ -1615,6 +1617,7 @@ test('saved motion preference and system reduced motion remain independent of au
     );
     await f.page.evaluate(() => {
       const style = document.createElement('style');
+      style.nonce = document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce ?? '';
       style.textContent =
         '@keyframes nativeMotionFixture{from{opacity:.1}to{opacity:.9}}#native-motion-fixture{animation:nativeMotionFixture 1s linear infinite}';
       document.head.appendChild(style);

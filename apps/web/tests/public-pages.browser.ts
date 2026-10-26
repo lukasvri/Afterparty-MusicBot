@@ -47,7 +47,13 @@ for (const [width, height] of [
         ['/admin', 'DJ tools'],
         ['/games', 'Games'],
       ]) {
-        await page.goto(`${origin}${path}`);
+        const response = await page.goto(`${origin}${path}`);
+        const headers = response!.headers();
+        assert.equal(headers['x-content-type-options'], 'nosniff');
+        assert.equal(headers['x-frame-options'], 'DENY');
+        assert.match(headers['content-security-policy'], /frame-ancestors 'none'/);
+        assert.match(headers['content-security-policy'], /script-src[^;]*'nonce-/);
+        assert.match(headers['content-security-policy'], /connect-src 'self'/);
         const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true });
         await navigation.waitFor();
         await page.getByRole('heading', { level: 1, name: active, exact: true }).waitFor();

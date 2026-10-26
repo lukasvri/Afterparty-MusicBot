@@ -15,7 +15,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 test("Drizzle loads a TypeScript schema and generates a migration with the patched toolchain", () => {
   const directory = mkdtempSync(join(tmpdir(), "afterparty-toolchain-"));
   try {
-    const schema = join(directory, "schema.ts");
+    const schema = join(directory, "schema.ts").replaceAll("\\", "/");
     const output = join(directory, "migrations");
     const config = join(directory, "drizzle.config.ts");
     writeFileSync(schema, `import { sqliteTable, integer, text } from ${JSON.stringify(require.resolve("drizzle-orm/sqlite-core"))};

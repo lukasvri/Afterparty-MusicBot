@@ -297,7 +297,9 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
                 } else this.changed(event.data.action === 'play' ? 1 : 2);
               };
               window.addEventListener('message', this.receive);
-              this.iframe.srcdoc = `<button onclick="parent.postMessage({type:'stream-native',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'stream-native',action:'pause'},'*')">Pause video</button><button onclick="parent.postMessage({type:'stream-native',action:'seek'},'*')">Seek video</button>`;
+              const fixtureNonce =
+                document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce ?? '';
+              this.iframe.srcdoc = `<button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'stream-native',action:button.dataset.action,position:42},'*')));</script>`;
               element.replaceWith(this.iframe);
               Object.assign(window, { __streamPlayer: this });
               setTimeout(() => options.events.onReady(), 0);

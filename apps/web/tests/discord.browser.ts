@@ -462,7 +462,9 @@ for (const canManage of [false, true])
                   }
                 };
                 window.addEventListener('message', this.receive);
-                this.iframe.srcdoc = `<button onclick="parent.postMessage({type:'native-concert',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'native-concert',action:'pause'},'*')">Pause video</button><button onclick="parent.postMessage({type:'native-concert',action:'seek'},'*')">Seek video</button>`;
+                const fixtureNonce =
+                  document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce ?? '';
+                this.iframe.srcdoc = `<button data-action="play">Play video</button><button data-action="pause">Pause video</button><button data-action="seek">Seek video</button><script nonce="${fixtureNonce}">document.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>parent.postMessage({type:'native-concert',action:button.dataset.action,position:42},'*')));</script>`;
                 container.replaceWith(this.iframe);
                 scope.__calls.push({ action: 'construct' });
                 setTimeout(() => options.events.onReady(), 0);
