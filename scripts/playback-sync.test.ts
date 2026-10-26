@@ -21,10 +21,30 @@ test('saved local calibration retains finite values, bounds and legacy defaults'
 test('stable mode tolerates jitter and spaces automatic corrections',()=>{const correct=(a: number,b: number,c: number,d: number)=>shouldCorrect(a,b,c,d,false,'stable');assert.equal(correct(50,49.7,9000,0),false);assert.equal(correct(50,48.6,9000,0),false);assert.equal(correct(50,48,5000,0),false);assert.equal(correct(50,48,6000,0),true);});
 test('precise mode remains available without changing manual correction',()=>{assert.equal(shouldCorrect(50,49,3000,0,false,'precise'),true);assert.equal(shouldCorrect(50,49,2999,0,false,'precise'),false);assert.equal(shouldCorrect(50,49.7,200,0,true),true);assert.equal(shouldCorrect(50,NaN,200,0,true),false);});
 test('buffering never triggers seeks, including manual synchronization',()=>{assert.equal(canCorrectPlayback(3,true,10000,0),false);assert.equal(canCorrectPlayback(3,true,10000,0,true),false);});
+test('automatic sync leaves a paused, cued or ended provider alone while a local pause is confirmed',()=>{
+ for(const state of [-1,0,2,5])assert.equal(canCorrectPlayback(state,true,10000,0),false);
+ assert.equal(canCorrectPlayback(1,true,10000,0),true);
+ assert.equal(canCorrectPlayback(2,false,10000,0),true,'shared paused alignment remains inaudible');
+ assert.equal(canCorrectPlayback(2,true,10000,0,true),true,'explicit synchronization is still available');
+});
 test('recovery gets a settling period but host pause and manual sync are immediate',()=>{assert.equal(canCorrectPlayback(1,true,1000,5000),false);assert.equal(canCorrectPlayback(1,true,5000,5000),true);assert.equal(canCorrectPlayback(2,false,1000,5000),true);assert.equal(canCorrectPlayback(1,true,1000,5000,true),true);});
 
-test('precise sync is the default while an explicit stable choice is retained',()=>{assert.equal(readSyncMode(null),'precise');assert.equal(readSyncMode('invalid'),'precise');assert.equal(readSyncMode('precise'),'precise');assert.equal(readSyncMode('stable'),'stable');assert.equal(shouldCorrect(50,49,3000,0),true);});
+test('stable sync is the default while an explicit precise choice is retained',()=>{assert.equal(readSyncMode(null),'stable');assert.equal(readSyncMode('invalid'),'stable');assert.equal(readSyncMode('precise'),'precise');assert.equal(readSyncMode('stable'),'stable');assert.equal(shouldCorrect(50,49,3000,0),false);assert.equal(shouldCorrect(50,49,3000,0,false,'precise'),true);});
 test('precise recovery is quicker without eliminating the buffering guard',()=>{assert.equal(syncRecoveryMs('precise'),2000);assert.equal(syncRecoveryMs('stable'),4000);assert.equal(canCorrectPlayback(1,true,1000,syncRecoveryMs('precise')),false);assert.equal(canCorrectPlayback(3,true,2000,syncRecoveryMs('precise')),false);});
+
+test('the default avoids repeated seeks for a normally progressing subsecond offset',()=>{
+ const stable=createPlaybackCorrection(),precise=createPlaybackCorrection();
+ let stableAt=-Infinity,preciseAt=-Infinity,stableSeeks=0,preciseSeeks=0;
+ for(let now=0;now<=60000;now+=250){
+  const target=50+now/1000,current=target-.8;
+  if(stable.shouldCorrect(target,current,now,stableAt)){stableSeeks++;stableAt=now;}
+  if(precise.shouldCorrect(target,current,now,preciseAt,false,'precise')){preciseSeeks++;preciseAt=now;}
+ }
+ assert.equal(stableSeeks,0,'normal subsecond iframe lag does not repeatedly discard the buffer');
+ assert(preciseSeeks>=10,'the reported repeated-seek behavior remains reproducible in explicit precise mode');
+ assert.equal(stable.shouldCorrect(100,90,70000,stableAt),true,'large drift still receives immediate correction');
+ assert.equal(stable.shouldCorrect(100,99.7,70000,stableAt,true),true,'explicit sync remains immediate');
+});
 test('visible rooms update every second and hidden rooms conserve requests',()=>{assert.equal(roomPollMs(false),1000);assert.equal(roomPollMs(true),4000);});
 
 test('same-revision delayed snapshots cannot rewind a running timeline',()=>{
@@ -41,8 +61,8 @@ test('explicit room seeks apply immediately but metadata changes do not',()=>{
  assert.equal(transportChanged(a,{...a,version:5,playing:false}),true);
 });
 test('subsecond iframe reporting jitter does not cause a hard seek',()=>{
- for(const jitter of [-.3,-.2,0,.2,.3]) assert.equal(shouldCorrect(50,50+jitter,9000,0),false);
- assert.equal(shouldCorrect(50,49,9000,0),true);
+ for(const jitter of [-.3,-.2,0,.2,.3]) assert.equal(shouldCorrect(50,50+jitter,9000,0,false,'precise'),false);
+ assert.equal(shouldCorrect(50,49,9000,0,false,'precise'),true);
 });
 
 test('buffering freezes the authoritative position without turning it into a pause',()=>{
@@ -149,8 +169,8 @@ test('isolated and alternating iframe jitter does not cause automatic hard seeks
  let previous=-Infinity,oldPrevious=-Infinity,filtered=0,old=0;
  for(let now=0;now<=30000;now+=250){
   const target=10+now/1000,drift=now%3000===0?.8:0;
-  if(shouldCorrect(target,target-drift,now,oldPrevious)){old++;oldPrevious=now;}
-  if(correction.shouldCorrect(target,target-drift,now,previous)){filtered++;previous=now;}
+  if(shouldCorrect(target,target-drift,now,oldPrevious,false,'precise')){old++;oldPrevious=now;}
+  if(correction.shouldCorrect(target,target-drift,now,previous,false,'precise')){filtered++;previous=now;}
  }
  assert.equal(old,11,'single stale readings repeatedly interrupt the old policy');
  assert.equal(filtered,0,'healthy readings between spikes retain the player buffer');
@@ -167,7 +187,7 @@ test('persistent drift aligns after a bounded observation window in both modes',
 test('manual alignment and large desynchronization keep their fast path',()=>{
  const correction=createPlaybackCorrection();
  assert.equal(correction.shouldCorrect(50,49.7,1,0,true),true);
- assert.equal(correction.shouldCorrect(50,47,3000,0),true);
+ assert.equal(correction.shouldCorrect(50,47,3000,0,false,'precise'),true);
  assert.equal(correction.shouldCorrect(50,45,6000,0,false,'stable'),true);
  assert.equal(correction.shouldCorrect(50,47,2999,0),false,'automatic cooldown remains enforced');
 });

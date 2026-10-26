@@ -1120,6 +1120,50 @@ test('a broken stream immediately restores the existing one-second authority pol
   f.client.destroy();
 });
 
+test('a successful poll clears a reconnect error raised while the read was in flight', async () => {
+  const pending = deferred<Response>();
+  const sources: SyntheticStream[] = [];
+  let reads = 0;
+  let monotonic = 100;
+  const snapshot = {
+    ...room(),
+    syncSource: 'live' as const,
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
+  const f = fixture(async () => (++reads === 1 ? json(snapshot) : pending.promise), {
+    now: () => monotonic,
+    eventSource: () => {
+      const source = new SyntheticStream();
+      sources.push(source);
+      return source as unknown as EventSource;
+    },
+    clockRequest: async () => json({ serverTime: snapshot.serverTime }),
+  });
+  try {
+    await f.client.join('ROOM0001');
+    sources[0].open();
+    await flush();
+    monotonic = 5100;
+    sources[0].send({ ...snapshot, version: 2, serverTime: 6000 });
+    f.scheduled[f.delays.findLastIndex((delay) => delay === 1000)]();
+    assert.equal(reads, 2);
+    sources[0].fail();
+    assert.equal(f.state.connection, 'reconnecting');
+    assert.match(f.state.error, /reconnecting/);
+    pending.resolve(
+      json({ ...snapshot, version: 3, current: null, playing: false, serverTime: 6100 }),
+    );
+    await flush();
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.state.room?.version, 3);
+    assert.equal(f.state.room?.current, null);
+    assert.equal(f.state.error, '');
+  } finally {
+    f.client.destroy();
+  }
+});
+
 test('an expired live lease does not suppress an authenticated room read', async () => {
   const f = streamFixture();
   await f.client.join('ROOM0001');

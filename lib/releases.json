@@ -1,5 +1,14 @@
 [
   {
+    "version": "3.0.0-alpha.4",
+    "date": "2026-10-26",
+    "title": "Smoother shared video playback",
+    "items": [
+      "New devices use Stable connection by default to avoid repeated small video jumps and buffering. Saved synchronization choices are preserved, and Precise alignment remains available in playback settings. Explicit synchronization and protection against stale connections remain unchanged.",
+      "Brief player pauses can recover without becoming a permanent local pause. Persistent device pauses remain local, explicit video-control pauses stay immediate, and automatic alignment leaves a paused player alone. A newer local pause also cancels older Play gestures waiting for a seek reply."
+    ]
+  },
+  {
     "version": "3.0.0-alpha.3",
     "date": "2026-10-26",
     "title": "Quicker room entry and clearer mobile controls",

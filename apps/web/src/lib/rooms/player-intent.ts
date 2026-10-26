@@ -8,6 +8,7 @@ type Observation = {
   gesture: boolean;
 };
 export const POSITION_ACK_TOLERANCE = 2.25;
+const LOCAL_PAUSE_CONFIRM_MS = 750;
 
 /** A queued scrub may already be playing by the time the previous receipt arrives.
  * Keep its observed progress, but reject cached backward or unrelated jumps. */
@@ -64,6 +65,7 @@ export function createPlayerIntent() {
   let sample: { position: number; at: number; state: number } | null = null;
   let expected: { state: number; until: number } | null = null;
   let positionUntil = 0;
+  let pendingLocalPause: { at: number } | null = null;
   let expectedPosition: {
     position: number;
     at: number;
@@ -77,10 +79,12 @@ export function createPlayerIntent() {
     sample = null;
     expected = null;
     positionUntil = 0;
+    pendingLocalPause = null;
     expectedPosition = null;
   };
   return {
     reset,
+    hasPendingLocalPause: () => pendingLocalPause !== null,
     command(
       key: string,
       action: 'load' | 'cue' | 'play' | 'pause' | 'seek',
@@ -89,6 +93,7 @@ export function createPlayerIntent() {
     ) {
       if (key !== identity) reset(key);
       if (action !== 'seek') {
+        pendingLocalPause = null;
         const target = action === 'cue' ? 5 : action === 'pause' ? 2 : 1;
         expected = target === state ? null : { state: target, until: now + 3000 };
       }
@@ -113,10 +118,12 @@ export function createPlayerIntent() {
         return null;
       }
       const previous = state;
+      if (value.state !== 2) pendingLocalPause = null;
       if (![1, 2, 5].includes(value.state)) return null;
       state = value.state;
       if (expected && value.now >= expected.until) expected = null;
       if (expected?.state === value.state) {
+        pendingLocalPause = null;
         expected = null;
         return null;
       }
@@ -149,9 +156,14 @@ export function createPlayerIntent() {
         return { action: 'seek', position: value.position };
       }
       if (previous === value.state || ![1, 2].includes(value.state)) return null;
-      // Browser/media-key pauses without provable iframe activation still stop
-      // this device. They can never control the room or cause an automatic resume.
-      if (!value.gesture) return value.state === 2 ? { action: 'pause', local: true } : null;
+      // YouTube can briefly pause during a source/quality transition. Let the
+      // provider recover itself before pinning a local pause. No play command is
+      // issued here; persistent media-key pauses stay stopped and remain local.
+      if (!value.gesture) {
+        if (value.state === 2 && Number.isFinite(value.now)) pendingLocalPause = { at: value.now };
+        return null;
+      }
+      pendingLocalPause = null;
       return { action: value.state === 1 ? 'play' : 'pause' };
     },
     time(value: Observation): PlayerIntent | null {
@@ -162,6 +174,14 @@ export function createPlayerIntent() {
       const previous = sample;
       if (!Number.isFinite(value.position) || value.position < 0 || !Number.isFinite(value.now))
         return null;
+      if (pendingLocalPause) {
+        if (value.state !== 2 || value.now < pendingLocalPause.at) pendingLocalPause = null;
+        else if (value.now - pendingLocalPause.at >= LOCAL_PAUSE_CONFIRM_MS) {
+          pendingLocalPause = null;
+          sample = { position: value.position, at: value.now, state: value.state };
+          return { action: 'pause', local: true };
+        }
+      }
       if (expectedPosition) {
         const target =
           expectedPosition.position +

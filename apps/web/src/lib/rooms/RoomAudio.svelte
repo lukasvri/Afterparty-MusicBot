@@ -6,6 +6,7 @@
     sharedSeekPosition,
     canCorrectPlayback,
     MAX_SYNC_OFFSET_SECONDS,
+    DEFAULT_SYNC_MODE,
     readSyncMode,
     readSyncOffset,
     createPlaybackCorrection,
@@ -51,7 +52,7 @@
   } from '../../../../../lib/audio-preferences.ts';
   let audio = $state({ ...defaultAudio });
   let syncOffset = $state(0),
-    syncMode = $state<SyncMode>('precise'),
+    syncMode = $state<SyncMode>(DEFAULT_SYNC_MODE),
     playerEpoch = $state(0);
   let stage: HTMLDivElement;
   let fullscreen = $state(false);
@@ -230,6 +231,13 @@
     player.pauseVideo();
     lastPlaying = false;
   }
+  function pauseThisDevice() {
+    localPaused = true;
+    if (nativePending) nativePending = { ...nativePending, pausePinned: true };
+    // A later device pause wins over transport gestures waiting for an older
+    // seek receipt. Keep a queued position change without replaying old Play.
+    queuedNative = queuedNative.filter((item) => item.intent.action === 'seek');
+  }
   function observation(state = player?.getPlayerState() ?? -1) {
     let sourceMatches = false;
     try {
@@ -259,8 +267,7 @@
   async function nativeIntent(intent: PlayerIntent) {
     if (!ready || !player || failedSource || !room.current || loaded !== identity()) return;
     if (intent.action === 'pause') {
-      localPaused = true;
-      if (nativePending) nativePending = { ...nativePending, pausePinned: true };
+      pauseThisDevice();
     }
     if (intent.action === 'play') {
       localPaused = false;
@@ -398,6 +405,18 @@
       nativePending = { ...nativePending, transportSuperseded: true };
     if (nativePending?.transportSuperseded && queuedNative.length) queuedNative = [];
     if (failedSource === key) return;
+    if (native.hasPendingLocalPause()) {
+      if (loaded !== key) {
+        // A new shared recording must not resume a possible device pause.
+        pauseThisDevice();
+        native.reset(key);
+      } else if (playing) {
+        // The provider is already paused. Do not issue play/seek commands while
+        // waiting to distinguish a short transition from a media-key pause.
+        correction.reset();
+        return;
+      }
+    }
     if (failedSource) {
       failedSource = '';
       message = '';
@@ -796,14 +815,14 @@
             aria-label="Synchronization mode"
             value={syncMode}
             onchange={(event) => browserStorage.set(SYNC_MODE_KEY, event.currentTarget.value)}
-            ><option value="precise">Precise alignment</option><option value="stable"
-              >Stable connection</option
+            ><option value="stable">Stable connection</option><option value="precise"
+              >Precise alignment</option
             ></select
           ></label
         >
         <p>
-          Precise follows the shared clock closely. Stable makes fewer adjustments on uneven
-          connections.
+          Stable favors uninterrupted video with fewer small jumps. Precise follows the shared clock
+          more closely and may adjust the video more often.
         </p>
         {#if room.mode === 'discord'}<div class="calibration">
             <label for="local-sync-offset"
