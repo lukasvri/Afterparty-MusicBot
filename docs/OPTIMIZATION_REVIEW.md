@@ -691,3 +691,14 @@ Only the unrelated pack journey was omitted. This is not a paired speed claim.
 Six selector regressions cover full-suite fallback, retained game smoke/audio,
 canonical flags, invalid diffs and game-to-playback renames. Existing lifecycle
 and producer tests also cover the consolidated job graph and release gates.
+
+
+A cold GitHub validation then exposed another independent setup bottleneck:
+`playwright install --with-deps` timed out fetching unused font families and
+upgrading already-installed libraries from a slow Ubuntu mirror. Browser setup
+now installs only the pinned headless shell, uses the hosted Ubuntu image's
+existing shared libraries and verifies an actual launch before running tests.
+FFmpeg cache/installer steps are shared with the manual report through YAML
+anchors; restore-prefix lookup reuses earlier APT-verified archives when the
+workflow key changes. Missing browser libraries or failed package verification
+still fail validation rather than concealing a broken environment.

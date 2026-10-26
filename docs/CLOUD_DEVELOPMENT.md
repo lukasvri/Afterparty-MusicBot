@@ -42,7 +42,9 @@ jobs cannot satisfy the required PR checks. GitHub-managed CodeQL remains a
 separate security workflow.
 
 The website job reuses the pinned Playwright headless shell and avoids downloading
-the unused headed browser. `apps/web/scripts/browser-ci.ts` reads the canonical
+the unused headed browser and bulk font packages. It uses the Ubuntu runner
+shared libraries and verifies an actual headless launch before the journeys.
+Website and coverage jobs share the same APT-verified FFmpeg download cache. `apps/web/scripts/browser-ci.ts` reads the canonical
 `test:browser` command. For a PR containing only explicitly recognized playback,
 presentation or documentation paths, it omits only the eight-round pack journey;
 all ordinary game, lobby and game-audio journeys remain. Game changes, dependency
