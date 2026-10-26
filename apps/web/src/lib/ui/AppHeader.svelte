@@ -39,6 +39,9 @@
     min-height: 88px;
     margin-inline: auto;
     padding: 16px var(--app-space);
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-left: max(var(--app-space), env(safe-area-inset-left));
+    padding-right: max(var(--app-space), env(safe-area-inset-right));
     display: flex;
     align-items: center;
     justify-content: space-between;

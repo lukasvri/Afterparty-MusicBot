@@ -13,6 +13,7 @@ for (const [width, height] of [
   [1920, 1080],
   [1440, 1000],
   [390, 1000],
+  [320, 900],
 ]) {
   test(
     `native public pages and private notice preparation at ${width}px`,
@@ -47,7 +48,13 @@ for (const [width, height] of [
         ['/admin', 'DJ tools'],
         ['/games', 'Games'],
       ]) {
-        await page.goto(`${origin}${path}`);
+        const response = await page.goto(`${origin}${path}`);
+        const headers = response!.headers();
+        assert.equal(headers['x-content-type-options'], 'nosniff');
+        assert.equal(headers['x-frame-options'], 'DENY');
+        assert.match(headers['content-security-policy'], /frame-ancestors 'none'/);
+        assert.match(headers['content-security-policy'], /script-src[^;]*'nonce-/);
+        assert.match(headers['content-security-policy'], /connect-src 'self'/);
         const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true });
         await navigation.waitFor();
         await page.getByRole('heading', { level: 1, name: active, exact: true }).waitFor();
@@ -98,6 +105,27 @@ for (const [width, height] of [
             .evaluate((item) => item === document.activeElement),
         );
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      }
+      await page.goto(origin);
+      const joinShortcut = page.getByRole('button', { name: 'Have a code? Join room' });
+      await joinShortcut.focus();
+      await page.keyboard.press('Enter');
+      assert(
+        await page.locator('#room-code').evaluate((input) => input === document.activeElement),
+      );
+      await page.getByRole('button', { name: 'Start a room', exact: true }).click();
+      assert(
+        await page.locator('#room-name').evaluate((input) => input === document.activeElement),
+      );
+      if (width <= 650) {
+        assert(
+          await page.evaluate(() => {
+            const forms = document.querySelector('.room-forms')!.getBoundingClientRect();
+            const art = document.querySelector('.welcome-stage')!.getBoundingClientRect();
+            return forms.bottom <= art.top;
+          }),
+          'room actions precede decorative artwork on phones',
+        );
       }
       const routes = {
         '/support': 'Support and privacy requests',

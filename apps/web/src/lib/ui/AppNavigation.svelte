@@ -86,9 +86,17 @@
     text-decoration: none;
     white-space: nowrap;
   }
-  .nav-link:hover {
-    color: var(--text);
-    background: var(--surface-raised);
+  @media (hover: hover) and (pointer: fine) {
+    .nav-link:hover {
+      color: var(--text);
+      background: var(--surface-raised);
+    }
+  }
+  .nav-link:focus-visible {
+    transition: none;
+  }
+  .nav-link:active {
+    background: var(--surface-hover);
   }
   .nav-link.active {
     color: var(--text);
@@ -104,6 +112,7 @@
       font-size: 12px;
       padding: 10px 5px;
       gap: 0;
+      min-width: 0;
     }
     .nav-link :global(svg) {
       display: none;

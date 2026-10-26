@@ -14,6 +14,18 @@ The [configuration reference](docs/CONFIGURATION.md) explains which values belon
 
 ## Dependency scan scope
 
+The native website uses SvelteKit-generated script/style nonces, blocks framing
+and plugins, and limits browser connections to its own host, the configured HTTPS
+Core origin (plus its WebSocket origin), and the validated optional Sentry
+ingestion origin. YouTube scripts/frames and HTTPS media/artwork remain allowed.
+Element style attributes remain enabled for player geometry and transitions.
+Responses add nosniff, a referrer policy, device permission restrictions and
+host-scoped HSTS on HTTPS only, without includeSubDomains or preload.
+
+Validate the production preview's public, login, room and playback journeys
+before promoting a release. A source change or local fixture does not verify
+the installed host or audible Discord playback.
+
 Install both locked dependency trees, at the repository root and in `services/core`,
 when checking dependency advisories. Root npm overrides do not apply to Core
 when it is installed as a separate project.

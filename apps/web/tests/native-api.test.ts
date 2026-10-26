@@ -9,6 +9,7 @@ test('the native map covers every existing API route and imports its canonical h
   const directory = new URL('../../../lib/api/', import.meta.url);
   const files = await readdir(directory, { recursive: true });
   const paths = files
+    .map((file) => file.replaceAll('\\', '/'))
     .filter((file) => file.endsWith('/route.ts'))
     .map((file) => '/api/' + file.slice(0, -'/route.ts'.length))
     .sort();
