@@ -25,7 +25,10 @@ The check command runs isolated automated suites. Integration scripts such as `s
 within each file keep their existing sequencing and isolated fixtures. The CI
 website job supervises its local preview and validation process groups; a preview
 exit fails validation immediately, and failure/cancellation retires both trees.
-Failure artifacts retain the preview output and Wrangler diagnostic log.
+Failure artifacts retain the preview output and Wrangler diagnostic log. The
+pinned preview SDK includes the upstream fix for transient requests terminating
+the dev server; [toolchain guidance](TOOLCHAIN.md#local-worker-preview-stability)
+records its source and supported version.
 
 Pull requests run the required `deployer`, `core`, `website` and dependency
 checks, including the final Core image probe. They do not create or upload

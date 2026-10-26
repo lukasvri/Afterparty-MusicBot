@@ -702,3 +702,15 @@ FFmpeg cache/installer steps are shared with the manual report through YAML
 anchors; restore-prefix lookup reuses earlier APT-verified archives when the
 workflow key changes. Missing browser libraries or failed package verification
 still fail validation rather than concealing a broken environment.
+
+
+Main validation also reproduced the preview-process failure separately from the
+package-download timeout. Upstream fixed Wrangler's whole-server exit on a
+transient request failure in 4.129.1
+([15252](https://github.com/cloudflare/workers-sdk/pull/15252)), and fixed the
+empty error message in 4.132.0
+([14906](https://github.com/cloudflare/workers-sdk/pull/14906)). The website's
+preview/build SDK is pinned to 4.132.0, retaining the SvelteKit adapter's supported
+Wrangler range. The fix limits retries to safe GET/HEAD requests and keeps request
+failures from terminating the dev server; it does not retry mutation requests or
+failed tests. Application framework and Core runtime versions are unchanged.

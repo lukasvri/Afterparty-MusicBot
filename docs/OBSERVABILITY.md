@@ -85,7 +85,8 @@ one upload containing all three LCOV files, set `upload_coverage=true` and the
 repository variable `CODECOV_ENABLED=true`. Automatic file discovery and uploader
 telemetry stay disabled. Missing reports and test/upload failures fail the job.
 Manual runs never publish release artifacts. Their regular-job check names are
-prefixed with `manual /`, so report-only runs cannot replace required PR checks.
+distinct from canonical PR contexts, so skipped report-only jobs cannot replace
+required PR checks.
 
 After the workflow is merged, a report-only run can be started with:
 
