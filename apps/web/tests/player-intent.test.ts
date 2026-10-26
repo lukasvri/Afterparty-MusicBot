@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { confirmsPlayerIntent, createPlayerIntent } from '../src/lib/rooms/player-intent.ts';
+import {
+  confirmsPlayerIntent,
+  createPlayerIntent,
+  refreshQueuedSeek,
+} from '../src/lib/rooms/player-intent.ts';
 const observation = (extra = {}) => ({
   identity: 'room:track:instance',
   state: 1,
@@ -154,4 +158,53 @@ test('a deliberate resume after a paused seek acknowledgement does not wait for 
   assert.deepEqual(bridge.state(observation({ state: 1, now: 100, position: 42 })), {
     action: 'play',
   });
+});
+
+test('consecutive native scrubs are not swallowed by an automatic-correction cooldown', () => {
+  const bridge = createPlayerIntent();
+  bridge.reset(observation().identity);
+  bridge.time(observation({ now: 2000, position: 10 }));
+  assert.deepEqual(bridge.time(observation({ now: 2250, position: 42 })), {
+    action: 'seek',
+    position: 42,
+  });
+  assert.deepEqual(bridge.time(observation({ now: 2400, position: 80 })), {
+    action: 'seek',
+    position: 80,
+  });
+  assert.equal(bridge.time(observation({ now: 2500, position: 80.1 })), null);
+});
+
+test('queued scrubs follow observed progress without trusting stale or unrelated player reads', () => {
+  const intent = { action: 'seek', position: 120 } as const;
+  assert.deepEqual(refreshQueuedSeek(intent, 121.2, 1200, 180), {
+    action: 'seek',
+    position: 121.2,
+  });
+  for (const [position, elapsed] of [
+    [42, 1200],
+    [150, 1200],
+    [NaN, 1200],
+    [121, NaN],
+    [121, -1],
+  ])
+    assert.equal(refreshQueuedSeek(intent, position, elapsed, 180), intent);
+  assert.deepEqual(
+    refreshQueuedSeek(intent, 120, 1200, 180),
+    intent,
+    'a paused/buffering scrub does not invent progress',
+  );
+  assert.equal(
+    refreshQueuedSeek(intent, 180, 60000, 180),
+    intent,
+    'an ended source does not cancel the original valid target',
+  );
+  const invalid = { action: 'seek', position: 180 } as const;
+  assert.equal(
+    refreshQueuedSeek(invalid, 179, 1200, 180),
+    invalid,
+    'an invalid original target is never repaired into a valid control',
+  );
+  const pause = { action: 'pause' } as const;
+  assert.equal(refreshQueuedSeek(pause, 121.2, 1200, 180), pause);
 });

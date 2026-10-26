@@ -559,7 +559,7 @@
                       !view.room.isHost
                     )
                       return false;
-                    return client.control(intent.action, intent.position);
+                    return client.controlNative(intent.action, intent.position);
                   }}
                 />{/key}
             {:else}
@@ -695,7 +695,8 @@
               onclick={() => {
                 void client?.refresh();
               }}
-              disabled={view.busy}>Reconnect</button
+              disabled={view.busy}
+              >{view.connection === 'connected' ? 'Refresh room' : 'Reconnect'}</button
             >{/if}
         </div>{/if}
     </main>
@@ -900,25 +901,6 @@
     display: flex;
     flex-direction: column;
   }
-  .theater-mode .workspace {
-    max-width: 3200px;
-  }
-  .theater-mode .listening-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .theater-mode .room-side {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    width: min(100%, 1440px);
-    margin-inline: auto;
-  }
-  @media (min-width: 1000px) {
-    .theater-mode .now-playing :global(.audio-stage:not(.fullscreen)) {
-      aspect-ratio: auto;
-      height: min(70svh, calc((100vw - 96px) * 9 / 16));
-    }
-  }
   .room-heading {
     display: block;
     margin: 0;
@@ -928,7 +910,7 @@
     gap: 24px;
   }
   .empty-stage {
-    --empty-stage-height: clamp(240px, 32vw, min(46svh, 480px));
+    --empty-stage-height: clamp(240px, calc(100svh - 300px), 1440px);
     display: grid;
     place-items: center;
     height: var(--empty-stage-height);
@@ -943,6 +925,15 @@
     width: min(100%, calc(var(--empty-stage-height) * 16 / 9));
     aspect-ratio: 16 / 9;
     max-height: 100%;
+  }
+  @media (max-width: 999px) {
+    .empty-stage {
+      height: auto;
+      aspect-ratio: 16 / 9;
+    }
+    .empty-stage-scene {
+      width: 100%;
+    }
   }
   .scene-fallback {
     aspect-ratio: 16 / 9;

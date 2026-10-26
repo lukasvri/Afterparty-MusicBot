@@ -25,7 +25,9 @@ async function liveFixture() {
   let version = 1,
     playing = false,
     updatedAt = Date.now();
+  let position = 12;
   let current = track('stream00001', 'Before the stream');
+  let readFailure = 0;
   let holdReads = false,
     broadcast = true,
     acceptStreams = true,
@@ -35,6 +37,8 @@ async function liveFixture() {
   const writes: { action: string; version: number }[] = [];
   const streams = new Set<ServerResponse>();
   const held = new Map<ServerResponse, boolean>();
+  let delayReplies = false;
+  const replies = new Map<ServerResponse, Room>();
   const errors: string[] = [];
   const snapshot = (authenticated: boolean): Room => ({
     code,
@@ -43,7 +47,7 @@ async function liveFixture() {
     playing,
     current,
     queue: [],
-    position: 12 + (playing ? (Date.now() - updatedAt) / 1000 : 0),
+    position: position + (playing ? (Date.now() - updatedAt) / 1000 : 0),
     serverTime: Date.now(),
     viewers: 2,
     isHost: authenticated && hostAccess,
@@ -94,6 +98,8 @@ async function liveFixture() {
         assert.equal(request.headers['x-afterparty-visitor'], visitor);
         const authenticated = request.headers.authorization === `Bearer ${token}`;
         if (request.method === 'GET') {
+          if (readFailure)
+            return json(response, { error: 'Synthetic temporary status outage' }, readFailure);
           if (holdReads) {
             held.set(response, authenticated);
             response.on('close', () => held.delete(response));
@@ -104,19 +110,27 @@ async function liveFixture() {
         }
         let body = '';
         for await (const chunk of request) body += chunk;
-        const input = JSON.parse(body) as { action: string; version: number };
+        const input = JSON.parse(body) as { action: string; version: number; position?: number };
         writes.push(input);
         if (!authenticated || !hostAccess)
           return json(response, { error: 'Host access required' }, 403);
         if (input.version !== version)
           return json(response, { error: 'Synthetic revision conflict' }, 409);
-        if (!['play', 'pause'].includes(input.action))
+        if (!['play', 'pause', 'seek'].includes(input.action))
           return json(response, { error: 'Unexpected action' }, 400);
+        position = snapshot(authenticated).position;
         version++;
-        playing = input.action === 'play';
+        if (input.action === 'seek') position = input.position!;
+        else playing = input.action === 'play';
         updatedAt = Date.now();
         send();
-        return json(response, { room: snapshot(authenticated) });
+        const receipt = snapshot(authenticated);
+        if (delayReplies) {
+          replies.set(response, receipt);
+          response.on('close', () => replies.delete(response));
+          return;
+        }
+        return json(response, { room: receipt });
       }
       if (url.pathname.startsWith('/api/'))
         return json(response, { error: 'Unused synthetic endpoint' }, 404);
@@ -159,6 +173,17 @@ async function liveFixture() {
     get heldReads() {
       return held.size;
     },
+    failReads(status: number) {
+      readFailure = status;
+    },
+    holdReplies() {
+      delayReplies = true;
+    },
+    releaseReplies() {
+      delayReplies = false;
+      for (const [response, room] of replies) json(response, { room });
+      replies.clear();
+    },
     hold() {
       holdReads = true;
     },
@@ -173,6 +198,7 @@ async function liveFixture() {
     advance(id: string, title: string, nextPlaying: boolean) {
       version++;
       current = track(id, title);
+      position = 12;
       playing = nextPlaying;
       updatedAt = Date.now();
       send();
@@ -192,6 +218,7 @@ async function liveFixture() {
       clearInterval(heartbeat);
       for (const response of streams) response.end();
       for (const response of held.keys()) response.end();
+      for (const response of replies.keys()) response.end();
       server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
@@ -217,8 +244,29 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
         __streamAudioCalls: calls,
         YT: {
           Player: class {
-            position = 0;
-            state = 2;
+            private basePosition = 0;
+            private clockAt = performance.now();
+            private playbackState = 2;
+            get position() {
+              return (
+                this.basePosition +
+                (this.playbackState === 1
+                  ? Math.max(0, performance.now() - this.clockAt) / 1000
+                  : 0)
+              );
+            }
+            set position(value: number) {
+              this.basePosition = value;
+              this.clockAt = performance.now();
+            }
+            get state() {
+              return this.playbackState;
+            }
+            set state(value: number) {
+              this.basePosition = this.position;
+              this.clockAt = performance.now();
+              this.playbackState = value;
+            }
             videoId = '';
             iframe: HTMLIFrameElement;
             changed: (state: number) => void;
@@ -238,13 +286,18 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
               this.iframe.title = 'Synthetic YouTube player';
               this.receive = (event) => {
                 if (
-                  event.source === this.iframe.contentWindow &&
-                  event.data?.type === 'stream-native'
+                  event.source !== this.iframe.contentWindow ||
+                  event.data?.type !== 'stream-native'
                 )
-                  this.changed(event.data.action === 'play' ? 1 : 2);
+                  return;
+                if (event.data.action === 'seek') {
+                  this.position = event.data.position ?? 42;
+                  this.changed(3);
+                  queueMicrotask(() => this.changed(1));
+                } else this.changed(event.data.action === 'play' ? 1 : 2);
               };
               window.addEventListener('message', this.receive);
-              this.iframe.srcdoc = `<button onclick="parent.postMessage({type:'stream-native',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'stream-native',action:'pause'},'*')">Pause video</button>`;
+              this.iframe.srcdoc = `<button onclick="parent.postMessage({type:'stream-native',action:'play'},'*')">Play video</button><button onclick="parent.postMessage({type:'stream-native',action:'pause'},'*')">Pause video</button><button onclick="parent.postMessage({type:'stream-native',action:'seek'},'*')">Seek video</button>`;
               element.replaceWith(this.iframe);
               Object.assign(window, { __streamPlayer: this });
               setTimeout(() => options.events.onReady(), 0);
@@ -274,6 +327,7 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
               queueMicrotask(() => this.changed(2));
             }
             seekTo(position: number) {
+              calls.push('seek');
               this.position = position;
             }
             getCurrentTime() {
@@ -501,3 +555,294 @@ test('the loopback SSE fixture rejects external request targets before forwardin
   }
   assert.deepEqual(fixture.errors, []);
 });
+
+test(
+  'a temporary status outage keeps the live video and recovers controls without rejoin',
+  { timeout: 30000 },
+  async () => {
+    const fixture = await liveFixture();
+    const browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.CHROMIUM_PATH,
+      args: ['--no-sandbox'],
+    });
+    try {
+      fixture.advance('stream00004', 'Continuous through a read outage', true);
+      const host = await prepare(
+        await browser.newContext({ viewport: { width: 1920, height: 1080 } }),
+        true,
+        fixture.origin,
+      );
+      await played(host.page, 'stream00004');
+      await waitFor(
+        () => fixture.streams === 1 && fixture.clockReads >= 1,
+        'live clock calibrated',
+      );
+      await host.page.evaluate(() => {
+        (window as unknown as { __streamAudioCalls: string[] }).__streamAudioCalls.length = 0;
+      });
+      fixture.failReads(503);
+      await host.page.getByText('Reconnecting…', { exact: true }).waitFor({ timeout: 12000 });
+      assert.equal(
+        await host.page.getByRole('button', { name: 'Next track', exact: true }).isDisabled(),
+        true,
+      );
+      await host.page.waitForTimeout(700);
+      assert.equal(
+        await host.page.evaluate(
+          () => (window as unknown as { __streamPlayer: { state: number } }).__streamPlayer.state,
+        ),
+        1,
+      );
+      assert.deepEqual(
+        await host.page.evaluate(() =>
+          (window as unknown as { __streamAudioCalls: string[] }).__streamAudioCalls.filter(
+            (call) =>
+              call === 'pause' ||
+              call.startsWith('load:') ||
+              call.startsWith('cue:') ||
+              call === 'destroy',
+          ),
+        ),
+        [],
+      );
+      fixture.failReads(0);
+      await host.page.getByText('Connected', { exact: true }).waitFor();
+      assert.equal(
+        await host.page.getByRole('button', { name: 'Next track', exact: true }).isEnabled(),
+        true,
+      );
+      assert.equal(fixture.writes.length, 0);
+      assert.deepEqual(host.errors, []);
+      assert.deepEqual(fixture.errors, []);
+    } finally {
+      await browser.close();
+      await fixture.close();
+    }
+  },
+);
+
+for (const change of ['pause', 'lease'])
+  test(
+    `a ${change} change stops an in-flight native scrub without replaying a queued control`,
+    { timeout: 30000 },
+    async () => {
+      const fixture = await liveFixture();
+      const browser = await chromium
+        .launch({
+          headless: true,
+          executablePath: process.env.CHROMIUM_PATH,
+          args: ['--no-sandbox'],
+        })
+        .catch(async (error) => {
+          await fixture.close();
+          throw error;
+        });
+      try {
+        fixture.advance('stream00005', 'Pending native receipt', true);
+        const host = await prepare(
+          await browser.newContext({ viewport: { width: 1920, height: 1080 } }),
+          true,
+          fixture.origin,
+        );
+        await played(host.page, 'stream00005');
+        await waitFor(
+          () => fixture.streams === 1 && fixture.clockReads >= 1,
+          'live clock calibrated',
+        );
+        await host.page.waitForTimeout(1100);
+        fixture.holdReplies();
+        const native = host.page.frameLocator('.audio-stage iframe');
+        await native.getByRole('button', { name: 'Seek video', exact: true }).click();
+        await waitFor(() => fixture.writes.length === 1, 'native scrub was received');
+        if (change === 'pause') {
+          await native.getByRole('button', { name: 'Pause video', exact: true }).click();
+          await native.getByRole('button', { name: 'Play video', exact: true }).click();
+          fixture.advance('stream00005', 'A newer shared pause', false);
+        } else {
+          fixture.hold();
+          fixture.silence();
+        }
+        await host.page.waitForFunction(
+          () =>
+            (window as unknown as { __streamPlayer: { state: number } }).__streamPlayer.state === 2,
+          undefined,
+          { timeout: 8000 },
+        );
+        fixture.releaseReplies();
+        await host.page.waitForTimeout(500);
+        assert.equal(
+          await host.page.evaluate(
+            () => (window as unknown as { __streamPlayer: { state: number } }).__streamPlayer.state,
+          ),
+          2,
+        );
+        assert.deepEqual(
+          fixture.writes.map((write) => write.action),
+          ['seek'],
+        );
+        assert.equal(await host.page.locator('.audio-stage iframe').count(), 1);
+        assert.deepEqual(host.errors, []);
+        assert.deepEqual(fixture.errors, []);
+      } finally {
+        await browser.close();
+        await fixture.close();
+      }
+    },
+  );
+
+test(
+  'three advancing players stay aligned through rapid scrubs and a local guest pause',
+  { timeout: 35000 },
+  async () => {
+    const fixture = await liveFixture();
+    const browser = await chromium
+      .launch({ headless: true, executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] })
+      .catch(async (error) => {
+        await fixture.close();
+        throw error;
+      });
+    try {
+      fixture.advance('stream00006', 'Three advancing clocks', true);
+      const clients: Awaited<ReturnType<typeof prepare>>[] = [];
+      for (const [width, height, owner] of [
+        [3840, 2160, true],
+        [2560, 1440, false],
+        [390, 844, false],
+      ] as const) {
+        clients.push(
+          await prepare(
+            await browser.newContext({ viewport: { width, height } }),
+            owner,
+            fixture.origin,
+          ),
+        );
+      }
+      const [host, guest, local] = clients;
+      for (const client of clients) await played(client.page, 'stream00006');
+      await waitFor(
+        () => fixture.streams === 3 && fixture.clockReads >= 3,
+        'all three live clocks calibrated',
+      );
+      await host.page.waitForTimeout(3500);
+      const sample = (page: Page) =>
+        page.evaluate(() => {
+          const player = window as unknown as {
+            __streamPlayer: { getCurrentTime(): number; state: number };
+            __streamAudioCalls: string[];
+          };
+          return {
+            position: player.__streamPlayer.getCurrentTime(),
+            state: player.__streamPlayer.state,
+            calls: [...player.__streamAudioCalls],
+          };
+        });
+      const aligned = async () => {
+        const states = await Promise.all(clients.map((client) => sample(client.page)));
+        assert(
+          Math.max(...states.map((s) => s.position)) - Math.min(...states.map((s) => s.position)) <
+            0.75,
+          `three synthetic advancing clocks remain within 750ms: ${states.map((s) => s.position.toFixed(3)).join(', ')}`,
+        );
+        return states;
+      };
+      const baseline = await aligned();
+      await host.page.waitForTimeout(3200);
+      const steady = await aligned();
+      for (const [index, state] of steady.entries()) {
+        assert.equal(
+          state.calls.filter((call) => call === 'seek').length,
+          baseline[index].calls.filter((call) => call === 'seek').length,
+          'settled advancing playback does not repeatedly correct a healthy clock',
+        );
+      }
+      await host.page.bringToFront();
+      fixture.holdReplies();
+      const seek = host.page
+        .frameLocator('.audio-stage iframe')
+        .getByRole('button', { name: 'Seek video', exact: true });
+      for (const target of [42, 80, 120]) {
+        await seek.evaluate(
+          (node, position) =>
+            node.setAttribute(
+              'onclick',
+              `parent.postMessage({type:'stream-native',action:'seek',position:${position}},'*')`,
+            ),
+          target,
+        );
+        await seek.click();
+      }
+      await waitFor(() => fixture.writes.length === 1, 'only the first seek is in flight');
+      await host.page.waitForTimeout(1200);
+      assert.equal(fixture.writes.length, 1);
+      fixture.releaseReplies();
+      await waitFor(() => fixture.writes.length === 2, 'coalesced final seek reaches the room');
+      await Promise.all(
+        clients.map((client) =>
+          client.page.waitForFunction(
+            () =>
+              (
+                window as unknown as { __streamPlayer: { getCurrentTime(): number } }
+              ).__streamPlayer.getCurrentTime() >= 120,
+          ),
+        ),
+      );
+      await aligned();
+      const afterScrub = await sample(host.page);
+      assert.equal(
+        afterScrub.calls.filter((call) => call === 'seek').length,
+        0,
+        'a native scrub acknowledgement must not force another timeline jump',
+      );
+      assert.deepEqual(
+        fixture.writes.map((write) => write.action),
+        ['seek', 'seek'],
+      );
+      await local.page.bringToFront();
+      await local.page
+        .frameLocator('.audio-stage iframe')
+        .getByRole('button', { name: 'Pause video', exact: true })
+        .click();
+      await local.page
+        .locator('.player-status')
+        .filter({ hasText: 'Paused on this device' })
+        .waitFor();
+      await host.page.bringToFront();
+      await seek.evaluate((node) =>
+        node.setAttribute(
+          'onclick',
+          "parent.postMessage({type:'stream-native',action:'seek',position:180},'*')",
+        ),
+      );
+      await seek.click();
+      await waitFor(() => fixture.writes.length === 3, 'host seek after guest pause');
+      await guest.page.waitForFunction(
+        () =>
+          (
+            window as unknown as { __streamPlayer: { getCurrentTime(): number } }
+          ).__streamPlayer.getCurrentTime() >= 180,
+      );
+      await host.page.waitForTimeout(900);
+      assert.equal((await sample(local.page)).state, 2, 'guest pause survives later shared seeks');
+      assert.equal(
+        fixture.writes.length,
+        3,
+        'guest gestures and automatic synchronization cannot issue host controls',
+      );
+      for (const client of clients) {
+        const state = await sample(client.page);
+        assert.equal(
+          state.calls.filter((call) => call.startsWith('load:') || call.startsWith('cue:')).length,
+          1,
+          'same-recording updates retain the original native video view',
+        );
+        assert(!state.calls.includes('destroy'));
+        assert.deepEqual(client.errors, []);
+      }
+      assert.deepEqual(fixture.errors, []);
+    } finally {
+      await browser.close();
+      await fixture.close();
+    }
+  },
+);

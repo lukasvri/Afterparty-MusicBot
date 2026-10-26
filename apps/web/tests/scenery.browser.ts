@@ -102,12 +102,12 @@ for (const [width, height] of [
             .getByRole('button', { name: 'Choose a song', exact: true })
             .boundingBox();
           assert(
-            card && card.height <= 480 && card.height <= Math.max(240, height * 0.46) + 1,
-            'empty player stays compact',
+            card && card.height <= Math.max(240, height - 300) + 1,
+            'stage stays within a bounded viewport height',
           );
           assert(
-            card && geometry.height >= card.height * 0.75,
-            'stage fills the compact card without intrinsic grid shrinkage',
+            card && geometry.width >= card.width * 0.9,
+            'DJ scene fills the player instead of a fixed-size island',
           );
           assert(action && action.height >= 44, 'integrated action retains a touch target');
           assert(

@@ -104,6 +104,11 @@ test('duplicate play acknowledgments preserve the agreed start and the advancing
     assert.equal(state.startsAt, 11500); assert.equal(state.position, 13);
     now = 13000;
     assert.equal(rooms.snapshot('TESTROOM').position, 13.5);
+    state = rooms.mutate('TESTROOM', { action: 'seek', position: 42, actorHash: owner, version: state.version });
+    assert.equal(state.startsAt, now, 'a playing scrub has no future-start pause');
+    assert.equal(state.playbackKey, 'same-track');
+    now += 250;
+    assert.equal(rooms.snapshot('TESTROOM').position, 42.25);
     state = rooms.mutate('TESTROOM', { action: 'pause', actorHash: owner, version: state.version });
     assert.equal(state.startsAt, undefined);
     state = rooms.mutate('TESTROOM', { action: 'seek', position: video.duration, actorHash: owner, version: state.version });

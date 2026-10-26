@@ -239,10 +239,29 @@ test('buffering, disconnected voice and deliberate pause never start browser pla
   try {
     await flush();
     f.streams[0].emit(frame({ buffering: true }));
+    assert.equal(f.view.room?.playing, true, 'buffering does not become a newer shared pause');
     assert.equal(f.audio.playback().playing, false);
+    f.setTime(500);
+    assert.equal(f.audio.playback().position, 20);
     f.streams[0].emit(frame({ sequence: 2, connected: false }));
+    assert.equal(
+      f.view.room?.playing,
+      true,
+      'voice readiness gates local playback, not shared intent',
+    );
     assert.equal(f.audio.playback().playing, false);
-    f.streams[0].emit(frame({ sequence: 3, playing: false }));
+    f.setTime(1000);
+    assert.equal(f.audio.playback().position, 20, 'voice loss also holds the local clock');
+    f.streams[0].emit(frame({ sequence: 3, ready: false }));
+    f.setTime(1500);
+    assert.equal(f.audio.playback().playing, false);
+    assert.equal(
+      f.audio.playback().position,
+      20,
+      'unready playback cannot advance the local clock',
+    );
+    f.streams[0].emit(frame({ sequence: 4, playing: false }));
+    assert.equal(f.view.room?.playing, false, 'a deliberate shared pause remains distinct');
     assert.equal(f.audio.playback().playing, false);
     assert.deepEqual(f.fetches, ['/api/realtime/clock']);
   } finally {

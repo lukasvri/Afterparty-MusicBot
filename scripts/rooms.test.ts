@@ -97,7 +97,9 @@ test('D1 fallback shares the future-start clock and duplicate-play behavior with
     now += 1000;
     assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 20.5);
     state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 50, version: state.version })).room;
-    assert.equal(state.playing, true); assert.equal(state.position, 50); assert.equal(state.startsAt, now + 1500);
+    assert.equal(state.playing, true); assert.equal(state.position, 50); assert.equal(state.startsAt, now);
+    now += 250;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 50.25);
     state = (await mutate(f.request, 'TESTROOM', { action: 'pause', version: state.version })).room;
     assert.equal(state.playing, false); assert.equal(state.startsAt, undefined);
     state = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 100, version: state.version })).room;

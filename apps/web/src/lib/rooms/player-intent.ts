@@ -1,4 +1,5 @@
 export type PlayerIntent = { action: 'play' | 'pause' | 'seek'; position?: number; local?: true };
+export type PlayerIntentReceipt = { accepted: boolean; version?: number };
 type Observation = {
   identity: string;
   state: number;
@@ -6,7 +7,32 @@ type Observation = {
   now: number;
   gesture: boolean;
 };
-const POSITION_ACK_TOLERANCE = 2.25;
+export const POSITION_ACK_TOLERANCE = 2.25;
+
+/** A queued scrub may already be playing by the time the previous receipt arrives.
+ * Keep its observed progress, but reject cached backward or unrelated jumps. */
+export function refreshQueuedSeek(
+  intent: PlayerIntent,
+  position: number,
+  elapsedMs: number,
+  duration: number,
+): PlayerIntent {
+  if (
+    intent.action !== 'seek' ||
+    !Number.isFinite(intent.position) ||
+    !Number.isFinite(position) ||
+    !Number.isFinite(elapsedMs) ||
+    !Number.isFinite(duration) ||
+    elapsedMs < 0 ||
+    intent.position! < 0 ||
+    intent.position! >= duration ||
+    position >= duration ||
+    position < intent.position! ||
+    position > intent.position! + elapsedMs / 1000 + POSITION_ACK_TOLERANCE
+  )
+    return intent;
+  return { ...intent, position };
+}
 
 /** A receipt alone is not a fresh shared timeline. Allow playback progress
  * between the seek and the next authoritative sample, including a delayed start. */
@@ -168,7 +194,6 @@ export function createPlayerIntent() {
         return null;
       const elapsed = previous.state === 1 ? Math.max(0, value.now - previous.at) / 1000 : 0;
       if (Math.abs(value.position - previous.position - elapsed) < 1.5) return null;
-      positionUntil = value.now + 1000;
       return { action: 'seek', position: value.position };
     },
   };

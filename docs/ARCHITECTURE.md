@@ -46,8 +46,9 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Shared persistent music workspace | `apps/web/src/lib/ui/MusicWorkspace.svelte` | Room and public concert routes supply queue, search and library snippets; owns tab visibility, inactive-panel isolation, focus and first-open library mounting |
 | Browser-room queue UI | `apps/web/src/lib/rooms/RoomQueue.svelte` | Host action disclosures, guest votes and Escape/action focus recovery; scoped commands and queue revisions remain in `room-client.ts` |
 | Website auth and scoped Core proxy | `lib/` | `discord-auth.ts`, `admin-session.ts`, `core-server.ts` |
-| Native YouTube user intent | `apps/web/src/lib/rooms/player-intent.ts` | Current iframe focus/activation, programmatic echo suppression and fresh-timeline confirmation; `RoomAudio.svelte` owns player lifecycle and permission callbacks |
-| Shared room position and future start | `services/core/src/room-state.ts` | `roomPlaybackPosition` and `changeRoom`, reused by Core and Worker |
+| Browser-room transport and recovery | `apps/web/src/lib/rooms/room-client.ts` | Serial revisioned controls with exact native receipt revisions; newer SSE timelines win over older receipts; one explicit-conflict retry only for unchanged playback; temporary authenticated-read loss can retain a fresh calibrated public stream while commands stay disabled. Access errors and expired leases stop playback |
+| Native YouTube user intent | `apps/web/src/lib/rooms/player-intent.ts` | Current iframe focus/activation, programmatic echo suppression, bounded queued-seek progress and fresh-timeline confirmation; `RoomAudio.svelte` owns player lifecycle, coalesced native intents and permission callbacks |
+| Shared room position and future start | `services/core/src/room-state.ts` | `roomPlaybackPosition` and `changeRoom`, reused by Core and Worker; playing seeks re-anchor immediately, while starts/resumes retain the shared future barrier |
 | Shared browser storage and playback rules | `lib/` | `browser-storage.ts`, `live-room.ts`, `playback-sync.ts` (canonical drift thresholds and sustained-correction evidence; `RoomAudio.svelte` resets evidence with its player lifecycle) |
 | Optional browser error privacy and initialization | `lib/error-reporting.ts` | Native root layout; [policy](OBSERVABILITY.md) |
 | Shared bot settings, bounds and UI fields | `services/core/src/settings.ts` | Imported by Core and the native website |
@@ -78,7 +79,7 @@ The v3 feature folders keep each component beside its client and behavior helper
 | `social/` | Reactions, moments and host bingo |
 | `admin/` | Server-scoped administration client, DJ desk and pure cue/transition rules |
 | `server/` | Native API dispatch and host-transition guard |
-| `ui/` | Root-rendered global theme, shared `AppHeader.svelte`/`AppNavigation.svelte`, `PageToolbar.svelte`, `AppFooter.svelte`, device-local `TheaterToggle.svelte`, persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery, shared search thumbnails and copyright form |
+| `ui/` | Root-rendered global theme, shared `AppHeader.svelte`/`AppNavigation.svelte`, `PageToolbar.svelte`, `AppFooter.svelte`, device-local `TheaterToggle.svelte` (tab-sized video, exit/focus/scroll lifecycle), persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery, shared search thumbnails and copyright form |
 
 Shared surfaces, focus styles and fluid TV sizing live in `apps/web/src/lib/ui/AppTheme.svelte`; `AppHeader.svelte`, `PageToolbar.svelte` and `AppFooter.svelte` own the common five-section frame; routes supply contextual actions and retain feature layout and authority. Validate 4K, QHD and 1080p plus mobile, including readable invitations and retained player controls.
 
