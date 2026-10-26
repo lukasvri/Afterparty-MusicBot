@@ -1405,9 +1405,53 @@ test('unactivated iframe state changes cannot send host commands', async (t) => 
     await page.evaluate(() =>
       (window as unknown as { __nativeVideo: (action: string) => void }).__nativeVideo('pause'),
     );
-    await page.waitForTimeout(500);
+    await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
     assert.deepEqual(f.writes, []);
     assert.match(await page.locator('.player-status').innerText(), /Paused on this device/);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('a short provider pause resumes itself without becoming a pinned local pause', async (t) => {
+  const f = await fixture(t, 1920, true, true);
+  try {
+    const { page } = f;
+    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await page.waitForFunction(
+      () => (window as unknown as { __playerState: () => number }).__playerState() === 1,
+    );
+    const before = await page.evaluate(
+      () => (window as unknown as { __audioCalls: unknown[] }).__audioCalls.length,
+    );
+    await page.evaluate(() => {
+      const native = (window as unknown as { __nativeVideo: (action: string) => void })
+        .__nativeVideo;
+      native('pause');
+      setTimeout(() => native('play'), 300);
+    });
+    await page.waitForTimeout(1300);
+    assert.equal(
+      await page.evaluate(() =>
+        (window as unknown as { __playerState: () => number }).__playerState(),
+      ),
+      1,
+    );
+    assert.match(await page.locator('.player-status').innerText(), /Following the shared clock/);
+    const writes = await page.evaluate(
+      (start) =>
+        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
+          .slice(start)
+          .filter((call) => ['play', 'pause', 'seek', 'load', 'cue'].includes(call.action)),
+      before,
+    );
+    assert.deepEqual(
+      writes,
+      [],
+      'the app neither forces a resume nor interrupts provider recovery',
+    );
+    assert.deepEqual(f.writes, []);
     assert.deepEqual(f.errors, []);
   } finally {
     await f.close();

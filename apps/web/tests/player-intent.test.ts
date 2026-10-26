@@ -46,13 +46,51 @@ test('native state changes require a current user gesture and never echo program
     key = observation().identity;
   bridge.command(key, 'load', 0);
   assert.equal(bridge.state(observation()), null);
-  assert.deepEqual(bridge.state(observation({ state: 2, gesture: false })), {
+  assert.equal(bridge.state(observation({ state: 2, gesture: false })), null);
+  assert.deepEqual(bridge.time(observation({ state: 2, gesture: false, now: 2750 })), {
     action: 'pause',
     local: true,
   });
   assert.deepEqual(bridge.state(observation({ state: 1, now: 3000 })), { action: 'play' });
   assert.deepEqual(bridge.state(observation({ state: 2, now: 4000 })), { action: 'pause' });
   assert.equal(bridge.state(observation({ state: 2, now: 4100 })), null);
+});
+
+test('a short provider pause may recover without pinning this device as user-paused', () => {
+  const bridge = createPlayerIntent();
+  bridge.state(observation({ now: 0 }));
+  assert.equal(bridge.state(observation({ state: 2, gesture: false, now: 100 })), null);
+  assert.equal(bridge.hasPendingLocalPause(), true);
+  assert.equal(bridge.time(observation({ state: 2, gesture: false, now: 500 })), null);
+  assert.equal(bridge.state(observation({ state: 1, gesture: false, now: 600 })), null);
+  assert.equal(bridge.hasPendingLocalPause(), false);
+  assert.equal(bridge.time(observation({ state: 1, gesture: false, now: 1000 })), null);
+});
+
+test('a persistent media-key pause stays local and an explicit iframe pause stays immediate', () => {
+  const bridge = createPlayerIntent();
+  bridge.state(observation({ now: 0 }));
+  assert.equal(bridge.state(observation({ state: 2, gesture: false, now: 100 })), null);
+  assert.equal(bridge.time(observation({ state: 2, gesture: false, now: 500 })), null);
+  assert.deepEqual(bridge.time(observation({ state: 2, gesture: false, now: 850 })), {
+    action: 'pause',
+    local: true,
+  });
+  assert.equal(bridge.time(observation({ state: 2, gesture: false, now: 1100 })), null);
+  bridge.state(observation({ state: 1, now: 1200 }));
+  assert.deepEqual(bridge.state(observation({ state: 2, now: 1300 })), { action: 'pause' });
+});
+
+test('buffering, source replacement and programmatic transport retire a pending local pause', () => {
+  for (const recovery of ['buffer', 'source', 'command'] as const) {
+    const bridge = createPlayerIntent();
+    bridge.state(observation({ now: 0 }));
+    bridge.state(observation({ state: 2, gesture: false, now: 100 }));
+    if (recovery === 'buffer') bridge.state(observation({ state: 3, gesture: false, now: 200 }));
+    if (recovery === 'source') bridge.reset(observation().identity);
+    if (recovery === 'command') bridge.command(observation().identity, 'pause', 200);
+    assert.equal(bridge.time(observation({ state: 2, gesture: false, now: 1000 })), null);
+  }
 });
 test('a delayed playing event cannot override an expected shared pause or another playback instance', () => {
   const bridge = createPlayerIntent(),

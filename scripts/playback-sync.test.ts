@@ -21,6 +21,12 @@ test('saved local calibration retains finite values, bounds and legacy defaults'
 test('stable mode tolerates jitter and spaces automatic corrections',()=>{const correct=(a: number,b: number,c: number,d: number)=>shouldCorrect(a,b,c,d,false,'stable');assert.equal(correct(50,49.7,9000,0),false);assert.equal(correct(50,48.6,9000,0),false);assert.equal(correct(50,48,5000,0),false);assert.equal(correct(50,48,6000,0),true);});
 test('precise mode remains available without changing manual correction',()=>{assert.equal(shouldCorrect(50,49,3000,0,false,'precise'),true);assert.equal(shouldCorrect(50,49,2999,0,false,'precise'),false);assert.equal(shouldCorrect(50,49.7,200,0,true),true);assert.equal(shouldCorrect(50,NaN,200,0,true),false);});
 test('buffering never triggers seeks, including manual synchronization',()=>{assert.equal(canCorrectPlayback(3,true,10000,0),false);assert.equal(canCorrectPlayback(3,true,10000,0,true),false);});
+test('automatic sync leaves a paused, cued or ended provider alone while a local pause is confirmed',()=>{
+ for(const state of [-1,0,2,5])assert.equal(canCorrectPlayback(state,true,10000,0),false);
+ assert.equal(canCorrectPlayback(1,true,10000,0),true);
+ assert.equal(canCorrectPlayback(2,false,10000,0),true,'shared paused alignment remains inaudible');
+ assert.equal(canCorrectPlayback(2,true,10000,0,true),true,'explicit synchronization is still available');
+});
 test('recovery gets a settling period but host pause and manual sync are immediate',()=>{assert.equal(canCorrectPlayback(1,true,1000,5000),false);assert.equal(canCorrectPlayback(1,true,5000,5000),true);assert.equal(canCorrectPlayback(2,false,1000,5000),true);assert.equal(canCorrectPlayback(1,true,1000,5000,true),true);});
 
 test('stable sync is the default while an explicit precise choice is retained',()=>{assert.equal(readSyncMode(null),'stable');assert.equal(readSyncMode('invalid'),'stable');assert.equal(readSyncMode('precise'),'precise');assert.equal(readSyncMode('stable'),'stable');assert.equal(shouldCorrect(50,49,3000,0),false);assert.equal(shouldCorrect(50,49,3000,0,false,'precise'),true);});

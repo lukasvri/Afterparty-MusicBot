@@ -399,6 +399,18 @@
       nativePending = { ...nativePending, transportSuperseded: true };
     if (nativePending?.transportSuperseded && queuedNative.length) queuedNative = [];
     if (failedSource === key) return;
+    if (native.hasPendingLocalPause()) {
+      if (loaded !== key) {
+        // A new shared recording must not resume a possible device pause.
+        localPaused = true;
+        native.reset(key);
+      } else if (playing) {
+        // The provider is already paused. Do not issue play/seek commands while
+        // waiting to distinguish a short transition from a media-key pause.
+        correction.reset();
+        return;
+      }
+    }
     if (failedSource) {
       failedSource = '';
       message = '';

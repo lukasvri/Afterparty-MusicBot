@@ -74,7 +74,8 @@ export function createPlaybackCorrection() {
 
 export function canCorrectPlayback(state:number,playing:boolean,now:number,settleUntil:number,force=false){
  // Seeking during buffering or immediately after recovery discards useful buffered data.
- return state!==3&&(force||!playing||now>=settleUntil);
+ // An unconfirmed provider/media-key pause must not be sought back into playback.
+ return state!==3&&(!playing||state===1||force)&&(force||!playing||now>=settleUntil);
 }
 /** Reject delayed polls/commands after a newer snapshot of the same timeline. */
 export function isOlderSnapshot(previous:Room|null, next:Room){
