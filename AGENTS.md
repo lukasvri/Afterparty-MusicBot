@@ -206,3 +206,18 @@ See [Cloud workflow](docs/CLOUD_DEVELOPMENT.md) and [operations](services/core/P
   [AI collaboration workflow](docs/AI_WORKFLOW.md). The live repository and
   reviewed PRs, not assistant chat history, are the source of truth.
 - Keep the context document to lasting, verified decisions. Use GitHub issues and PRs for current task progress. Never confuse merged code with production deployment.
+
+
+## Agent skills
+
+### Issue tracker
+
+Use this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the configured standard labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use a single documentation context. See `docs/agents/domain.md`.
