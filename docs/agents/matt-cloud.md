@@ -7,7 +7,11 @@ user-level plugin installation or writes to a protected home directory.
 
 Source: https://github.com/mattpocock/skills/tree/a496f5513d4a4cf889bc48e189e579f4b0bdf6aa
 
-The upstream files are preserved verbatim, with the MIT license alongside them.
+The upstream files are preserved with the MIT license alongside them.
+Local patch: `wizard/template.sh` uses dotenv-compatible quoting and preserves
+values containing apostrophes; values without a safe delimiter are rejected
+before modifying the file. The accompanying synthetic round-trip test covers
+Node dotenv loading and wizard readback.
 To update, review a new upstream revision, replace the complete skill folders,
 and validate their metadata, resources and project compatibility in a PR.
 

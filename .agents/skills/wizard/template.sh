@@ -89,16 +89,16 @@ confirm() {
   [[ "$reply" =~ ^[Yy] ]]
 }
 
-# _existing KEY: current value of KEY in ENV_FILE, if any, with write_env's single
-# quotes or a plain dotenv double-quoted value undone.
+# _existing KEY reads a quoted dotenv value without evaluating shell syntax.
 _existing() {
   [[ -f "$ENV_FILE" ]] || return 1
-  local line value sq="'\\''"; line=$(grep -E "^${1}=" "$ENV_FILE" | tail -n1) || return 1
+  local line value; line=$(grep -E "^${1}=" "$ENV_FILE" | tail -n1) || return 1
   value="${line#*=}"
-  if [[ "$value" == \'*\' ]]; then value="${value:1:${#value}-2}"; value="${value//"$sq"/\'}"
+  if [[ "$value" == \'*\' || "$value" == \`*\` ]]; then
+    value="${value:1:${#value}-2}"
   elif [[ "$value" == \"*\" ]]; then
     value="${value:1:${#value}-2}"
-    [[ "$value" == *[\\\$\"]* ]] && return 1   # escapes, $ or ": can't decode safely; ask again
+    [[ "$value" == *'\n'* || "$value" == *'\r'* ]] && return 1
   fi
   printf '%s' "$value"
 }
@@ -134,15 +134,25 @@ ask_secret() {
   printf -v "$key" '%s' "$input"
 }
 
-# write_env KEY VALUE upserts KEY='VALUE' into ENV_FILE (replaces any existing
+# write_env KEY VALUE upserts a dotenv-quoted value into ENV_FILE (replaces any existing
 # line) and sets $KEY. Idempotent. Creates ENV_FILE at mode 0600; writes through
 # a symlink and keeps an existing file's mode.
 write_env() {
-  local key="$1" value="$2" tmp sq="'\\''"
+  local key="$1" value="$2" tmp quote="'"
+  if [[ "$value" == *"'"* ]]; then
+    quote='"'
+    if [[ "$value" == *'"'* || "$value" == *'\n'* || "$value" == *'\r'* ]]; then
+      quote='`'
+      if [[ "$value" == *'`'* ]]; then
+        warn "cannot safely represent $key as dotenv; file unchanged"
+        return 1
+      fi
+    fi
+  fi
   [[ -e "$ENV_FILE" ]] || (umask 077 && : > "$ENV_FILE")
   tmp=$(mktemp)
   grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
-  printf "%s='%s'\n" "$key" "${value//\'/$sq}" >> "$tmp"
+  printf '%s=%s%s%s\n' "$key" "$quote" "$value" "$quote" >> "$tmp"
   cat "$tmp" > "$ENV_FILE"
   rm -f "$tmp"
   printf -v "$key" '%s' "$value"
