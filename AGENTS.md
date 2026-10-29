@@ -210,6 +210,9 @@ See [Cloud workflow](docs/CLOUD_DEVELOPMENT.md) and [operations](services/core/P
 
 ## Agent skills
 
+For skill discovery and use in Codex Cloud, see
+[Matt cloud setup](docs/agents/matt-cloud.md).
+
 ### Issue tracker
 
 Use this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
