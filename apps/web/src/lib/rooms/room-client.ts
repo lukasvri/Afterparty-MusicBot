@@ -507,7 +507,24 @@ export function createRoomClient(options: RoomClientOptions = {}) {
           );
           const result = await (commandId ? Promise.race([response, receipt]) : response);
           if (!current(target)) return false;
-          if (!result.streamed) accept(target, result.room, sent);
+          if (!result.streamed) {
+            const authority = target.authority;
+            // The capped RTT compensation cannot date an arbitrarily held reply.
+            // A committed gesture is acknowledged, but an expired sample cannot
+            // grant a new playback lease. A fresh authenticated poll can recover it.
+            const expired =
+              commandId &&
+              authority &&
+              result.room.code === target.code &&
+              result.room.syncSource === 'live' &&
+              authority.room.syncSource === 'live' &&
+              result.room.syncEpoch === authority.room.syncEpoch &&
+              authority.room.serverTime + now() - authority.receivedAt - result.room.serverTime >=
+                (result.room.syncValidForMs ?? 0);
+            if (!expired) accept(target, result.room, sent);
+            else if (state.room && playbackTarget(state.room, state.receivedAt, now()).stale)
+              publish({ connection: 'reconnecting', error: 'Live playback is reconnecting.' });
+          }
           onAccepted?.(result.room);
           return true;
         } catch (error) {

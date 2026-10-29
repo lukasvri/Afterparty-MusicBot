@@ -28,6 +28,15 @@ The same case delivers a newer shared pause before releasing both older HTTP
 replies and verifies that playback stays paused without another mutation.
 The existing uncorrelated held-reply cases retain HTTP recovery coverage.
 
+The full CI browser run exposed an additional held-HTTP fallback defect: RTT
+compensation caps at 1.5 seconds, so an old reply sampled just after a stream
+frame could incorrectly renew playback after the stream lease expired. A
+focused client regression reproduces that timing deterministically. Native HTTP
+receipts now use the existing authoritative sample and monotonic elapsed time
+to reject an expired timeline as a new playback lease while still acknowledging
+the committed gesture. A fresh authenticated poll restores playback. The
+original lease-expiry browser assertion remains unchanged.
+
 These source checks do not resolve the owner's separate Start a room lost
 connection/re-entry report in the existing live-stability issue.
 
