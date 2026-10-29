@@ -1,7 +1,8 @@
 import {elapsedPlayingMs,roomSeekPosition} from '../services/core/src/protocol.ts';
 import type {Room} from './types.ts';
-export function compensateDelivery(room:Room,roundTripMs:number):Room {
- const transit=Number.isFinite(roundTripMs)?Math.min(1500,Math.max(0,roundTripMs/2)):0;
+export function compensateDelivery(room:Room,roundTripMs:number,sampleAgeMs?:number):Room {
+ // A known same-epoch sample age also accounts for a held response beyond the RTT cap.
+ const transit=sampleAgeMs!==undefined&&Number.isFinite(sampleAgeMs)?Math.max(0,sampleAgeMs):Number.isFinite(roundTripMs)?Math.min(1500,Math.max(0,roundTripMs/2)):0;
  return {...room,position:room.position+(room.playing&&!room.buffering?elapsedPlayingMs(room.serverTime,room.startsAt,transit)/1000:0),syncSampledAt:room.syncSampledAt??room.serverTime,serverTime:room.serverTime+transit,...(room.syncValidForMs!==undefined?{syncValidForMs:Math.max(0,room.syncValidForMs-transit)}:{})};
 }
 export function playbackTarget(room:Room,receivedAt:number,now:number,offset=0){

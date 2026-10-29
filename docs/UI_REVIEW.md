@@ -33,8 +33,10 @@ compensation caps at 1.5 seconds, so an old reply sampled just after a stream
 frame could incorrectly renew playback after the stream lease expired. A
 focused client regression reproduces that timing deterministically. Native HTTP
 receipts now use the existing authoritative sample and monotonic elapsed time
-to reject an expired timeline as a new playback lease while still acknowledging
-the committed gesture. A fresh authenticated poll restores playback. The
+to preserve the actual remaining lease and reject an expired timeline as a new
+playback lease while still acknowledging the committed gesture. The shared
+delivery projection accepts this known age instead of the capped RTT estimate;
+near-expiry coverage verifies that a 4900 ms-old sample has only 100 ms left. A fresh authenticated poll restores playback. The
 original lease-expiry browser assertion remains unchanged.
 
 These source checks do not resolve the owner's separate Start a room lost

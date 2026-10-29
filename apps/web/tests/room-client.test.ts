@@ -1486,59 +1486,70 @@ test('leaving during conflict reconciliation cannot replay a control or change t
   }
 });
 
-test('an HTTP receipt sampled before lease expiry cannot restart playback after the lease is lost', async () => {
-  const pending = deferred<Response>(),
-    source = new SyntheticStream();
-  let now = 100,
-    freshRead = false;
-  const snapshot: Room = {
-    ...room(),
-    playing: true,
-    serverTime: 1000,
-    syncSource: 'live',
-    syncEpoch: 'epoch-one',
-    syncValidForMs: 5000,
-  };
-  const committed: Room = { ...snapshot, version: 2, position: 42, serverTime: 1100 };
-  const f = fixture(
-    async (_path, init) =>
-      init.method === 'POST'
-        ? pending.promise
-        : json(freshRead ? { ...committed, serverTime: 7100 } : snapshot),
-    {
-      now: () => now,
-      eventSource: () => source as unknown as EventSource,
-      clockRequest: async () => json({ serverTime: 1000 }),
-    },
-  );
-  let command: Promise<unknown> | undefined;
-  try {
-    await f.client.join('ROOM0001');
-    source.open();
-    await flush();
-    command = f.client.controlNative('seek', 42);
-    await flush();
-    source.send(committed);
-    now = 6200;
-    const leaseIndex = f.delays.findLastIndex((delay) => delay === 5000);
-    assert(leaseIndex >= 0);
-    f.scheduled[leaseIndex]();
-    assert.equal(f.state.connection, 'reconnecting');
-    pending.resolve(json({ room: { ...committed, serverTime: 1110 } }));
-    assert.deepEqual(await command, { accepted: true, version: 2 });
-    assert.equal(
-      f.client.playback()?.playing,
-      false,
-      'a delayed old receipt is not a fresh playback lease',
+for (const sampleAge of [4900, 5990])
+  test(`a ${sampleAge}ms-old HTTP receipt cannot extend a lost stream lease`, async () => {
+    const pending = deferred<Response>(),
+      source = new SyntheticStream();
+    let now = 100,
+      freshRead = false;
+    const snapshot: Room = {
+      ...room(),
+      playing: true,
+      serverTime: 1000,
+      syncSource: 'live',
+      syncEpoch: 'epoch-one',
+      syncValidForMs: 5000,
+    };
+    const committed: Room = { ...snapshot, version: 2, position: 42, serverTime: 1100 };
+    const f = fixture(
+      async (_path, init) =>
+        init.method === 'POST'
+          ? pending.promise
+          : json(freshRead ? { ...committed, serverTime: 900 + now } : snapshot),
+      {
+        now: () => now,
+        eventSource: () => source as unknown as EventSource,
+        clockRequest: async () => json({ serverTime: 1000 }),
+      },
     );
-    assert.equal(f.state.connection, 'reconnecting');
-    freshRead = true;
-    await f.client.refresh();
-    assert.equal(f.state.connection, 'connected');
-    assert.equal(f.client.playback()?.playing, true);
-  } finally {
-    pending.resolve(json({ room: snapshot }));
-    await command;
-    f.client.destroy();
-  }
-});
+    let command: Promise<unknown> | undefined;
+    try {
+      await f.client.join('ROOM0001');
+      source.open();
+      await flush();
+      command = f.client.controlNative('seek', 42);
+      await flush();
+      source.send(committed);
+      now = sampleAge + 210;
+      const leaseIndex = f.delays.findLastIndex((delay) => delay === 5000);
+      assert(leaseIndex >= 0);
+      f.scheduled[leaseIndex]();
+      assert.equal(f.state.connection, 'reconnecting');
+      pending.resolve(json({ room: { ...committed, serverTime: 1110 } }));
+      assert.deepEqual(await command, { accepted: true, version: 2 });
+      if (sampleAge < 5000) {
+        assert.equal(f.client.playback()?.playing, true);
+        now += 101;
+        assert.equal(
+          f.client.playback()?.playing,
+          false,
+          'only the actual remaining 100ms may be used',
+        );
+      } else {
+        assert.equal(
+          f.client.playback()?.playing,
+          false,
+          'a delayed old receipt is not a fresh playback lease',
+        );
+        assert.equal(f.state.connection, 'reconnecting');
+      }
+      freshRead = true;
+      await f.client.refresh();
+      assert.equal(f.state.connection, 'connected');
+      assert.equal(f.client.playback()?.playing, true);
+    } finally {
+      pending.resolve(json({ room: snapshot }));
+      await command;
+      f.client.destroy();
+    }
+  });

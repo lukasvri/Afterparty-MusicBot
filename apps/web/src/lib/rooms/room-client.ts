@@ -197,7 +197,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     });
     return target;
   };
-  const accept = (target: Session, room: Room, sent: number) => {
+  const accept = (target: Session, room: Room, sent: number, sampleAge?: number) => {
     if (!current(target)) return;
     if (
       !room ||
@@ -209,7 +209,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       !Array.isArray(room.queue)
     )
       throw new Error('This view supports browser rooms only.');
-    const next = compensateDelivery(room, now() - sent);
+    const next = compensateDelivery(room, now() - sent, sampleAge);
     target.authority = { room: next, receivedAt: now() };
     target.pollRecovering = false;
     target.accessLost = false;
@@ -512,16 +512,23 @@ export function createRoomClient(options: RoomClientOptions = {}) {
             // The capped RTT compensation cannot date an arbitrarily held reply.
             // A committed gesture is acknowledged, but an expired sample cannot
             // grant a new playback lease. A fresh authenticated poll can recover it.
-            const expired =
+            const sampleAge =
               commandId &&
               authority &&
               result.room.code === target.code &&
               result.room.syncSource === 'live' &&
               authority.room.syncSource === 'live' &&
-              result.room.syncEpoch === authority.room.syncEpoch &&
-              authority.room.serverTime + now() - authority.receivedAt - result.room.serverTime >=
-                (result.room.syncValidForMs ?? 0);
-            if (!expired) accept(target, result.room, sent);
+              result.room.syncEpoch === authority.room.syncEpoch
+                ? Math.max(
+                    0,
+                    authority.room.serverTime +
+                      now() -
+                      authority.receivedAt -
+                      result.room.serverTime,
+                  )
+                : undefined;
+            if (sampleAge === undefined || sampleAge < (result.room.syncValidForMs ?? 0))
+              accept(target, result.room, sent, sampleAge);
             else if (state.room && playbackTarget(state.room, state.receivedAt, now()).stale)
               publish({ connection: 'reconnecting', error: 'Live playback is reconnecting.' });
           }
