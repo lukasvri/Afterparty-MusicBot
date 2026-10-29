@@ -16,6 +16,11 @@ export type RoomVideo = {
   /** Private room recommendation proof; removed from publicPlayback snapshots. */
   radioRelatedTo?: string;
 };
+export type RoomCommandReceipt = { id: string; version: number };
+export const ROOM_COMMAND_RECEIPT_LIMIT = 32;
+export function validRoomCommandId(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
+}
 export type RoomTimeline = {
   code: string;
   name: string;
@@ -39,6 +44,7 @@ export type RoomTimeline = {
   history?: RoomVideo[];
   voteCounts?: Record<string, number>;
   skipVotes?: number;
+  commandReceipt?: RoomCommandReceipt;
 };
 /** Browser-room seeks leave the same final second available on every authority. */
 export function roomSeekPosition(position: number, duration: number): number {
@@ -98,7 +104,9 @@ export function readRoomTimeline(value: unknown): RoomTimeline | null {
     !Number.isInteger(r.viewers) ||
     r.viewers < 0 ||
     typeof r.isHost !== "boolean" ||
-    (r.startsAt !== undefined && !Number.isFinite(r.startsAt))
+    (r.startsAt !== undefined && !Number.isFinite(r.startsAt)) ||
+    (r.commandReceipt !== undefined && (!r.commandReceipt ||
+      !validRoomCommandId(r.commandReceipt.id) || r.commandReceipt.version !== r.version))
   )
     return null;
   return r;

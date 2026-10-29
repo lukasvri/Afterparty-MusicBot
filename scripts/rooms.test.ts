@@ -1204,3 +1204,21 @@ test('D1 bypasses old metadata when newer declared-AI evidence is only in the de
     assert.equal(result.videos[0].aiGenerated, true);
   } finally { f.close(); }
 });
+
+
+test('Worker transport receipts deduplicate a stale retry without undoing a newer pause', async () => {
+  const f = fixture();
+  try {
+    await f.save('TESTROOM', { current: seed, queue: [], playing: true, position: 0, radio: false });
+    const command = { action: 'seek', position: 10, version: 1,
+      commandId: '11111111-1111-4111-8111-111111111111' };
+    const committed = (await mutate(f.request, 'TESTROOM', command)).room;
+    assert.deepEqual(committed.commandReceipt, { id: command.commandId, version: 2 });
+    await mutate(f.request, 'TESTROOM', { action: 'pause', version: 2 });
+    const duplicate = (await mutate(f.request, 'TESTROOM', command)).room;
+    assert.equal(duplicate.version, 3); assert.equal(duplicate.playing, false);
+    assert.equal(duplicate.commandReceipt, undefined);
+    await assert.rejects(() => mutate(f.request, 'TESTROOM', { ...command, position: 20 }), { status: 409 });
+    assert.equal(JSON.stringify(await publicRoom(f.request, f.roomRow(), false, false)).includes('commandReceipts'), false);
+  } finally { f.close(); }
+});

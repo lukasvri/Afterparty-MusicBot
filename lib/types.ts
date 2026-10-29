@@ -33,6 +33,7 @@ export type OpenRoom = {
   expiresAt: number;
 };
 export type Room = {
+  commandReceipt?: import("../services/core/src/protocol.ts").RoomCommandReceipt;
   isOwner?: boolean;
   approvalRequired?: boolean;
   requests?: Video[];

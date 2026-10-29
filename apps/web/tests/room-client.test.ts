@@ -718,6 +718,144 @@ class SyntheticStream extends EventTarget {
   }
 }
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+test('a matching live command receipt releases native controls before the held HTTP reply', async () => {
+  const pending = deferred<Response>(),
+    source = new SyntheticStream();
+  let input: Record<string, unknown> = {},
+    done = false;
+  const snapshot: Room = {
+    ...room(),
+    playing: true,
+    serverTime: 1000,
+    syncSource: 'live',
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
+  const f = fixture(
+    async (_path, init) => {
+      if (init.method !== 'POST') return json(snapshot);
+      input = JSON.parse(String(init.body));
+      return pending.promise;
+    },
+    { eventSource: () => source, clockRequest: async () => json({ serverTime: 1000 }) },
+  );
+  let command: Promise<unknown> | undefined;
+  try {
+    await f.client.join('ROOM0001');
+    source.open();
+    await flush();
+    command = f.client.controlNative('seek', 42).then((result) => {
+      done = true;
+      return result;
+    });
+    await flush();
+    assert.match(String(input.commandId), /^[a-f0-9-]{36}$/);
+    source.send({
+      ...snapshot,
+      version: 2,
+      position: 42,
+      commandReceipt: { id: input.commandId, version: 2 },
+    });
+    await flush();
+    assert.equal(
+      done,
+      true,
+      'the matching stream commit must settle the native gesture while HTTP is held',
+    );
+    assert.deepEqual(await command, { accepted: true, version: 2 });
+    assert.equal(f.state.busy, false);
+    source.send({ ...snapshot, version: 3, serverTime: 1100, playing: false });
+    pending.resolve(json({ error: 'Late transport failure' }, 503));
+    await flush();
+    assert.equal(f.state.room?.playing, false);
+    assert.equal(f.state.error, '');
+  } finally {
+    pending.resolve(json({ room: snapshot }));
+    await command;
+    f.client.destroy();
+  }
+});
+for (const mismatch of [
+  'id',
+  'room',
+  'epoch',
+  'revision',
+  'source',
+  'playback',
+  'pause',
+  'expired',
+  'authority',
+])
+  test(`a ${mismatch} mismatch cannot release a held native command through the stream`, async () => {
+    const pending = deferred<Response>(),
+      source = new SyntheticStream();
+    let input: Record<string, unknown> = {},
+      done = false,
+      now = 100;
+    const snapshot: Room = {
+      ...room(),
+      playing: true,
+      serverTime: 1000,
+      playbackKey: 'original',
+      syncSource: 'live',
+      syncEpoch: 'epoch-one',
+      syncValidForMs: 5000,
+    };
+    const f = fixture(
+      async (_path, init) => {
+        if (init.method !== 'POST') return json(snapshot);
+        input = JSON.parse(String(init.body));
+        return pending.promise;
+      },
+      {
+        now: () => now,
+        eventSource: () => source,
+        clockRequest: async () => json({ serverTime: 1000 }),
+      },
+    );
+    let command: Promise<unknown> | undefined;
+    try {
+      await f.client.join('ROOM0001');
+      source.open();
+      await flush();
+      command = f.client.controlNative('seek', 42).then((result) => {
+        done = true;
+        return result;
+      });
+      await flush();
+      if (mismatch === 'authority') now = 5200;
+      const frame = {
+        ...snapshot,
+        version: 2,
+        position: 42,
+        commandReceipt: { id: String(input.commandId), version: 2 },
+      };
+      if (mismatch === 'id') frame.commandReceipt.id = crypto.randomUUID();
+      if (mismatch === 'room') frame.code = 'ROOM0002';
+      if (mismatch === 'epoch') frame.syncEpoch = 'another-epoch';
+      if (mismatch === 'revision') {
+        frame.version = 3;
+        frame.commandReceipt.version = 3;
+      }
+      if (mismatch === 'source') frame.current = { ...snapshot.current!, id: 'another0001' };
+      if (mismatch === 'playback') frame.playbackKey = 'replacement';
+      if (mismatch === 'pause') frame.playing = false;
+      if (mismatch === 'expired') frame.syncValidForMs = 0;
+      source.send(frame);
+      await flush();
+      assert.equal(
+        done,
+        false,
+        'ambiguous or stale stream evidence must leave HTTP as the receipt',
+      );
+      pending.resolve(json({ room: { ...snapshot, version: 2, position: 42 } }));
+      assert.deepEqual(await command, { accepted: true, version: 2 });
+    } finally {
+      pending.resolve(json({ room: snapshot }));
+      await command;
+      f.client.destroy();
+    }
+  });
 function streamFixture() {
   let monotonic = 100;
   let failedReadStatus: number | 'network' = 0;

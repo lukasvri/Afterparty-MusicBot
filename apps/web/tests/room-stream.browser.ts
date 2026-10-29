@@ -37,13 +37,16 @@ async function liveFixture() {
   const writes: { action: string; version: number }[] = [];
   const streams = new Set<ServerResponse>();
   const held = new Map<ServerResponse, boolean>();
-  let delayReplies = false;
+  let delayReplies = false,
+    correlate = false;
+  let commandReceipt: Room['commandReceipt'];
   const replies = new Map<ServerResponse, Room>();
   const errors: string[] = [];
   const snapshot = (authenticated: boolean): Room => ({
     code,
     name: 'Synthetic live listening',
     version,
+    ...(commandReceipt?.version === version ? { commandReceipt } : {}),
     playing,
     current,
     queue: [],
@@ -110,7 +113,12 @@ async function liveFixture() {
         }
         let body = '';
         for await (const chunk of request) body += chunk;
-        const input = JSON.parse(body) as { action: string; version: number; position?: number };
+        const input = JSON.parse(body) as {
+          action: string;
+          version: number;
+          position?: number;
+          commandId?: string;
+        };
         writes.push(input);
         if (!authenticated || !hostAccess)
           return json(response, { error: 'Host access required' }, 403);
@@ -123,6 +131,7 @@ async function liveFixture() {
         if (input.action === 'seek') position = input.position!;
         else playing = input.action === 'play';
         updatedAt = Date.now();
+        if (correlate && input.commandId) commandReceipt = { id: input.commandId, version };
         send();
         const receipt = snapshot(authenticated);
         if (delayReplies) {
@@ -175,6 +184,12 @@ async function liveFixture() {
     },
     failReads(status: number) {
       readFailure = status;
+    },
+    correlate() {
+      correlate = true;
+    },
+    get heldReplies() {
+      return replies.size;
     },
     holdReplies() {
       delayReplies = true;
@@ -841,6 +856,76 @@ test(
         assert(!state.calls.includes('destroy'));
         assert.deepEqual(client.errors, []);
       }
+      assert.deepEqual(fixture.errors, []);
+    } finally {
+      await browser.close();
+      await fixture.close();
+    }
+  },
+);
+
+test(
+  'correlated stream receipts release a second native seek while HTTP replies remain held',
+  { timeout: 30000 },
+  async () => {
+    const fixture = await liveFixture();
+    const browser = await chromium
+      .launch({ headless: true, executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] })
+      .catch(async (error) => {
+        await fixture.close();
+        throw error;
+      });
+    try {
+      fixture.correlate();
+      fixture.advance('stream00007', 'Correlated native controls', true);
+      const host = await prepare(
+        await browser.newContext({ viewport: { width: 1920, height: 1080 } }),
+        true,
+        fixture.origin,
+      );
+      await played(host.page, 'stream00007');
+      await waitFor(
+        () => fixture.streams === 1 && fixture.clockReads >= 1,
+        'live clock calibrated',
+      );
+      await host.page.waitForTimeout(1100);
+      fixture.holdReplies();
+      const seek = host.page
+        .frameLocator('.audio-stage iframe')
+        .getByRole('button', { name: 'Seek video', exact: true });
+      await seek.click();
+      await waitFor(() => fixture.writes.length === 1, 'first native seek committed');
+      await seek.evaluate((node) => {
+        (node as HTMLElement).dataset.position = '80';
+      });
+      await seek.click();
+      await waitFor(() => fixture.writes.length === 2, 'second seek committed before HTTP release');
+      assert.equal(fixture.heldReplies, 2, 'both HTTP responses must still be held');
+      assert.deepEqual(
+        fixture.writes.map((write) => write.version),
+        [2, 3],
+      );
+      await host.page.waitForFunction(
+        () =>
+          (
+            window as unknown as { __streamPlayer: { getCurrentTime(): number } }
+          ).__streamPlayer.getCurrentTime() >= 80,
+      );
+      fixture.advance('stream00007', 'Newer deliberate shared pause', false);
+      await host.page.waitForFunction(
+        () =>
+          (window as unknown as { __streamPlayer: { state: number } }).__streamPlayer.state === 2,
+      );
+      fixture.releaseReplies();
+      await host.page.waitForTimeout(300);
+      assert.equal(
+        await host.page.evaluate(
+          () => (window as unknown as { __streamPlayer: { state: number } }).__streamPlayer.state,
+        ),
+        2,
+      );
+      assert.equal(fixture.writes.length, 2, 'late HTTP replies must not replay transport');
+      assert.deepEqual(host.errors, []);
       assert.deepEqual(fixture.errors, []);
     } finally {
       await browser.close();
