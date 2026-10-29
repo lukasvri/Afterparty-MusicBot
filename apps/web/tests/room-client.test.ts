@@ -737,7 +737,10 @@ test('a matching live command receipt releases native controls before the held H
       input = JSON.parse(String(init.body));
       return pending.promise;
     },
-    { eventSource: () => source, clockRequest: async () => json({ serverTime: 1000 }) },
+    {
+      eventSource: () => source as unknown as EventSource,
+      clockRequest: async () => json({ serverTime: 1000 }),
+    },
   );
   let command: Promise<unknown> | undefined;
   try {
@@ -809,7 +812,7 @@ for (const mismatch of [
       },
       {
         now: () => now,
-        eventSource: () => source,
+        eventSource: () => source as unknown as EventSource,
         clockRequest: async () => json({ serverTime: 1000 }),
       },
     );

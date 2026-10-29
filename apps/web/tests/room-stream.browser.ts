@@ -35,6 +35,7 @@ async function liveFixture() {
   let successfulReads = 0,
     clockReads = 0;
   const writes: { action: string; version: number }[] = [];
+  const dispatchedAt: number[] = [];
   const streams = new Set<ServerResponse>();
   const held = new Map<ServerResponse, boolean>();
   let delayReplies = false,
@@ -120,6 +121,7 @@ async function liveFixture() {
           commandId?: string;
         };
         writes.push(input);
+        dispatchedAt.push(performance.now());
         if (!authenticated || !hostAccess)
           return json(response, { error: 'Host access required' }, 403);
         if (input.version !== version)
@@ -169,6 +171,7 @@ async function liveFixture() {
   return {
     origin,
     writes,
+    dispatchedAt,
     errors,
     get streams() {
       return streams.size;
@@ -867,7 +870,7 @@ test(
 test(
   'correlated stream receipts release a second native seek while HTTP replies remain held',
   { timeout: 30000 },
-  async () => {
+  async (t) => {
     const fixture = await liveFixture();
     const browser = await chromium
       .launch({ headless: true, executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] })
@@ -898,9 +901,13 @@ test(
       await seek.evaluate((node) => {
         (node as HTMLElement).dataset.position = '80';
       });
+      const gestureAt = performance.now();
       await seek.click();
       await waitFor(() => fixture.writes.length === 2, 'second seek committed before HTTP release');
       assert.equal(fixture.heldReplies, 2, 'both HTTP responses must still be held');
+      t.diagnostic(
+        `Synthetic local gesture-to-second-dispatch: ${(fixture.dispatchedAt[1] - gestureAt).toFixed(1)} ms; both HTTP replies held. Excludes real provider/network/Discord acceptance.`,
+      );
       assert.deepEqual(
         fixture.writes.map((write) => write.version),
         [2, 3],

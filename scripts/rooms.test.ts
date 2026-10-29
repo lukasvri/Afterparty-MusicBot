@@ -1222,3 +1222,32 @@ test('Worker transport receipts deduplicate a stale retry without undoing a newe
     assert.equal(JSON.stringify(await publicRoom(f.request, f.roomRow(), false, false)).includes('commandReceipts'), false);
   } finally { f.close(); }
 });
+
+test('Worker forwards correlated native transport to Core with its own scoped actor', async (t) => {
+  const f = fixture();
+  try {
+    await f.save('TESTROOM', { current: seed, queue: [], playing: true, position: 0, radio: false });
+    syntheticEnv.GUTTA_CORE_PUBLIC_URL = 'https://synthetic-core.invalid';
+    syntheticEnv.ADMIN_BRIDGE_KEY = 'synthetic-key';
+    const actor = await hash('synthetic-host'), commandId = crypto.randomUUID();
+    const timeline = { code: 'TESTROOM', name: 'Test', version: 1, current: seed, queue: [],
+      playing: true, position: 0, serverTime: Date.now(), viewers: 0, isHost: false,
+      expiresAt: Date.now() + 60000, syncSource: 'live', syncEpoch: 'core-epoch', syncValidForMs: 5000 };
+    let committed = false;
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+      const command = JSON.parse(String(init.body));
+      if (command.operation === 'import') return Response.json({ room: timeline });
+      assert.equal(command.commandId, commandId); assert.equal(command.syncEpoch, 'core-epoch');
+      assert.equal(command.actorHash, actor); assert.equal(command.version, 1);
+      committed = true;
+      return Response.json({ room: { ...timeline, version: 2, position: 42,
+        commandReceipt: { id: commandId, version: 2 } } });
+    });
+    const result = (await mutate(f.request, 'TESTROOM', { action: 'seek', position: 42, version: 1,
+      commandId, syncEpoch: 'core-epoch', actorHash: 'spoofed' })).room;
+    assert.equal(committed, true); assert.equal(result.isHost, true);
+    assert.deepEqual(result.commandReceipt, { id: commandId, version: 2 });
+  } finally {
+    delete syntheticEnv.GUTTA_CORE_PUBLIC_URL; delete syntheticEnv.ADMIN_BRIDGE_KEY; f.close();
+  }
+});
