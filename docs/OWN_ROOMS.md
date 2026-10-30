@@ -35,6 +35,12 @@ The player's own controls handle playback, volume, quality, captions and fullscr
 player and its local pause. Reconnect replaces a failed live stream and rereads
 room access without replaying playback commands or discarding saved ownership.
 
+If the browser detects a discontinuity between its device clocks, it pauses the
+old timeline and reconnects. It retains the room and saved credentials, but
+requires a fresh access check and live-clock sample before following live
+playback again. A current shared pause or revoked host role remains effective.
+This does not change the synchronization mode or its correction thresholds.
+
 Hosts can use native play/pause/seek to update the shared timeline. Shared commands
 still require current host authority and queue revisions. Native events without
 provable user activation cannot issue shared commands. Guest pause stays local;
