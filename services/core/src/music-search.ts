@@ -1,5 +1,8 @@
 import { normalized } from './matching.ts';
 
+export const MUSIC_SEARCH_CACHE_MS = 3600000;
+export const EMPTY_MUSIC_SEARCH_CACHE_MS = 60000;
+
 type SearchRecording = {
   id: string;
   title: string;
@@ -24,7 +27,11 @@ export function rankMusicSearch<T extends SearchRecording>(query: string, tracks
   // Negative provider terms are exclusions, never desired recording words.
   const wanted = normalized(query.slice(0, 2000).replace(/(?:^|\s)-(?:(?:"[^"]*")|\S+)/g, ' '));
   const words = [...new Set(wanted.split(' ').filter(Boolean))];
-  const requestedFormats = formats.map(format => format.test(wanted));
+  // A title word such as "Live Forever" is not a performance request. A
+  // trailing qualifier or an explicit venue/version context expresses intent.
+  const requestedFormats = formats.map((format, i) => i === 0
+    ? /\blive(?:$|\s+(?:at|from|in|on|version|performance|session|set|lounge)\b)/.test(wanted)
+    : format.test(wanted));
   if (concertIntent.test(wanted)) {
     requestedFormats[0] = true;
     requestedFormats[formats.length - 1] = true;

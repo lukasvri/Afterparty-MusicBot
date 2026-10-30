@@ -2,7 +2,7 @@ import {readLiveState,liveRoom} from "./live-room.ts";
 import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
 import { metadataAiGenerated } from "../services/core/src/music-content.ts";
-import { rankMusicSearch } from "../services/core/src/music-search.ts";
+import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS } from "../services/core/src/music-search.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { visitorSQL } from "./room-visitors.ts";
 import { env as cloudEnv } from "cloudflare:workers";
@@ -367,7 +367,7 @@ async function searchVideos(request: Request, query: string, radio: boolean) {
       [...new Set(data.items.map((v) => v.id.videoId).filter(id => /^[\w-]{11}$/.test(id)))].slice(0, count),
     );
     return radio ? result : rankMusicSearch(query, result);
-  }, videos => videos.length ? 3600000 : 60000);
+  }, videos => videos.length ? MUSIC_SEARCH_CACHE_MS : EMPTY_MUSIC_SEARCH_CACHE_MS);
   return { videos: result };
 }
 type Row = {

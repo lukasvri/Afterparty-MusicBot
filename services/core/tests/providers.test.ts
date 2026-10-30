@@ -45,6 +45,21 @@ test('a failed shared search is released so the next request can recover',async(
   assert.equal((await p.search('Artist audio'))[0].id,'abcdefghijk');assert.equal(calls,2);
  }finally{t.close();}
 });
+test('an empty manual result after failed metadata hydration can recover immediately',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{});let searches=0,available=false;
+  p.youtube=async <K extends keyof YouTubeResponses>(path: K)=>{
+   if(path==='search'){searches++;return {items:[{id:{videoId:'abcdefghijk'}}]} as YouTubeResponses[K];}
+   if(!available)throw Error('synthetic unavailable metadata');
+   return {items:[{id:'abcdefghijk',snippet:{title:'Example Song',channelTitle:'Artist',description:'',categoryId:'10',liveBroadcastContent:'none'},contentDetails:{duration:'PT3M'},status:{embeddable:true}}]} as YouTubeResponses[K];
+  };
+  p.extract=async()=>{throw Error('synthetic unavailable extractor');};
+  assert.deepEqual(await p.search('Artist Example Song',1),[]);
+  available=true;
+  assert.equal((await p.search('Artist Example Song',1))[0]?.id,'abcdefghijk');
+  assert.equal(searches,2);
+ }finally{t.close();}
+});
 test('matching rejects different versions, substrings, wrong durations and supports ISRC metadata',()=>{
  assert(scoreMatch(source,track())>.9);
  for(const suffix of ['Live','Remix','Acoustic','Karaoke','Cover','Slowed','Sped Up','Instrumental'])assert.equal(scoreMatch(source,track('Artist - Example Song '+suffix)),0);
@@ -232,6 +247,39 @@ test('empty cached searches are refreshed so a radio retry can recover',async()=
   assert.equal((await p.search(query,20,true))[0]?.id,'next1234567');assert.equal(calls,1);
   await p.search(query,20,true);assert.equal(calls,1);
  }finally{t.close();}
+});
+
+test('manual empty search results avoid repeated provider calls for one minute, then recover', async context => {
+ const t=setup();let now=1000000,calls=0;
+ context.mock.method(Date,'now',()=>now);
+ try {
+  const p=new Providers(t.store,{});
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;return {items:[]} as unknown as YouTubeResponses[K];};
+  assert.deepEqual(await p.search('missing song'),[]);
+  now+=59999;
+  assert.deepEqual(await p.search('missing song'),[]);
+  assert.equal(calls,1);
+  now++;
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;return {items:[{id:{videoId:'next1234567'}}]} as unknown as YouTubeResponses[K];};
+  p.video=async()=>[track('Artist - Found after expiry','next1234567')];
+  assert.equal((await p.search('missing song'))[0]?.id,'next1234567');
+  assert.equal(calls,2);
+ } finally {t.close();}
+});
+
+test('radio can retry immediately after a successful empty provider result', async () => {
+ const t=setup();let calls=0;
+ try {
+  const p=new Providers(t.store,{});
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{
+   calls++;
+   return {items:calls===1?[]:[{id:{videoId:'next1234567'}}]} as unknown as YouTubeResponses[K];
+  };
+  p.video=async ids=>ids.map(id=>track('Artist - Newly available',id));
+  assert.deepEqual(await p.search('radio recovery',20,true),[]);
+  assert.equal((await p.search('radio recovery',20,true))[0]?.id,'next1234567');
+  assert.equal(calls,2);
+ } finally {t.close();}
 });
 
 test('video metadata retains explicit genre tags for unlabelled song titles',async()=>{
