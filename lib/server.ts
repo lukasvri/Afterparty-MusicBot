@@ -3,6 +3,7 @@ import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
 import { metadataAiGenerated } from "../services/core/src/music-content.ts";
 import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS } from "../services/core/src/music-search.ts";
+import { ProviderWork, MUSIC_REQUEST_DEADLINE_MS } from "../services/core/src/provider-work.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { visitorSQL } from "./room-visitors.ts";
 import { env as cloudEnv } from "cloudflare:workers";
@@ -228,51 +229,58 @@ export function videoId(input: string) {
   if (!id || !/^[\w-]{11}$/.test(id)) fail(400, "Lenken må peke til en video.");
   return id;
 }
-const inFlight = new Map<string, Promise<unknown>>();
-async function cached<T>(key: string, provider: () => Promise<T>, lifetime: (result: T) => number = () => 3600000): Promise<T> {
-  const row = await db()
-    .prepare("SELECT data FROM cached WHERE key=? AND expires_at>?")
-    .bind(key, Date.now())
-    .first<{ data: string }>();
-  if (row) {
-    try {
-      return JSON.parse(row.data);
-    } catch {
-      /* refresh invalid cache */
-    }
+const inFlight = new Map<string, ProviderWork<unknown>>();
+async function cached<T>(key: string, provider: (signal: AbortSignal) => Promise<T>, lifetime: (result: T) => number | null = () => 3600000, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
+  let pending = inFlight.get(key);
+  if (!pending) {
+    if (inFlight.size >= 64) fail(503, "Musikksøket er opptatt. Prøv igjen om litt.");
+    const shared = new ProviderWork<unknown>(MUSIC_REQUEST_DEADLINE_MS, () => {
+      if (inFlight.get(key) === shared) inFlight.delete(key);
+    });
+    inFlight.set(key, shared); pending = shared;
+    shared.run(async signal => {
+      const row = await db()
+        .prepare("SELECT data FROM cached WHERE key=? AND expires_at>?")
+        .bind(key, Date.now())
+        .first<{ data: string }>();
+      signal.throwIfAborted();
+      if (row) {
+        try { return JSON.parse(row.data); }
+        catch { /* refresh invalid cache */ }
+      }
+      const result = await provider(signal);
+      signal.throwIfAborted();
+      const ttl = lifetime(result);
+      if (ttl !== null) await db()
+        .prepare(
+          "INSERT INTO cached(key,data,expires_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data, expires_at=excluded.expires_at",
+        )
+        .bind(key, JSON.stringify(result), Date.now() + ttl)
+        .run();
+      signal.throwIfAborted();
+      return result;
+    });
   }
-  const existing = inFlight.get(key);
-  if (existing) return existing as Promise<T>;
-  const pending = (async () => {
-    const result = await provider();
-    await db()
-      .prepare(
-        "INSERT INTO cached(key,data,expires_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data, expires_at=excluded.expires_at",
-      )
-      .bind(key, JSON.stringify(result), Date.now() + lifetime(result))
-      .run();
-    return result;
-  })();
-  inFlight.set(key, pending);
-  try {
-    return await pending;
-  } finally {
-    inFlight.delete(key);
-  }
+  return structuredClone(await pending.wait(signal)) as T;
 }
-async function youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) {
+async function youtube<K extends keyof YouTubeResponses>(path: K, params: Record<string, string>, signal: AbortSignal) {
+  signal.throwIfAborted();
   const key = env().YOUTUBE_API_KEY;
   if (!key) fail(503, "Musikksøket er ikke konfigurert ennå.");
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`);
   for (const [k, v] of Object.entries({ ...params, key }))
     url.searchParams.set(k, v);
-  const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const response = await fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) });
+  signal.throwIfAborted();
   if (!response.ok)
     fail(
       response.status === 403 ? 429 : 502,
       "YouTube-søket er midlertidig utilgjengelig. Prøv igjen senere.",
     );
-  return response.json() as Promise<YouTubeResponses[K]>;
+  const result = await response.json() as YouTubeResponses[K];
+  signal.throwIfAborted();
+  return result;
 }
 function duration(input: string) {
   const m = input?.match(/^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
@@ -294,17 +302,20 @@ function decode(input: string) {
 export async function videos(
   request: Request,
   ids: string[],
+  signal: AbortSignal = request.signal,
 ): Promise<Video[]> {
   if (!ids.length) return [];
-  return cached(`videos:v5:${ids.join(",")}`, async () => {
+  return cached(`videos:v5:${ids.join(",")}`, async signal => {
     if (coreUrl()) {
       try {
         return (
           await coreRequest<{ videos: Video[] }>(
             "/v1/catalog?ids=" + ids.join(","),
+            "GET", undefined, {}, signal,
           )
         ).videos;
       } catch {
+        signal.throwIfAborted();
         /* retain the direct metadata API */
       }
     }
@@ -312,7 +323,7 @@ export async function videos(
     const data = await youtube("videos", {
       id: ids.join(","),
       part: "snippet,contentDetails,status",
-    });
+    }, signal);
     return data.items.map((v) => ({
       id: v.id,
       genres: metadataGenres(v.snippet.description, v.snippet.tags),
@@ -325,30 +336,39 @@ export async function videos(
       live: v.snippet.liveBroadcastContent === "live",
       embeddable: v.status.embeddable !== false,
     }));
-  });
+  }, undefined, signal);
 }
 export async function search(request: Request, query: string) {
   return searchVideos(request, query, false);
 }
 /** Only room handlers can select the internal radio mode; public search has a fixed budget. */
 async function searchVideos(request: Request, query: string, radio: boolean) {
+  const job = new ProviderWork<{ videos: Video[] }>(MUSIC_REQUEST_DEADLINE_MS, () => {});
+  job.run(signal => searchWithinDeadline(request, query, radio, signal));
+  return job.wait(request.signal);
+}
+async function searchWithinDeadline(request: Request, query: string, radio: boolean, signal: AbortSignal) {
   query = query.trim();
   if (query.length < 2 || query.length > 120)
     fail(400, "Skriv mellom 2 og 120 tegn.");
   await limit(request, radio ? "radio-visitor" : "search-visitor", radio ? 120 : 20, 600000);
+  signal.throwIfAborted();
   if (/^https?:\/\//.test(query))
-    return { videos: await videos(request, [videoId(query)]) };
+    return { videos: await videos(request, [videoId(query)], signal) };
   const count = radio ? 20 : 30;
-  const result = await cached(`search:v6:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async () => {
+  let complete = true;
+  const result = await cached(`search:v6:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async signal => {
     if (coreUrl()) {
       try {
-        const result = (
-          await coreRequest<{ videos: Video[] }>(
+        const response = await coreRequest<{ videos: Video[]; complete?: boolean }>(
             "/v1/catalog?q=" + encodeURIComponent(query) + (radio ? "&mode=radio" : ""),
-          )
-        ).videos.slice(0, count);
+            "GET", undefined, {}, signal,
+          );
+        complete = response.complete !== false;
+        const result = response.videos.slice(0, count);
         return radio ? result : rankMusicSearch(query, result);
       } catch {
+        signal.throwIfAborted();
         /* retain the direct metadata API */
       }
     }
@@ -361,13 +381,14 @@ async function searchVideos(request: Request, query: string, radio: boolean) {
       videoEmbeddable: "true",
       safeSearch: "moderate",
       ...(radio ? { videoCategoryId: "10" } : {}),
-    });
+    }, signal);
     const result = await videos(
       request,
       [...new Set(data.items.map((v) => v.id.videoId).filter(id => /^[\w-]{11}$/.test(id)))].slice(0, count),
+      signal,
     );
     return radio ? result : rankMusicSearch(query, result);
-  }, videos => videos.length ? MUSIC_SEARCH_CACHE_MS : EMPTY_MUSIC_SEARCH_CACHE_MS);
+  }, videos => complete ? videos.length ? MUSIC_SEARCH_CACHE_MS : EMPTY_MUSIC_SEARCH_CACHE_MS : null, signal);
   return { videos: result };
 }
 type Row = {

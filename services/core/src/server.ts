@@ -322,12 +322,17 @@ export async function createServers(
           throw new UserError("Enter between 2 and 120 characters.");
         if (ids && !/^[\w,-]{11,600}$/.test(ids))
           throw new UserError("Invalid video IDs.");
-        const tracks = ids
-          ? await engine.providers.video(ids.split(",").slice(0, 50))
-          : query
-            ? await engine.providers.search(query, mode === "radio" ? 20 : 30, mode === "radio")
-            : [];
-        json(response, 200, { videos: tracks.map((t) => publicTrack(t)) });
+        const controller = new AbortController();
+        const disconnected = () => controller.abort(new UserError("The request was cancelled.", 499));
+        response.once("close", disconnected);
+        try {
+          const result = ids
+            ? { tracks: await engine.providers.video(ids.split(",").slice(0, 50), false, controller.signal), complete: true }
+            : query
+              ? await engine.providers.searchResult(query, mode === "radio" ? 20 : 30, mode === "radio", controller.signal)
+              : { tracks: [], complete: true };
+          if (!response.destroyed) json(response, 200, { videos: result.tracks.map((t) => publicTrack(t)), complete: result.complete });
+        } finally { response.removeListener("close", disconnected); }
         return;
       }
       if (url.pathname === "/v1/application") {
