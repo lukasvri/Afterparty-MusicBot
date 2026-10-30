@@ -68,6 +68,7 @@ function fixture(
       },
     },
     now: () => 100,
+    wallNow: options.now ?? (() => 100),
     setTimeout: ((callback: () => void, delay?: number) => {
       scheduled.push(callback);
       delays.push(delay);
@@ -1010,9 +1011,10 @@ for (const mismatch of [
       f.client.destroy();
     }
   });
-function streamFixture() {
+function streamFixture(options: Pick<RoomClientOptions, 'wallNow' | 'clockRequest'> = {}) {
   let monotonic = 100;
   let failedReadStatus: number | 'network' = 0;
+  let heldRead: Promise<Response> | null = null;
   let snapshot: Room = {
     ...room(),
     serverTime: 1000,
@@ -1028,6 +1030,7 @@ function streamFixture() {
   const streamUrls: string[] = [];
   const f = fixture(
     async () => {
+      if (heldRead) return heldRead;
       if (failedReadStatus === 'network') throw new Error('Synthetic network failure');
       return failedReadStatus
         ? json({ error: 'Synthetic read failure' }, failedReadStatus)
@@ -1042,6 +1045,7 @@ function streamFixture() {
         return source as unknown as EventSource;
       },
       clockRequest: async () => json({ serverTime: 1000 + monotonic - 100 }),
+      ...options,
     },
   );
   return {
@@ -1053,6 +1057,9 @@ function streamFixture() {
     streamUrls,
     failReads(status: number | 'network') {
       failedReadStatus = status;
+    },
+    holdReads(response: Promise<Response> | null) {
+      heldRead = response;
     },
     get snapshot() {
       return snapshot;
@@ -1176,6 +1183,415 @@ test('a live lease expires locally even without a browser error or a responsive 
   assert.equal(f.state.connection, 'reconnecting');
   assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
   f.client.destroy();
+});
+
+test('a frozen monotonic clock cannot keep a pre-suspend live lease playing after a wall-clock gap', async (t) => {
+  let wall = 10000;
+  t.mock.method(Date, 'now', () => wall);
+  const f = streamFixture({ wallNow: () => Date.now() });
+  try {
+    await f.client.join('ROOM0001');
+    const source = f.sources[0];
+    source.open();
+    await flush();
+    source.send({ ...f.snapshot, version: 2, serverTime: 1000 });
+    assert.equal(f.client.playback()?.playing, true);
+    wall += 60000;
+    assert.equal(
+      f.client.playback()?.playing,
+      false,
+      'sleep must retire the old lease even if performance.now did not advance',
+    );
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+for (const trigger of ['projection', 'stream', 'poll'] as const)
+  test(`a clock gap first observed by ${trigger} retires old frames and timers with one authenticated recovery`, async () => {
+    let wall = 10000;
+    const f = streamFixture({ wallNow: () => wall });
+    const fresh = deferred<Response>();
+    try {
+      await f.client.join('ROOM0001');
+      const old = f.sources[0];
+      old.open();
+      await flush();
+      old.send({ ...f.snapshot, version: 2, serverTime: 1000 });
+      const callbacks = [...f.scheduled];
+      f.holdReads(fresh.promise);
+      wall += 60000;
+      if (trigger === 'projection') f.client.playback();
+      else if (trigger === 'stream') old.send({ ...f.snapshot, version: 999, serverTime: 1000 });
+      else callbacks[f.delays.findIndex((delay) => delay === 1000)]();
+      await flush();
+      assert.equal(old.closed, true);
+      assert.equal(f.state.room?.version, 2);
+      assert.equal(f.state.room?.isHost, false);
+      assert.equal(f.state.connection, 'reconnecting');
+      assert.equal(f.client.playback()?.playing, false);
+      old.send({ ...f.snapshot, version: 999, isHost: true });
+      callbacks.forEach((callback) => callback());
+      assert.equal(
+        f.calls.length,
+        2,
+        'one read follows the initial join despite retired callbacks',
+      );
+      assert.equal(await f.client.action('next'), false);
+      assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+    } finally {
+      f.client.destroy();
+      fresh.resolve(json(f.snapshot));
+    }
+  });
+
+for (const epoch of ['epoch-one', 'epoch-two'])
+  for (const playing of [false, true])
+    test(`wake recovery awaits fresh authority and calibration, retaining current intent (${epoch}, playing ${playing})`, async () => {
+      let wall = 10000,
+        clockCalls = 0;
+      const clock = deferred<Response>(),
+        read = deferred<Response>();
+      const f = streamFixture({
+        wallNow: () => wall,
+        clockRequest: async () => (++clockCalls === 1 ? json({ serverTime: 1000 }) : clock.promise),
+      });
+      f.data.set('afterparty-host:ROOM0001', 'saved-synthetic-owner');
+      try {
+        await f.client.join('ROOM0001');
+        const old = f.sources[0];
+        old.open();
+        await flush();
+        old.send({ ...f.snapshot, version: 2, serverTime: 1000 });
+        f.holdReads(read.promise);
+        wall += 60000;
+        f.client.playback();
+        const fresh = {
+          ...f.snapshot,
+          version: epoch === 'epoch-one' ? 3 : 1,
+          syncEpoch: epoch,
+          serverTime: 61000,
+          position: 42,
+          playing,
+          isHost: false,
+          isOwner: false,
+        };
+        read.resolve(json(fresh));
+        await flush();
+        assert.equal(f.state.connection, 'reconnecting');
+        assert.equal(f.state.room?.isHost, false);
+        assert.equal(
+          f.client.playback()?.playing,
+          false,
+          'fresh HTTP alone cannot reuse the pre-suspend calibration',
+        );
+        assert.equal(clockCalls, 2);
+        const next = f.sources[1];
+        next.open();
+        next.send({ ...fresh, version: 999, isHost: true, playing: true });
+        old.send({ ...fresh, version: 1000, isHost: true, playing: true });
+        assert.equal(f.state.room?.version, fresh.version);
+        clock.resolve(json({ serverTime: 61000 }));
+        await flush();
+        assert.equal(f.state.connection, 'connected');
+        assert.equal(f.state.room?.isHost, false);
+        assert.equal(f.client.playback()?.playing, playing);
+        assert.equal(f.client.playback()?.position, 42);
+        assert.equal(f.data.get('afterparty-host:ROOM0001'), 'saved-synthetic-owner');
+        assert.equal(f.calls.length, 2);
+        assert.equal(
+          clockCalls,
+          2,
+          'opening a stream during calibration shares the recovery sample',
+        );
+      } finally {
+        f.client.destroy();
+        read.resolve(json(f.snapshot));
+        clock.resolve(json({ serverTime: 61000 }));
+      }
+    });
+
+test('a read sent before suspend cannot restore its late timeline or replace the fresh recovery read', async () => {
+  let wall = 10000;
+  const f = streamFixture({
+    wallNow: () => wall,
+    clockRequest: async () => json({ serverTime: wall - 9000 }),
+  });
+  const oldRead = deferred<Response>(),
+    freshRead = deferred<Response>();
+  try {
+    await f.client.join('ROOM0001');
+    f.sources[0].open();
+    await flush();
+    f.sources[0].send({ ...f.snapshot, version: 2, serverTime: 1000 });
+    f.holdReads(oldRead.promise);
+    const refreshing = f.client.refresh();
+    f.holdReads(freshRead.promise);
+    wall += 60000;
+    oldRead.resolve(json({ ...f.snapshot, version: 999, serverTime: 1000 }));
+    await refreshing;
+    assert.equal(f.state.connection, 'reconnecting');
+    assert.equal(f.state.room?.version, 2);
+    freshRead.resolve(json({ ...f.snapshot, version: 3, serverTime: 61000, playing: false }));
+    await flush();
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.state.room?.version, 3);
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(f.calls.length, 3);
+  } finally {
+    f.client.destroy();
+    oldRead.resolve(json(f.snapshot));
+    freshRead.resolve(json(f.snapshot));
+  }
+});
+
+test('revoked access during wake recovery cannot be restored by an old public stream', async () => {
+  let wall = 10000;
+  const f = streamFixture({ wallNow: () => wall });
+  try {
+    await f.client.join('ROOM0001');
+    const old = f.sources[0];
+    old.open();
+    await flush();
+    f.failReads(403);
+    wall += 60000;
+    f.client.playback();
+    await flush();
+    old.send({ ...f.snapshot, version: 999, isHost: true, isOwner: true });
+    assert.equal(f.state.connection, 'reconnecting');
+    assert.equal(f.state.room?.isHost, false);
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(await f.client.action('next'), false);
+    assert.equal(f.sources.length, 1);
+    assert.equal(f.calls.length, 2);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('ordinary background time expires the existing lease without using wall time as playback authority', async () => {
+  let wall = 10000;
+  const f = streamFixture({ wallNow: () => wall });
+  try {
+    await f.client.join('ROOM0001');
+    f.sources[0].open();
+    await flush();
+    f.sources[0].send({ ...f.snapshot, version: 2 });
+    wall += 60000;
+    f.now += 60000;
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(f.sources[0].closed, false);
+    assert.equal(f.calls.length, 1);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('a backward wall adjustment requests fresh authority without shifting an HTTP-only room position', async () => {
+  let wall = 10000,
+    monotonic = 100,
+    reads = 0;
+  const f = fixture(
+    async () => json({ ...room('ROOM0001', ++reads), position: 42, playing: true }),
+    { now: () => monotonic, wallNow: () => wall, eventSource: null },
+  );
+  try {
+    await f.client.join('ROOM0001');
+    wall -= 60000;
+    monotonic += 100;
+    assert.equal(f.client.playback()?.playing, false);
+    await flush();
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.client.playback()?.position, 42);
+    assert.equal(reads, 2);
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('wake recovery can calibrate a live HTTP timeline when EventSource is unavailable', async () => {
+  let wall = 10000,
+    reads = 0,
+    samples = 0;
+  const f = fixture(
+    async () =>
+      json({
+        ...room('ROOM0001', ++reads),
+        serverTime: wall - 9000,
+        syncSource: 'live',
+        syncEpoch: 'clock-only',
+        syncValidForMs: 5000,
+        position: 42,
+        playing: true,
+      }),
+    {
+      eventSource: null,
+      wallNow: () => wall,
+      clockRequest: async () => {
+        samples++;
+        return json({ serverTime: wall - 9000 });
+      },
+    },
+  );
+  try {
+    await f.client.join('ROOM0001');
+    wall += 60000;
+    assert.equal(f.client.playback()?.playing, false);
+    await flush();
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.client.playback()?.position, 42);
+    assert.equal(reads, 2);
+    assert.equal(samples, 1);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('playback projection pauses immediately without publishing inside a derived read', async () => {
+  let wall = 10000,
+    updates = 0;
+  const f = streamFixture({ wallNow: () => wall });
+  const read = deferred<Response>();
+  f.client.subscribe(() => {
+    updates++;
+  });
+  try {
+    await f.client.join('ROOM0001');
+    f.sources[0].open();
+    await flush();
+    f.sources[0].send({ ...f.snapshot, version: 2 });
+    f.holdReads(read.promise);
+    const before = updates;
+    wall += 60000;
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(updates, before, 'derived callers cannot synchronously receive a state mutation');
+    assert.equal(
+      await f.client.action('next'),
+      false,
+      'a queued recovery already blocks old authority',
+    );
+    await flush();
+    assert.equal(f.state.connection, 'reconnecting');
+    assert.equal(f.calls.length, 2);
+  } finally {
+    f.client.destroy();
+    read.resolve(json(f.snapshot));
+  }
+});
+
+test('leaving before a queued clock recovery prevents it from reopening the retired room', async () => {
+  let wall = 10000;
+  const f = streamFixture({ wallNow: () => wall });
+  try {
+    await f.client.join('ROOM0001');
+    f.sources[0].open();
+    await flush();
+    wall += 60000;
+    f.client.playback();
+    f.client.leave();
+    await flush();
+    assert.equal(f.state.room, null);
+    assert.equal(f.state.connection, 'idle');
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.sources.length, 1);
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('a pre-suspend calibration reply is retired before it can renew live playback', async () => {
+  let wall = 10000,
+    samples = 0;
+  const oldClock = deferred<Response>();
+  const f = streamFixture({
+    wallNow: () => wall,
+    clockRequest: async () => {
+      samples++;
+      return samples === 2 ? oldClock.promise : json({ serverTime: wall - 9000 });
+    },
+  });
+  try {
+    await f.client.join('ROOM0001');
+    const old = f.sources[0];
+    old.open();
+    await flush();
+    old.send({ ...f.snapshot, version: 2, serverTime: 1000 });
+    f.scheduled[f.delays.findIndex((delay) => delay === 10000)]();
+    assert.equal(samples, 2);
+    wall += 60000;
+    f.snapshot = { ...f.snapshot, version: 3, serverTime: 61000, playing: false };
+    oldClock.resolve(json({ serverTime: 1000 }));
+    await flush();
+    assert.equal(old.closed, true);
+    assert.equal(samples, 3);
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.state.room?.version, 3);
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(f.calls.length, 2);
+  } finally {
+    f.client.destroy();
+    oldClock.resolve(json({ serverTime: 1000 }));
+  }
+});
+
+test('an old play receipt cannot complete a native gesture or undo a newer pause after wake', async () => {
+  let wall = 10000,
+    reads = 0,
+    accepted = 0;
+  const reply = deferred<Response>(),
+    source = new SyntheticStream();
+  const initial: Room = {
+    ...room(),
+    playing: false,
+    serverTime: 1000,
+    syncSource: 'live',
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
+  const f = fixture(
+    async (_path, init) =>
+      init.method === 'POST'
+        ? reply.promise
+        : json(
+            ++reads === 1 ? initial : { ...initial, version: 3, serverTime: 61000, playing: false },
+          ),
+    {
+      wallNow: () => wall,
+      eventSource: () => source as unknown as EventSource,
+      clockRequest: async () => json({ serverTime: wall - 9000 }),
+    },
+  );
+  try {
+    await f.client.join('ROOM0001');
+    source.open();
+    await flush();
+    const pending = f.client.action('play', {}, () => {
+      accepted++;
+    });
+    const post = f.calls.find((call) => call.init.method === 'POST')!;
+    const id = JSON.parse(String(post.init.body)).commandId;
+    wall += 60000;
+    f.client.playback();
+    await flush();
+    source.send({ ...initial, version: 2, playing: true, commandReceipt: { id, version: 2 } });
+    reply.resolve(json({ room: { ...initial, version: 2, playing: true } }));
+    assert.equal(await pending, false);
+    assert.equal(accepted, 0);
+    assert.equal(post.init.signal?.aborted, true);
+    assert.equal(f.state.room?.version, 3);
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(
+      f.calls.filter((call) => call.init.method === 'POST').length,
+      1,
+      'uncertain controls are never replayed',
+    );
+  } finally {
+    f.client.destroy();
+    reply.resolve(json({ room: initial }));
+  }
 });
 
 test('fresh stream pauses cross pending commands and older receipts cannot restore playback', async () => {
