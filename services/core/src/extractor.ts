@@ -2,7 +2,13 @@ import { spawn } from "node:child_process";
 import { UserError } from "./types.ts";
 
 const MAX_OUTPUT_BYTES = 8_000_000;
-const MAX_ACTIVE = 4;
+// Each yt-dlp tree can include a large Node JavaScript challenge runtime.
+// Budget one tree per 512 MiB of container memory, retaining the four-job
+// ceiling on larger/unconstrained hosts and the existing playback priority.
+const memoryLimit = process.constrainedMemory();
+const MAX_ACTIVE = Number.isFinite(memoryLimit) && memoryLimit > 0
+  ? Math.max(1, Math.min(4, Math.floor(memoryLimit / (512 * 1024 * 1024))))
+  : 4;
 const MAX_WAITING = 16;
 type Waiter = { enter: () => void; priority: boolean };
 let active = 0;

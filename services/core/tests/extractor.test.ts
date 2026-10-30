@@ -1,6 +1,94 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runJson } from "../src/extractor.ts";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+
+test("a 1 GiB container admits two extractor trees and keeps playback ahead of queued searches", async (t) => {
+  const memory = t.mock.method(process, "constrainedMemory", () => 1024 ** 3);
+  const { runJson: bounded }: typeof import("../src/extractor.ts") = await import(`../src/extractor.ts?memory=${randomUUID()}`);
+  memory.mock.restore();
+  const dir = await mkdtemp(join(tmpdir(), "extractor-admission-"));
+  const jobs: Promise<unknown>[] = [];
+  const start = (name: string, priority = false) => {
+    const job = bounded(process.execPath, ["-e", `
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const dir = process.argv[1], name = process.argv[2];
+      fs.writeFileSync(path.join(dir, name + '.started'), '');
+      const timer = setInterval(() => {
+        if (fs.existsSync(path.join(dir, name + '.release'))) {
+          clearInterval(timer); process.stdout.write('{}');
+        }
+      }, 10);
+    `, dir, name], undefined, priority);
+    jobs.push(job);
+    return job;
+  };
+  const waitFor = async (name: string) => {
+    for (let n = 0; n < 200; n++) {
+      if ((await readdir(dir)).includes(name + ".started")) return;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.fail("Extractor did not start: " + name);
+  };
+  try {
+    start("first"); start("second");
+    await Promise.all([waitFor("first"), waitFor("second")]);
+    start("search"); start("playback", true);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.deepEqual((await readdir(dir)).sort(), ["first.started", "second.started"]);
+    await writeFile(join(dir, "first.release"), "");
+    await waitFor("playback");
+    assert.equal((await readdir(dir)).includes("search.started"), false);
+    await writeFile(join(dir, "playback.release"), "");
+    await waitFor("search");
+  } finally {
+    for (const name of ["first", "second", "search", "playback"])
+      await writeFile(join(dir, name + ".release"), "");
+    await Promise.allSettled(jobs);
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+for (const [label, limit, expected] of [
+  ["small container", 256 * 1024 ** 2, 1],
+  ["2 GiB container", 2 * 1024 ** 3, 4],
+  ["unknown memory limit", 0, 4],
+] as const) {
+  test(`extractor admission retains a usable bounded pool with ${label}`, async (t) => {
+    const memory = t.mock.method(process, "constrainedMemory", () => limit);
+    const { runJson: bounded }: typeof import("../src/extractor.ts") = await import(`../src/extractor.ts?memory=${randomUUID()}`);
+    memory.mock.restore();
+    const dir = await mkdtemp(join(tmpdir(), "extractor-slots-"));
+    const jobs = Array.from({ length: expected }, (_, index) =>
+      bounded(process.execPath, ["-e", `
+        const fs = require('node:fs'), path = require('node:path');
+        fs.writeFileSync(path.join(process.argv[1], process.argv[2]), '');
+        const timer = setInterval(() => {
+          if (fs.existsSync(path.join(process.argv[1], 'release'))) {
+            clearInterval(timer); process.stdout.write('{}');
+          }
+        }, 10);
+      `, dir, String(index)]),
+    );
+    try {
+      let started = 0;
+      for (let n = 0; n < 250; n++) {
+        started = (await readdir(dir)).length;
+        if (started === expected) break;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.equal(started, expected);
+    } finally {
+      await writeFile(join(dir, "release"), "");
+      await Promise.allSettled(jobs);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+}
 
 test("extractor preserves UTF-8 characters split between stdout chunks", async () => {
   const result = await runJson(process.execPath, [
