@@ -365,8 +365,8 @@ FFmpeg and 185 native website cases, static/type/unused-file/format gates and th
 production build/dry-run. The first full 108-case browser run passes 107 cases;
 its lease-loss case detects an ambiguous reconnect label during a held music
 command. The follow-up distinguishes an explicit connecting attempt from a busy
-music mutation; original playback safety assertions are retained. Final rerun
-results are recorded in the PR. Both local Worker/D1/Core stack cases pass;
+music mutation; original playback safety assertions are retained. The final full browser rerun
+passes all 108 cases with no failures or skips. Both local Worker/D1/Core stack cases pass;
 their browser boundary aborts the two expected official iframe-API requests
 on room entry/reload and verifies the local recovery action, without contacting
 YouTube.
