@@ -22,6 +22,7 @@ import { selectRadio } from "./radio-pipeline.ts";
 import { favoriteRecording } from "./recommendation-ranking.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
+import { ProviderWork, CORE_SEARCH_DEADLINE_MS, CORE_SEARCH_RESULTS_MS, MUSIC_REQUEST_DEADLINE_MS } from "./provider-work.ts";
 function extractedCatalogArtist(media: ExtractedMedia) {
   const original = media.artist ?? media.uploader ?? "YouTube";
   const artists = media.artists;
@@ -99,6 +100,7 @@ function validSearchTrack(value: unknown): value is Track {
 const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
   ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) });
 export type PlaylistImportResult = { videos: Track[]; total?: number; skipped: number; limited: boolean };
+type SearchResult = { tracks: Track[]; complete: boolean };
 const importObject = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const unavailablePlaylistEntry = (entry: Record<string, unknown>) =>
   entry.is_unavailable === true || entry.availability !== undefined && !["public", "unlisted"].includes(String(entry.availability)) ||
@@ -114,8 +116,8 @@ export class Providers {
   private readonly deezerMetadata: boolean;
   recommendations: Recommendations;
   recommendationStatus = "artist";
-  private searches = new Map<string, Promise<Track[]>>();
-  private videoLookups = new Map<string, Promise<Track | undefined>>();
+  private searches = new Map<string, ProviderWork<SearchResult>>();
+  private videoLookups = new Map<string, ProviderWork<Track | undefined>>();
   constructor(store: Store, env: NodeJS.ProcessEnv = process.env) {
     this.store = store;
     this.key = env.YOUTUBE_API_KEY ?? "";
@@ -147,7 +149,15 @@ export class Providers {
   async extract(args: string[], signal?: AbortSignal, priority = false, profile: ExtractorProfile = "media") {
     return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile);
   }
-  async video(ids: string[], skipUnavailable = false): Promise<Track[]> {
+  async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false): Promise<Track[]> {
+    const controller = new AbortController();
+    try {
+      return await this.videoResults(ids, skipUnavailable,
+        signal ? AbortSignal.any([signal, controller.signal]) : controller.signal, partial);
+    } finally { controller.abort(new UserError("The request was cancelled.", 499)); }
+  }
+  private async videoResults(ids: string[], skipUnavailable: boolean, signal: AbortSignal, partial: boolean): Promise<Track[]> {
+    if (!partial) signal.throwIfAborted();
     if (!ids.length) return [];
     if (ids.some((id) => !/^[\w-]{11}$/.test(id)))
       throw new UserError("Invalid video ID.");
@@ -164,12 +174,18 @@ export class Providers {
     }
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
-      const owned = new Map<string, { resolve: (value: Track | undefined) => void; reject: (error: unknown) => void }>();
+      if (signal.aborted && partial) break;
+      signal.throwIfAborted();
+      const owned = new Map<string, ProviderWork<Track | undefined>>();
+      const batchController = new AbortController();
+      const abandoned = new Map<string, () => void>();
       const pending: [string, Promise<Track | undefined>][] = [];
       const complete = (id: string, value: Track | Error | undefined) => {
         const lookup = owned.get(id);
         if (!lookup) return;
         owned.delete(id);
+        lookup.signal.removeEventListener("abort", abandoned.get(id)!);
+        abandoned.delete(id);
         if (value instanceof Error) lookup.reject(value); else lookup.resolve(value);
       };
       for (const id of batch) {
@@ -185,21 +201,29 @@ export class Providers {
             pending.push([id, Promise.reject(new UserError("The music source is busy. Try again shortly.", 503))]);
             continue;
           }
-          const shared = new Promise<Track | undefined>((resolve, reject) => {
-            owned.set(id, { resolve, reject });
-          }).finally(() => { if (this.videoLookups.get(id) === shared) this.videoLookups.delete(id); });
+          const shared = new ProviderWork<Track | undefined>(MUSIC_REQUEST_DEADLINE_MS, () => {
+            if (this.videoLookups.get(id) === shared) this.videoLookups.delete(id);
+          });
+          owned.set(id, shared);
+          const abandon = () => {
+            owned.delete(id); abandoned.delete(id);
+            if (!owned.size) batchController.abort(shared.signal.reason);
+          };
+          abandoned.set(id, abandon);
+          shared.signal.addEventListener("abort", abandon, { once: true });
           this.videoLookups.set(id, shared); lookup = shared;
         }
-        pending.push([id, lookup]);
+        pending.push([id, lookup.wait(signal)]);
       }
-      if (owned.size) void this.hydrateVideoBatch([...owned.keys()], complete).catch(error => {
+      if (owned.size) void this.hydrateVideoBatch([...owned.keys()], complete, batchController.signal, id => owned.get(id)?.signal).catch(error => {
         for (const id of owned.keys()) complete(id, error instanceof Error ? error : new Error(String(error)));
       });
       await Promise.all(pending.map(async ([id, lookup]) => {
         try { const track = await lookup; if (track) found.set(id, track); }
-        catch (error) { if (!skipUnavailable) throw error; }
+        catch (error) { if (signal.aborted && !partial || !skipUnavailable) throw error; }
       }));
     }
+    if (!partial) signal.throwIfAborted();
     return ids
       .map((id) => found.get(id))
       .filter((t): t is Track => Boolean(t))
@@ -207,17 +231,21 @@ export class Providers {
         ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) }));
   }
   /** A shared batch contains raw per-ID outcomes; caller strictness stays outside. */
-  private async hydrateVideoBatch(batch: string[], complete: (id: string, value: Track | Error | undefined) => void): Promise<void> {
+  private async hydrateVideoBatch(batch: string[], complete: (id: string, value: Track | Error | undefined) => void, signal: AbortSignal, active: (id: string) => AbortSignal | undefined): Promise<void> {
     const found = new Map<string, Track>();
     const remember = (track: Track) => {
+      signal.throwIfAborted();
+      if (!active(track.id)) return;
       this.store.set("metadata:v6:" + track.id, { at: Date.now(), track });
       found.set(track.id, track);
     };
     try {
       const data = await this.youtube("videos", {
         id: batch.join(","), part: "snippet,contentDetails,status",
-      });
+      }, signal);
+      signal.throwIfAborted();
       for (const v of data.items ?? []) {
+        if (!active(v.id)) continue;
         const parts = String(v.contentDetails.duration).match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
         remember({
           id: v.id,
@@ -233,7 +261,12 @@ export class Providers {
       }
       for (const id of batch) complete(id, found.get(id));
     } catch {
+      signal.throwIfAborted();
       await mapLimited(batch, 3, async (id) => {
+        signal.throwIfAborted();
+        const item = active(id);
+        if (!item || item.aborted) return;
+        const itemSignal = AbortSignal.any([signal, item]);
         try {
           const args = [
             "--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node",
@@ -243,12 +276,13 @@ export class Providers {
             // Metadata still comes from full video/player responses. Avoid
             // resolving audio formats until playback actually needs a stream.
             v = await this.extract([...args, "--extractor-args", "youtube:player_skip=js;skip=hls,dash",
-              "--no-ignore-no-formats-error", url], undefined, false, "metadata");
+              "--no-ignore-no-formats-error", url], itemSignal, false, "metadata");
           } catch (error) {
             // Some playable videos have only JS-dependent formats. Preserve
             // their full fallback without retrying private/network/deadline errors.
-            if (!(error instanceof ExtractorFormatError)) throw error;
-            v = await this.extract([...args, url]);
+            itemSignal.throwIfAborted();
+            if (!active(id) || !(error instanceof ExtractorFormatError)) throw error;
+            v = await this.extract([...args, url], itemSignal);
           }
           remember({
             id, genres: metadataGenres(v.description, v.tags), music: metadataMusic(undefined, v.categories),
@@ -264,7 +298,11 @@ export class Providers {
       });
     }
   }
-  async search(query: string, count = 30, musicOnly = false): Promise<Track[]> {
+  async search(query: string, count = 30, musicOnly = false, signal?: AbortSignal): Promise<Track[]> {
+    return (await this.searchResult(query, count, musicOnly, signal)).tracks;
+  }
+  async searchResult(query: string, count = 30, musicOnly = false, signal?: AbortSignal): Promise<SearchResult> {
+    signal?.throwIfAborted();
     query = query.trim();
     if (!query || query.length > 2000 || !Number.isInteger(count) || count < 1 || count > 50 || typeof musicOnly !== "boolean")
       throw new UserError("Invalid music search.");
@@ -284,27 +322,39 @@ export class Providers {
       now - cached.at < (cached.tracks.length ? MUSIC_SEARCH_CACHE_MS : EMPTY_MUSIC_SEARCH_CACHE_MS) &&
       (cached.tracks.length > 0 || !musicOnly) && cached.tracks.length <= count && cached.tracks.every(validSearchTrack) &&
       new Set(cached.tracks.map(track => track.id)).size === cached.tracks.length)
-      return cached.tracks.map(copySearchTrack);
+      return { tracks: cached.tracks.map(copySearchTrack), complete: true };
     let lookup = this.searches.get(key);
     if (!lookup) {
       if (this.searches.size >= 64) throw new UserError("The music source is busy. Try again shortly.", 503);
-      lookup = this.searchUncached(query, count, musicOnly).then(({ tracks, emptySearch }) => {
-        if (tracks.length || emptySearch && !musicOnly) this.store.set(key, { at: Date.now(), tracks });
-        return tracks;
+      const shared = new ProviderWork<SearchResult>(CORE_SEARCH_DEADLINE_MS, () => {
+        if (this.searches.get(key) === shared) this.searches.delete(key);
       });
+      lookup = shared;
       // Coalesce bursts and bound the number of distinct provider lookups in flight.
       this.searches.set(key, lookup);
+      shared.run(async signal => {
+        const hydration = new AbortController();
+        // One soft cutoff from search start, not a new budget for each ID.
+        const timer = setTimeout(() => hydration.abort(), CORE_SEARCH_RESULTS_MS);
+        try {
+          const { tracks, emptySearch } = await this.searchUncached(query, count, musicOnly, signal, hydration.signal);
+          signal.throwIfAborted();
+          const complete = !hydration.signal.aborted || musicOnly;
+          if (complete && (tracks.length || emptySearch && !musicOnly))
+            this.store.set(key, { at: Date.now(), tracks });
+          return { tracks, complete };
+        } finally { clearTimeout(timer); }
+      });
     }
-    try {
-      return (await lookup).map(copySearchTrack);
-    } finally {
-      if (this.searches.get(key) === lookup) this.searches.delete(key);
-    }
+    const result = await lookup.wait(signal);
+    return { tracks: result.tracks.map(copySearchTrack), complete: result.complete };
   }
   private async searchUncached(
     query: string,
     count: number,
     musicOnly: boolean,
+    signal: AbortSignal,
+    hydration: AbortSignal,
   ): Promise<{ tracks: Track[]; emptySearch: boolean }> {
     let ids: string[];
     try {
@@ -316,21 +366,28 @@ export class Providers {
         part: "snippet",
         safeSearch: "moderate",
         ...(musicOnly ? { videoCategoryId: "10" } : {}),
-      });
+      }, signal);
+      signal.throwIfAborted();
       ids = data.items.map((i) => i.id.videoId);
     } catch {
+      signal.throwIfAborted();
       const data = await this.extract([
         "--flat-playlist",
         "--dump-single-json",
         "--skip-download",
         `ytsearch${count}:${query}`,
-      ]);
+      ], signal);
+      signal.throwIfAborted();
       ids = (data.entries ?? [])
         .map((t) => t?.id)
         .filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id));
     }
     const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
-    const tracks = await this.video(unique, true);
+    const partial = !musicOnly;
+    const tracks = await this.video(unique, true, partial ? AbortSignal.any([signal, hydration]) : signal, partial);
+    signal.throwIfAborted();
+    if (partial && hydration.aborted && unique.length && !tracks.length)
+      throw new UserError("The music source took too long. Try again shortly.", 504);
     // Hydration deliberately tolerates unavailable IDs. Only an empty discovery
     // result proves a negative cache entry is safe; failed hydration must retry.
     return { tracks: musicOnly ? tracks : rankMusicSearch(query, tracks), emptySearch: unique.length === 0 };
