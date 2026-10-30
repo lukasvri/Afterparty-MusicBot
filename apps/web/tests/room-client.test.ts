@@ -13,6 +13,7 @@ const hook = registerHooks({
   },
 });
 const { createRoomClient } = await import('../src/lib/rooms/room-client.ts');
+const { request: actualBrowserRequest } = await import('../../../lib/browser-api.ts');
 hook.deregister();
 
 const room = (code = 'ROOM0001', version = 1, isHost = true): Room => ({
@@ -321,6 +322,155 @@ test('seek sends server position and revision; read failures stop local playback
   f.client.destroy();
 });
 
+for (const timeout of ['browser', 'gateway']) {
+  test(`${timeout} search timeout explains retry without reconnecting or changing playback`, async () => {
+    let fail = true;
+    const snapshot = room();
+    const f = fixture(async (path) => {
+      if (!path.startsWith('/api/search')) return json(snapshot);
+      if (!fail) return json({ videos: [snapshot.current] });
+      if (timeout === 'browser') throw new DOMException('signal timed out', 'TimeoutError');
+      return json({ error: 'signal timed out' }, 504);
+    });
+    try {
+      await f.client.join('ROOM0001');
+      const before = f.state.room;
+      await f.client.search('Janji Heroes Tonight');
+      assert.equal(f.state.searchError, 'Music search took too long. Try again.');
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.searching, false);
+      assert.equal(f.state.query, 'Janji Heroes Tonight');
+      assert.equal(f.state.connection, 'connected');
+      assert.deepEqual(f.state.room, before);
+      assert.equal(f.calls.filter((call) => call.path.startsWith('/api/search')).length, 1);
+      fail = false;
+      await f.client.search('Janji Heroes Tonight');
+      assert.equal(f.state.searchError, '');
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.results[0]?.id, snapshot.current?.id);
+      assert.equal(f.calls.filter((call) => call.path.startsWith('/api/search')).length, 2);
+      assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+    } finally {
+      f.client.destroy();
+    }
+  });
+}
+
+for (const body of ['', '<html>Gateway timeout</html>']) {
+  test(`${body ? 'HTML' : 'empty'} gateway timeout survives the actual browser response parser and explicit retry`, async (t) => {
+    let fail = true,
+      searches = 0,
+      writes = 0;
+    t.mock.method(
+      globalThis,
+      'fetch',
+      async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        if (init?.method === 'POST') writes++;
+        if (!String(input).startsWith('/api/search')) return json(room());
+        searches++;
+        return fail
+          ? new Response(body, { status: 504, headers: { 'Content-Type': 'text/html' } })
+          : json({ videos: [room().current] });
+      },
+    );
+    const f = fixture(async () => assert.fail('Use the actual browser response parser.'), {
+      request: actualBrowserRequest,
+    });
+    try {
+      await f.client.join('ROOM0001');
+      await f.client.search('Synthetic music');
+      assert.equal(f.state.searchError, 'Music search took too long. Try again.');
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.connection, 'connected');
+      assert.equal(searches, 1);
+      fail = false;
+      await f.client.search('Synthetic music');
+      assert.equal(f.state.searchError, '');
+      assert.equal(f.state.results.length, 1);
+      assert.equal(searches, 2);
+      assert.equal(writes, 0);
+    } finally {
+      f.client.destroy();
+    }
+  });
+}
+
+test('the browser response parser preserves non-JSON error status without exposing its body', async (t) => {
+  for (const status of [401, 403, 404, 429, 503, 504]) {
+    t.mock.method(
+      globalThis,
+      'fetch',
+      async () => new Response('<html>Private upstream detail</html>', { status }),
+    );
+    await assert.rejects(
+      actualBrowserRequest('/api/search'),
+      (error: unknown) =>
+        error instanceof Error &&
+        (error as Error & { status?: number }).status === status &&
+        error.message === 'Tjenesten svarer ikke. Prøv igjen.',
+    );
+  }
+  t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 200 }));
+  await assert.rejects(
+    actualBrowserRequest('/api/search'),
+    (error: unknown) =>
+      error instanceof Error && (error as Error & { status?: number }).status === undefined,
+  );
+});
+
+test('non-timeout search failures retain their access, quota and availability guidance', async () => {
+  for (const [status, error] of [
+    [403, 'This search is not allowed.'],
+    [429, 'Search quota reached. Try again later.'],
+    [503, 'The music source is busy. Try again shortly.'],
+  ] as const) {
+    const f = fixture(async (path) =>
+      path.startsWith('/api/search') ? json({ error }, status) : json(room()),
+    );
+    try {
+      await f.client.join('ROOM0001');
+      await f.client.search('Synthetic music');
+      assert.equal(f.state.searchError, error);
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.connection, 'connected');
+      assert.equal(f.state.searching, false);
+      assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+    } finally {
+      f.client.destroy();
+    }
+  }
+});
+
+test('search timeout and retry preserve an independent room failure', async () => {
+  let failSearch = true;
+  const f = fixture(async (path, init) => {
+    if (path.startsWith('/api/search'))
+      return failSearch
+        ? json({ error: 'signal timed out' }, 504)
+        : json({ videos: [room().current] });
+    return init.method === 'POST'
+      ? json({ error: 'Playback service is unavailable.' }, 503)
+      : json(room());
+  });
+  try {
+    await f.client.join('ROOM0001');
+    assert.equal(await f.client.control('next'), false);
+    assert.equal(f.state.error, 'Playback service is unavailable.');
+    const writes = f.calls.filter((call) => call.init.method === 'POST').length;
+    await f.client.search('Synthetic music');
+    assert.equal(f.state.searchError, 'Music search took too long. Try again.');
+    assert.equal(f.state.error, 'Playback service is unavailable.');
+    failSearch = false;
+    await f.client.search('Synthetic music');
+    assert.equal(f.state.searchError, '');
+    assert.equal(f.state.results.length, 1);
+    assert.equal(f.state.error, 'Playback service is unavailable.');
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, writes);
+  } finally {
+    f.client.destroy();
+  }
+});
+
 test('late search errors and destroyed sessions cannot overwrite current state or issue polling', async () => {
   const oldSearch = deferred<Response>();
   const f = fixture(async (path) =>
@@ -395,6 +545,7 @@ test('leave cancels reads, searches and polling, clears the view and preserves o
     busy: false,
     error: '',
     searching: false,
+    searchError: '',
     results: [],
     query: '',
     receivedAt: 0,

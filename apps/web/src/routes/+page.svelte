@@ -25,6 +25,7 @@
     busy: false,
     error: '',
     searching: false,
+    searchError: '',
     results: [],
     query: '',
     receivedAt: 0,
@@ -635,13 +636,15 @@
                         >{view.searching ? 'Searching…' : 'Find music'}</button
                       >
                     </form>
-                    <div role="status" class="search-summary">
-                      {#if view.searching}Looking for your soundtrack…{:else if view.query}{view
-                          .results.length
-                          ? `${view.results.length} results for “${view.query}”`
-                          : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
-                        YouTube and add a track to the shared queue.{/if}
-                    </div>
+                    {#if view.searchError}
+                      <div role="alert" class="search-summary">{view.searchError}</div>
+                    {:else}<div role="status" class="search-summary">
+                        {#if view.searching}Looking for your soundtrack…{:else if view.query}{view
+                            .results.length
+                            ? `${view.results.length} results for “${view.query}”`
+                            : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
+                          YouTube and add a track to the shared queue.{/if}
+                      </div>{/if}
                     {#if view.results.length}<ul class="search-results">
                         {#each view.results as video, index (`${video.id}:${index}`)}<li>
                             <TrackThumbnail image={video.image} />
