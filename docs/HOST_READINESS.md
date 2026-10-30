@@ -83,6 +83,16 @@ a tight CPU quota on real-time playback. CPU shares are a relative weight under
 contention, not a CPU reservation. Equal Docker memory and memory-plus-swap
 limits disable swapping for that container.
 
+Extractor admission accounts for the OS-reported process memory constraint:
+one active yt-dlp process tree per 512 MiB, with a minimum of one and a maximum
+of four. A 1 GiB container therefore admits two trees; a 2 GiB or unconstrained
+host retains four. Queued playback requests still precede queued catalog work.
+This is a concurrency budget, not a memory reservation or an OOM guarantee:
+JavaScript challenge runtimes, FFmpeg and Core share the container's limit.
+Measure cold catalog latency as well as playback when qualifying smaller hosts;
+less parallel extraction can increase search latency. No request deadlines or
+container limits are raised by this admission policy.
+
 The Compose template permits 512 tasks because FFmpeg threads count against
 `pids_limit`. A limit of 128 can be too small for eight concurrent crossfades.
 The voice-session limit remains a separate guard. Preserve loopback-only ports,
