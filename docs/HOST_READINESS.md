@@ -83,15 +83,26 @@ a tight CPU quota on real-time playback. CPU shares are a relative weight under
 contention, not a CPU reservation. Equal Docker memory and memory-plus-swap
 limits disable swapping for that container.
 
-Extractor admission accounts for the OS-reported process memory constraint:
-one active yt-dlp process tree per 512 MiB, with a minimum of one and a maximum
-of four. A 1 GiB container therefore admits two trees; a 2 GiB or unconstrained
-host retains four. Queued playback requests still precede queued catalog work.
+Extractor admission uses one shared weighted budget from the OS-reported process
+memory constraint, with a four-process ceiling. Full extraction costs 512 MiB;
+metadata that skips player JavaScript and audio manifests costs 256 MiB. A 1 GiB
+container can therefore admit two full extractions or four lightweight metadata
+jobs, subject to each batch's three-worker bound. Mixed work shares that budget;
+queued playback remains ahead of catalog work even when a lighter job could fit.
+Unknown constraints retain enough budget for four full jobs, and the minimum
+budget admits one full job.
 This is a concurrency budget, not a memory reservation or an OOM guarantee:
 JavaScript challenge runtimes, FFmpeg and Core share the container's limit.
 Measure cold catalog latency as well as playback when qualifying smaller hosts;
 less parallel extraction can increase search latency. No request deadlines or
 container limits are raised by this admission policy.
+
+The no-key video-metadata fallback requests full player metadata while skipping
+player JS and HLS/DASH format resolution. It keeps no-format errors enabled and
+tries the original full extraction once only for a final formats-unavailable
+error. Private/source failures and deadlines are not retried through that path.
+Actual stream extraction still resolves its original audio formats. See the
+[pinned yt-dlp source review](research/yt-dlp-metadata-only.md).
 
 The Compose template permits 512 tasks because FFmpeg threads count against
 `pids_limit`. A limit of 128 can be too small for eight concurrent crossfades.

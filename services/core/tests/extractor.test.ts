@@ -6,6 +6,79 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
+test("formats-only failures are classified across stderr chunks without exposing source errors", async () => {
+  await assert.rejects(runJson(process.execPath, ["-e", `
+    process.stderr.write('ERROR: Requested for');
+    setImmediate(() => {
+      process.stderr.write('mat is not available. synthetic-private-source');
+      process.exitCode = 1;
+    });
+  `]), error => error instanceof Error && error.name === "ExtractorFormatError" &&
+    !error.message.includes("synthetic-private-source"));
+});
+
+test("a warning or earlier format error cannot reclassify a final private/source failure", async () => {
+  for (const prefix of ["WARNING: No video formats found!", "ERROR: Requested format is not available"]) {
+    await assert.rejects(runJson(process.execPath, ["-e", `
+      process.stderr.write(process.argv[1] + '\\n');
+      setImmediate(() => {
+        process.stderr.write('ERROR: Video unavailable. Private source');
+        process.exitCode = 1;
+      });
+    `, prefix]), error => error instanceof Error && error.name !== "ExtractorFormatError" &&
+      !error.message.includes("Private source"));
+  }
+});
+
+test("lightweight metadata shares the memory budget without bypassing queued playback", async (t) => {
+  const memory = t.mock.method(process, "constrainedMemory", () => 1024 ** 3);
+  const { runJson: bounded }: typeof import("../src/extractor.ts") = await import(`../src/extractor.ts?weighted=${randomUUID()}`);
+  memory.mock.restore();
+  const dir = await mkdtemp(join(tmpdir(), "extractor-weighted-"));
+  const jobs: Promise<unknown>[] = [];
+  const start = (name: string, metadata: boolean, priority = false, signal?: AbortSignal) => {
+    const job = bounded(process.execPath, ["-e", `
+      const fs = require('node:fs'), path = require('node:path');
+      const dir = process.argv[1], name = process.argv[2];
+      fs.writeFileSync(path.join(dir, name + '.started'), '');
+      const timer = setInterval(() => {
+        if (fs.existsSync(path.join(dir, name + '.release'))) {
+          clearInterval(timer); process.stdout.write('{}');
+        }
+      }, 10);
+    `, dir, name], signal, priority, metadata ? "metadata" : "media");
+    jobs.push(job);
+    return job;
+  };
+  const waitFor = async (name: string) => {
+    for (let n = 0; n < 250; n++) {
+      if ((await readdir(dir)).includes(name + ".started")) return;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.fail("Extractor did not start: " + name);
+  };
+  try {
+    start("media", false); start("metadata", true);
+    await Promise.all([waitFor("media"),waitFor("metadata")]);
+    const controller = new AbortController();
+    const cancelled = start("cancelled-playback", false, true, controller.signal);
+    const rejected = assert.rejects(cancelled, /cancelled/);
+    start("later-metadata", true);
+    await new Promise(resolve=>setTimeout(resolve,150));
+    assert.equal((await readdir(dir)).includes("later-metadata.started"),false);
+    controller.abort();await rejected;
+    await waitFor("later-metadata");
+    assert.equal((await readdir(dir)).includes("cancelled-playback.started"),false);
+    start("playback", false, true);
+    await writeFile(join(dir,"media.release"),"");
+    await Promise.all([waitFor("playback"),waitFor("later-metadata")]);
+  } finally {
+    for (const name of ["media","metadata","playback","cancelled-playback","later-metadata"])
+      await writeFile(join(dir,name+".release"),"");
+    await Promise.allSettled(jobs);await rm(dir,{recursive:true,force:true});
+  }
+});
+
 test("a 1 GiB container admits two extractor trees and keeps playback ahead of queued searches", async (t) => {
   const memory = t.mock.method(process, "constrainedMemory", () => 1024 ** 3);
   const { runJson: bounded }: typeof import("../src/extractor.ts") = await import(`../src/extractor.ts?memory=${randomUUID()}`);
