@@ -59,7 +59,7 @@ export async function checkConfiguredGuessSource(env: NodeJS.ProcessEnv, options
     ...(provider === 'deezer' ? { GUESS_DEEZER_INVENTORY_PATH: env.GUESS_DEEZER_INVENTORY_PATH } : {}),
     ...(provider === 'youtube' ? { GUESS_YOUTUBE_INVENTORY_PATH: env.GUESS_YOUTUBE_INVENTORY_PATH } : {}) };
   const lifetime = new AbortController();
-  let source: Source | undefined, result = unavailable(provider);
+  let source: Source | undefined, result: GuessCheckResult;
   const released = new WeakSet<object>();
   const release = (prepared: Source | undefined) => {
     if (prepared === undefined) return true;

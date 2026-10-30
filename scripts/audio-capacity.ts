@@ -1,5 +1,6 @@
 // Offline compute probe. Run in a bounded test container, never with production data.
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -78,7 +79,8 @@ try {
           const packetStream: AsyncIterable<unknown> = encoded.stream;
           let packets = 0;
           for await (const packet of packetStream) {
-            assert(Buffer.isBuffer(packet) && packet.length > 0);
+            // Keep byte-view narrowing explicit with mixed Node/Worker types.
+            assert(Buffer.isBuffer(packet) && packet instanceof Uint8Array && packet.byteLength > 0);
             packets++;
           }
           assert(packets >= 700 && packets <= 701, "An independent stream lost audio packets.");

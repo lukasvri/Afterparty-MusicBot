@@ -400,7 +400,6 @@ export async function publicRoom(
 ): Promise<Room> {
   const state = JSON.parse(value.state) as RoomState;
   const actor = visitorIdentity(request.headers);
-  let now = Date.now();
   const discord = Boolean(value.guild_id) || value.code === "DISCORD1";
   // Unchanged room snapshots do not need a write on every bridge heartbeat.
   // Read liveness from the same guild's heartbeat, retaining legacy room-only
@@ -418,7 +417,7 @@ export async function publicRoom(
       if (live) return liveRoom(live);
     } catch { /* negotiated checkpoints become offline immediately */ }
   }
-  now = Date.now();
+  const now = Date.now();
   const heartbeatAt = bridgeHeartbeat?.updated_at ?? value.updated_at;
   let positionAt = value.updated_at;
   if (discord && bridgeHeartbeat && !authority) {

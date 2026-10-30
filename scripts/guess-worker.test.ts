@@ -7,7 +7,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { build } from 'esbuild';
-import { Miniflare, Response as WorkerResponse, type Request as WorkerRequest } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions, Response as WorkerResponse, type Request as WorkerRequest } from 'miniflare';
 import { Store } from '../services/core/src/store.ts';
 import { Engine } from '../services/core/src/engine.ts';
 import { Commands } from '../services/core/src/commands.ts';
@@ -48,7 +48,7 @@ test('Worker media proxy serves authorized synthetic WAV and rejects redirects w
     // Test the project's flags, and separately the optional incoming-signal flag.
     // Both must work; this regression is not fixed by enable_request_signal.
     for (const flags of [['nodejs_compat'], ['nodejs_compat', 'enable_request_signal']]) {
-      worker = new Miniflare({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: flags,
+      worker = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: flags,
         d1Databases: ['DB'], bindings: { GUTTA_CORE_PUBLIC_URL: 'https://core.example', ADMIN_BRIDGE_KEY: key },
         outboundService: async (request: WorkerRequest) => {
           assert.equal(request.url, 'https://core.example/v1/guess', 'no redirect destination or other upstream route is allowed');
@@ -70,7 +70,7 @@ test('Worker media proxy serves authorized synthetic WAV and rejects redirects w
             body: JSON.stringify(input), signal: request.signal, redirect: 'manual' });
           return new WorkerResponse(await response.arrayBuffer(), { status: response.status, headers: response.headers });
         },
-      });
+      }));
       const db = await worker.getD1Database('DB');
       for (const name of (await readdir(new URL('../drizzle/', import.meta.url))).filter(name => name.endsWith('.sql')).sort()) {
         const sql = await readFile(new URL('../drizzle/' + name, import.meta.url), 'utf8');

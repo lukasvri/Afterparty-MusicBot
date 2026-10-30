@@ -155,8 +155,8 @@ test('failed preparation stays private and retryable while source disposal and o
 test('active and revealed rounds cannot prepare; an expired snapshot can be loaded from a new lobby and played again', async t => {
   let clock = Date.now(); t.mock.method(Date, 'now', () => clock);
   let calls = 0; const f = await fixture(t, () => source(++calls)), before = f.ordinary(), host = await f.join();
-  let state = await f.ok({ ...host.context, ...mutation(host.state, 'prepare') }); await f.manager.reload();
-  state = await f.ok({ ...host.context, action: 'read' });
+  await f.ok({ ...host.context, ...mutation(host.state, 'prepare') }); await f.manager.reload();
+  let state = await f.ok({ ...host.context, action: 'read' });
   const first = f.manager.catalog.select('2010s', { exclude: [], durationSeconds: 30 });
   state = await f.ok({ ...host.context, ...mutation(state, 'configure', { categoryId: '2010s', settings: { ...DEFAULT_GUESS_SETTINGS, roundCount: 1 } }) });
   state = await f.ok({ ...host.context, ...mutation(state, 'start') }); assert.equal(state.canPrepare, false); clock = state.game.round!.startsAt;
@@ -169,7 +169,7 @@ test('active and revealed rounds cannot prepare; an expired snapshot can be load
   state = await f.ok({ ...host.context, ...mutation(state, 'next') }); assert.equal(state.game.phase, 'results'); assert.equal(state.canPrepare, true);
   clock += 300_000; state = await f.ok({ ...host.context, action: 'read' }); assert.equal(state.sourceState, 'unavailable');
   state = await f.ok({ ...host.context, ...mutation(state, 'reset') }); assert.equal(state.game.phase, 'lobby');
-  state = await f.ok({ ...host.context, ...mutation(state, 'prepare') }); await f.manager.reload();
+  await f.ok({ ...host.context, ...mutation(state, 'prepare') }); await f.manager.reload();
   state = await f.ok({ ...host.context, action: 'read' }); assert.equal(state.sourceState, 'ready'); assert.equal(calls, 2);
   const second = f.manager.catalog.select('2010s', { exclude: [], durationSeconds: 30 }); assert.notEqual(first.mediaKey, second.mediaKey);
   await assert.rejects(f.manager.media.read(first.mediaKey, new AbortController().signal), { status: 503 });

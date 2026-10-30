@@ -1,0 +1,92 @@
+{
+  "commit": "d5441119332c2ce3cb6868a3eef4d50ac14b0d36",
+  "core_source_tree": "3da4d827ee574a783ed8a5c3b083906ec4e10b9e",
+  "dockerfile_sha256": "f85344c19336d614f1984c7b976f0d4bef99943ee3e4b1e109e3795fcacbcd65",
+  "qualification_dockerfile_sha256": "a41d72c447b0a9a025ffec32eb12601284240d619cb7e780e5cc64837fc8a7bd",
+  "variant_reason": "Session CA secret mounts only; no CA copy or canonical source adaptation",
+  "date": "2026-10-30",
+  "platform": "linux/amd64",
+  "image_id": "sha256:c0cdc5563f7bdf8b7a129cb232c99c11ff32a8daf366b106002241ebb21e01fb",
+  "yt_dlp": "2026.10.26",
+  "strict_types": "passed",
+  "core_tests": {
+    "passed": 801,
+    "failed": 0,
+    "skipped": 0
+  },
+  "runtime": {
+    "node": "v26.13.0",
+    "lts": "Lithium",
+    "uid": 1000,
+    "modules": "147",
+    "openssl": "3.5.9",
+    "readableSourceAndLicenseFiles": 62,
+    "requiredImports": "passed",
+    "esmWorker": "passed",
+    "buildCaAbsent": true,
+    "ffmpeg": "ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026 the FFmpeg developers"
+  },
+  "offline_audio_probe": [
+    {
+      "streams": 1,
+      "seconds": 0.349,
+      "audio_seconds_per_stream": 14,
+      "speed_vs_realtime": 40.07,
+      "packets": [
+        701
+      ],
+      "peak_pids": 26,
+      "peak_memory_mib": 76,
+      "event_loop_p99_ms": 15.77
+    },
+    {
+      "streams": 4,
+      "seconds": 1.214,
+      "audio_seconds_per_stream": 14,
+      "speed_vs_realtime": 11.53,
+      "packets": [
+        701,
+        701,
+        701,
+        701
+      ],
+      "peak_pids": 74,
+      "peak_memory_mib": 168,
+      "event_loop_p99_ms": 53.48
+    },
+    {
+      "streams": 8,
+      "seconds": 2.469,
+      "audio_seconds_per_stream": 14,
+      "speed_vs_realtime": 5.67,
+      "packets": [
+        701,
+        701,
+        701,
+        701,
+        701,
+        701,
+        701,
+        701
+      ],
+      "peak_pids": 137,
+      "peak_memory_mib": 300,
+      "event_loop_p99_ms": 94.83
+    }
+  ],
+  "probe_constraints": {
+    "network": "none",
+    "filesystem": "read-only",
+    "cpus": 1.5,
+    "memory_mib": 768,
+    "pids_limit": 512,
+    "tmpfs_mib": 128
+  },
+  "limitations": [
+    "Unsigned local qualification image, not a published release or installed-host acceptance",
+    "Temporary Dockerfile mounts session CA as a build secret; no CA copy into layers",
+    "Unpaced generated audio compute only; not a live concurrency or audible playback measurement",
+    "No saved-image package/archive validation repeated for this graph",
+    "An initial Docker build exhausted local disk before validation; task-owned cache and archived qualification image were removed before successful rebuild"
+  ]
+}

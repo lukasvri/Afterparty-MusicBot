@@ -463,7 +463,7 @@ export function createDiscordClient(options: Options = {}) {
           publish({
             error: `${added} tracks confirmed. ${reason} Check the queue before retrying.`,
           });
-        throw Error(reason);
+        throw Error(reason, { cause: error });
       } finally {
         if (additions === operation) additions = null;
         if (current(target)) {
