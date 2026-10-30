@@ -45,6 +45,21 @@ test('a failed shared search is released so the next request can recover',async(
   assert.equal((await p.search('Artist audio'))[0].id,'abcdefghijk');assert.equal(calls,2);
  }finally{t.close();}
 });
+test('an empty manual result after failed metadata hydration can recover immediately',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{});let searches=0,available=false;
+  p.youtube=async <K extends keyof YouTubeResponses>(path: K)=>{
+   if(path==='search'){searches++;return {items:[{id:{videoId:'abcdefghijk'}}]} as YouTubeResponses[K];}
+   if(!available)throw Error('synthetic unavailable metadata');
+   return {items:[{id:'abcdefghijk',snippet:{title:'Example Song',channelTitle:'Artist',description:'',categoryId:'10',liveBroadcastContent:'none'},contentDetails:{duration:'PT3M'},status:{embeddable:true}}]} as YouTubeResponses[K];
+  };
+  p.extract=async()=>{throw Error('synthetic unavailable extractor');};
+  assert.deepEqual(await p.search('Artist Example Song',1),[]);
+  available=true;
+  assert.equal((await p.search('Artist Example Song',1))[0]?.id,'abcdefghijk');
+  assert.equal(searches,2);
+ }finally{t.close();}
+});
 test('matching rejects different versions, substrings, wrong durations and supports ISRC metadata',()=>{
  assert(scoreMatch(source,track())>.9);
  for(const suffix of ['Live','Remix','Acoustic','Karaoke','Cover','Slowed','Sped Up','Instrumental'])assert.equal(scoreMatch(source,track('Artist - Example Song '+suffix)),0);

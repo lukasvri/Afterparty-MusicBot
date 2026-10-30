@@ -201,9 +201,13 @@ and festival requests remain available. Core and Worker also share canonical
 manual-search cache bounds. A successful empty manual query now reuses its result
 for one minute; expiry reaches the provider again. The regression initially
 observed two provider calls instead of one. Core radio still immediately retries
-a successful empty result, and failed requests remain retryable.
+a successful empty result, and failed requests remain retryable. Only discovery
+with zero valid video IDs establishes an empty manual result for caching.
+Failed metadata hydration after discovery remains immediately retryable; the
+actual hydration-path regression first failed and then recovered on the next
+search after this distinction was retained.
 
-Local validation passes 107 Python recovery, 237 shared/Worker, 803 Core with real
+Local validation passes 107 Python recovery, 237 shared/Worker, 804 Core with real
 FFmpeg and 185 native web cases, lint/unused-file/type/format checks and production
 build/dry-run. A generated-type check initially failed when the worktree borrowed
 another checkout's dependency symlinks; installing its own locked dependencies

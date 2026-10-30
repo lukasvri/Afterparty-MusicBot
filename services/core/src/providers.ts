@@ -275,8 +275,8 @@ export class Providers {
     let lookup = this.searches.get(key);
     if (!lookup) {
       if (this.searches.size >= 64) throw new UserError("The music source is busy. Try again shortly.", 503);
-      lookup = this.searchUncached(query, count, musicOnly).then((tracks) => {
-        if (tracks.length || !musicOnly) this.store.set(key, { at: Date.now(), tracks });
+      lookup = this.searchUncached(query, count, musicOnly).then(({ tracks, emptySearch }) => {
+        if (tracks.length || emptySearch && !musicOnly) this.store.set(key, { at: Date.now(), tracks });
         return tracks;
       });
       // Coalesce bursts and bound the number of distinct provider lookups in flight.
@@ -292,7 +292,7 @@ export class Providers {
     query: string,
     count: number,
     musicOnly: boolean,
-  ): Promise<Track[]> {
+  ): Promise<{ tracks: Track[]; emptySearch: boolean }> {
     let ids: string[];
     try {
       const data = await this.youtube("search", {
@@ -318,7 +318,9 @@ export class Providers {
     }
     const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
     const tracks = await this.video(unique, true);
-    return musicOnly ? tracks : rankMusicSearch(query, tracks);
+    // Hydration deliberately tolerates unavailable IDs. Only an empty discovery
+    // result proves a negative cache entry is safe; failed hydration must retry.
+    return { tracks: musicOnly ? tracks : rankMusicSearch(query, tracks), emptySearch: unique.length === 0 };
   }
   /** Metadata-only import. Its 500-entry budget is independent of ordinary queue settings. */
   async importPlaylist(input: string, signal: AbortSignal): Promise<PlaylistImportResult> {
