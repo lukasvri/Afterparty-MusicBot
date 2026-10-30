@@ -87,6 +87,15 @@ type Session = {
   authority: { room: Room; receivedAt: number } | null;
   pollRecovering: boolean;
   accessLost: boolean;
+  command?: {
+    id: string;
+    epoch: string;
+    version: number;
+    videoId: string;
+    playbackKey?: string;
+    playing: boolean;
+    complete: (room: Room) => void;
+  };
 };
 
 /** Browser rooms only. The existing website owns authorization, persistence and progression. */
@@ -188,7 +197,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     });
     return target;
   };
-  const accept = (target: Session, room: Room, sent: number) => {
+  const accept = (target: Session, room: Room, sent: number, sampleAge?: number) => {
     if (!current(target)) return;
     if (
       !room ||
@@ -200,7 +209,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       !Array.isArray(room.queue)
     )
       throw new Error('This view supports browser rooms only.');
-    const next = compensateDelivery(room, now() - sent);
+    const next = compensateDelivery(room, now() - sent, sampleAge);
     target.authority = { room: next, receivedAt: now() };
     target.pollRecovering = false;
     target.accessLost = false;
@@ -347,6 +356,22 @@ export function createRoomClient(options: RoomClientOptions = {}) {
               loseStream(target, live);
           }, next.syncValidForMs!);
           publish({ room: next, receivedAt: now() });
+          const command = target.command;
+          if (
+            command &&
+            state.connection === 'connected' &&
+            !target.accessLost &&
+            target.authority?.room.isHost &&
+            now() - target.authority.receivedAt < 5000 &&
+            timeline.syncEpoch === command.epoch &&
+            timeline.version === command.version + 1 &&
+            timeline.commandReceipt?.id === command.id &&
+            timeline.commandReceipt.version === timeline.version &&
+            timeline.current?.id === command.videoId &&
+            timeline.playbackKey === command.playbackKey &&
+            timeline.playing === command.playing
+          )
+            command.complete(next);
         } catch {
           // Invalid messages cannot alter permissions, playback or the lease.
         }
@@ -436,29 +461,77 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         const before = state.room!;
+        const commandId =
+          onAccepted && before.syncSource === 'live' && before.syncEpoch
+            ? crypto.randomUUID()
+            : undefined;
+        let complete!: (value: { room: Room; streamed: boolean }) => void;
+        const receipt = new Promise<{ room: Room; streamed?: boolean }>((resolve) => {
+          complete = resolve;
+        });
+        if (commandId)
+          target.command = {
+            id: commandId,
+            epoch: before.syncEpoch!,
+            version: before.version,
+            videoId: before.current?.id ?? '',
+            playbackKey: before.playbackKey,
+            playing: action === 'seek' ? before.playing : action === 'play',
+            complete: (room) => complete({ room, streamed: true }),
+          };
         try {
           const sent = now();
-          const result = await request<{ room: Room }>(`/api/rooms/${target.code}`, {
-            method: 'POST',
-            headers: headers(target.code),
-            signal: signal(
-              target.controller,
-              ['next', 'radio', 'skip-vote'].includes(action) ? 35000 : 12000,
-            ),
-            body: JSON.stringify({
-              ...fields,
-              ...(action === 'add' || action === 'play-video'
-                ? {
-                    displayName:
-                      (storage.get('afterparty-display-name') ?? '').trim().slice(0, 32) || 'Guest',
-                  }
-                : {}),
-              action,
-              version: before.version,
-            }),
-          });
+          const response = request<{ room: Room; streamed?: boolean }>(
+            `/api/rooms/${target.code}`,
+            {
+              method: 'POST',
+              headers: headers(target.code),
+              signal: signal(
+                target.controller,
+                ['next', 'radio', 'skip-vote'].includes(action) ? 35000 : 12000,
+              ),
+              body: JSON.stringify({
+                ...fields,
+                ...(action === 'add' || action === 'play-video'
+                  ? {
+                      displayName:
+                        (storage.get('afterparty-display-name') ?? '').trim().slice(0, 32) ||
+                        'Guest',
+                    }
+                  : {}),
+                action,
+                version: before.version,
+                ...(commandId ? { commandId, syncEpoch: before.syncEpoch } : {}),
+              }),
+            },
+          );
+          const result = await (commandId ? Promise.race([response, receipt]) : response);
           if (!current(target)) return false;
-          accept(target, result.room, sent);
+          if (!result.streamed) {
+            const authority = target.authority;
+            // The capped RTT compensation cannot date an arbitrarily held reply.
+            // A committed gesture is acknowledged, but an expired sample cannot
+            // grant a new playback lease. A fresh authenticated poll can recover it.
+            const sampleAge =
+              commandId &&
+              authority &&
+              result.room.code === target.code &&
+              result.room.syncSource === 'live' &&
+              authority.room.syncSource === 'live' &&
+              result.room.syncEpoch === authority.room.syncEpoch
+                ? Math.max(
+                    0,
+                    authority.room.serverTime +
+                      now() -
+                      authority.receivedAt -
+                      result.room.serverTime,
+                  )
+                : undefined;
+            if (sampleAge === undefined || sampleAge < (result.room.syncValidForMs ?? 0))
+              accept(target, result.room, sent, sampleAge);
+            else if (state.room && playbackTarget(state.room, state.receivedAt, now()).stale)
+              publish({ connection: 'reconnecting', error: 'Live playback is reconnecting.' });
+          }
           onAccepted?.(result.room);
           return true;
         } catch (error) {
@@ -488,6 +561,8 @@ export function createRoomClient(options: RoomClientOptions = {}) {
           } else refreshAfterConflict = conflict;
           publish({ error: message(error) });
           return false;
+        } finally {
+          if (target.command?.id === commandId) target.command = undefined;
         }
       }
       return false;

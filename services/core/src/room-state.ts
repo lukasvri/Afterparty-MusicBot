@@ -1,5 +1,5 @@
 import { UserError } from "./types.ts";
-import { ROOM_QUEUE_LIMIT, ROOM_START_LEAD_MS, roomQueueCapacity, roomSeekPosition, type RoomVideo } from "./protocol.ts";
+import { ROOM_QUEUE_LIMIT, ROOM_START_LEAD_MS, ROOM_COMMAND_RECEIPT_LIMIT, validRoomCommandId, roomQueueCapacity, roomSeekPosition, type RoomVideo } from "./protocol.ts";
 import { roomRadioSeed, playableRoomQueue, hasPlayableRoomQueue, roomRadioHistory } from "./room-radio.ts";
 import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
 
@@ -23,7 +23,28 @@ export type RoomPlayback = {
   radioRetryAt?: number;
   radioExcluded?: string[];
   radioExcludedSongs?: RoomVideo[];
+  /** Private bounded deduplication. Only the current revision's opaque receipt is public. */
+  commandReceipts?: RoomCommandRecord[];
 };
+type RoomCommandRecord = { id: string; actor: string; request: string; version: number };
+export function prepareRoomCommand(state: RoomPlayback, input: Record<string, unknown>, version: number, epoch?: string) {
+  if (input.commandId === undefined) return null;
+  if (!validRoomCommandId(input.commandId) || !["play", "pause", "seek"].includes(String(input.action)))
+    throw new UserError("Invalid playback command ID.");
+  if (input.syncEpoch !== epoch) throw new UserError("The room restarted. Refresh before trying again.", 409);
+  const record = { id: input.commandId, actor: String(input.actorHash ?? ""),
+    request: JSON.stringify([input.action, input.version, input.position ?? null, epoch ?? null]), version: version + 1 };
+  const previous = state.commandReceipts?.find(item => item.id === record.id && item.actor === record.actor);
+  if (previous && previous.request !== record.request) throw new UserError("The command ID was already used.", 409);
+  return { record, duplicate: Boolean(previous) };
+}
+export function recordRoomCommand(state: RoomPlayback, command: ReturnType<typeof prepareRoomCommand>) {
+  if (command) state.commandReceipts = [...(state.commandReceipts ?? []), command.record].slice(-ROOM_COMMAND_RECEIPT_LIMIT);
+}
+export function roomCommandReceipt(state: RoomPlayback, version: number) {
+  const receipt = state.commandReceipts?.at(-1);
+  return receipt?.version === version ? { commandReceipt: { id: receipt.id, version } } : {};
+}
 export const guestActions = new Set(["add", "vote", "skip-vote"]);
 function publicVideo(video: RoomVideo): RoomVideo {
   if (video.radioRelatedTo === undefined) return video;

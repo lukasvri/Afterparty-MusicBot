@@ -16,6 +16,9 @@ import {
   finished,
   prefetchDue,
   publicPlayback,
+  prepareRoomCommand,
+  recordRoomCommand,
+  roomCommandReceipt,
   guestActions,
   roomPlaybackPosition,
 } from "../services/core/src/room-state.ts";
@@ -511,6 +514,7 @@ export async function publicRoom(
     code: value.code,
     name: value.name,
     ...visibleState,
+    ...roomCommandReceipt(state, value.version),
     radio: state.radio !== false,
     isPublic: value.is_public === 1,
     position:
@@ -705,7 +709,7 @@ export async function mutate(
     );
     return { ok: true };
   }
-  if (input.version !== (live?.version ?? value.version))
+  if (input.commandId === undefined && input.version !== (live?.version ?? value.version))
     fail(409, "Rommet er endret. Prøv igjen med den nye køen.");
   let video: Video | undefined;
   if (action === "add" || action === "play-video") {
@@ -715,6 +719,8 @@ export async function mutate(
     if (!video) fail(404, "Videoen er ikke tilgjengelig.");
   }
   const command = {
+    commandId: input.commandId,
+    syncEpoch: input.syncEpoch,
     action,
     version: input.version,
     videoId: input.videoId,
@@ -744,6 +750,10 @@ export async function mutate(
       },
     };
   }
+  const receipt = prepareRoomCommand(state, command, value.version);
+  if (receipt?.duplicate) return { room: await publicRoom(request, value, true, false) };
+  if (input.version !== value.version)
+    fail(409, "Rommet er endret. Prøv igjen med den nye køen.");
   let recommended: Video | null = null;
   if (needsRecommendation(state, command))
     recommended = await roomRecommendation(
@@ -759,6 +769,7 @@ export async function mutate(
   const next = changeRoom(state, {
     ...command, action: emptyEarlyNext ? "radio-prefetch" : action, now,
   }, host, position, recommended);
+  recordRoomCommand(next, receipt);
   const result = await db()
     .prepare(
       "UPDATE rooms SET state=?,version=version+1,updated_at=? WHERE code=? AND version=?",

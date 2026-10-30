@@ -16,6 +16,9 @@ import {
   finished,
   prefetchDue,
   publicPlayback,
+  prepareRoomCommand,
+  recordRoomCommand,
+  roomCommandReceipt,
   roomPlaybackPosition,
   type RoomPlayback,
 } from "./room-state.ts";
@@ -123,6 +126,7 @@ export class Rooms extends EventEmitter {
     const position = this.position(room, now);
     return {
       ...publicPlayback(room.state),
+      ...roomCommandReceipt(room.state, room.version),
       code,
       name: room.name,
       radio: room.state.radio !== false,
@@ -216,6 +220,10 @@ export class Rooms extends EventEmitter {
     recommended: RoomVideo | null = null,
   ) {
     const room = this.load(code);
+    if (!guestActions.has(String(input.action)) && input.actorHash !== room.ownerHash)
+      throw new UserError("Only the host can control playback.", 403);
+    const command = prepareRoomCommand(room.state, input, room.version, this.epoch);
+    if (command?.duplicate) return this.snapshot(code);
     if (input.version !== room.version)
       throw new UserError("The room has changed. Try again.", 409);
     const now = this.now();
@@ -226,6 +234,7 @@ export class Rooms extends EventEmitter {
       this.position(room, now),
       recommended,
     );
+    recordRoomCommand(state, command);
     room.state = state;
     room.updatedAt = now;
     room.version++;

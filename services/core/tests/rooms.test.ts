@@ -15,6 +15,26 @@ const video = {
   embeddable: true,
 };
 
+test("native transport receipts identify a committed revision and deduplicate without undoing a newer pause", () => {
+  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  try {
+    rooms.import({ code: "TESTROOM", name: "Test", owner_hash: "a".repeat(64),
+      state: { current: video, queue: [], position: 0, playing: true },
+      version: 1, updated_at: 10000, expires_at: 100000 });
+    const command = { action: "seek", position: 10, version: 1, actorHash: "a".repeat(64),
+      commandId: "11111111-1111-4111-8111-111111111111", syncEpoch: rooms.epoch };
+    const committed = rooms.mutate("TESTROOM", command);
+    assert.deepEqual(committed.commandReceipt, { id: command.commandId, version: 2 });
+    rooms.mutate("TESTROOM", { action: "pause", version: 2, actorHash: "a".repeat(64) });
+    const duplicate = rooms.mutate("TESTROOM", command);
+    assert.equal(duplicate.version, 3);
+    assert.equal(duplicate.playing, false);
+    assert.equal(duplicate.commandReceipt, undefined);
+    assert.throws(() => rooms.mutate("TESTROOM", { ...command, position: 20 }), { status: 409 });
+    assert.throws(() => rooms.mutate("TESTROOM", { ...command, actorHash: "b".repeat(64) }), { status: 403 });
+  } finally { rooms.dispose(); store.close(); }
+});
+
 test("room scheduling uses the playing-room expiry index without rewriting durable rooms", () => {
   const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
   try {
@@ -740,3 +760,28 @@ for (const winner of ["add", "radio"])
       assert.deepEqual(current.queue.map(video => video.id), winner === "add" ? [next.id] : []);
     } finally { rooms.dispose(); store.close(); }
   });
+
+
+test('native receipt history is bounded and a restarted epoch rejects old command identities', () => {
+  const store = new Store(':memory:'), rooms = new Rooms(store, () => 10000);
+  try {
+    rooms.import({ code: 'TESTROOM', name: 'Test', owner_hash: 'a'.repeat(64),
+      state: { current: video, queue: [], position: 0, playing: true },
+      version: 1, updated_at: 10000, expires_at: 100000 });
+    const commands = Array.from({ length: 33 }, (_, i) => ({ action: 'seek', position: 10,
+      version: i + 1, actorHash: 'a'.repeat(64), commandId: crypto.randomUUID(), syncEpoch: rooms.epoch }));
+    for (const command of commands) rooms.mutate('TESTROOM', command);
+    assert.equal(rooms.mutate('TESTROOM', commands.at(-1)!).version, 34);
+    assert.throws(() => rooms.mutate('TESTROOM', commands[0]), { status: 409 });
+    const published = JSON.stringify(rooms.snapshot('TESTROOM'));
+    assert.equal(published.includes('commandReceipts'), false);
+    assert.equal(published.includes('a'.repeat(64)), false);
+    for (const commandId of ['too-short', 'x'.repeat(1000)])
+      assert.throws(() => rooms.mutate('TESTROOM', { ...commands[0], version: 34, commandId }), { status: 400 });
+    const restarted = new Rooms(store, () => 10000);
+    try {
+      assert.throws(() => restarted.mutate('TESTROOM', { ...commands.at(-1)!, version: 34 }), { status: 409 });
+      assert.equal(restarted.snapshot('TESTROOM').version, 34);
+    } finally { restarted.dispose(); }
+  } finally { rooms.dispose(); store.close(); }
+});

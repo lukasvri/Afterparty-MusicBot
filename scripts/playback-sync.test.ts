@@ -214,3 +214,10 @@ test('shared seek conversion matches achievable calibration and browser-room aut
  assert.equal(sharedSeekPosition(browser,179.9),179);
  assert.equal(sharedSeekPosition({...browser,current:{...browser.current!,duration:.5}},.4),0);
 });
+
+test('a known held sample age preserves the actual remaining lease beyond the RTT cap', () => {
+ const next=compensateDelivery({...room,position:42,syncValidForMs:5000},6000,4900);
+ assert.equal(next.syncValidForMs,100);
+ assert.equal(next.position,46.9);
+ assert.equal(playbackTarget(next,1000,1101).playing,false);
+});
