@@ -19,6 +19,97 @@ function extracted(id: string) {
     track: `Song ${id}`, duration: 210, categories: ["Music"], tags: ["deep house"], playable_in_embed: true };
 }
 
+for (const radio of [false, true]) test(`${radio ? "radio" : "manual"} search handles a slow tail without caching an incomplete search`, async context => {
+  const store = new Store(":memory:"), gate = deferred<void>();
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const providers = new Providers(store, {}); let available = false, settled = false;
+    const calls = new Map<string, number>();
+    providers.youtube = async <K extends keyof YouTubeResponses>(path: K) => {
+      if (path === "search") return { items: ids.slice(0, 2).map(videoId => ({ id: { videoId } })) } as YouTubeResponses[K];
+      throw Error("synthetic API outage");
+    };
+    providers.extract = async (args, signal) => {
+      const id = args.at(-1)!.split("=").at(-1)!; calls.set(id, (calls.get(id) ?? 0) + 1);
+      if (id === ids[1] && !available) await gate.promise;
+      signal?.throwIfAborted(); return extracted(id);
+    };
+    const pending = providers.searchResult("slow metadata tail", 2, radio);
+    void pending.then(() => { settled = true; }, () => { settled = true; });
+    const rejected = radio ? assert.rejects(pending, error => error instanceof UserError && error.status === 504) : undefined;
+    await yieldTurn(); context.mock.timers.tick(22000); await yieldTurn();
+    if (radio) { assert.equal(settled, false); context.mock.timers.tick(2000); await rejected; }
+    else {
+      const result = await pending;
+      assert.equal(result.complete, false); assert.deepEqual(result.tracks.map(track => track.id), [ids[0]]);
+    }
+    assert.equal(store.get(`search:v7:["slow metadata tail",2,${radio}]`, null), null);
+    available = true;
+    const retry = await providers.searchResult("slow metadata tail", 2, radio);
+    assert.equal(retry.complete, true); assert.deepEqual(retry.tracks.map(track => track.id), ids.slice(0, 2));
+    assert.equal(calls.get(ids[0]), 1, "Retry reuses fully verified metadata from before the cutoff");
+    assert.equal(calls.get(ids[1]), 2, "Only the unfinished ID needs another lookup");
+  } finally { gate.resolve(); await yieldTurn(); context.mock.timers.reset(); store.close(); }
+});
+
+test("an expired search releases its metadata subscriber while a later search still succeeds", async context => {
+  const store = new Store(":memory:"), gate = deferred<void>();
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const providers = new Providers(store, {}); let calls = 0, metadataSignal: AbortSignal | undefined;
+    providers.youtube = async <K extends keyof YouTubeResponses>(path: K, _params: Record<string, string>, signal?: AbortSignal) => {
+      if (path === "search") return { items: [{ id: { videoId: ids[1] } }] } as YouTubeResponses[K];
+      calls++; metadataSignal = signal; await gate.promise;
+      return { items: [apiVideo(ids[1])] } as YouTubeResponses[K];
+    };
+    const expired = providers.search("first cold search", 1);
+    const rejected = assert.rejects(expired, error => error instanceof UserError && error.status === 504);
+    await yieldTurn(); context.mock.timers.tick(21000);
+    const survivor = providers.search("second cold search", 1);
+    await yieldTurn(); context.mock.timers.tick(1000); await rejected;
+    assert.equal(metadataSignal?.aborted, false, "A later metadata subscriber still needs this shared batch");
+    gate.resolve(); assert.equal((await survivor)[0].id, ids[1]); assert.equal(calls, 1);
+    assert.equal(store.get('search:v7:["first cold search",1,false]', null), null);
+  } finally { gate.resolve(); context.mock.timers.reset(); store.close(); }
+});
+
+test("cancelling one metadata ID stops its extractor without aborting another ID in the batch", async () => {
+  const store = new Store(":memory:"), gate = deferred<void>(), controller = new AbortController();
+  const signals = new Map<string, AbortSignal>();
+  try {
+    const providers = new Providers(store, {});
+    providers.youtube = async () => { throw Error("synthetic API outage"); };
+    providers.extract = async (args, signal) => {
+      const id = args.at(-1)!.split("=").at(-1)!; signals.set(id, signal!);
+      await gate.promise; signal!.throwIfAborted(); return extracted(id);
+    };
+    const owner = providers.video(ids.slice(0, 2), false, controller.signal);
+    const rejected = assert.rejects(owner, /cancel/i);
+    const survivor = providers.video([ids[1]]);
+    await yieldTurn(); controller.abort(); await rejected;
+    assert.equal(signals.get(ids[0])?.aborted, true);
+    assert.equal(signals.get(ids[1])?.aborted, false);
+    gate.resolve(); assert.equal((await survivor)[0].id, ids[1]);
+    assert.equal(store.get("metadata:v6:" + ids[0], null), null);
+  } finally { gate.resolve(); await yieldTurn(); store.close(); }
+});
+
+test("a completely abandoned metadata batch aborts its API and never falls back or caches", async () => {
+  const store = new Store(":memory:"), gate = deferred<void>(), controller = new AbortController();
+  try {
+    const providers = new Providers(store, {}); let signal: AbortSignal | undefined, extractions = 0;
+    providers.youtube = async <K extends keyof YouTubeResponses>(_path: K, _params: Record<string, string>, input?: AbortSignal) => {
+      signal = input; await gate.promise; return { items: [apiVideo(ids[0])] } as YouTubeResponses[K];
+    };
+    providers.extract = async () => { extractions++; return extracted(ids[0]); };
+    const pending = providers.video([ids[0]], true, controller.signal);
+    const rejected = assert.rejects(pending, /cancel/i);
+    await yieldTurn(); controller.abort(); await rejected; assert.equal(signal?.aborted, true);
+    gate.resolve(); await yieldTurn(); assert.equal(extractions, 0);
+    assert.equal(store.get("metadata:v6:" + ids[0], null), null);
+  } finally { gate.resolve(); await yieldTurn(); store.close(); }
+});
+
 test("overlapping cold metadata calls hydrate each video once and isolate caller results", async () => {
   const store = new Store(":memory:"), gate = deferred<void>();
   try {

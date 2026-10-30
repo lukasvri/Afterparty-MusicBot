@@ -97,6 +97,43 @@ from a playing snapshot or replace user pause with repeated `playVideo` calls.
 
 ### B. Align the search deadline with provider work
 
+**Implementation follow-up:** The subsequent deadline candidate gives Core search
+one 24-second budget across discovery, extractor admission/execution and metadata.
+Manual metadata collection has a 22-second cutoff from search start: return
+already verified results, abort the unfinished tail and mark the internal catalog
+response incomplete. Core and Worker do not cache that incomplete search, so an
+immediate retry can reuse completed metadata and discover more results. With no
+verified result, return retry guidance instead of caching an empty success.
+Radio never admits a partial search through this path. The website request has
+one 30-second budget, including visitor limits, D1 cache reads and any Core/direct
+API fallback, below the existing 35-second browser limit.
+These are upper bounds, not faster-provider claims. Shared jobs track subscribers:
+one cancellation releases only that caller; the last cancellation retires the
+job, aborts fetch/extractor work and frees its map reservation. Overlapping
+metadata IDs retain batching and per-ID ownership, so a surviving lookup can
+finish even if another search expires. A disconnected catalog HTTP response
+releases its subscription. Admission/playback priority and radio policy remain.
+
+The first proposed 20-second all-or-nothing deadline failed two real 30-result
+cold searches in isolated Latitude staging. Five-result controls succeeded before
+and after the source change, identifying serial metadata hydration of the larger
+pool as the slow tail. This motivated the bounded partial manual result rather
+than treating a shorter timeout as a successful search repair.
+The revised candidate returned 10 verified results in 22.16 seconds and 22 on an
+immediate retry in 22.00 seconds in that bounded no-key provider run. This is one
+query and host, not a latency percentile or proof of all catalog/provider paths.
+
+Tests hold old provider responses and verify that retired jobs cannot start
+fallback, publish a new cache entry or deliver a result to a new caller. An
+already submitted D1 cache statement has no cancellation API and may still
+complete; this is public metadata cache work, not room/queue/authority mutation.
+No compensating deletion races another caller's valid cache. The isolated
+[benchmark](../services/core/benchmarks/search-deadline.ts) records controlled
+cold/warm p50/p95, stage durations, adapter counts and a real hung subprocess's
+timeout/exit. Its synthetic delays do not establish real-provider latency.
+
+The original source observations and plan below describe the reviewed baseline.
+
 **Observed:** The browser allows 35 seconds and suppresses retired search results.
 [Providers.search](../services/core/src/providers.ts) has no caller signal;
 its API request can take 12 seconds before extractor fallback and metadata
