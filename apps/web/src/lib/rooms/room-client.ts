@@ -61,6 +61,7 @@ export type RoomClientOptions = {
   request?: typeof browserRequest;
   storage?: Storage;
   now?: () => number;
+  wallNow?: () => number;
   pollMs?: number;
   setTimeout?: typeof globalThis.setTimeout;
   clearTimeout?: typeof globalThis.clearTimeout;
@@ -88,6 +89,7 @@ type Session = {
   authority: { room: Room; receivedAt: number } | null;
   pollRecovering: boolean;
   accessLost: boolean;
+  awaitingClock: boolean;
   command?: {
     id: string;
     epoch: string;
@@ -104,6 +106,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
   const request = options.request ?? browserRequest;
   const storage = options.storage ?? browserStorage;
   const now = options.now ?? (() => performance.now());
+  const wallNow = options.wallNow ?? (() => Date.now());
   const schedule = options.setTimeout ?? globalThis.setTimeout;
   const cancel = options.clearTimeout ?? globalThis.clearTimeout;
   const eventSource =
@@ -125,11 +128,13 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     receivedAt: 0,
   };
   let session: Session | null = null;
+  let pendingRecovery: Session | null = null;
   let generation = 0,
     searchSerial = 0,
     destroyed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let searchController: AbortController | null = null;
+  let timeSample = { monotonic: now(), wall: wallNow() };
   const publish = (change: Partial<RoomClientState>) => {
     if (destroyed) return;
     state = { ...state, ...change };
@@ -166,6 +171,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     }
   };
   const retire = () => {
+    pendingRecovery = null;
     if (session) stopStream(session);
     session?.controller.abort();
     session = null;
@@ -178,8 +184,9 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     searchController = null;
     searchSerial++;
   };
-  const begin = (code: string) => {
+  const begin = (code: string, recovering = false) => {
     retire();
+    timeSample = { monotonic: now(), wall: wallNow() };
     const target: Session = {
       code,
       generation,
@@ -189,23 +196,23 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       authority: null,
       pollRecovering: false,
       accessLost: false,
+      awaitingClock: recovering,
     };
     session = target;
     publish({
-      room: null,
-      connection: 'connecting',
+      ...(recovering
+        ? { room: state.room ? { ...state.room, isHost: false, isOwner: false } : null }
+        : { room: null, results: [], query: '', receivedAt: 0 }),
+      connection: recovering ? 'reconnecting' : 'connecting',
       busy: false,
-      error: '',
+      error: recovering ? 'Reconnecting to the room…' : '',
       searching: false,
       searchError: '',
-      results: [],
-      query: '',
-      receivedAt: 0,
     });
     return target;
   };
   const accept = (target: Session, room: Room, sent: number, sampleAge?: number) => {
-    if (!current(target)) return;
+    if (!current(target) || clockDiscontinuity()) return;
     if (
       !room ||
       room.code !== target.code ||
@@ -217,6 +224,9 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     )
       throw new Error('This view supports browser rooms only.');
     const next = compensateDelivery(room, now() - sent, sampleAge);
+    const recovering = target.awaitingClock;
+    if (recovering && (isOlderSnapshot(state.room, next) || isDuplicateSnapshot(state.room, next)))
+      return;
     target.authority = { room: next, receivedAt: now() };
     target.pollRecovering = false;
     target.accessLost = false;
@@ -230,13 +240,19 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       live.clock = new LiveClock(now);
       if (live.source) void sampleClock(target, live);
     }
-    const update = roomPollUpdate(state.room, next, Boolean(live && live.freshUntil > now()));
+    const update = roomPollUpdate(
+      recovering ? null : state.room,
+      next,
+      Boolean(live && live.freshUntil > now()),
+    );
+    if (next.syncSource !== 'live') target.awaitingClock = false;
     publish({
       room: update.snapshot,
-      connection: 'connected',
+      connection: target.awaitingClock ? 'reconnecting' : 'connected',
       ...(update.timeline ? { receivedAt: now() } : {}),
     });
     startStream(target);
+    if (target.awaitingClock && target.realtime) void sampleClock(target, target.realtime);
   };
   const loseStream = (target: Session, live: Realtime) => {
     if (!current(target) || target.realtime !== live) return;
@@ -265,17 +281,35 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     if (live.sampling === clock) return;
     live.sampling = clock;
     const trip = await clock.sample(target.controller.signal, options.clockRequest);
-    if (!current(target) || target.realtime !== live || live.clock !== clock) return;
+    if (
+      !current(target) ||
+      target.realtime !== live ||
+      live.clock !== clock ||
+      clockDiscontinuity()
+    )
+      return;
     live.sampling = null;
-    if (trip !== null) live.calibrated = true;
-    else {
+    if (trip !== null) {
+      live.calibrated = true;
+      const authority = target.authority;
+      if (
+        target.awaitingClock &&
+        authority &&
+        !target.accessLost &&
+        authority.room.syncEpoch === live.epoch &&
+        !playbackTarget(authority.room, authority.receivedAt, now()).stale
+      ) {
+        target.awaitingClock = false;
+        publish({ connection: 'connected', error: '' });
+      }
+    } else {
       live.calibrated = false;
       loseStream(target, live);
     }
   };
   const startStream = (target: Session) => {
     if (
-      !eventSource ||
+      (!eventSource && !target.awaitingClock) ||
       !current(target) ||
       target.realtime ||
       state.room?.syncSource !== 'live' ||
@@ -294,7 +328,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     target.realtime = live;
     const activeStream = () => current(target) && target.realtime === live;
     const connect = () => {
-      if (!activeStream()) return;
+      if (!activeStream() || !eventSource) return;
       let source: RoomStream;
       try {
         source = eventSource(`/api/realtime/stream?room=${target.code}`);
@@ -305,11 +339,12 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       live.source = source;
       const active = () => activeStream() && live.source === source;
       source.addEventListener('open', () => {
-        if (active()) void sampleClock(target, live);
+        if (active() && !clockDiscontinuity() && !live.calibrated) void sampleClock(target, live);
       });
       source.addEventListener('message', (event) => {
         if (
           !active() ||
+          clockDiscontinuity() ||
           !live.calibrated ||
           (state.connection !== 'connected' && !target.pollRecovering)
         )
@@ -385,7 +420,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         }
       });
       source.addEventListener('error', () => {
-        if (!active()) return;
+        if (!active() || clockDiscontinuity()) return;
         live.calibrated = false;
         live.clock.reset();
         live.clock = new LiveClock(now);
@@ -398,7 +433,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       });
     };
     const measure = () => {
-      if (!activeStream()) return;
+      if (!activeStream() || clockDiscontinuity()) return;
       if (live.source) void sampleClock(target, live);
       live.measure = schedule(measure, 10000);
     };
@@ -419,9 +454,10 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       if (!current(target) || target.serial !== serial) return;
       const reconnecting = state.connection === 'reconnecting';
       accept(target, room, sent);
+      if (!current(target)) return;
       if (clearError || recovering || reconnecting) publish({ error: '' });
     } catch (error) {
-      if (current(target) && target.serial === serial) {
+      if (current(target) && target.serial === serial && !clockDiscontinuity()) {
         const status = (error as { status?: number })?.status;
         if (status === 401 || status === 403 || status === 404) target.accessLost = true;
         target.pollRecovering = !target.accessLost && (!status || status >= 500);
@@ -432,6 +468,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
   const poll = (target: Session) => {
     if (!current(target)) return;
     timer = schedule(() => {
+      if (!current(target) || clockDiscontinuity()) return;
       const live = target.realtime;
       // SSE supplies the live timeline. Keep authenticated roles and presence
       // bounded to five seconds without repeating the same snapshot each second.
@@ -451,6 +488,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     fields: RoomActionFields = {},
     onAccepted?: (room: Room) => void,
   ) => {
+    if (clockDiscontinuity()) return false;
     const target = session,
       room = state.room;
     if (!target || !room || !current(target) || state.busy || state.connection !== 'connected')
@@ -514,7 +552,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
             },
           );
           const result = await (commandId ? Promise.race([response, receipt]) : response);
-          if (!current(target)) return false;
+          if (!current(target) || clockDiscontinuity()) return false;
           if (!result.streamed) {
             const authority = target.authority;
             // The capped RTT compensation cannot date an arbitrarily held reply.
@@ -540,10 +578,11 @@ export function createRoomClient(options: RoomClientOptions = {}) {
             else if (state.room && playbackTarget(state.room, state.receivedAt, now()).stale)
               publish({ connection: 'reconnecting', error: 'Live playback is reconnecting.' });
           }
+          if (!current(target)) return false;
           onAccepted?.(result.room);
           return true;
         } catch (error) {
-          if (!current(target)) return false;
+          if (!current(target) || clockDiscontinuity()) return false;
           const conflict = (error as { status?: number })?.status === 409;
           if (conflict && attempt === 0 && ['play', 'pause', 'seek'].includes(action)) {
             // Only a rejected command can be retried, never an uncertain receipt.
@@ -575,13 +614,14 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       }
       return false;
     } finally {
-      if (current(target)) {
+      if (current(target) && !clockDiscontinuity()) {
         publish({ busy: false });
         if (refreshAfterConflict) await read(target);
       }
     }
   };
   const manageHosts = async (action: 'invite' | 'transfer-invite' | 'revoke-hosts') => {
+    if (clockDiscontinuity()) return null;
     const target = session,
       room = state.room;
     if (!target || !room || !current(target) || state.busy || state.connection !== 'connected')
@@ -601,13 +641,14 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         signal: signal(target.controller),
         body: JSON.stringify({ action, version: room.version }),
       });
-      if (!current(target)) return null;
+      if (!current(target) || clockDiscontinuity()) return null;
       if (action !== 'revoke-hosts' && !/^[a-f0-9]{64}$/.test(result.token ?? ''))
         throw new Error('A private invitation could not be created. Try again.');
       accept(target, result.room, sent);
+      if (!current(target)) return null;
       return { token: result.token };
     } catch (error) {
-      if (current(target)) {
+      if (current(target) && !clockDiscontinuity()) {
         // Access credentials belong only in private fragment links and local storage.
         publish({ error: message(error).replace(/[a-f0-9]{64}/gi, '[private token]') });
         refreshAfterConflict = (error as { status?: number })?.status === 409;
@@ -619,6 +660,36 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         if (refreshAfterConflict) await read(target);
       }
     }
+  };
+  const clockDiscontinuity = (defer = false) => {
+    if (session && pendingRecovery === session) return true;
+    const sample = { monotonic: now(), wall: wallNow() },
+      previous = timeSample;
+    timeSample = sample;
+    const monotonicElapsed = sample.monotonic - previous.monotonic;
+    const gap = sample.wall - previous.wall - monotonicElapsed;
+    // Wall time is only a discontinuity signal, never playback authority.
+    if (
+      !session ||
+      destroyed ||
+      (monotonicElapsed >= 0 && Number.isFinite(gap) && Math.abs(gap) < 5000)
+    )
+      return false;
+    const previousSession = session;
+    const recover = () => {
+      if (!current(previousSession)) return;
+      const target = begin(previousSession.code, true);
+      void read(target, true).finally(() => poll(target));
+    };
+    if (defer) {
+      pendingRecovery = previousSession;
+      // playback() is read from a Svelte derived value. Stop its projection
+      // immediately, but publish recovery only after that calculation ends.
+      queueMicrotask(() => {
+        if (pendingRecovery === previousSession) recover();
+      });
+    } else recover();
+    return true;
   };
   return {
     subscribe(listener: (state: RoomClientState) => void) {
@@ -701,6 +772,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       return current(target) && state.room !== null;
     },
     async refresh() {
+      if (clockDiscontinuity()) return;
       const target = session;
       if (!target || !current(target) || state.busy) return;
       if (state.connection === 'connected') {
@@ -829,6 +901,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       return { accepted, version };
     },
     playback() {
+      const recovering = clockDiscontinuity(true);
       if (!state.room) return null;
       const target = playbackTarget(state.room, state.receivedAt, now());
       const live = session?.realtime;
@@ -840,7 +913,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         live?.calibrated &&
         live.source?.readyState === 1 &&
         live.freshUntil > now();
-      return state.connection === 'connected' || sustained
+      return !recovering && (state.connection === 'connected' || sustained)
         ? target
         : { ...target, playing: false, stale: true };
     },

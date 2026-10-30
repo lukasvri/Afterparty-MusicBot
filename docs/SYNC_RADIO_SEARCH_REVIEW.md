@@ -63,6 +63,31 @@ clock RTT, stale-frame rejection and corrective-seek counts in controlled tests.
 Then qualify two-device Chrome/Safari/Firefox behavior, background/foreground and
 actual sleep before changing the default correction thresholds.
 
+**Follow-up source evidence:** A regression against the room client after
+`f619049` reproduced a playing pre-suspend lease with frozen monotonic time and
+a 60-second wall-clock advance. The candidate now treats a wall/monotonic
+elapsed-time difference of at least five seconds as an invalidation signal.
+It retires the old session, requests fresh authenticated state and recalibrates
+the live clock before resuming. Wall time never supplies a playback position.
+Old HTTP replies, stream frames, timers, calibration replies and command
+receipts cannot revive the retired session. New room epochs, revoked roles and
+current paused intent are reconciled through the fresh authority path.
+The playback projection remains safe to read from a Svelte derived value:
+it reports stale playback immediately and queues one recovery publication
+outside that calculation, respecting [Svelte's state-mutation rule][wake-derived].
+
+The focused tests include normal background time where both clocks advance,
+backward wall adjustment and clock-only recovery when EventSource is absent.
+Native Chromium fixtures exercise a controlled clock discontinuity on the built
+website at 3840, 2560, 1920 and 390 pixels, using the existing synthetic room
+server and player. The fixture uses [Playwright's clock API][wake-clock], not
+actual operating-system sleep. These checks do not establish real-device sleep,
+two-device audible continuity, Safari/Firefox acceptance or the cause of the
+owner's intermittent Discord tempo report. Those acceptance items stay open.
+
+[wake-clock]: https://playwright.dev/docs/clock
+[wake-derived]: https://svelte.dev/docs/svelte/runtime-errors#state_unsafe_mutation
+
 **Iframe limit:** YouTube's official sample exposes discrete player state,
 current-time reads, seeks and available playback rates [S4]. Browser autoplay may
 require user activation [S5]. Neither source establishes sample-accurate or
