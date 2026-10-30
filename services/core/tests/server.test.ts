@@ -93,7 +93,16 @@ test('public transport is read only, admin stays private, commands are acknowled
  }finally{await servers.close();commands.close();engine.close();store.close();rmSync(dir,{recursive:true,force:true});}
 });
 
-test('the authenticated own-room bridge advances radio without a Discord connection',async()=>{
+test('the authenticated own-room bridge advances radio without a Discord connection',async(t)=>{
+ const originalFetch=globalThis.fetch;
+ t.mock.method(globalThis,'fetch',async(target:Parameters<typeof fetch>[0],init?:Parameters<typeof fetch>[1])=>{
+  const url=new URL(typeof target==='string'?target:target instanceof URL?target.href:target.url);
+  if(url.origin==='https://www.youtube.com'){
+   assert.equal(url.pathname,'/watch');
+   return new Response(watchPage(url.searchParams.get('v')!));
+  }
+  return originalFetch(target,init);
+ });
  const dir=mkdtempSync(join(tmpdir(),'gutta-room-radio-api-')),store=new Store(join(dir,'db.sqlite'));
  const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
  const providers=new Providers(store,{}),engine=new Engine(store,providers,sink),commands=new Commands(engine);
@@ -146,3 +155,4 @@ test('reconciliation quarantine masks only the selected public guild, rejects au
   assert.equal(sessions[0].engine.paused,false);assert.equal(sessions[0].pauses(),0);assert.equal(sessions[0].store.get('bridge-reconciliation-block',false),true);
  }finally{await servers.close();for(const session of sessions){session.commands.close();session.engine.close();session.store.close();}}
 });
+import { watchPage } from './youtube-watch-fixture.ts';
