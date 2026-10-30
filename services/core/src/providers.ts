@@ -1,6 +1,6 @@
 import type {YouTubeResponses, ExtractedMedia} from "./external-types.ts";
 import { metadataGenres, metadataMusic, radioArtist, radioTitle, sameRadioRecording, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
-import { runJson } from "./extractor.ts";
+import { ExtractorFormatError, runJson, type ExtractorProfile } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
@@ -142,8 +142,8 @@ export class Providers {
     signal?.throwIfAborted();
     return value;
   }
-  async extract(args: string[], signal?: AbortSignal, priority = false) {
-    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority);
+  async extract(args: string[], signal?: AbortSignal, priority = false, profile: ExtractorProfile = "media") {
+    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile);
   }
   async video(ids: string[], skipUnavailable = false): Promise<Track[]> {
     if (!ids.length) return [];
@@ -233,10 +233,21 @@ export class Providers {
     } catch {
       await mapLimited(batch, 3, async (id) => {
         try {
-          const v = await this.extract([
+          const args = [
             "--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node",
-            "https://www.youtube.com/watch?v=" + id,
-          ]);
+          ], url = "https://www.youtube.com/watch?v=" + id;
+          let v: ExtractedMedia;
+          try {
+            // Metadata still comes from full video/player responses. Avoid
+            // resolving audio formats until playback actually needs a stream.
+            v = await this.extract([...args, "--extractor-args", "youtube:player_skip=js;skip=hls,dash",
+              "--no-ignore-no-formats-error", url], undefined, false, "metadata");
+          } catch (error) {
+            // Some playable videos have only JS-dependent formats. Preserve
+            // their full fallback without retrying private/network/deadline errors.
+            if (!(error instanceof ExtractorFormatError)) throw error;
+            v = await this.extract([...args, url]);
+          }
           remember({
             id, genres: metadataGenres(v.description, v.tags), music: metadataMusic(undefined, v.categories),
             title: v.title ?? "YouTube", artist: v.artist ?? v.uploader ?? "YouTube",

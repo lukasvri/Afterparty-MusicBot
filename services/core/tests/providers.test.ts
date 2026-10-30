@@ -2,7 +2,8 @@ import type {YouTubeResponses} from '../src/external-types.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';
-import {Store} from '../src/store.ts';import {Providers} from '../src/providers.ts';
+import {Store} from '../src/store.ts';import {Providers,runJson} from '../src/providers.ts';
+import {UserError} from '../src/types.ts';
 import {scoreMatch,mapLimited} from '../src/matching.ts';import {spotifyRef,SpotifyCatalog,expandSpotifyLink} from '../src/spotify.ts';
 import {soundcloudUrl,resolveSoundcloud} from '../src/soundcloud.ts';import {Recommendations} from '../src/recommendations.ts';
 import {audioBitrate} from '../src/audio.ts';import type {Track} from '../src/types.ts';
@@ -10,6 +11,54 @@ import {deferred} from './deferred.ts';
 const source={id:'4uLU6hMCjMI75M1A2tKUQC',isrc:'GBARL9300135',title:'Example Song',artist:'Artist',duration:200};
 const track=(title='Artist - Example Song',id='abcdefghijk'):Track=>({id,title,artist:'Artist - Topic',duration:200,entryId:id,image:'',live:false,embeddable:true,source:'youtube'});
 const setup=()=>{const dir=mkdtempSync(join(tmpdir(),'gutta-provider-'));const store=new Store(join(dir,'db.sqlite'));return {store,close:()=>{store.close();rmSync(dir,{recursive:true,force:true});}};};
+
+test('cold video metadata skips player JavaScript without weakening source errors or stream extraction',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{});p.youtube=async()=>{throw Error('Unavailable API')};
+  p.extract=async(args,_signal,_priority,profile)=>{
+   assert.equal(profile,'metadata');
+   assert(args.includes('youtube:player_skip=js;skip=hls,dash'));
+   assert(args.includes('--no-ignore-no-formats-error'));
+   assert(!args.includes('--ignore-no-formats-error'));
+   return {title:'Artist - Song',uploader:'Artist',duration:200,is_live:false,playable_in_embed:false};
+  };
+  const [video]=await p.video(['abcdefghijk']);assert.equal(video.embeddable,false);assert.equal(video.duration,200);
+  p.extract=async(args,_signal,priority,profile)=>{
+   assert(!args.some(arg=>arg.includes('player_skip=js')));
+   assert(args.includes('--js-runtimes'));
+   assert.equal(priority,true);assert.notEqual(profile,'metadata');
+   return {url:'https://media.example.test/audio',http_headers:{}};
+  };
+  assert.equal((await p.stream(video,new AbortController().signal)).url,'https://media.example.test/audio');
+ }finally{t.close();}
+});
+
+test('a formats-only metadata failure retries the full extractor once and then shares its verified result',async()=>{
+ const t=setup();try{
+  const formatError=await runJson(process.execPath,['-e',"process.stderr.write('ERROR: No video formats found!');process.exitCode=1;"]).then(()=>assert.fail('Expected a source failure'),error=>error);
+  const p=new Providers(t.store,{});p.youtube=async()=>{throw Error('Unavailable API')};let calls=0;
+  p.extract=async args=>{
+   calls++;
+   if(calls===1)throw formatError;
+   assert(!args.some(arg=>arg.includes('player_skip=js')));
+   return {title:'Artist - Song',artist:'Artist',duration:200,playable_in_embed:true};
+  };
+  const [first,joined]=await Promise.all([p.video(['abcdefghijk']),p.video(['abcdefghijk'])]);
+  assert.equal(calls,2);assert.equal(first[0].id,joined[0].id);assert.notEqual(first[0].entryId,joined[0].entryId);
+  await p.video(['abcdefghijk']);assert.equal(calls,2);
+ }finally{t.close();}
+});
+
+test('metadata never retries private/source failures and never loops after full-format failure',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{});p.youtube=async()=>{throw Error('Unavailable API')};let calls=0;
+  p.extract=async()=>{calls++;throw new UserError('Private or unavailable source',502)};
+  await assert.rejects(p.video(['abcdefghijk']),/Private or unavailable/);assert.equal(calls,1);
+  const formatError=await runJson(process.execPath,['-e',"process.stderr.write('ERROR: Requested format is not available');process.exitCode=1;"]).then(()=>assert.fail('Expected a source failure'),error=>error);
+  calls=0;p.extract=async()=>{calls++;throw formatError};
+  await assert.rejects(p.video(['abcdefghijk']));assert.equal(calls,2);
+ }finally{t.close();}
+});
 
 test('concurrent identical searches share one lookup and return independent queue entry identities',async()=>{
  const t=setup(),gate=deferred<void>();try{

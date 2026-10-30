@@ -2,22 +2,38 @@ import { spawn } from "node:child_process";
 import { UserError } from "./types.ts";
 
 const MAX_OUTPUT_BYTES = 8_000_000;
-// Each yt-dlp tree can include a large Node JavaScript challenge runtime.
-// Budget one tree per 512 MiB of container memory, retaining the four-job
-// ceiling on larger/unconstrained hosts and the existing playback priority.
+// Full extraction can include a large Node challenge runtime. Metadata that
+// skips player JS uses half its admission weight, within the same shared pool.
+const MAX_ACTIVE = 4;
 const memoryLimit = process.constrainedMemory();
-const MAX_ACTIVE = Number.isFinite(memoryLimit) && memoryLimit > 0
-  ? Math.max(1, Math.min(4, Math.floor(memoryLimit / (512 * 1024 * 1024))))
-  : 4;
+const MEMORY_UNITS = Number.isFinite(memoryLimit) && memoryLimit > 0
+  ? Math.max(2, Math.min(8, Math.floor(memoryLimit / (256 * 1024 * 1024))))
+  : 8;
+export type ExtractorProfile = "media" | "metadata";
 const MAX_WAITING = 16;
-type Waiter = { enter: () => void; priority: boolean };
-let active = 0;
+const SOURCE_FAILURE = "Could not load the media source. Try another link.";
+/** A metadata fast path may retry only when no usable format survives. */
+export class ExtractorFormatError extends UserError {
+  constructor() {
+    super(SOURCE_FAILURE, 502);
+    this.name = "ExtractorFormatError";
+  }
+}
+type Waiter = { enter: () => void; priority: boolean; units: number };
+let active = 0, activeUnits = 0;
 const waiting: Waiter[] = [];
 
-async function acquire(signal?: AbortSignal, priority = false) {
+const fits = (units: number) => active < MAX_ACTIVE && activeUnits + units <= MEMORY_UNITS;
+const enter = (units: number) => { active++; activeUnits += units; };
+function drain() {
+  // Do not let lighter catalog work bypass an older queued playback request.
+  while (waiting[0] && fits(waiting[0].units)) waiting.shift()!.enter();
+}
+
+async function acquire(units: number, signal?: AbortSignal, priority = false) {
   if (signal?.aborted) throw new UserError("The request was cancelled.");
-  if (active < MAX_ACTIVE) {
-    active++;
+  if (!waiting.length && fits(units)) {
+    enter(units);
     return;
   }
   if (waiting.length >= MAX_WAITING)
@@ -32,6 +48,7 @@ async function acquire(signal?: AbortSignal, priority = false) {
       if (index < 0) return;
       waiting.splice(index, 1);
       cleanup();
+      drain();
       reject(
         new UserError(
           signal?.aborted
@@ -42,10 +59,10 @@ async function acquire(signal?: AbortSignal, priority = false) {
       );
     };
     const waiter: Waiter = {
-      priority,
+      priority, units,
       enter: () => {
         cleanup();
-        active++;
+        enter(units);
         resolve();
       },
     };
@@ -70,6 +87,14 @@ function spawnJson<T>(
     const chunks: Buffer[] = [];
     let bytes = 0,
       failure: Error | undefined;
+    let stderrPrefix = "", stderrTail = "", formatUnavailable = false;
+    const finishStderrLine = () => {
+      // Only the final ERROR line determines whether a full-format fallback
+      // is appropriate. Earlier warnings must not reclassify a private failure.
+      if (/^\s*ERROR:/i.test(stderrPrefix))
+        formatUnavailable = /Requested format is not available|No video formats found/i.test(stderrTail);
+      stderrPrefix = ""; stderrTail = "";
+    };
     const stop = (error: Error) => {
       failure ??= error;
       child.kill("SIGKILL");
@@ -87,8 +112,16 @@ function spawnJson<T>(
         stop(new UserError("The media source response was too large.", 502));
       else chunks.push(chunk);
     });
-    // Drain stderr without retaining private source URLs or redundant log buffers.
-    child.stderr.resume();
+    // Inspect a bounded rolling suffix for a formats-only failure. Never return
+    // or log stderr, which can contain private source URLs.
+    child.stderr.on("data", (chunk: Buffer) => {
+      const parts = chunk.toString("utf8").split(/\r?\n/);
+      for (let index = 0; index < parts.length; index++) {
+        if (index) finishStderrLine();
+        stderrPrefix = (stderrPrefix + parts[index]).slice(0, 64);
+        stderrTail = (stderrTail + parts[index]).slice(-512);
+      }
+    });
     child.on("error", (error) => {
       failure ??= error;
     });
@@ -98,13 +131,11 @@ function spawnJson<T>(
     child.once("close", (code) => {
       clearTimeout(timer);
       signal?.removeEventListener("abort", cancel);
+      finishStderrLine();
       if (failure) return reject(failure);
       if (code !== 0)
         return reject(
-          new UserError(
-            "Could not load the media source. Try another link.",
-            502,
-          ),
+          formatUnavailable ? new ExtractorFormatError() : new UserError(SOURCE_FAILURE, 502),
         );
       try {
         resolve(JSON.parse(Buffer.concat(chunks, bytes).toString("utf8")));
@@ -121,12 +152,15 @@ export async function runJson<T = Record<string, unknown>>(
   args: string[],
   signal?: AbortSignal,
   priority = false,
+  profile: ExtractorProfile = "media",
 ) {
-  await acquire(signal, priority);
+  const units = profile === "metadata" ? 1 : 2;
+  await acquire(units, signal, priority);
   try {
     return await spawnJson<T>(command, args, signal);
   } finally {
     active--;
-    waiting.shift()?.enter();
+    activeUnits -= units;
+    drain();
   }
 }
