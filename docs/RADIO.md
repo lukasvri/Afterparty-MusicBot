@@ -111,11 +111,42 @@ Negative evidence survives metadata caching, public recording copies and room
 persistence, so a clean title cannot erase a declaration in the description.
 Versioned caches require fresh metadata instead of reusing the older format.
 
+YouTube's own watch-page AI disclosure is also checked before an automatic
+winner is returned. This closes the observed Sadrican `By The Way` case: its
+extractor metadata contained no AI declaration, while its player displayed
+an AI badge. `youtube-content.ts` reads only the requested video's primary
+badge and structured creation-disclosure section from `ytInitialData`. It
+validates the video ID and English page structure and never executes page
+scripts or scans unrelated recommendations for AI words. A preferred music
+video is a separate upload and must pass its own check.
+
+The shared selector checks at most four ranked uploads. A disclosed or
+uncheckable upload is skipped, with already checked audio retained if its
+preferred video fails. Public requests have a five-second total deadline,
+a 4 MiB body limit, two active requests and at most sixteen pending IDs.
+Concurrent lookups for one ID share work. A bounded 256-ID process cache keeps
+complete observations for one hour and explicit disclosures for one day;
+network, consent, parsing and unsupported-structure failures remain retryable.
+The check adds no requests to ordinary manual search or playback resolution.
+It applies equally to Core radio, browser rooms and the Worker fallback.
+
+Checked automatic suggestions retain a private versioned marker. Older pending
+automatic suggestions without this marker are discarded before a new start,
+including after restart. Manual queue entries remain intact. Resuming the
+exact already-started Core recovery entry retains the existing recovery policy;
+this change does not abruptly interrupt current playback. Public snapshots
+omit the marker. No database schema migration is needed.
+
 These are conservative metadata filters. A missing declaration is unknown, and
 neither a Topic/VEVO name nor an official-looking title establishes human
 authorship. The editorial lists are not provider provenance attestations. An
 unlabelled or misleading upload can evade metadata checks, so this is not a
 guarantee of zero AI audio. Explicit manual playback retains its existing behavior.
+YouTube's disclosure can refer to visuals as well as audio; either kind excludes
+that upload from automatic radio. The watch-page structures are undocumented,
+so a provider change may temporarily reduce radio availability. A complete
+page without a supported disclosure is an observation, not proof of human
+authorship. See [YouTube's label explanation](https://support.google.com/youtube/answer/15447836?hl=en).
 
 ### Stored favorites and optional discovery
 

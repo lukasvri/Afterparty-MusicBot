@@ -1,3 +1,4 @@
+import { fixtureRadioContent, fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Providers } from '../src/providers.ts';
@@ -45,7 +46,7 @@ test('24 guild-scoped radio rounds survive corrupted caches, partial errors, ski
     if (event === 'core-radio') diagnostics.push(JSON.parse(String(value)) as RadioDiagnostic);
   });
   const guilds = [0, 1].map(index => {
-    const store = new Store(':memory:'), providers = new Providers(store, { LASTFM_API_KEY: 'synthetic-only' });
+    const store = new Store(':memory:'), providers = fixtureRadioOwner(new Providers(store, { LASTFM_API_KEY: 'synthetic-only' }));
     let searches = 0, matches = 0, requests = 0;
     const history: Track[] = [], seen = new Set<string>();
     const counters = () => ({ searches, matches, requests });
@@ -162,7 +163,7 @@ test('12 room radio rounds keep a fixed seed, avoid composition repeats and reco
       if (query.endsWith('official music video')) return [];
       if (query.startsWith('deep house') && round % 2 === 0) throw Error('private-room-provider-error');
       return [...invalidCandidates(round, skipped, excluded), ...prior, ...candidates, candidates[0]];
-    }, value => diagnostics.push(value));
+    }, value => diagnostics.push(value), fixtureRadioContent);
     assert(next, `room round ${round} must find a safe nonrepeated song`);
     const expected = byId.get(next.id); assert(expected, 'only an admitted synthetic studio recording may win');
     assert.equal(next.title, expected.title); assert.equal(next.artist, expected.artist);
@@ -174,10 +175,10 @@ test('12 room radio rounds keep a fixed seed, avoid composition repeats and reco
     if (artists.length) assert.notEqual(artist, artists.at(-1), 'an equally safe different artist must break an immediate artist repeat');
     artists.push(artist);
     assertDiagnostic(diagnostics.at(-1)!, [seed.id, next.id, next.title, 'private-room-provider-error']);
-    state.radioHistory = [...(state.radioHistory ?? []), state.current!]; state.current = { ...next, radio: true };
+    state.radioHistory = [...(state.radioHistory ?? []), state.current!]; state.current = { ...next, radio: true, radioContentChecked: 1 as const };
   }
   assert.equal(seen.size, 12); assert.equal(new Set(artists).size, 3); assert.equal(diagnostics.length, 12);
   assert.equal(diagnostics.filter(value => value.failedSearches === 1).length, 6);
   state.queue = [{ ...track('manual00001', 'Manual Artist', 'Deliberate choice'), radio: false }];
-  assert.equal(await roomRecommendation(state, async () => { assert.fail('a manual queued song must suppress automatic discovery'); }, () => {}), null);
+  assert.equal(await roomRecommendation(state, async () => { assert.fail('a manual queued song must suppress automatic discovery'); }, () => {}, fixtureRadioContent), null);
 });

@@ -1,3 +1,4 @@
+import { fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import captured from "./fixtures/radio-artist-credits.json" with { type: "json" };
@@ -12,7 +13,7 @@ const seed: Track = { id: "TDe1DqxwJoc", title: "Oasis - Live Forever (Official 
 test("captured structured Oasis credits reach the same-artist radio fallback", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     providers.youtube = async () => { throw new Error("API capability disabled in isolated fixture"); };
     // Identity fields are the exact public capture. Duration/category/availability
     // below are controlled inputs, independently observed in the prior live capture.
@@ -30,7 +31,7 @@ test("captured structured Oasis credits reach the same-artist radio fallback", a
 test("a single structured artist can contain a comma without being truncated", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     providers.youtube = async () => { throw new Error("API capability disabled in isolated fixture"); };
     // Controlled parser variations, not another live metadata capture.
     providers.extract = async () => ({ title: "EARFQUAKE", track: "EARFQUAKE", artist: "Tyler, The Creator",
@@ -43,7 +44,7 @@ test("missing structured credits and an unconfirmed multi-artist list retain the
   for (const artists of [undefined, ["Oasis", "Noel Gallagher"]]) {
     const store = new Store(":memory:");
     try {
-      const providers = new Providers(store, {});
+      const providers = fixtureRadioOwner(new Providers(store, {}));
       providers.youtube = async () => { throw new Error("API capability disabled in isolated fixture"); };
       providers.extract = async () => ({ title: "Wonderwall", track: "Wonderwall", artist: "Oasis, Noel Gallagher",
         artists, uploader: "Unknown channel", duration: 259, playable_in_embed: true });
@@ -55,7 +56,7 @@ test("missing structured credits and an unconfirmed multi-artist list retain the
 test("older persisted combined credits still exclude another upload after artist refinement", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     providers.youtube = async () => { throw new Error("API capability disabled in isolated fixture"); };
     providers.extract = async () => ({ ...captured, duration: 259, categories: ["Music"],
       is_live: false, playable_in_embed: true });
@@ -64,7 +65,7 @@ test("older persisted combined credits still exclude another upload after artist
     // A controlled old ID makes this exercise recording identity, not ID exclusion.
     const legacy = { ...candidate, id: "legacy00001", catalog: { ...candidate.catalog!, artist: captured.artist } };
     providers.rememberRadioTrack(legacy);
-    const afterUpgrade = new Providers(store, {});
+    const afterUpgrade = fixtureRadioOwner(new Providers(store, {}));
     afterUpgrade.search = async () => [candidate];
     assert.equal(await afterUpgrade.radio(seed, [seed.id]), null,
       "Retained private history must not replay the same composition under its refined artist identity");
@@ -74,7 +75,7 @@ test("older persisted combined credits still exclude another upload after artist
 test("a legacy combined-credit seed can use verified complete credits without trusting one shared collaborator", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     providers.youtube = async () => { throw new Error("API capability disabled in isolated fixture"); };
     providers.extract = async () => ({ ...captured, duration: 259, categories: ["Music"],
       is_live: false, playable_in_embed: true });

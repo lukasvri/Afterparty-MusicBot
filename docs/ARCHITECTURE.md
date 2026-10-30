@@ -61,6 +61,7 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Playback and source extraction | `services/core/src/` | `engine.ts`, `audio.ts`, `providers.ts`, `extractor.ts` |
 | User search relevance | `services/core/src/music-search.ts` | One bounded title/artist and recording-format ranking policy, with canonical positive/empty cache bounds shared by Core search and Worker fallback; Core radio retains fresh empty-result retries and its separate admission/ranking pipeline |
 | Shared room-radio queue selection and existence checks | `services/core/src/room-radio.ts` | One lazy selection policy for Core and website fallback; `room-state.ts` owns command/prefetch eligibility |
+| YouTube radio disclosure verification | `services/core/src/youtube-content.ts` | Bounded public watch-page identity/disclosure checks and shared cache; `radio-pipeline.ts` verifies winners and preferred video uploads; private versioned queue markers prevent unchecked pending suggestions from starting |
 | Shared browser-room seek bounds | `services/core/src/protocol.ts` | `roomSeekPosition` clamps Core/Worker seeks and native browser command targets; `lib/playback-sync.ts` converts device calibration before submission and confirmation |
 | Shared browser-room queue capacity | `services/core/src/protocol.ts` | `ROOM_QUEUE_LIMIT` and `roomQueueCapacity` reserve pending requests; Core and native room/library controls use the same bounds |
 | Core rooms, games and social authority | `services/core/src/` | `rooms.ts`, `guess-game.ts`, `social.ts` |

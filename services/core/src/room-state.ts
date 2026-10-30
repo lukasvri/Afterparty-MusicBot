@@ -2,6 +2,7 @@ import { UserError } from "./types.ts";
 import { ROOM_QUEUE_LIMIT, ROOM_START_LEAD_MS, ROOM_COMMAND_RECEIPT_LIMIT, validRoomCommandId, roomQueueCapacity, roomSeekPosition, type RoomVideo } from "./protocol.ts";
 import { roomRadioSeed, playableRoomQueue, hasPlayableRoomQueue, roomRadioHistory } from "./room-radio.ts";
 import { songIdentity, RADIO_HISTORY_LIMIT } from "./radio.ts";
+import { RADIO_CONTENT_VERSION } from "./protocol.ts";
 
 /** Durable room state, shared by Core and the Worker fallback. Never publish vote identities. */
 export type RoomPlayback = {
@@ -47,9 +48,10 @@ export function roomCommandReceipt(state: RoomPlayback, version: number) {
 }
 export const guestActions = new Set(["add", "vote", "skip-vote"]);
 function publicVideo(video: RoomVideo): RoomVideo {
-  if (video.radioRelatedTo === undefined) return video;
+  if (video.radioRelatedTo === undefined && video.radioContentChecked === undefined) return video;
   const visible = { ...video };
   delete visible.radioRelatedTo;
+  delete visible.radioContentChecked;
   return visible;
 }
 export function publicPlayback(state: RoomPlayback) {
@@ -161,7 +163,7 @@ export function changeRoom(
     if (state.current && !state.current.radio && state.current !== recommended)
       state.radioSeed = structuredClone(state.current);
     if (state.current === recommended && recommended)
-      state.current = { ...recommended, radio: true };
+      state.current = { ...recommended, radio: true, radioContentChecked: RADIO_CONTENT_VERSION };
     state.position = 0;
     state.playing = Boolean(state.current);
     state.playbackKey = crypto.randomUUID();
@@ -231,7 +233,7 @@ export function changeRoom(
       throw new UserError("This video does not support seeking.");
     state.position = roomSeekPosition(input.position, state.current.duration);
   } else if (action === "radio-prefetch") {
-    if (!state.queue.length && state.radio !== false && recommended) state.queue.push({ ...recommended, radio: true });
+    if (!state.queue.length && state.radio !== false && recommended) state.queue.push({ ...recommended, radio: true, radioContentChecked: RADIO_CONTENT_VERSION });
     state.radioRetryAt = Number(input.now ?? 0) + 15000;
   } else if (action === "next") advance();
   else if (action === "radio" || action === "approval") {
@@ -243,7 +245,7 @@ export function changeRoom(
       if (input.enabled) {
         if (!state.current && recommended) advance();
         else if (!state.queue.length) {
-          if (recommended) state.queue.push({ ...recommended, radio: true });
+          if (recommended) state.queue.push({ ...recommended, radio: true, radioContentChecked: RADIO_CONTENT_VERSION });
           state.radioRetryAt = Number(input.now ?? 0) + 15000;
         }
       }

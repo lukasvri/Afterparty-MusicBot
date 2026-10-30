@@ -9,6 +9,7 @@ import {
   type RoomVideo,
 } from "./protocol.ts";
 import { roomRecommendation, playableRoomQueue } from "./room-radio.ts";
+import { verifyRadioContent } from "./youtube-content.ts";
 import {
   changeRoom,
   guestActions,
@@ -35,6 +36,7 @@ type Saved = {
 
 /** Owns room clocks and transitions even when no browsers are connected. */
 export class Rooms extends EventEmitter {
+  verifyRadioContent = verifyRadioContent;
   readonly epoch = randomUUID();
   search: ((query: string) => Promise<RoomVideo[]>) | null = null;
   private advancing = new Set<string>();
@@ -170,6 +172,8 @@ export class Rooms extends EventEmitter {
             : {}),
         },
         this.search,
+        undefined,
+        this.verifyRadioContent,
       );
       this.radioLookups.set(lookupKey, lookup);
     }

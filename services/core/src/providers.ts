@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
 import { normalizePlaylistUrl } from "./playlist-url.ts";
 import { metadataAiGenerated } from "./music-content.ts";
+import { verifyRadioContent } from "./youtube-content.ts";
 import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS } from "./music-search.ts";
 import { deezerRef, deezerShareUrl, expandDeezerLink, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
@@ -104,6 +105,7 @@ const unavailablePlaylistEntry = (entry: Record<string, unknown>) =>
   typeof entry.title === "string" && /^\[?(?:deleted|private|unavailable) video\]?$/i.test(entry.title.trim());
 
 export class Providers {
+  verifyRadioContent = verifyRadioContent;
   store: Store;
   key: string;
   spotifyId: string;
@@ -619,6 +621,7 @@ export class Providers {
       .filter(([, at]) => Date.now() - at < 7 * 86400000).map(([id]) => id)];
     const soundcloud = seed.source === "soundcloud" && !seed.concert;
     const result = await selectRadio({
+      verifyContent: this.verifyRadioContent,
       seed, recent, excluded: banned, requireEmbeddable: Boolean(seed.concert),
       search: query => soundcloud
         ? resolveSoundcloud(`sc:${query}`, 5,

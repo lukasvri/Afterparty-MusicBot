@@ -1,5 +1,7 @@
 // Shared by the web client and the local Discord/room service. No runtime secrets.
-export type RoomVideo = {
+export const RADIO_CONTENT_VERSION = 1;
+export type RadioContentProof = { radioContentChecked?: typeof RADIO_CONTENT_VERSION };
+export type RoomVideo = RadioContentProof & {
   id: string;
   title: string;
   artist: string;

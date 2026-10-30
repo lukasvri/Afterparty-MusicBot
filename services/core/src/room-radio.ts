@@ -3,7 +3,9 @@ import {
   RADIO_HISTORY_LIMIT,
 } from "./radio.ts";
 import type { RoomVideo } from "./protocol.ts";
+import { RADIO_CONTENT_VERSION } from "./protocol.ts";
 import { selectRadio, type RadioDiagnostic } from "./radio-pipeline.ts";
+import { verifyRadioContent, type RadioContentVerifier } from "./youtube-content.ts";
 
 export type RoomRadioState = {
   current: RoomVideo | null;
@@ -33,7 +35,7 @@ function* playableEntries(state: RoomRadioState): Generator<RoomVideo> {
   let seedId: string | undefined;
   for (const [index, video] of state.queue.entries()) {
     if (!video.radio) { yield video; continue; }
-    if (state.radio === false || !video.embeddable) continue;
+    if (state.radio === false || !video.embeddable || video.radioContentChecked !== RADIO_CONTENT_VERSION) continue;
     if (!ranker) {
       const seed = roomRadioSeed(state);
       if (!seed) continue;
@@ -65,10 +67,12 @@ export async function roomRecommendation(
   state: RoomRadioState,
   search: (query: string) => Promise<RoomVideo[]>,
   diagnose: (result: RoomRadioDiagnostic) => void = result => console.info("room-radio", JSON.stringify(result)),
+  verifyContent: RadioContentVerifier = verifyRadioContent,
 ): Promise<RoomVideo | null> {
   const seed = roomRadioSeed(state);
   if (state.radio === false || !seed || seed.live || seed.music === false || hasPlayableRoomQueue(state)) return null;
   const result = await selectRadio({
+    verifyContent,
     seed: { ...seed, entryId: seed.id, source: "youtube" },
     recent: [...(state.radioHistory ?? []), ...(state.history ?? []),
       ...(state.radioExcludedSongs ?? []), ...(state.current ? [state.current] : [])],
@@ -81,7 +85,7 @@ export async function roomRecommendation(
   const next = result.track;
   return next ? {
     id: next.id, title: next.title, artist: next.artist, genres: next.genres,
-    music: next.music, ...(next.aiGenerated === true ? { aiGenerated: true } : {}), radioRelatedTo: seed.id, image: next.image,
+    music: next.music, ...(next.aiGenerated === true ? { aiGenerated: true } : {}), radioRelatedTo: seed.id, radioContentChecked: RADIO_CONTENT_VERSION, image: next.image,
     duration: next.duration, live: next.live, embeddable: next.embeddable,
   } : null;
 }

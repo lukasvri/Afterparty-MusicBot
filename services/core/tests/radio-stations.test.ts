@@ -1,3 +1,4 @@
+import { fixtureRadioContent } from './radio-content-fixture.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { selectRadio, RADIO_LIMITS, type RadioInput } from '../src/radio-pipeline.ts';
@@ -32,7 +33,7 @@ function discovery(seed: Track) {
 for (const [name, original] of [['Janji', janji], ['Lost Sky', lost]] as const) {
   test(`${name} with an NCS uploader and no genre gets another named artist instead of arbitrary same-artist videos`, async () => {
     const seed = original(), before = structuredClone(seed), f = discovery(seed);
-    const selected = await selectRadio(defaults(seed, { search: f.search }));
+    const selected = await selectRadio({ ...(defaults(seed, { search: f.search })), verifyContent: fixtureRadioContent });
     assert(selected.track); assert.equal(selected.source, 'curated');
     assert.notEqual(radioArtist(selected.track), radioArtist(seed));
     assert.equal(radioGenre(selected.track), null, 'the fixed recording relation does not invent genre metadata');
@@ -45,15 +46,15 @@ for (const [name, original] of [['Janji', janji], ['Lost Sky', lost]] as const) 
     assert(!f.calls.some(query => query === `${name} music audio`));
     assert(f.calls.length <= 1 + RADIO_LIMITS.curatedMatches + 1, 'metadata, bounded named lookups and optional format lookup only');
     const roomState = { current: seed, queue: [], radio: true, history: [] };
-    const roomBefore = structuredClone(roomState), room = await roomRecommendation(roomState, f.search, () => {});
+    const roomBefore = structuredClone(roomState), room = await roomRecommendation(roomState, f.search, () => {}, fixtureRadioContent);
     assert(room); assert.notEqual(radioArtist(room), name); assert.equal(room.radioRelatedTo, seed.id);
     assert.deepEqual(roomState, roomBefore);
   });
   test(`${name} remains the original room anchor after a curated song becomes current`, async () => {
-    const seed = original(), f = discovery(seed), first = await selectRadio(defaults(seed, { search: f.search }));
+    const seed = original(), f = discovery(seed), first = await selectRadio({ ...(defaults(seed, { search: f.search })), verifyContent: fixtureRadioContent });
     assert(first.track);
-    const state = { current: { ...first.track, radio: true }, radioSeed: seed, queue: [], radio: true, history: [seed] };
-    const before = structuredClone(state), next = await roomRecommendation(state, f.search, () => {});
+    const state = { current: { ...first.track, radio: true, radioContentChecked: 1 as const }, radioSeed: seed, queue: [], radio: true, history: [seed] };
+    const before = structuredClone(state), next = await roomRecommendation(state, f.search, () => {}, fixtureRadioContent);
     assert(next); assert.notEqual(next.id, first.track.id); assert.equal(next.radioRelatedTo, seed.id);
     assert(stationRecording(f.station, next)); assert.deepEqual(state, before);
   });
@@ -77,7 +78,7 @@ test('NCS channel labels and attached catalog objects cannot fabricate station m
 
 test('failed curated searches cannot reintroduce the original arbitrary Janji-video fallback', async () => {
   const seed = janji(), f = discovery(seed);
-  const selected = await selectRadio(defaults(seed, { search: async () => [f.unrelated] }));
+  const selected = await selectRadio({ ...(defaults(seed, { search: async () => [f.unrelated] })), verifyContent: fixtureRadioContent });
   assert.equal(selected.track, null); assert.equal(selected.diagnostic.curatedSearches, 3);
   assert(selected.diagnostic.rejected['catalog-match'] > 0);
 });
@@ -86,18 +87,18 @@ test('known recordings are removed before targeted searches, including an explic
   const seed = lost(), f = discovery(seed);
   const superhero = f.recordings.find(track => track.title.includes('Superhero'))!;
   const seasons = track('Rival & Cadmium', 'Seasons (feat. Harley Bird)');
-  const selected = await selectRadio(defaults(seed, { recent: [superhero, seasons], search: f.search }));
+  const selected = await selectRadio({ ...(defaults(seed, { recent: [superhero, seasons], search: f.search })), verifyContent: fixtureRadioContent });
   assert(selected.track); assert(!selected.track.title.includes('Superhero')); assert(!selected.track.title.includes('Seasons'));
   assert(!f.calls.some(query => query.includes('"Superhero'))); assert(!f.calls.some(query => query.includes('"Seasons')));
 });
 
 test('curated lookups share the four-operation catalog budget rather than adding unbounded hydration', async () => {
   const seed = janji(), f = discovery(seed); let matched = 0;
-  const selected = await selectRadio(defaults(seed, { search: f.search,
+  const selected = await selectRadio({ ...(defaults(seed, { search: f.search,
     similar: async () => ['First', 'Second', 'Third'].map((title, index) => ({ title, artist: 'Unrelated ' + index, duration: 210 })),
     match: async () => { matched++; throw Error('synthetic unavailable'); },
     topTracks: async () => { assert.fail('a selected curated recording needs no artist recovery'); },
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert(selected.track); assert.equal(matched, 3);
   assert.equal(selected.diagnostic.curatedSearches, 1); assert.equal(selected.diagnostic.catalogMatches, RADIO_LIMITS.catalogMatches);
 });
@@ -105,24 +106,24 @@ test('curated lookups share the four-operation catalog budget rather than adding
 test('explicit matching genre outranks unknown catalog metadata and unknown curated genre without bypassing conflicts', async () => {
   const seed = track('Aster', 'Opening', { genres: ['deep house'] });
   const exact = track('Aster', 'Exact Theme', { genres: ['deep house'] });
-  const selected = await selectRadio(defaults(seed, { search: async () => [exact],
+  const selected = await selectRadio({ ...(defaults(seed, { search: async () => [exact],
     similar: async () => [{ artist: 'Beryl', title: 'Unknown Theme', duration: 210 }],
     match: async () => track('Beryl', 'Unknown Theme'), favorites: ['Beryl - Unknown Theme'],
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(selected.track?.id, exact.id);
   const namedSeed = janji(); namedSeed.genres = ['deep house'];
   const f = discovery(namedSeed);
   for (const recording of f.recordings) if (recording.title.includes('Firefly')) recording.genres = ['tech house'];
   const hope = f.recordings.find(track => track.title.includes('Hope'))!; hope.genres = ['deep house'];
-  const named = await selectRadio(defaults(namedSeed, { search: f.search }));
+  const named = await selectRadio({ ...(defaults(namedSeed, { search: f.search })), verifyContent: fixtureRadioContent });
   assert.equal(named.track?.id, hope.id); assert(named.diagnostic.rejected.style > 0);
 });
 
 test('explicit AI metadata, titles or uploader labels reject original seeds before every provider lookup', async () => {
   for (const seed of [{ ...janji(), aiGenerated: true }, track('Janji', 'Heroes Tonight (AI Generated)'), { ...lost(), artist: 'Suno Music' }]) {
-    const selected = await selectRadio(defaults(seed, { search: async () => { assert.fail('AI seed must not search'); },
+    const selected = await selectRadio({ ...(defaults(seed, { search: async () => { assert.fail('AI seed must not search'); },
       similar: async () => { assert.fail('AI seed must not discover'); }, match: async () => { assert.fail('AI seed must not hydrate'); },
-    }));
+    })), verifyContent: fixtureRadioContent });
     assert.equal(selected.track, null); assert.equal(selected.diagnostic.outcome, 'insufficient-metadata');
   }
 });
@@ -131,14 +132,14 @@ test('AI-labelled catalog descriptors are rejected before hydration and raw AI u
   const seed = track('Aster', 'Opening', { genres: ['deep house'] }); let hydrated = 0;
   const flagged = track('Beryl', 'Evening', { genres: ['deep house'], aiGenerated: true, catalog: { artist: 'Beryl', title: 'Evening', duration: 210 } });
   const titleFlagged = track('Beryl', 'Evening (AI generated)', { genres: ['deep house'], catalog: flagged.catalog });
-  const selected = await selectRadio(defaults(seed, { search: async () => [flagged, titleFlagged],
+  const selected = await selectRadio({ ...(defaults(seed, { search: async () => [flagged, titleFlagged],
     similar: async () => [{ artist: 'Beryl', title: 'Evening (AI generated)', duration: 210 }, { artist: 'Suno', title: 'Evening', duration: 210 }],
     match: async () => { hydrated++; return flagged; },
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(hydrated, 0); assert.equal(selected.track, null);
   assert.equal(isRadioMusic(flagged), false); assert.equal(isRadioMusic(titleFlagged), false);
   assert.equal(isRadioTitle('Evening (AI generated)'), false);
-  const queued = { ...flagged, radio: true, radioRelatedTo: seed.id };
+  const queued = { ...flagged, radio: true, radioRelatedTo: seed.id , radioContentChecked: 1 as const };
   assert.deepEqual(playableRoomQueue({ current: seed, radioSeed: seed, queue: [queued] }), []);
   const manual = { ...queued, radio: false };
   assert.deepEqual(playableRoomQueue({ current: seed, radioSeed: seed, queue: [manual] }), [manual], 'manual selections are unaffected by radio eligibility');
@@ -147,7 +148,7 @@ test('AI-labelled catalog descriptors are rejected before hydration and raw AI u
 test('an AI-labelled official-video candidate never replaces an eligible audio recording', async () => {
   const seed = track('Aster', 'Opening', { genres: ['deep house'] }), audio = track('Beryl', 'Evening', { genres: ['deep house'] });
   const video = track('Beryl', 'Evening (Official Music Video)', { genres: ['deep house'], aiGenerated: true });
-  const selected = await selectRadio(defaults(seed, { search: async query => query.endsWith('official music video') ? [video] : [video, audio] }));
+  const selected = await selectRadio({ ...(defaults(seed, { search: async query => query.endsWith('official music video') ? [video] : [video, audio] })), verifyContent: fixtureRadioContent });
   assert.equal(selected.track?.id, audio.id); assert.equal(selected.diagnostic.musicVideo, 'filtered');
 });
 
@@ -155,16 +156,16 @@ test('finite station histories and two independent station seeds keep exclusions
   const a = janji(), b = lost(), fa = discovery(a), fb = discovery(b);
   const history: Track[] = [];
   for (let pass = 0; pass < fa.station.songs.length - 1; pass++) {
-    const selected = await selectRadio(defaults(a, { recent: history, search: fa.search }));
+    const selected = await selectRadio({ ...(defaults(a, { recent: history, search: fa.search })), verifyContent: fixtureRadioContent });
     assert(selected.track); assert(!history.some(track => track.id === selected.track!.id)); history.push(selected.track);
   }
-  const exhausted = await selectRadio(defaults(a, { recent: history, search: fa.search }));
+  const exhausted = await selectRadio({ ...(defaults(a, { recent: history, search: fa.search })), verifyContent: fixtureRadioContent });
   assert.equal(exhausted.track, null); assert.equal(exhausted.diagnostic.curatedSearches, 0);
-  const other = await selectRadio(defaults(b, { search: fb.search }));
+  const other = await selectRadio({ ...(defaults(b, { search: fb.search })), verifyContent: fixtureRadioContent });
   assert(other.track); assert(stationRecording(fb.station, other.track));
   assert.equal(stationRecording(fa.station, other.track), false);
   const excluded = fa.recordings.filter(track => track.id !== a.id).map(track => track.id);
-  assert.equal((await selectRadio(defaults(a, { excluded, search: fa.search }))).track, null);
+  assert.equal((await selectRadio({ ...(defaults(a, { excluded, search: fa.search })), verifyContent: fixtureRadioContent })).track, null);
 });
 
 test('genre and catalog results cannot replay the same station recording under reversed collaborative credits', async () => {
@@ -172,13 +173,13 @@ test('genre and catalog results cannot replay the same station recording under r
   const previous = track('Itro & Tobu', 'Cloud 9');
   const repeated = track('Tobu & Itro', 'Cloud 9');
   for (const source of ['genre', 'catalog']) {
-    const selected = await selectRadio(defaults(seed, { recent: [previous],
+    const selected = await selectRadio({ ...(defaults(seed, { recent: [previous],
       search: async query => source === 'genre' && query.startsWith('progressive house audio') ? [repeated] : [],
       ...(source === 'catalog' ? {
         similar: async () => [{ artist: 'Tobu & Itro', title: 'Cloud 9', duration: 210 }],
         match: async () => repeated,
       } : {}),
-    }));
+    })), verifyContent: fixtureRadioContent });
     assert.equal(selected.track, null, source);
     assert(selected.diagnostic.rejected.recording > 0, source);
   }

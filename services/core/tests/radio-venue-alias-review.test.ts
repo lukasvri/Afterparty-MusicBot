@@ -1,3 +1,4 @@
+import { fixtureRadioContent } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createRadioRanker, isRadioMusic, isRadioTitle, radioArtist, rankRadio, sameRadioRecording, sameRadioSong } from "../src/radio.ts";
@@ -76,10 +77,10 @@ for (const requireEmbeddable of [false, true]) {
     const candidate = { ...track("candidate", "Yesterday", "Beatles"), genres: ["deep house"] };
     const live = { ...track("live", "New Song Live Wembley"), genres: ["deep house"] };
     const allowed = { ...clean, genres: ["deep house"] };
-    const result = await selectRadio({ seed: { ...seed, genres: ["deep house"] },
+    const result = await selectRadio({ ...({ seed: { ...seed, genres: ["deep house"] },
       recent: [publicHistory(previous)], excluded: [], requireEmbeddable,
       search: async () => [candidate, live, allowed],
-    });
+    }), verifyContent: fixtureRadioContent });
     assert.equal(result.track?.id, allowed.id);
     assert.ok(result.diagnostic.rejected.content > 0, "The venue recording is rejected as content");
     assert.ok(result.diagnostic.rejected.recording > 0, "The artist alias is rejected as a repeat");
@@ -89,7 +90,7 @@ for (const requireEmbeddable of [false, true]) {
 test("review aliases: catalog descriptors exclude the repeated spelling before hydration", async () => {
   const previous = track("previous", "Hey Jude", "The Beatles");
   const attempted: string[] = [];
-  const result = await selectRadio({ seed, recent: [publicHistory(previous)], excluded: [], requireEmbeddable: true,
+  const result = await selectRadio({ ...({ seed, recent: [publicHistory(previous)], excluded: [], requireEmbeddable: true,
     search: async () => [],
     similar: async () => [
       { artist: "Beatles", title: "Hey Jude", duration: 210 },
@@ -99,7 +100,7 @@ test("review aliases: catalog descriptors exclude the repeated spelling before h
       attempted.push(song.title);
       return { ...track("catalog-match", song.title, song.artist), catalog: song };
     },
-  });
+  }), verifyContent: fixtureRadioContent });
   assert.deepEqual(attempted, ["Another Song"]);
   assert.equal(result.track?.id, "catalog-match");
 });

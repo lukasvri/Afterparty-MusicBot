@@ -1,3 +1,4 @@
+import { fixtureRadioContent } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setImmediate as yieldTurn } from "node:timers/promises";
@@ -14,10 +15,10 @@ test("independent bounded discovery pools start before either provider reply", a
   let release!: (tracks: Track[]) => void;
   const gate = new Promise<Track[]>(resolve => { release = resolve; });
   const queries: string[] = [];
-  const pending = selectRadio({ ...input, search: async query => {
+  const pending = selectRadio({ ...({ ...input, search: async query => {
     queries.push(query);
     return queries.length === 1 ? gate : [track("later000001", "Cedar")];
-  } });
+  } }), verifyContent: fixtureRadioContent });
   try {
     await yieldTurn();
     assert.equal(queries.length, 2, "one slow provider pool must not delay starting the other bounded pool");
@@ -29,8 +30,8 @@ test("reverse provider completion preserves stable discovery order and private p
   let release!: (tracks: Track[]) => void;
   const gate = new Promise<Track[]>(resolve => { release = resolve; });
   const before = structuredClone(seed);
-  const pending = selectRadio({ ...input, search: query => query.startsWith("deep house")
-    ? gate : Promise.resolve([track("later000001", "Cedar")]) });
+  const pending = selectRadio({ ...({ ...input, search: query => query.startsWith("deep house")
+    ? gate : Promise.resolve([track("later000001", "Cedar")]) }), verifyContent: fixtureRadioContent });
   await yieldTurn(); release([track("first000001", "Beryl")]);
   const selected = await pending;
   assert.equal(selected.track?.id, "first000001");
@@ -42,10 +43,10 @@ test("reverse provider completion preserves stable discovery order and private p
 });
 
 test("one failed discovery pool cannot hide the other safe result", async () => {
-  const selected = await selectRadio({ ...input, search: async query => {
+  const selected = await selectRadio({ ...({ ...input, search: async query => {
     if (query.startsWith("deep house")) throw new Error("private provider diagnostic");
     return [track("later000001", "Cedar")];
-  } });
+  } }), verifyContent: fixtureRadioContent });
   assert.equal(selected.track?.id, "later000001");
   assert.equal(selected.source, "artist");
   assert.equal(selected.diagnostic.failedSearches, 1);

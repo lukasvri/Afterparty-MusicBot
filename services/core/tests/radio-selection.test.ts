@@ -1,3 +1,4 @@
+import { fixtureRadioOwner } from './radio-content-fixture.ts';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Store } from "../src/store.ts";
@@ -15,7 +16,7 @@ const positive = track("next0000001", "Related Artist - Next song");
 
 test("specific genre fallback reaches an eligible result without inventing an artist", async () => {
   const store = new Store(":memory:");
-  const p = new Providers(store, {});
+  const p = fixtureRadioOwner(new Providers(store, {}));
   const queries: string[] = [];
   p.search = async (query) => { queries.push(query); return [positive]; };
   try {
@@ -29,7 +30,7 @@ test("specific genre fallback reaches an eligible result without inventing an ar
 
 test("unknown artist with broad or absent genre still does not search", async () => {
   const store = new Store(":memory:");
-  const p = new Providers(store, {});
+  const p = fixtureRadioOwner(new Providers(store, {}));
   p.search = async () => { assert.fail("No relationship evidence"); };
   try {
     for (const genres of [[], ["pop"], ["house"]]) {
@@ -40,7 +41,7 @@ test("unknown artist with broad or absent genre still does not search", async ()
 
 test("genre fallback preserves style, title, duration, embedding and skip exclusions", async () => {
   const store = new Store(":memory:");
-  const p = new Providers(store, {});
+  const p = fixtureRadioOwner(new Providers(store, {}));
   const concert = { ...seed, concert: true };
   const rejected = [
     track("wrong000001", "Other Artist - Wrong style", ["synth pop"]),
@@ -63,7 +64,7 @@ test("genre fallback preserves style, title, duration, embedding and skip exclus
 
 test("HTTP 200 can yield no catalog songs; an eligible fallback still succeeds", async () => {
   const store = new Store(":memory:");
-  const p = new Providers(store, {});
+  const p = fixtureRadioOwner(new Providers(store, {}));
   const named = { ...seed, title: "Seed Artist - Seed song" };
   let requests = 0;
   p.recommendations = new Recommendations(store, "synthetic", async () => {
@@ -86,7 +87,7 @@ test("HTTP 200 can yield no catalog songs; an eligible fallback still succeeds",
 
 test("catalog matches can all fail style checks before a positive fallback", async () => {
   const store = new Store(":memory:");
-  const p = new Providers(store, { LASTFM_API_KEY: "synthetic" });
+  const p = fixtureRadioOwner(new Providers(store, { LASTFM_API_KEY: "synthetic" }));
   p.recommendations.topTracks = async () => [];
   const named = { ...seed, title: "Seed Artist - Seed song" };
   const matched: string[] = [];
@@ -111,7 +112,7 @@ test("catalog matches can all fail style checks before a positive fallback", asy
 test("an in-flight lookup can exceed 45 seconds and is shared with naturalNext", async (t) => {
   const { Engine } = await import("../src/engine.ts");
   const store = new Store(":memory:");
-  const p = new Providers(store, {});
+  const p = fixtureRadioOwner(new Providers(store, {}));
   const engine = new Engine(store, p, {
     onIdle: null, onError: null, play() {}, pause() {}, resume() {}, stop() {},
     duration: () => 0, advancing: () => false, buffering: () => false,
@@ -146,7 +147,7 @@ test("an in-flight lookup can exceed 45 seconds and is shared with naturalNext",
 test("empty selections retry after 15 seconds and stop after three attempts", async (t) => {
   const { Engine } = await import("../src/engine.ts");
   const store = new Store(":memory:");
-  const p = new Providers(store, {});
+  const p = fixtureRadioOwner(new Providers(store, {}));
   const engine = new Engine(store, p, {
     onIdle: null, onError: null, play() {}, pause() {}, resume() {}, stop() {},
     duration: () => 0, advancing: () => false, buffering: () => false,
@@ -177,7 +178,7 @@ test("empty selections retry after 15 seconds and stop after three attempts", as
 
 test("Discord discovers during source startup before audible frames and preserves a later pause", async () => {
   const { Engine } = await import("../src/engine.ts");
-  const store = new Store(":memory:"), providers = new Providers(store, {});
+  const store = new Store(":memory:"), providers = fixtureRadioOwner(new Providers(store, {}));
   let resumes = 0, calls = 0;
   const engine = new Engine(store, providers, {
     onIdle: null, onError: null, play() {}, pause() {}, resume() { resumes++; }, stop() {},
@@ -211,7 +212,7 @@ test("Discord discovers during source startup before audible frames and preserve
 
 test("successful YouTube search can lose unavailable IDs at metadata hydration", async (t) => {
   const store = new Store(":memory:");
-  const p = new Providers(store, {});
+  const p = fixtureRadioOwner(new Providers(store, {}));
   const stages: string[] = [];
   t.mock.method(p, "youtube", async (path: string) => {
     stages.push(path);
