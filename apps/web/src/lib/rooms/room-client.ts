@@ -50,6 +50,7 @@ export type RoomClientState = {
   busy: boolean;
   error: string;
   searching: boolean;
+  searchError: string;
   results: Video[];
   query: string;
   receivedAt: number;
@@ -118,6 +119,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     busy: false,
     error: '',
     searching: false,
+    searchError: '',
     results: [],
     query: '',
     receivedAt: 0,
@@ -195,6 +197,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       busy: false,
       error: '',
       searching: false,
+      searchError: '',
       results: [],
       query: '',
       receivedAt: 0,
@@ -730,9 +733,9 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       searchController?.abort();
       const controller = new AbortController();
       searchController = controller;
-      publish({ query, results: [], searching: false, error: '' });
+      publish({ query, results: [], searching: false, searchError: '' });
       if (query.length < 2 || query.length > 120) {
-        publish({ error: 'Enter between 2 and 120 characters.' });
+        publish({ searchError: 'Enter between 2 and 120 characters.' });
         return;
       }
       publish({ searching: true });
@@ -746,15 +749,23 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         if (!destroyed && serial === searchSerial && roomGeneration === generation)
           publish({ results: result.videos, searching: false });
       } catch (error) {
-        if (!destroyed && serial === searchSerial && roomGeneration === generation)
-          publish({ searching: false, error: message(error) });
+        if (!destroyed && serial === searchSerial && roomGeneration === generation) {
+          const timedOut =
+            error instanceof Error &&
+            (error.name === 'TimeoutError' ||
+              (error as Error & { status?: number }).status === 504);
+          publish({
+            searching: false,
+            searchError: timedOut ? 'Music search took too long. Try again.' : message(error),
+          });
+        }
       }
     },
     cancelSearch() {
       searchSerial++;
       searchController?.abort();
       searchController = null;
-      publish({ searching: false, results: [], query: '' });
+      publish({ searching: false, results: [], query: '', searchError: '' });
     },
     add(videoId: string) {
       return mutate('add', { videoId });
@@ -842,6 +853,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         busy: false,
         error: '',
         searching: false,
+        searchError: '',
         results: [],
         query: '',
         receivedAt: 0,

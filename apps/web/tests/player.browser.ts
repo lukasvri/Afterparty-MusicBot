@@ -877,6 +877,66 @@ for (const width of [1440, 390]) {
   });
 }
 
+for (const width of [1440, 390]) {
+  for (const timeout of ['browser', 'gateway']) {
+    test(`${width}px: ${timeout} search timeout explains retry while the paused room stays connected`, async (t) => {
+      const f = await fixture(t, width, { host: true, initial: true, paused: true });
+      try {
+        const { page } = f;
+        await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
+        if (timeout === 'gateway') {
+          await page.route('**/api/search?*', async (route) => {
+            await page.unroute('**/api/search?*');
+            await route.fulfill({ status: 504, json: { error: 'signal timed out' } });
+          });
+        } else {
+          await page.evaluate(() => {
+            const original = window.fetch;
+            window.fetch = (input, init) => {
+              const url = new URL(
+                typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+                location.href,
+              );
+              if (url.pathname === '/api/search') {
+                window.fetch = original;
+                return Promise.reject(new DOMException('signal timed out', 'TimeoutError'));
+              }
+              return original(input, init);
+            };
+          });
+        }
+        await find(page, 'night');
+        await page
+          .getByRole('alert')
+          .filter({ hasText: 'Music search took too long. Try again.' })
+          .waitFor();
+        await page.locator('.discovery [role="alert"]').waitFor();
+        assert.equal(
+          await page.getByRole('button', { name: 'Refresh room', exact: true }).count(),
+          0,
+        );
+        assert.equal(await page.getByText(/No songs found/).count(), 0);
+        await page.getByText('Connected', { exact: true }).waitFor();
+        assert.deepEqual(f.writes, [], 'a failed search never sends playback commands');
+        await noOverflow(page);
+        await page.screenshot({
+          path: `/tmp/afterparty-search-timeout-${timeout}-${width}.png`,
+          fullPage: true,
+        });
+        await find(page, 'night');
+        await page
+          .getByRole('button', { name: `Add ${results[0].title} to queue`, exact: true })
+          .waitFor();
+        assert.equal(await page.getByRole('alert').count(), 0);
+        assert.deepEqual(f.writes, []);
+        assert.deepEqual(f.errors, []);
+      } finally {
+        await f.close();
+      }
+    });
+  }
+}
+
 test('music tabs preserve searches and unfinished library inputs beside the player', async (t) => {
   const f = await fixture(t, 1920, { initial: true });
   try {

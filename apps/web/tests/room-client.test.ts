@@ -321,6 +321,93 @@ test('seek sends server position and revision; read failures stop local playback
   f.client.destroy();
 });
 
+for (const timeout of ['browser', 'gateway']) {
+  test(`${timeout} search timeout explains retry without reconnecting or changing playback`, async () => {
+    let fail = true;
+    const snapshot = room();
+    const f = fixture(async (path) => {
+      if (!path.startsWith('/api/search')) return json(snapshot);
+      if (!fail) return json({ videos: [snapshot.current] });
+      if (timeout === 'browser') throw new DOMException('signal timed out', 'TimeoutError');
+      return json({ error: 'signal timed out' }, 504);
+    });
+    try {
+      await f.client.join('ROOM0001');
+      const before = f.state.room;
+      await f.client.search('Janji Heroes Tonight');
+      assert.equal(f.state.searchError, 'Music search took too long. Try again.');
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.searching, false);
+      assert.equal(f.state.query, 'Janji Heroes Tonight');
+      assert.equal(f.state.connection, 'connected');
+      assert.deepEqual(f.state.room, before);
+      assert.equal(f.calls.filter((call) => call.path.startsWith('/api/search')).length, 1);
+      fail = false;
+      await f.client.search('Janji Heroes Tonight');
+      assert.equal(f.state.searchError, '');
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.results[0]?.id, snapshot.current?.id);
+      assert.equal(f.calls.filter((call) => call.path.startsWith('/api/search')).length, 2);
+      assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+    } finally {
+      f.client.destroy();
+    }
+  });
+}
+
+test('non-timeout search failures retain their access, quota and availability guidance', async () => {
+  for (const [status, error] of [
+    [403, 'This search is not allowed.'],
+    [429, 'Search quota reached. Try again later.'],
+    [503, 'The music source is busy. Try again shortly.'],
+  ] as const) {
+    const f = fixture(async (path) =>
+      path.startsWith('/api/search') ? json({ error }, status) : json(room()),
+    );
+    try {
+      await f.client.join('ROOM0001');
+      await f.client.search('Synthetic music');
+      assert.equal(f.state.searchError, error);
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.connection, 'connected');
+      assert.equal(f.state.searching, false);
+      assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+    } finally {
+      f.client.destroy();
+    }
+  }
+});
+
+test('search timeout and retry preserve an independent room failure', async () => {
+  let failSearch = true;
+  const f = fixture(async (path, init) => {
+    if (path.startsWith('/api/search'))
+      return failSearch
+        ? json({ error: 'signal timed out' }, 504)
+        : json({ videos: [room().current] });
+    return init.method === 'POST'
+      ? json({ error: 'Playback service is unavailable.' }, 503)
+      : json(room());
+  });
+  try {
+    await f.client.join('ROOM0001');
+    assert.equal(await f.client.control('next'), false);
+    assert.equal(f.state.error, 'Playback service is unavailable.');
+    const writes = f.calls.filter((call) => call.init.method === 'POST').length;
+    await f.client.search('Synthetic music');
+    assert.equal(f.state.searchError, 'Music search took too long. Try again.');
+    assert.equal(f.state.error, 'Playback service is unavailable.');
+    failSearch = false;
+    await f.client.search('Synthetic music');
+    assert.equal(f.state.searchError, '');
+    assert.equal(f.state.results.length, 1);
+    assert.equal(f.state.error, 'Playback service is unavailable.');
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, writes);
+  } finally {
+    f.client.destroy();
+  }
+});
+
 test('late search errors and destroyed sessions cannot overwrite current state or issue polling', async () => {
   const oldSearch = deferred<Response>();
   const f = fixture(async (path) =>
@@ -395,6 +482,7 @@ test('leave cancels reads, searches and polling, clears the view and preserves o
     busy: false,
     error: '',
     searching: false,
+    searchError: '',
     results: [],
     query: '',
     receivedAt: 0,
