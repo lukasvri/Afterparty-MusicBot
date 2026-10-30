@@ -1134,6 +1134,29 @@ test('a guest device pause survives browsing the room directory and returning to
   }
 });
 
+test('a saved theater preference does not trap focus or scrolling in the room directory', async (t) => {
+  const f = await fixture(t, 390, { initial: true });
+  try {
+    await f.page.evaluate(() => localStorage.setItem('afterparty-theater', 'on'));
+    await f.page.goto(`${origin}/?room=${code}&view=rooms`);
+    await f.page.getByRole('heading', { name: 'Open rooms', exact: true }).waitFor();
+    const filter = f.page.getByLabel('Find an open room', { exact: true });
+    await filter.focus();
+    assert.equal(await filter.evaluate((node) => node === document.activeElement), true);
+    assert.notEqual(
+      await f.page.evaluate(() => getComputedStyle(document.documentElement).overflow),
+      'hidden',
+    );
+    await f.page.getByRole('link', { name: 'Music', exact: true }).click();
+    await f.page.locator('.app-shell.theater-mode').waitFor();
+    await f.page.getByRole('button', { name: 'Exit theater mode', exact: true }).click();
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
 for (const width of [1440, 390])
   test(`queue options support keyboard reorder and removal at ${width}px`, async (t) => {
     const f = await fixture(t, width, { initial: true });

@@ -353,3 +353,9 @@ view now remains mounted behind the directory, retaining the actual iframe and
 local pause, while its hidden keyboard shortcuts are disabled. Browser fixtures
 simulate the official player boundary, with no provider media or Discord account;
 their success does not establish real-device autoplay permission or audible quality.
+
+The retained view also exposed a saved theater mode locking document scrolling
+behind the directory. The focused browser case reproduced `overflow: hidden` with
+the theater view suppressed. Unmounting only the theater toggle while browsing
+retires its focus/scroll effect without discarding the player; returning restores
+the saved theater preference.

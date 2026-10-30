@@ -343,7 +343,7 @@
       {:else if room}
         {#snippet roomPageActions()}
           <div class="room-actions">
-            {#if room.current && !tv}<TheaterToggle
+            {#if room.current && !tv && !directory}<TheaterToggle
                 bind:active={theater}
                 controls="room-player"
               />{/if}
