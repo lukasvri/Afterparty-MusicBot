@@ -110,7 +110,7 @@ host's latency while its normal desktop workloads are running.
 
 ## Qualifying a Core runtime change
 
-Use this sequence for [Node 26 qualification](TOOLCHAIN.md#core-qualification-evidence-24-october-2026)
+Use this sequence for [Node 26 LTS qualification](TOOLCHAIN.md#core-lts-qualification-evidence-30-october-2026)
 and later runtime changes. This is a preparation and review plan, not an
 instruction to update a live host without its owner's approval.
 

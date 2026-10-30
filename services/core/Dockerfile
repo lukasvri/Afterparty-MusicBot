@@ -1,4 +1,4 @@
-FROM node:26.12.1-bookworm-slim@sha256:1884ec272c7c06aba7696262fb822dc602f8fa5eb978d03617d6bfe487d7ebac AS base
+FROM node:26.13.0-bookworm-slim@sha256:cd820d60a7f3ae057389f3e1bcf1a0ac09dd57c428fe14f191dcbc5c56ac5fe2 AS base
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip ca-certificates tini && rm -rf /var/lib/apt/lists/*
 RUN pip3 install --break-system-packages --no-cache-dir 'yt-dlp[default]==2026.8.19'
 WORKDIR /app

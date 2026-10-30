@@ -13,7 +13,7 @@ official compatibility documentation before implementing each change.
 | Website/Core source language | **TypeScript 6.0.3** | One supported compiler generation across the project | Validate strict types, native Worker and Core audio/recovery |
 | Website styling | Native Svelte component CSS | Maintain one design system | Preserve Afterparty black/red identity, accessibility and touch targets |
 | Database/API | Drizzle ORM, Cloudflare tooling | Retain Drizzle for applicable database access, Workers and D1 for website hosting | Validate bindings, schema changes and authorization without touching production |
-| Core/audio | Source image: immutable Node.js 26.12.1, TypeScript 6, discord.js and FFmpeg | Complete actual LTS/host acceptance in #117 | Source qualification is separate from installed hosts; preserve isolation, queue revisions, explicit intent and clock |
+| Core/audio | Source candidate: immutable Node.js 26.13.0 LTS, TypeScript 6, discord.js and FFmpeg | Complete installed-host acceptance in #117 | Source qualification is separate from installed hosts; preserve isolation, queue revisions, explicit intent and clock |
 | Other service languages | Existing Core is TypeScript | Consider Go for independent APIs, Rust for measured low-level work, Python for automation/AI | Choose per workload, interoperability, hosting and test evidence; paused Rust work is not resumed by this decision |
 
 SvelteKit 3 was released on 1 October 2026. Its selection is an **approved
@@ -45,7 +45,7 @@ The native website is the sole source implementation. Installed revisions and ru
 | Prettier | Scope formatting to the new Svelte candidate with the Svelte plugin. | Adopted in `apps/web/` only; legacy formatting remains unchanged |
 | Wrangler and Cloudflare | Validate the actual target Workers/D1 build locally in isolation; do not enable deployment or modify secrets/DNS. | Cloudflare tooling already present; production cutover not established |
 | Drizzle ORM | Retain typed schema/data access where already suitable. Test migrations against synthetic data only. | Already present |
-| Node.js runtime | **Node 26** is the preferred next LTS target; **Node 24** stays the proven production fallback. Node 26 enters LTS on 28 October 2026, subject to schedule changes. | Use Node 26 in the existing **website CI validation job** for early compatibility feedback. The Core source Dockerfile targets qualified immutable Node 26.12.1. Installed hosts remain unchanged until separately approved updates; actual LTS confirmation is still open. |
+| Node.js runtime | **Node 26.13.0 Lithium** entered LTS on 28 October 2026; **Node 24** remains the recorded fallback baseline. | Website CI uses Node 26. The Core source candidate pins qualified immutable Node 26.13.0. Installed-host runtime acceptance remains separate and open in #117. |
 
 Practical standards:
 
@@ -91,16 +91,82 @@ is separate from application-framework or production-host runtime promotion.
 
 1. **Source candidate:** Website CI uses Node 26, all maintained TypeScript
    projects use compiler 6.0.3 and Core targets the qualified immutable Node
-   26.12.1 image. Node 24 remains a recorded compatibility/recovery baseline.
+   26.13.0 LTS image. Node 24 remains a recorded compatibility/recovery baseline.
    Source changes do not update any installed host.
 2. **Before switching an installed Core:** Test the Node 26 build and required
    synthetic FFmpeg, transport, recovery, queue and audio suites. Validate
    the exact Node 26 Docker base image digest and dependencies.
-3. **When LTS is available:** Reconfirm supported Cloudflare tooling and
+3. **Before a real LTS runtime switch:** Reconfirm supported Cloudflare tooling and
    production host availability. Switch any real deployment only after
    owner approval, compatible CI/host validation and a rollback plan.
 4. A successful Node 26 CI workflow is not evidence that a website has
    been published or that audible Discord playback was tested.
+
+### Core LTS qualification evidence, 30 October 2026
+
+Tracking: [issue #117](https://github.com/lukasvri/Afterparty-MusicBot/issues/117).
+The [official distribution index](https://nodejs.org/dist/index.json) identifies
+Node **v26.13.0**, dated 28 October 2026, as LTS **Lithium**. Its `security: false`
+field classifies that release; it is not a vulnerability assessment. Node 26 is
+in active LTS, with maintenance scheduled from 20 October 2027 and support ending
+30 April 2029 in the [official schedule](https://github.com/nodejs/Release/blob/main/schedule.json).
+
+Candidate `8f1a83c34bd76fa35e0999104d0060586a261318`, based on main
+`231317df27c6c6bb82cfc0d3364d0e3084a943f8`, changes only the Core Docker base:
+
+```text
+node:26.13.0-bookworm-slim@sha256:cd820d60a7f3ae057389f3e1bcf1a0ac09dd57c428fe14f191dcbc5c56ac5fe2
+```
+
+That exact official manifest was pulled and inspected as `linux/amd64`. A
+network-disabled base probe confirms v26.13.0, `lts: Lithium`, module ABI 147 and
+OpenSSL 3.5.9. The locked application dependencies and application/test source are
+unchanged. A comparison against `40209466047ee9b8877665a8445b899f3131a75c`
+confirms identical Core application, tests, package/lock and TypeScript config;
+its previously recorded 801-test Node 24.19.0 baseline is reused, not relabelled
+as a new run.
+
+The clean tracked-source build passes strict types and all **801 Core tests**
+with real FFmpeg, no failures or skips. The final unprivileged image also passes
+its existing `guess-pack --list` build check. Its image-specific offline runtime
+probe passes at UID 1000 with a read-only filesystem, no network, one CPU,
+256 MiB memory and 64 processes: source/license/package readability, Discord
+voice and prism imports, TypeScript data-import loading, an ESM worker and
+FFmpeg **5.1.9-0+deb12u1**. No build CA mount remains in that runtime.
+
+The existing offline audio probe passes with 1, 4 and 8 independent generated
+PCM/mixer/Opus streams, each producing 701 packets for 14 seconds of audio.
+It runs with no network, read-only root, a 128 MiB temporary filesystem,
+1.5 CPUs, 768 MiB memory and a 512-process limit. This is unpaced synthetic
+computation; it does not establish live Discord capacity or audible continuity.
+
+Qualification identity:
+
+- Final image: `sha256:cb8e7b28cd4e5ba90eef22be2410d2ee983e6566ce0298d053afe2835d370bfe`.
+- Core source tree: `e47186dfea8ffe7a47407fecc4951e9ae4caf27a`.
+- Canonical Dockerfile SHA-256: `f1087984f7d94bb46eeb572b640c14170b2cf57ea018c549401a4462e61c7f05`.
+- Temporary qualification Dockerfile SHA-256: `f95dcfef2e3c76ca296484d9472c802bbf1eb67ab693a86593e5c4edf03f94d4`.
+
+The existing `scripts/build_release.py core-package` operation passes its
+unprivileged runtime probe and validates the saved image archive. The unsigned
+local archive is 322,890,076 bytes with SHA-256
+`f5f3e94ce1cc949bb316516f42908b79ad602ffe973bd3b07439ba3ff7c11d34`.
+All 27 existing release-artifact contract tests and repository lint pass.
+[Qualification metadata and offline probe results](assets/node26-lts-qualification-20261030.json)
+record the exact identities and measurement limits. The archive itself is not
+committed, published or supplied to an installed host.
+
+The temporary variant adds only session CA secret mounts and tool-specific trust
+settings to networked build steps. It does not copy the CA into layers or change
+the canonical source's build/network configuration. The image label records this
+variant separately; it is an unsigned local qualification image, not a production
+release. Public application and license files stay readable and root-owned, with
+the existing unprivileged user and data directory behavior preserved.
+
+The [prepared host qualification plan](HOST_READINESS.md#qualifying-a-core-runtime-change)
+still requires separate owner-approved installed-host, backup/rollback, staging
+and actual listening evidence. This source qualification does not update any
+installed host or close #117. Earlier qualification evidence is retained below.
 
 ### Core qualification evidence, 24 October 2026
 
