@@ -711,7 +711,11 @@
                 void client?.refresh();
               }}
               disabled={view.busy}
-              >{view.connection === 'connected' ? 'Refresh room' : 'Reconnect'}</button
+              >{view.connection === 'connected'
+                ? 'Refresh room'
+                : view.busy
+                  ? 'Reconnecting…'
+                  : 'Reconnect'}</button
             >{/if}
         </div>{/if}
     </main>

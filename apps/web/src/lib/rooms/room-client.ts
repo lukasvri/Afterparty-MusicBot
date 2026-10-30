@@ -143,8 +143,9 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   };
-  const retire = () => {
-    const realtime = session?.realtime;
+  const stopStream = (target: Session) => {
+    const realtime = target.realtime;
+    target.realtime = null;
     if (realtime) {
       realtime.source?.close();
       realtime.source = null;
@@ -152,6 +153,9 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       for (const pending of [realtime.retry, realtime.measure, realtime.lease])
         if (pending !== undefined) cancel(pending);
     }
+  };
+  const retire = () => {
+    if (session) stopStream(session);
     session?.controller.abort();
     session = null;
     generation++;
@@ -276,8 +280,9 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       freshUntil: 0,
     };
     target.realtime = live;
+    const activeStream = () => current(target) && target.realtime === live;
     const connect = () => {
-      if (!current(target)) return;
+      if (!activeStream()) return;
       let source: RoomStream;
       try {
         source = eventSource(`/api/realtime/stream?room=${target.code}`);
@@ -286,7 +291,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         return;
       }
       live.source = source;
-      const active = () => current(target) && live.source === source;
+      const active = () => activeStream() && live.source === source;
       source.addEventListener('open', () => {
         if (active()) void sampleClock(target, live);
       });
@@ -365,7 +370,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       });
     };
     const measure = () => {
-      if (!current(target)) return;
+      if (!activeStream()) return;
       if (live.source) void sampleClock(target, live);
       live.measure = schedule(measure, 10000);
     };
@@ -618,7 +623,22 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       return current(target) && state.room !== null;
     },
     async refresh() {
-      if (session) await read(session, true);
+      const target = session;
+      if (!target || !current(target) || state.busy) return;
+      if (state.connection === 'connected') {
+        await read(target, true);
+        return;
+      }
+      // An explicit retry replaces the failed transport now, while retaining
+      // the room identity, saved ownership and current shared playback intent.
+      stopStream(target);
+      publish({ busy: true, error: 'Reconnecting to the room…' });
+      startStream(target);
+      try {
+        await read(target, true, true);
+      } finally {
+        if (current(target)) publish({ busy: false });
+      }
     },
     async createInvitation(type: 'cohost' | 'transfer' = 'cohost') {
       const result = await manageHosts(type === 'transfer' ? 'transfer-invite' : 'invite');
