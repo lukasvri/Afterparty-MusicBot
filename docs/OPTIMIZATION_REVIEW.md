@@ -714,3 +714,32 @@ preview/build SDK is pinned to 4.132.0, retaining the SvelteKit adapter's suppor
 Wrangler range. The fix limits retries to safe GET/HEAD requests and keeps request
 failures from terminating the dev server; it does not retry mutation requests or
 failed tests. Application framework and Core runtime versions are unchanged.
+
+### Automatic room video and startup measurement, 30 October 2026
+
+PR #163 intentionally starts the local YouTube player when a music room has a
+current video. The startup audit's old blanket pre-activation assertion therefore
+failed before the CI browser journeys ran. The same command reproduced that
+failure locally on source `4020946`.
+
+The audit now aborts every external request, then requires exactly one attempted
+official `https://www.youtube.com/iframe_api` request for a playing room and none
+for welcome, empty-room or game entry. It verifies the local recovery action
+after blocking that API. Queue-mutation rejection, lazy library loading, active
+room scenery exclusion and page-error checks remain enforced.
+
+All eight viewport/scenario combinations pass `measure:startup --verify-lazy`.
+[Raw local measurements](assets/v3-room-autostart-startup-20261030.json) match at
+1440px and 390px:
+
+| Scenario | First-party decoded JavaScript | Sum of individually recomputed gzip |
+| --- | ---: | ---: |
+| Welcome / empty music room | 227,650 B | 83,953 B |
+| Music room with a current video | 207,269 B | 78,000 B |
+| Game entry | 152,519 B | 57,653 B |
+
+These are successful first-party script responses from the local build. Blocked
+provider requests are counted separately and excluded from the byte totals; the
+values do not measure full YouTube startup, wire transfer, field performance or
+audible playback. Earlier dated measurements retain their original build and
+activation conditions and are not relabelled by this audit change.

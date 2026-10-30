@@ -38,6 +38,7 @@ try {
       });
       const responses: Promise<{ url: string; bytes: number; gzipBytes: number }>[] = [];
       const failures: string[] = [];
+      const blockedProviderRequests: string[] = [];
       page.on('pageerror', (error) => failures.push(error.message));
       page.on('response', (response) => {
         if (response.request().resourceType() === 'script' && response.ok())
@@ -51,7 +52,10 @@ try {
       });
       await page.route('**/*', async (route) => {
         const url = new URL(route.request().url());
-        assert.equal(url.origin, origin, 'Startup must not contact providers before consent');
+        if (url.origin !== origin) {
+          blockedProviderRequests.push(url.href);
+          return route.abort();
+        }
         if (!url.pathname.startsWith('/api/')) return route.continue();
         assert.equal(route.request().method(), 'GET', 'Measurement never changes a queue');
         if (url.pathname !== '/api/rooms/PERFROOM')
@@ -113,6 +117,13 @@ try {
               );
           });
       await page.waitForLoadState('networkidle');
+      assert.deepEqual(
+        blockedProviderRequests,
+        scenario === 'playing-room' ? ['https://www.youtube.com/iframe_api'] : [],
+        'Only a room with a current video attempts the official player API; all external requests remain blocked',
+      );
+      if (scenario === 'playing-room')
+        await page.getByRole('button', { name: 'Enable audio', exact: true }).waitFor();
       const initial = await Promise.all(responses);
       if (verify)
         assert(
@@ -130,6 +141,7 @@ try {
       results.push({
         viewport: width,
         scenario,
+        blockedProviderRequests: blockedProviderRequests.length,
         scriptRequests: unique.length,
         decodedJavaScriptBytes: unique.reduce((sum, item) => sum + item.bytes, 0),
         sumIndividualGzipBytes: unique.reduce((sum, item) => sum + item.gzipBytes, 0),
@@ -155,7 +167,7 @@ process.stdout.write(
     {
       label: process.env.MEASUREMENT_LABEL ?? 'local-built-worker',
       metric:
-        'Decoded successful script responses; gzip is recomputed per response, not measured wire transfer or field performance.',
+        'Decoded successful first-party script responses; external requests are aborted and excluded. Gzip is recomputed per response, not measured wire transfer, full provider startup or field performance.',
       results,
     },
     null,
