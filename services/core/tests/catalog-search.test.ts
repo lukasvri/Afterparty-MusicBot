@@ -20,7 +20,8 @@ test('authenticated catalog separates thirty public search results from twenty m
   const sink: Sink = { onIdle: null, onError: null, play() {}, pause() {}, resume() {}, stop() {}, duration: () => 0, advancing: () => false, buffering: () => false };
   const engine = new Engine(store, providers, sink), commands = new Commands(engine);
   const calls: { query: string; count: number; musicOnly: boolean }[] = [];
-  providers.search = async (query, count = 30, musicOnly = false) => { calls.push({ query, count, musicOnly }); return Array.from({ length: count }, (_, i) => track(i)); };
+  let complete = true;
+  providers.searchResult = async (query, count = 30, musicOnly = false) => { calls.push({ query, count, musicOnly }); return { tracks: Array.from({ length: complete ? count : 1 }, (_, i) => track(i)), complete }; };
   const servers = await createServers(engine, commands, { key: 'synthetic-key', origin: 'https://site.example', host: '127.0.0.1', publicPort: 0 });
   const base = 'http://127.0.0.1:'+(servers.publicServer.address() as { port: number }).port;
   const request = (path: string, authorized = true) => fetch(base+path, { headers: authorized ? { Authorization: 'Bearer synthetic-key' } : {} });
@@ -28,7 +29,7 @@ test('authenticated catalog separates thirty public search results from twenty m
   try {
     assert.equal((await request('/v1/catalog?q=Example', false)).status, 403); assert.equal(calls.length, 0);
     const user = await request('/v1/catalog?q=%20Example%20'); assert.equal(user.status, 200);
-    const userData = await user.json() as { videos: PublicTrack[] }; assert.equal(userData.videos.length, 30);
+    const userData = await user.json() as { videos: PublicTrack[]; complete: boolean }; assert.equal(userData.videos.length, 30); assert.equal(userData.complete, true);
     assert(!JSON.stringify(userData).includes('private-')); assert.deepEqual(calls.at(-1), { query: 'Example', count: 30, musicOnly: false });
     const radio = await request('/v1/catalog?q=Example&mode=radio'); assert.equal(radio.status, 200); assert.equal(((await radio.json()) as { videos: PublicTrack[] }).videos.length, 20);
     assert.deepEqual(calls.at(-1), { query: 'Example', count: 20, musicOnly: true });
@@ -36,6 +37,10 @@ test('authenticated catalog separates thirty public search results from twenty m
     const before = calls.length;
     for (const query of ['?q=Example&mode=unknown', '?q=Example&mode=', '?q=Example&mode=radio&mode=unknown', '?q=%20%20']) assert.equal((await request('/v1/catalog'+query)).status, 400);
     assert.equal(calls.length, before); assert.equal(JSON.stringify({ queue: engine.queue, current: engine.current, settings: engine.settings }), initial);
+    complete = false;
+    const partial = await (await request('/v1/catalog?q=Partial')).json() as { videos: PublicTrack[]; complete: boolean };
+    assert.equal(partial.complete, false); assert.equal(partial.videos.length, 1);
+    assert(!JSON.stringify(partial).includes('private-'));
   } finally { await servers.close(); commands.close(); engine.close(); store.close(); }
 });
 
@@ -93,7 +98,7 @@ test('sixty-four distinct pending searches bound provider work while shared join
   p.video = async () => [track(0)];
   const pending = Array.from({ length: 64 }, (_, index) => p.search('Query '+index, 30));
   try {
-    const joined = p.search('Query 0', 30); assert.equal(calls, 64);
+    const joined = p.search('Query 0', 30); await Promise.resolve(); assert.equal(calls, 64);
     await assert.rejects(p.search('Another query', 30), /busy/); assert.equal(calls, 64);
     gate.resolve(); await Promise.all([...pending, joined]);
     assert.equal((await p.search('Another query', 30)).length, 1); assert.equal(calls, 65);
