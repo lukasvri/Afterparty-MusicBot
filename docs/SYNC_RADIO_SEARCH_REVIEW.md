@@ -211,7 +211,8 @@ Local validation passes 107 Python recovery, 237 shared/Worker, 804 Core with re
 FFmpeg and 185 native web cases, lint/unused-file/type/format checks and production
 build/dry-run. A generated-type check initially failed when the worktree borrowed
 another checkout's dependency symlinks; installing its own locked dependencies
-resolved that setup issue and the affected native checks/build were rerun.
+resolved that setup issue. After the hydration correction, a fresh complete
+`npm run check:all` invocation passes with all 804 Core cases.
 Eight focused search, cold-catalog and room browser cases and two isolated real
 Worker/D1 stack cases also pass. An initial stack run collided with this task's
 preview ports; a separate-port rerun passes after task-owned Docker cache cleanup
