@@ -234,6 +234,39 @@ test('empty cached searches are refreshed so a radio retry can recover',async()=
  }finally{t.close();}
 });
 
+test('manual empty search results avoid repeated provider calls for one minute, then recover', async context => {
+ const t=setup();let now=1000000,calls=0;
+ context.mock.method(Date,'now',()=>now);
+ try {
+  const p=new Providers(t.store,{});
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;return {items:[]} as unknown as YouTubeResponses[K];};
+  assert.deepEqual(await p.search('missing song'),[]);
+  now+=59999;
+  assert.deepEqual(await p.search('missing song'),[]);
+  assert.equal(calls,1);
+  now++;
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;return {items:[{id:{videoId:'next1234567'}}]} as unknown as YouTubeResponses[K];};
+  p.video=async()=>[track('Artist - Found after expiry','next1234567')];
+  assert.equal((await p.search('missing song'))[0]?.id,'next1234567');
+  assert.equal(calls,2);
+ } finally {t.close();}
+});
+
+test('radio can retry immediately after a successful empty provider result', async () => {
+ const t=setup();let calls=0;
+ try {
+  const p=new Providers(t.store,{});
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{
+   calls++;
+   return {items:calls===1?[]:[{id:{videoId:'next1234567'}}]} as unknown as YouTubeResponses[K];
+  };
+  p.video=async ids=>ids.map(id=>track('Artist - Newly available',id));
+  assert.deepEqual(await p.search('radio recovery',20,true),[]);
+  assert.equal((await p.search('radio recovery',20,true))[0]?.id,'next1234567');
+  assert.equal(calls,2);
+ } finally {t.close();}
+});
+
 test('video metadata retains explicit genre tags for unlabelled song titles',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{});

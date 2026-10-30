@@ -59,7 +59,7 @@ The native SvelteKit website in `apps/web` is the only interface. Shared API han
 | Device-local reaction expiry | `lib/social-reactions.ts` | Used by the native social client |
 | Discord/Core startup | `services/core/src/` | `main.ts`, `guilds.ts`, `server.ts` |
 | Playback and source extraction | `services/core/src/` | `engine.ts`, `audio.ts`, `providers.ts`, `extractor.ts` |
-| User search relevance | `services/core/src/music-search.ts` | One bounded title/artist and recording-format ranking policy for Core search and Worker fallback; radio retains its separate admission and ranking pipeline |
+| User search relevance | `services/core/src/music-search.ts` | One bounded title/artist and recording-format ranking policy, with canonical positive/empty cache bounds shared by Core search and Worker fallback; Core radio retains fresh empty-result retries and its separate admission/ranking pipeline |
 | Shared room-radio queue selection and existence checks | `services/core/src/room-radio.ts` | One lazy selection policy for Core and website fallback; `room-state.ts` owns command/prefetch eligibility |
 | Shared browser-room seek bounds | `services/core/src/protocol.ts` | `roomSeekPosition` clamps Core/Worker seeks and native browser command targets; `lib/playback-sync.ts` converts device calibration before submission and confirmation |
 | Shared browser-room queue capacity | `services/core/src/protocol.ts` | `ROOM_QUEUE_LIMIT` and `roomQueueCapacity` reserve pending requests; Core and native room/library controls use the same bounds |

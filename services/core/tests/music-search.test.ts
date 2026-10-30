@@ -49,10 +49,14 @@ test('declared AI is a default preference rather than a manual playback ban', ()
 });
 
 test('a song named Live Forever remains the exact recording rather than a live-format request', () => {
-  const original = track('original001', 'Oasis - Live Forever (Official Video)', 'Oasis');
-  const live = track('live0000001', 'Oasis - Live Forever (Live at Wembley)', 'Oasis');
-  assert.equal(rankMusicSearch('Live Forever', [live, original])[0].id, original.id);
-  assert.equal(rankMusicSearch('Oasis', [original, track('other000001', 'Oasis - Another Song', 'Oasis')])[0].id, original.id);
+  for (const suffix of ['Official Video', 'Remastered 2014']) {
+    const original = track('original001', `Oasis - Live Forever (${suffix})`, 'Oasis');
+    const live = track('live0000001', 'Oasis - Live Forever (Live at Wembley)', 'Oasis');
+    for (const query of ['Live Forever', 'Oasis Live Forever'])
+      assert.equal(rankMusicSearch(query, [live, original])[0].id, original.id);
+    assert.equal(rankMusicSearch('Oasis Live Forever live', [original, live])[0].id, live.id);
+    assert.equal(rankMusicSearch('Oasis', [original, track('other000001', 'Oasis - Another Song', 'Oasis')])[0].id, original.id);
+  }
 });
 
 test('festival queries favor relevant full live sets without hiding ordinary tracks', () => {

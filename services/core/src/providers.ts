@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
 import { normalizePlaylistUrl } from "./playlist-url.ts";
 import { metadataAiGenerated } from "./music-content.ts";
-import { rankMusicSearch } from "./music-search.ts";
+import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS } from "./music-search.ts";
 import { deezerRef, deezerShareUrl, expandDeezerLink, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
@@ -267,15 +267,16 @@ export class Providers {
         null,
       );
     const now = Date.now();
-    if (cached && Number.isFinite(cached.at) && cached.at <= now && now - cached.at < 3600000 && Array.isArray(cached.tracks) &&
-      cached.tracks.length > 0 && cached.tracks.length <= count && cached.tracks.every(validSearchTrack) &&
+    if (cached && Number.isFinite(cached.at) && cached.at <= now && Array.isArray(cached.tracks) &&
+      now - cached.at < (cached.tracks.length ? MUSIC_SEARCH_CACHE_MS : EMPTY_MUSIC_SEARCH_CACHE_MS) &&
+      (cached.tracks.length > 0 || !musicOnly) && cached.tracks.length <= count && cached.tracks.every(validSearchTrack) &&
       new Set(cached.tracks.map(track => track.id)).size === cached.tracks.length)
       return cached.tracks.map(copySearchTrack);
     let lookup = this.searches.get(key);
     if (!lookup) {
       if (this.searches.size >= 64) throw new UserError("The music source is busy. Try again shortly.", 503);
       lookup = this.searchUncached(query, count, musicOnly).then((tracks) => {
-        if (tracks.length) this.store.set(key, { at: Date.now(), tracks });
+        if (tracks.length || !musicOnly) this.store.set(key, { at: Date.now(), tracks });
         return tracks;
       });
       // Coalesce bursts and bound the number of distinct provider lookups in flight.
