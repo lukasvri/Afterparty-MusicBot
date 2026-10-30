@@ -1,3 +1,4 @@
+import { fixtureRadioContent, fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import { Store } from "../src/store.ts";
@@ -23,13 +24,13 @@ const own = track("own00000001", "Aster - Evening");
 test("radio v2: Core and room adapters share the safe original-artist fallback", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {}), queries: string[] = [];
+    const providers = fixtureRadioOwner(new Providers(store, {})), queries: string[] = [];
     const search = async (query: string) => {
       queries.push(query);
       return query.startsWith("Aster ") ? [own] : [];
     };
     providers.search = search;
-    const room = await roomRecommendation({ current: seed, radioSeed: seed, queue: [], radio: true }, search, () => {});
+    const room = await roomRecommendation({ current: seed, radioSeed: seed, queue: [], radio: true }, search, () => {}, fixtureRadioContent);
     assert.equal(room?.id, own.id);
     queries.length = 0;
     const core = await providers.radio(seed, []);
@@ -42,7 +43,7 @@ test("radio v2: Core and room adapters share the safe original-artist fallback",
 test("radio v2: known recent catalog songs do not consume all hydration slots", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, { LASTFM_API_KEY: "synthetic" });
+    const providers = fixtureRadioOwner(new Providers(store, { LASTFM_API_KEY: "synthetic" }));
     const titles = ["Recent One", "Recent Two", "Recent Three", "Recent Four", "Fresh Evening"];
     const recent = titles.slice(0, 4).map((title, index) => track(`recent0000${index}`, `Other Artist - ${title} [Deep House]`));
     providers.radioHistory = () => recent;
@@ -83,7 +84,7 @@ test("radio v2: a successful empty catalog lookup can recover after its short ne
 test("radio v2: an eligible different artist wins across the complete catalog pool", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, { LASTFM_API_KEY: "synthetic" });
+    const providers = fixtureRadioOwner(new Providers(store, { LASTFM_API_KEY: "synthetic" }));
     const original = structuredClone(seed);
     providers.recommendations.similar = async () => [
       { title: "Familiar Evening", artist: "Aster", duration: 210 },
@@ -103,21 +104,21 @@ test("radio v2: an eligible different artist wins across the complete catalog po
 test("radio v2: adapter capabilities distinguish private Discord audio from concerts and browser video", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     const audioOnly = { ...own, embeddable: false };
     providers.search = async () => [audioOnly];
     assert.equal((await providers.radio(seed, []))?.id, audioOnly.id,
       "Ordinary Discord audio retains its existing non-embed capability");
     assert.equal(await providers.radio({ ...seed, concert: true }, []), null);
-    assert.equal(await roomRecommendation({ current: seed, queue: [] }, async () => [audioOnly], () => {}), null);
+    assert.equal(await roomRecommendation({ current: seed, queue: [] }, async () => [audioOnly], () => {}, fixtureRadioContent), null);
     providers.search = async () => [own];
     assert.equal((await providers.radio({ ...seed, concert: true }, []))?.id, own.id);
-    assert.equal((await roomRecommendation({ current: seed, queue: [] }, async () => [own], () => {}))?.id, own.id);
+    assert.equal((await roomRecommendation({ current: seed, queue: [] }, async () => [own], () => {}, fixtureRadioContent))?.id, own.id);
   } finally { store.close(); }
 });
 
 test("radio v2: room adapter retains the manual anchor, exclusions, playback state and private diagnostics", async () => {
-  const automatic = track("auto0000001", "Other Artist - Automatic Song [Deep House]", { radio: true });
+  const automatic = track("auto0000001", "Other Artist - Automatic Song [Deep House]", { radio: true, radioContentChecked: 1 as const });
   const played = track("played00001", "Other Artist - Played Song [Deep House]");
   const alternate = track("repeat00001", "Other Artist - Played Song (2024 Remaster) [Deep House]");
   const excluded = track("excluded001", "Other Artist - Removed Song [Deep House]");
@@ -129,7 +130,7 @@ test("radio v2: room adapter retains the manual anchor, exclusions, playback sta
   const selected = await roomRecommendation(state, async query => {
     queries.push(query);
     return [alternate, excluded, incompatible, good];
-  }, diagnostic => diagnostics.push(diagnostic));
+  }, diagnostic => diagnostics.push(diagnostic), fixtureRadioContent);
   assert.equal(selected?.id, good.id);
   assert.equal(selected.radioRelatedTo, seed.id);
   assert(queries[0].startsWith("deep house audio"), "Discovery must remain anchored to the original manual recording");
@@ -141,5 +142,5 @@ test("radio v2: room adapter retains the manual anchor, exclusions, playback sta
   const manual = { ...own, radio: false };
   assert.equal(await roomRecommendation({ ...state, queue: [manual] }, async () => {
     assert.fail("A pending manual selection must prevent radio discovery");
-  }, () => {}), null);
+  }, () => {}, fixtureRadioContent), null);
 });

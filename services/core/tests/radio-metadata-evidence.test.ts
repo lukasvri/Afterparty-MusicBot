@@ -1,3 +1,4 @@
+import { fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isRadioTitle, metadataGenres, sameRadioSong } from "../src/radio.ts";
@@ -8,7 +9,7 @@ import capturedCredits from "./fixtures/radio-artist-credits.json" with { type: 
 test("fresh and cached catalog matches preserve only the same artist's verified legacy credit", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     providers.youtube = async () => { throw new Error("No external API capability in the isolated fixture"); };
     providers.extract = async () => ({ ...capturedCredits, duration: 259, categories: ["Music"],
       is_live: false, playable_in_embed: true });
@@ -61,7 +62,7 @@ test("old inferred-genre metadata and search caches cannot survive the parser ch
       duration: 231, live: false, embeddable: true, image: "", genres: ["punk"] };
     store.set("metadata:v3:" + id, { at: Date.now(), track: oldTrack });
     store.set('search:v4:["starboy",5,true]', { at: Date.now(), tracks: [oldTrack] });
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     providers.youtube = async () => { throw new Error("API capability unavailable in isolated test"); };
     const calls: string[] = [];
     providers.extract = async args => {

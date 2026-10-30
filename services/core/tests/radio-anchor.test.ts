@@ -1,3 +1,4 @@
+import { fixtureRadioContent, fixtureRadioOwner } from './radio-content-fixture.ts';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Store } from "../src/store.ts";
@@ -28,6 +29,7 @@ const original = song("original001", "Martin Garrix - Animals", [
 const next = {
   ...song("nextsong001", "Other Artist - Next", ["electro house"]),
   radio: true,
+  radioContentChecked: 1 as const,
 };
 const third = song("thirdsong01", "Third Artist - Third", ["electro house"]);
 const sink = (): Sink => ({
@@ -44,7 +46,7 @@ const sink = (): Sink => ({
 
 test("Discord radio keeps the manually chosen original through recommendations and restart", async () => {
   const store = new Store(":memory:"),
-    providers = new Providers(store, {});
+    providers = fixtureRadioOwner(new Providers(store, {}));
   let engine = new Engine(store, providers, sink());
   const seeds: string[] = [];
   providers.radio = async (seed) => {
@@ -95,7 +97,7 @@ test("room radio persists its original instead of drifting through the previous 
         third,
         song("oldsynth001", "Old Artist - Eighties", ["synth pop"]),
       ];
-    },
+    }, undefined, fixtureRadioContent
   );
   assert.equal(result?.id, third.id);
   assert(queries[0].includes('"Animals"'));
@@ -143,7 +145,7 @@ test("a broad pop tag does not turn an EDM artist seed into unrelated eighties r
 
 test("Last.fm radio applies video safety and the original genre even after catalog matching", async () => {
   const store = new Store(":memory:"),
-    p = new Providers(store, { LASTFM_API_KEY: "synthetic" });
+    p = fixtureRadioOwner(new Providers(store, { LASTFM_API_KEY: "synthetic" }));
   try {
     p.recommendations.similar = async () => [
       { artist: "Martin Garrix", title: "Lesson", duration: 210 },
@@ -279,7 +281,7 @@ test("an older room recovers its last explicit song choice from history", async 
   const selected = await roomRecommendation(room, async (query) => {
     queries.push(query);
     return [third];
-  });
+  }, undefined, fixtureRadioContent);
   assert.equal(selected?.id, third.id);
   assert(queries[0].includes('"Animals"'));
   assert.equal(
@@ -302,7 +304,7 @@ test("unsafe alternate recordings cannot supply a genre for the original song", 
     async (query) => {
       queries.push(query);
       return queries.length === 1 ? [taggedTutorial] : [valid];
-    },
+    }, undefined, fixtureRadioContent
   );
   assert.equal(result?.id, valid.id);
   assert(queries[1].startsWith("Martin Garrix audio"));
@@ -330,9 +332,10 @@ test("unsafe radio suggestions saved by an older build do not block a safe room 
       "electro house",
     ]),
     radio: true,
+    radioContentChecked: 1 as const,
   };
   const state = { current: original, queue: [bad], playing: true, position: 0 };
-  const result = await roomRecommendation(state, async () => [third]);
+  const result = await roomRecommendation(state, async () => [third], undefined, fixtureRadioContent);
   assert.equal(result?.id, third.id);
   const advanced = changeRoom(state, { action: "next" }, true, 210, result);
   assert.equal(advanced.current?.id, third.id);
@@ -341,7 +344,7 @@ test("unsafe radio suggestions saved by an older build do not block a safe room 
 
 test("Discord playback drops an older unsafe radio entry while preserving manual choices", async () => {
   const store = new Store(":memory:"),
-    engine = new Engine(store, new Providers(store, {}), sink());
+    engine = new Engine(store, fixtureRadioOwner(new Providers(store, {})), sink());
   try {
     engine.connected = true;
     engine.current = original;
@@ -351,6 +354,7 @@ test("Discord playback drops an older unsafe radio entry while preserving manual
           "electro house",
         ]),
         radio: true,
+        radioContentChecked: 1 as const,
       },
       third,
     ];
@@ -368,7 +372,7 @@ test("Discord playback drops an older unsafe radio entry while preserving manual
 
 test("crossfade preparation cannot decode an older instructional radio suggestion", async () => {
   const store = new Store(":memory:"),
-    engine = new Engine(store, new Providers(store, {}), sink());
+    engine = new Engine(store, fixtureRadioOwner(new Providers(store, {})), sink());
   try {
     engine.connected = true;
     engine.current = original;
@@ -378,6 +382,7 @@ test("crossfade preparation cannot decode an older instructional radio suggestio
           "electro house",
         ]),
         radio: true,
+        radioContentChecked: 1 as const,
       },
     ];
     let prepared = false;
@@ -411,7 +416,7 @@ test("an alternate instrumental cannot supply the original recording's genre", a
     async (query) => {
       queries.push(query);
       return queries.length === 1 ? [alternate] : [valid];
-    },
+    }, undefined, fixtureRadioContent
   );
   assert.equal(result?.id, valid.id);
   assert(queries[1].startsWith("Martin Garrix audio"));
@@ -436,13 +441,14 @@ test("a broad tag and an unknown uploader cannot establish a radio relationship"
 test("Discord validates a recovered recommendation against the original, not an older drifted track", async () => {
   const store = new Store(":memory:");
   store.set("radio-seed", original);
-  const providers = new Providers(store, {}),
+  const providers = fixtureRadioOwner(new Providers(store, {})),
     engine = new Engine(store, providers, sink());
   try {
     engine.connected = true;
     engine.current = {
       ...song("oldradio001", "Old Artist - Eighties", ["synth pop"]),
       radio: true,
+      radioContentChecked: 1 as const,
     };
     providers.radio = async (seed) => {
       assert.equal(seed.id, original.id);

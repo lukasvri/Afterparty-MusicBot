@@ -1,3 +1,4 @@
+import { fixtureRadioContent, fixtureRadioOwner } from './radio-content-fixture.ts';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Store } from "../src/store.ts";
@@ -22,7 +23,7 @@ const sink = (advancing = false): Sink => ({
 });
 function fixture(advancing = false) {
   const store = new Store(":memory:");
-  const providers = new Providers(store, {});
+  const providers = fixtureRadioOwner(new Providers(store, {}));
   const engine = new Engine(store, providers, sink(advancing));
   clearInterval(engine.timer);
   return { store, providers, engine, close: () => { engine.close(); store.close(); } };
@@ -134,8 +135,8 @@ test('radio rejects explicit recreated uploads and Norwegian vlogs while retaini
   try {
     f.providers.search = search;
     assert.equal((await f.providers.radio(original, []))?.id, safe.id);
-    assert.equal((await roomRecommendation({ current: original, queue: [], radio: true }, search, () => {}))?.id, safe.id);
-    assert.deepEqual(playableRoomQueue({ current: original, radioSeed: original, queue: bad.map(track => ({ ...track, radio: true })) }), []);
+    assert.equal((await roomRecommendation({ current: original, queue: [], radio: true }, search, () => {}, fixtureRadioContent))?.id, safe.id);
+    assert.deepEqual(playableRoomQueue({ current: original, radioSeed: original, queue: bad.map(track => ({ ...track, radio: true, radioContentChecked: 1 as const })) }), []);
     assert.deepEqual(playableRoomQueue({ current: original, radioSeed: original, queue: bad.map(track => ({ ...track, radio: false })) }), bad.map(track => ({ ...track, radio: false })),
       'explicit manual playback retains the user’s choice');
   } finally { f.close(); }
@@ -165,7 +166,7 @@ test("paused and not-yet-consumed current radio tracks still exclude alternate u
     f.engine.connected = true;
     f.engine.paused = true;
     f.engine.radioSeed = seed;
-    f.engine.current = { ...next, radio: true };
+    f.engine.current = { ...next, radio: true, radioContentChecked: 1 as const };
     f.providers.radio = async () => song("copy0000001", "Evening - 2024 Remaster");
     await f.engine.ensureRadio();
     assert.equal(f.store.history().length, 0);
@@ -179,6 +180,7 @@ test("consumed catalog identity stays private and survives provider recreation",
   const f = fixture(true);
   const played = song("played00001", "Side B", {
     catalog: { artist: "Aster", title: "Evening", duration: 210 }, radio: true,
+    radioContentChecked: 1 as const,
   });
   try {
     f.engine.settings.radio = false;
@@ -189,7 +191,7 @@ test("consumed catalog identity stays private and survives provider recreation",
     assert.equal(f.store.history().length, 1);
     assert(!JSON.stringify(f.store.history()).includes("catalog"));
     assert(!JSON.stringify(f.engine.snapshot()).includes("catalog"));
-    const restored = new Providers(f.store, {});
+    const restored = fixtureRadioOwner(new Providers(f.store, {}));
     assert.equal(songIdentity(restored.radioHistory().find((track) => track.id === played.id)!), "evening");
     restored.search = async () => [next, song("fresh000001", "Morning")];
     assert.equal((await restored.radio(seed, []))?.id, "fresh000001");
@@ -200,12 +202,13 @@ test("early skips retain canonical song exclusions even before audible history e
   const f = fixture();
   const rejected = song("reject00001", "Side B", {
     catalog: { artist: "Aster", title: "Evening", duration: 210 }, radio: true,
+    radioContentChecked: 1 as const,
   });
   try {
     f.engine.current = rejected;
     await f.engine.skip();
     assert.equal(f.store.history().length, 0);
-    const restarted = new Providers(f.store, {});
+    const restarted = fixtureRadioOwner(new Providers(f.store, {}));
     restarted.search = async () => [next, song("fresh000001", "Morning")];
     assert.equal((await restarted.radio(seed, []))?.id, "fresh000001");
     assert.equal(f.engine.enqueue([rejected]), 1, "manual replay remains available");
@@ -235,7 +238,7 @@ test("numbered skip keeps the requested manual target while discarding unsafe ol
     f.engine.current = seed;
     const manualA = song("manual00001", "First explicit choice");
     const manualB = song("manual00002", "Second explicit choice");
-    f.engine.queue = [song("unsafe00001", "Aster - Gameplay", { radio: true }), manualA, manualB];
+    f.engine.queue = [song("unsafe00001", "Aster - Gameplay", { radio: true, radioContentChecked: 1 as const }), manualA, manualB];
     let selected: Track | null = null;
     f.engine.startTrack = async (track) => { selected = track; };
     await f.engine.skip(2);
@@ -251,8 +254,8 @@ test("restored radio queues reject unrelated and recently played entries before 
     f.engine.current = seed;
     f.store.record("heard", publicTrack(next)!);
     f.engine.queue = [
-      song("copy0000001", "Evening Remastered 2024", { radio: true }),
-      song("wrong000001", "Unrelated Artist - Random", { artist: "Publisher", radio: true }),
+      song("copy0000001", "Evening Remastered 2024", { radio: true, radioContentChecked: 1 as const }),
+      song("wrong000001", "Unrelated Artist - Random", { artist: "Publisher", radio: true, radioContentChecked: 1 as const }),
       song("manual00001", "Manual choice", { music: false }),
     ];
     const prepared: Track[] = [];
@@ -266,7 +269,7 @@ test("the exact checkpoint remains resumable despite recent history and malforme
   const f = fixture();
   let restored: Engine | undefined;
   try {
-    const checkpoint = { ...next, radio: true };
+    const checkpoint = { ...next, radio: true, radioContentChecked: 1 as const };
     f.store.record("heard", publicTrack(checkpoint)!);
     f.store.set("radio-seed", seed);
     f.store.set("recovery", { track: checkpoint, position: 43.25, paused: true });
@@ -289,7 +292,7 @@ test("explicit queue looping still replays the current radio song", async () => 
   const f = fixture();
   try {
     f.engine.connected = true;
-    f.engine.current = { ...next, radio: true };
+    f.engine.current = { ...next, radio: true, radioContentChecked: 1 as const };
     f.engine.radioSeed = seed;
     f.engine.loopQueue = true;
     f.store.record("heard", publicTrack(next)!);
@@ -304,9 +307,9 @@ test("explicit queue looping still replays the current radio song", async () => 
 test("looping two previously automatic tracks preserves both explicit replay entries", async () => {
   const f = fixture();
   try {
-    const second = song("second00001", "Morning", { radio: true });
+    const second = song("second00001", "Morning", { radio: true, radioContentChecked: 1 as const });
     f.engine.connected = true;
-    f.engine.current = { ...next, radio: true };
+    f.engine.current = { ...next, radio: true, radioContentChecked: 1 as const };
     f.engine.radioSeed = seed;
     f.engine.queue = [second];
     f.engine.loopQueue = true;
@@ -324,14 +327,14 @@ test("looping two previously automatic tracks preserves both explicit replay ent
 test("room queue validation includes paused current, history, exclusions and earlier suggestions", () => {
   const recent = song("heard000001", "Morning");
   const rejected = song("reject00001", "Night");
-  const good = song("fresh000001", "Afternoon", { radio: true });
+  const good = song("fresh000001", "Afternoon", { radio: true, radioContentChecked: 1 as const });
   const state = {
     current: next, radioSeed: seed, playing: false, position: 0,
     history: [recent], radioExcludedSongs: [rejected],
     queue: [
-      song("copy0000001", "Evening - 2024 Remaster", { radio: true }),
-      song("copy0000002", "Morning Instrumental", { radio: true }),
-      song("copy0000003", "Night DJ Example Remix", { radio: true }),
+      song("copy0000001", "Evening - 2024 Remaster", { radio: true, radioContentChecked: 1 as const }),
+      song("copy0000002", "Morning Instrumental", { radio: true, radioContentChecked: 1 as const }),
+      song("copy0000003", "Night DJ Example Remix", { radio: true, radioContentChecked: 1 as const }),
       good, { ...good, id: "copy0000004", title: "Afternoon (Lyrics)" },
       song("manual00001", "Explicit non-music choice", { music: false }),
     ],
@@ -344,7 +347,7 @@ test("a learned genre survives room prefetch and restart without publishing priv
   let lookups = 0;
   const recommendation = await roomRecommendation({ current: seed, queue: [] }, async () => {
     return ++lookups === 1 ? [{ ...seed, title: "Opening [Electro House]" }] : [selected];
-  });
+  }, undefined, fixtureRadioContent);
   assert.equal(recommendation?.id, selected.id);
   let state = changeRoom({ current: seed, queue: [], position: 0, playing: true }, { action: "radio-prefetch" }, true, 0, recommendation);
   state = JSON.parse(JSON.stringify(state));
@@ -358,11 +361,11 @@ test("a learned genre survives room prefetch and restart without publishing priv
 });
 
 test("removing a room suggestion suppresses its remaster and undo restores only that rejection", async () => {
-  const removed = { ...next, radio: true };
+  const removed = { ...next, radio: true, radioContentChecked: 1 as const };
   const otherRejected = song("reject00001", "Night");
   const before = { current: seed, queue: [removed], playing: true, position: 0, radioExcludedSongs: [otherRejected] };
   const state = changeRoom(before, { action: "remove", index: 0 }, true, 0);
-  const result = await roomRecommendation(state, async () => [song("copy0000001", "Evening Remastered 2024"), song("fresh000001", "Morning")]);
+  const result = await roomRecommendation(state, async () => [song("copy0000001", "Evening Remastered 2024"), song("fresh000001", "Morning")], undefined, fixtureRadioContent);
   assert.equal(result?.id, "fresh000001");
   const restored = changeRoom(state, { action: "undo" }, true, 0);
   assert.deepEqual(publicPlayback(restored).queue.map((track) => track.id), [removed.id]);
@@ -371,11 +374,11 @@ test("removing a room suggestion suppresses its remaster and undo restores only 
 
 for (const alternate of [false, true])
 test(`undo preserves exclusions for a manual ${alternate ? "alternate upload" : "rejected video"}`, async () => {
-  const rejected = song("reject00001", "Night", { radio: true });
+  const rejected = song("reject00001", "Night", { radio: true, radioContentChecked: 1 as const });
   const manual = alternate
     ? song("manual00001", "Night (2024 Remaster)", { radio: false })
     : { ...rejected, radio: false };
-  const suggestion = { ...next, radio: true };
+  const suggestion = { ...next, radio: true, radioContentChecked: 1 as const };
   const original = {
     current: seed, queue: [manual, suggestion], playing: true, position: 0,
     playbackKey: "unchanged-playback", radioExcluded: [rejected.id], radioExcludedSongs: [rejected],
@@ -394,17 +397,17 @@ test(`undo preserves exclusions for a manual ${alternate ? "alternate upload" : 
   const afterQueue = { ...restored, queue: [] };
   assert.equal(await roomRecommendation(afterQueue, async () => [
     rejected, song("copy0000001", "Night (2024 Remaster)"),
-  ]), null, "both the rejected video and another upload remain excluded from radio");
+  ], undefined, fixtureRadioContent), null, "both the rejected video and another upload remain excluded from radio");
   assert.deepEqual(original.radioExcluded, [rejected.id], "the input snapshot is not mutated");
 });
 
 for (const radio of [true, false])
 test(`undo retains a removed suggestion manually re-added before undo (radio: ${radio})`, async () => {
-  const rejected = { ...next, radio: true };
+  const rejected = { ...next, radio: true, radioContentChecked: 1 as const };
   const before = song("manual00001", "First manual choice", { radio: false });
   const after = song("manual00002", "Second manual choice", { radio: false });
   const addition = song("manual00003", "Later manual choice", { radio: false });
-  const otherRejected = song("reject00001", "Night", { radio: true });
+  const otherRejected = song("reject00001", "Night", { radio: true, radioContentChecked: 1 as const });
   const original = {
     current: seed, queue: [before, rejected, after], playing: true, position: 0,
     playbackKey: "unchanged-playback", radioExcluded: [otherRejected.id],
@@ -428,7 +431,7 @@ test(`undo retains a removed suggestion manually re-added before undo (radio: ${
   assert.equal(restored.undoQueue, undefined);
   assert.equal(await roomRecommendation({ ...restored, queue: [], radio: true }, async () => [
     rejected, song("copy0000001", "Evening (2024 Remaster)"), otherRejected,
-  ]), null, "manual re-addition must not lift ID or recording exclusions for future radio");
+  ], undefined, fixtureRadioContent), null, "manual re-addition must not lift ID or recording exclusions for future radio");
   assert.deepEqual(original.queue.map(track => track.id), [before.id, rejected.id, after.id]);
   assert.equal(original.queue[1].radio, true, "the saved snapshot is not mutated");
 });
@@ -439,7 +442,7 @@ test("radio history includes the last hundred tracks and skip suppression is sco
   try {
     for (let i = 0; i < 100; i++) first.store.record(`play:${i}`, publicTrack(song(`id:${i}`, `Song ${i}`))!, i);
     assert.equal(first.providers.radioHistory().length, 100);
-    first.engine.rejectRadio([{ ...next, radio: true }]);
+    first.engine.rejectRadio([{ ...next, radio: true, radioContentChecked: 1 as const }]);
     first.providers.search = other.providers.search = async () => [next];
     assert.equal(await first.providers.radio(seed, []), null);
     assert.equal((await other.providers.radio(seed, []))?.id, next.id);

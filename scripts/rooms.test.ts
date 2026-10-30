@@ -5,6 +5,17 @@ import { registerHooks } from "node:module";
 import { transpileFixtureModule } from "./fixture-transpile.ts";
 import { readFileSync, readdirSync } from "node:fs";
 import type { RoomState } from "../lib/types.ts";
+import { watchPage } from "../services/core/tests/youtube-watch-fixture.ts";
+
+function watchFixture(url: URL, ai = false) {
+  if (url.origin !== 'https://www.youtube.com') return null;
+  assert.equal(url.pathname, '/watch'); assert.equal(url.searchParams.get('hl'), 'en');
+  const id = url.searchParams.get('v')!;
+  assert.match(id, /^[A-Za-z0-9_-]{11}$/);
+  return new Response(watchPage(id, ai));
+}
+
+
 
 // Exercise the actual Worker handlers and SQL using only an in-memory D1 adapter.
 type FixtureEnvironment = {
@@ -214,6 +225,7 @@ function fixture() {
   let calls = 0;
   globalThis.fetch = async (target) => {
     const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
     assert.equal(url.origin, "https://www.googleapis.com");
     calls++;
     if (url.pathname.endsWith("/search"))
@@ -469,6 +481,7 @@ test("D1 radio refreshes old search metadata and excludes explicit non-music cat
     const stages: string[] = [];
     globalThis.fetch = async (target) => {
       const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, "https://www.googleapis.com");
       if (url.pathname.endsWith("/search")) {
         stages.push("search");
@@ -499,6 +512,7 @@ test("D1 House radio prepares a different artist at the start of playback", asyn
     await f.save("TESTROOM", { current: original, queue: [], playing: true, position: 0 });
     globalThis.fetch = async target => {
       const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, "https://www.googleapis.com");
       if (url.pathname.endsWith("/search")) {
         const query = url.searchParams.get("q") ?? "";
@@ -850,6 +864,7 @@ test("D1 Radio 2.0 compares discovery pools without restarting current playback"
     globalThis.fetch = async target => {
       time += 250;
       const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, "https://www.googleapis.com");
       if (url.pathname.endsWith("/search")) {
         const query = url.searchParams.get("q") ?? "";
@@ -888,6 +903,7 @@ for (const title of ["Live Forever", "Hello"]) {
         playbackKey: "real-name-playback", history: [heard] });
       globalThis.fetch = async target => {
         const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
         assert.equal(url.origin, "https://www.googleapis.com");
         if (url.pathname.endsWith("/search"))
           return Response.json({ items: [{ id: { videoId: candidate.id } }] });
@@ -919,6 +935,7 @@ test("D1 refreshes both cached search and video genres after the free-form tag c
     const calls: string[] = [];
     globalThis.fetch = async target => {
       const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, "https://www.googleapis.com");
       if (url.pathname.endsWith("/search")) {
         calls.push("search");
@@ -948,6 +965,7 @@ test("D1 compound genre labels retain specific cross-artist discovery and privat
       playbackKey: "compound-genre-playback" });
     globalThis.fetch = async target => {
       const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, "https://www.googleapis.com");
       if (url.pathname.endsWith("/search"))
         return Response.json({ items: [{ id: { videoId: candidate.id } }] });
@@ -978,6 +996,7 @@ for (const candidateTitle of ["Oasis - Song Live Wembley", "Oasis - Song Live Gl
         playbackKey: "review-playback" });
       globalThis.fetch = async target => {
         const url = new URL(typeof target === "string" ? target : target instanceof URL ? target.href : target.url);
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
         assert.equal(url.origin, "https://www.googleapis.com");
         if (url.pathname.endsWith("/search"))
           return Response.json({ items: [{ id: { videoId: candidate.id } }] });
@@ -1004,6 +1023,7 @@ test('D1 user discovery returns thirty unique results in one bounded search and 
     const calls: string[] = [];
     globalThis.fetch = async target => {
       const url = new URL(String(target));
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, 'https://www.googleapis.com');
       calls.push(url.pathname);
       if (url.pathname.endsWith('/search')) {
@@ -1054,6 +1074,7 @@ test('D1 radio uses twenty music results and its own visitor allowance after use
     let radioSearches = 0;
     globalThis.fetch = async target => {
       const url = new URL(String(target));
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       if (url.pathname.endsWith('/search') && url.searchParams.get('q') !== 'user results') {
         radioSearches++;
         assert.equal(url.searchParams.get('maxResults'), '20');
@@ -1077,6 +1098,7 @@ test('D1 retains description, tags and synthetic-media AI declarations for radio
     const ids = ['ai000000001', 'ai000000002', 'ai000000003'];
     globalThis.fetch = async target => {
       const url = new URL(String(target));
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       if (url.pathname.endsWith('/search')) return Response.json({ items: ids.map(videoId => ({ id: { videoId } })) });
       return Response.json({ items: ids.map((id, index) => ({ id,
         snippet: { title: 'Artist - Quiet song', channelTitle: 'Artist', categoryId: '10',
@@ -1108,6 +1130,7 @@ for (const example of [
     let lookups = 0;
     globalThis.fetch = async target => {
       const url = new URL(String(target));
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, 'https://www.googleapis.com');
       if (url.pathname.endsWith('/search')) {
         lookups++;
@@ -1184,6 +1207,7 @@ test('D1 user search shares title and artist ranking without extra provider requ
     globalThis.fetch = async target => {
       calls++;
       const url = new URL(String(target));
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, 'https://www.googleapis.com');
       if (url.pathname.endsWith('/search'))
         return Response.json({ items: ids.map(videoId => ({ id: { videoId } })) });
@@ -1208,6 +1232,7 @@ test('D1 bypasses old metadata when newer declared-AI evidence is only in the de
     let metadataReads = 0;
     globalThis.fetch = async target => {
       const url = new URL(String(target));
+      const disclosure = watchFixture(url); if (disclosure) return disclosure;
       assert.equal(url.origin, 'https://www.googleapis.com');
       if (url.pathname.endsWith('/search')) return Response.json({ items: [{ id: { videoId: id } }] });
       metadataReads++;
@@ -1267,4 +1292,22 @@ test('Worker forwards correlated native transport to Core with its own scoped ac
   } finally {
     delete syntheticEnv.GUTTA_CORE_PUBLIC_URL; delete syntheticEnv.ADMIN_BRIDGE_KEY; f.close();
   }
+});
+
+test('D1 radio rejects a provider-labeled AI upload even when its API metadata has a clean title', async () => {
+  const f = fixture(), bad = { ...next, id: 'badlabel001' };
+  try {
+    await f.save('TESTROOM', { current: seed, queue: [], playing: true, position: 0 });
+    globalThis.fetch = async target => {
+      const url = new URL(String(target));
+      const disclosure = watchFixture(url, true); if (disclosure) return disclosure;
+      assert.equal(url.origin, 'https://www.googleapis.com');
+      return Response.json({ items: url.pathname.endsWith('/search') ? [{ id: { videoId: bad.id } }]
+        : [{ id: bad.id, snippet: { title: bad.title, channelTitle: bad.artist, categoryId: '10' },
+          contentDetails: { duration: 'PT3M20S' }, status: { embeddable: true } }] });
+    };
+    const { room } = await mutate(f.request, 'TESTROOM', { action: 'radio-prefetch', version: 1 });
+    assert.equal(room.current?.id, seed.id); assert.deepEqual(room.queue, []);
+    assert.equal(f.roomState().current?.id, seed.id);
+  } finally { f.close(); }
 });

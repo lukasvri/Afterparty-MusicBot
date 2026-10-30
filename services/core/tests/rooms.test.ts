@@ -1,3 +1,4 @@
+import { fixtureRadioContent, fixtureRadioOwner } from './radio-content-fixture.ts';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Store } from "../src/store.ts";
@@ -16,7 +17,7 @@ const video = {
 };
 
 test("the first approved room addition starts on the shared clock without resuming an existing pause", () => {
-  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  const store = new Store(":memory:"), rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
   try {
     rooms.import({ code: "TESTROOM", name: "Test", owner_hash: "a".repeat(64),
       state: { current: null, queue: [], position: 0, playing: false },
@@ -35,7 +36,7 @@ test("the first approved room addition starts on the shared clock without resumi
 });
 
 test("a guest request in an empty room waits for host approval before starting", () => {
-  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  const store = new Store(":memory:"), rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
   try {
     rooms.import({ code: "TESTROOM", name: "Test", owner_hash: "a".repeat(64),
       state: { current: null, queue: [], position: 0, playing: false, approvalRequired: true },
@@ -53,7 +54,7 @@ test("a guest request in an empty room waits for host approval before starting",
 });
 
 test("native transport receipts identify a committed revision and deduplicate without undoing a newer pause", () => {
-  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  const store = new Store(":memory:"), rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
   try {
     rooms.import({ code: "TESTROOM", name: "Test", owner_hash: "a".repeat(64),
       state: { current: video, queue: [], position: 0, playing: true },
@@ -73,7 +74,7 @@ test("native transport receipts identify a committed revision and deduplicate wi
 });
 
 test("room scheduling uses the playing-room expiry index without rewriting durable rooms", () => {
-  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  const store = new Store(":memory:"), rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
   try {
     const insert = store.prepare("INSERT INTO video_rooms(code,data) VALUES(?,?)");
     for (let i = 0; i < 100; i++) insert.run(`R${String(i).padStart(7,"0")}`, JSON.stringify({ expiresAt: i % 3 ? 20000 : 9000, state: { playing: i % 2 === 0 } }));
@@ -87,7 +88,7 @@ test("room scheduling uses the playing-room expiry index without rewriting durab
 test("one persisted room clock, shared start deadline, host protection and queue races", () => {
   const store = new Store(":memory:");
   let now = 10000;
-  const rooms = new Rooms(store, () => now);
+  const rooms = fixtureRadioOwner(new Rooms(store, () => now));
   try {
     const input = {
       code: "TESTROOM",
@@ -131,7 +132,7 @@ test("one persisted room clock, shared start deadline, host protection and queue
         actorHash: "a".repeat(64),
       }),
     );
-    const recovered = new Rooms(store, () => now);
+    const recovered = fixtureRadioOwner(new Rooms(store, () => now));
     assert.equal(recovered.snapshot("TESTROOM").position, 0.5);
     assert(
       !JSON.stringify(recovered.snapshot("TESTROOM")).includes("ownerHash"),
@@ -146,7 +147,7 @@ test("one persisted room clock, shared start deadline, host protection and queue
 test('duplicate play acknowledgments preserve the agreed start and the advancing room clock', () => {
   const store = new Store(':memory:');
   let now = 10000;
-  const rooms = new Rooms(store, () => now), owner = 'a'.repeat(64);
+  const rooms = fixtureRadioOwner(new Rooms(store, () => now)), owner = 'a'.repeat(64);
   try {
     rooms.import({ code: 'TESTROOM', name: 'Clock', owner_hash: owner,
       state: { current: video, queue: [], playing: false, position: 12, radio: false, playbackKey: 'same-track' },
@@ -180,7 +181,7 @@ test('duplicate play acknowledgments preserve the agreed start and the advancing
 
 test('room seek rejects unknown-length and live videos without changing shared state', () => {
   for (const change of [{ live: true }, { duration: 0 }]) {
-    const store = new Store(':memory:'), rooms = new Rooms(store, () => 10000);
+    const store = new Store(':memory:'), rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
     try {
       rooms.import({ code: 'TESTROOM', name: 'Clock', owner_hash: 'a'.repeat(64),
         state: { current: { ...video, ...change }, queue: [], playing: false, position: 0, radio: false },
@@ -208,7 +209,7 @@ const next = {
 };
 function setup() {
   const store = new Store(":memory:"),
-    rooms = new Rooms(store, () => 10000);
+    rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
   rooms.import({
     code: "TESTROOM",
     name: "Synthetic room",
@@ -238,7 +239,7 @@ test("own-room radio continues an empty queue and retains its shared clock", asy
     assert.equal(state.playing, true);
     assert.equal(state.startsAt, 11500);
     assert.equal(
-      new Rooms(store, () => 10000).snapshot("TESTROOM").current?.id,
+      fixtureRadioOwner(new Rooms(store, () => 10000)).snapshot("TESTROOM").current?.id,
       next.id,
     );
     assert(!JSON.stringify(state).includes("ownerHash"));
@@ -331,19 +332,19 @@ test("shared room recommendation filters repeats, live and blocked videos", asyn
       seed,
       blocked,
       { ...next, live: true },
-    ]),
+    ], undefined, fixtureRadioContent),
     null,
   );
   assert.equal(
     await roomRecommendation(
       { current: seed, queue: [], radioHistory: [next] },
-      async () => [next],
+      async () => [next], undefined, fixtureRadioContent
     ),
     null,
   );
   const selected = await roomRecommendation(
     { current: seed, queue: [] },
-    async () => [next],
+    async () => [next], undefined, fixtureRadioContent
   );
   assert.equal(selected?.id, next.id);
 });
@@ -370,7 +371,7 @@ test("a failed own-room recommendation preserves the seed and can be retried", a
 test("clock advances without a host, once, and survives a restart", async () => {
   const store = new Store(":memory:");
   let now = 10000;
-  let rooms = new Rooms(store, () => now);
+  let rooms = fixtureRadioOwner(new Rooms(store, () => now));
   try {
     rooms.import({
       code: "TESTROOM",
@@ -392,7 +393,7 @@ test("clock advances without a host, once, and survives a restart", async () => 
     assert.equal(rooms.snapshot("TESTROOM").current?.id, next.id);
     assert.equal(rooms.snapshot("TESTROOM").version, 2);
     rooms.dispose();
-    rooms = new Rooms(store, () => now);
+    rooms = fixtureRadioOwner(new Rooms(store, () => now));
     assert.equal(rooms.snapshot("TESTROOM").current?.id, next.id);
     now += 202000;
     await rooms.tick();
@@ -406,7 +407,7 @@ test("clock advances without a host, once, and survives a restart", async () => 
 test("automatic radio cannot override a newer pause and failed radio ends cleanly", async () => {
   const store = new Store(":memory:");
   let now = 10000;
-  const rooms = new Rooms(store, () => now);
+  const rooms = fixtureRadioOwner(new Rooms(store, () => now));
   try {
     rooms.import({
       code: "TESTROOM",
@@ -505,7 +506,7 @@ test("moderation, participant votes and queue undo never expose identities", () 
 
 test("live events never disclose imported website access metadata", () => {
   const store = new Store(":memory:");
-  const rooms = new Rooms(store, () => 10000);
+  const rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
   try {
     rooms.import({
       code: "TESTROOM",
@@ -599,7 +600,7 @@ test("radio falls back to a second artist search and can restart after the last 
 test("radio queues the next song before the end, preserves the clock, and yields to manual choices", async () => {
   const store = new Store(":memory:");
   let now=10000, searches=0;
-  const rooms=new Rooms(store,()=>now);
+  const rooms=fixtureRadioOwner(new Rooms(store,()=>now));
   rooms.import({code:"TESTROOM",name:"Preview radio",owner_hash:"a".repeat(64),state:{current:seed,queue:[],position:169,playing:true},version:1,updated_at:now,expires_at:100000});
   rooms.search=async()=>{searches++;return [next];};
   try {
@@ -622,7 +623,7 @@ test("radio queues the next song before the end, preserves the clock, and yields
 test("House room prefetch fills the queue on the first playing tick without waiting for the tail", async () => {
   const store = new Store(":memory:");
   let now = 10000;
-  const rooms = new Rooms(store, () => now);
+  const rooms = fixtureRadioOwner(new Rooms(store, () => now));
   const original = { ...seed, title: "SAM WAITIN - AFTERMATH | House | NCS - Copyright Free Music", artist: "NoCopyrightSounds" };
   const fresh = { ...next, title: "Other Artist - Synthetic Next | House" };
   rooms.import({ code: "TESTROOM", name: "Early House radio", owner_hash: "a".repeat(64),
@@ -675,7 +676,7 @@ test("untagged radio seeds can learn genre from the same recording and cross art
  const result=await roomRecommendation({current:plain,queue:[]},async query=>{
   queries.push(query);
   return queries.length===1?[seed]:[next];
- });
+ }, undefined, fixtureRadioContent);
  assert.equal(result?.id,next.id);
  assert(queries[1].startsWith('future house'));
 });
@@ -705,7 +706,7 @@ test('an unsuccessful early skip keeps the current song and allows retry',async(
 for (const skipFirst of [false, true]) test(`empty shared radio lookup persists backoff (skip first: ${skipFirst})`, async () => {
   const store = new Store(":memory:");
   let now = 10000, calls = 0;
-  const rooms = new Rooms(store, () => now);
+  const rooms = fixtureRadioOwner(new Rooms(store, () => now));
   rooms.import({ code: "TESTROOM", name: "Cooldown", owner_hash: "a".repeat(64), state: { current: seed, queue: [], position: 10, playing: true }, version: 1, updated_at: now, expires_at: 100000 });
   const gate = deferred<RoomVideo[]>();
   rooms.search = async () => { calls++; return gate.promise; };
@@ -720,7 +721,7 @@ for (const skipFirst of [false, true]) test(`empty shared radio lookup persists 
     assert.equal(calls, 2, "one shared lookup with its two search queries");
     assert.equal(rooms.snapshot("TESTROOM").current?.id, seed.id);
     assert.equal(rooms.snapshot("TESTROOM").playing, true);
-    const recovered = new Rooms(store, () => now);
+    const recovered = fixtureRadioOwner(new Rooms(store, () => now));
     recovered.search = rooms.search;
     for (let i = 0; i < 29; i++) { now += 500; await recovered.tick(); }
     assert.equal(calls, 2, "persisted cooldown survives reload and repeated 500ms ticks");
@@ -800,7 +801,7 @@ for (const winner of ["add", "radio"])
 
 
 test('native receipt history is bounded and a restarted epoch rejects old command identities', () => {
-  const store = new Store(':memory:'), rooms = new Rooms(store, () => 10000);
+  const store = new Store(':memory:'), rooms = fixtureRadioOwner(new Rooms(store, () => 10000));
   try {
     rooms.import({ code: 'TESTROOM', name: 'Test', owner_hash: 'a'.repeat(64),
       state: { current: video, queue: [], position: 0, playing: true },
@@ -815,7 +816,7 @@ test('native receipt history is bounded and a restarted epoch rejects old comman
     assert.equal(published.includes('a'.repeat(64)), false);
     for (const commandId of ['too-short', 'x'.repeat(1000)])
       assert.throws(() => rooms.mutate('TESTROOM', { ...commands[0], version: 34, commandId }), { status: 400 });
-    const restarted = new Rooms(store, () => 10000);
+    const restarted = fixtureRadioOwner(new Rooms(store, () => 10000));
     try {
       assert.throws(() => restarted.mutate('TESTROOM', { ...commands.at(-1)!, version: 34 }), { status: 409 });
       assert.equal(restarted.snapshot('TESTROOM').version, 34);

@@ -1,3 +1,4 @@
+import { fixtureRadioContent } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, mock, test } from "node:test";
@@ -135,9 +136,9 @@ test("real catalog policy: distinct artists' Hello recordings are not duplicates
 test("real catalog policy: another artist's homonym in history does not consume catalog recovery", async () => {
   let matches = 0;
   const seed = recording("real-policy-supersonic", "Oasis", "Supersonic");
-  const result = await selectRadio({ seed, recent: [oasisHello], excluded: [], requireEmbeddable: true,
+  const result = await selectRadio({ ...({ seed, recent: [oasisHello], excluded: [], requireEmbeddable: true,
     search: async () => [], similar: async () => [{ artist: "Adele", title: "Hello", duration: 210 }],
-    match: async song => { matches++; return { ...adeleHello, catalog: song }; } });
+    match: async song => { matches++; return { ...adeleHello, catalog: song }; } }), verifyContent: fixtureRadioContent });
   assert.equal(matches, 1, "A different artist's known title must reach bounded playback matching");
   assert.equal(result.track?.id, adeleHello.id);
 });

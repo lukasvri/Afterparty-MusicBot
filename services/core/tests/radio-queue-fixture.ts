@@ -26,7 +26,7 @@ export const syntheticSong = (id: number, extra: Partial<Track> = {}): Track => 
   id: `id${String(id).padStart(9, "0")}`, entryId: String(id),
   title: `Synthetic Artist ${id} - Song ${id} [Electro House]`,
   artist: "Synthetic Publisher", duration: 210, image: "", live: false,
-  embeddable: true, radio: true, music: true, ...extra,
+  embeddable: true, radio: true, music: true, radioContentChecked: 1, ...extra,
 });
 
 export function syntheticRoom(automatic: number, manual: number, history: number): RoomRadioState {

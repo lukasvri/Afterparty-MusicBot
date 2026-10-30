@@ -1,3 +1,4 @@
+import { fixtureRadioContent, fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import { selectRadio, RADIO_LIMITS, type RadioInput } from "../src/radio-pipeline.ts";
@@ -23,7 +24,7 @@ const input = (extra: Partial<RadioInput> = {}): RadioInput => ({
 test("radio pipeline caps hydration and retains its reserved artist-catalog recovery slot", async () => {
   const titles = ["First", "Second", "Third", "Recovery"];
   const attempted: string[] = [];
-  const result = await selectRadio(input({
+  const result = await selectRadio({ ...(input({
     similar: async () => titles.map(title => ({ title, artist: "Aster", duration: 210 })),
     topTracks: async () => [{ title: titles[3], artist: "Aster", duration: 210 }],
     match: async song => {
@@ -31,7 +32,7 @@ test("radio pipeline caps hydration and retains its reserved artist-catalog reco
       if (song.title !== titles[3]) throw new Error("synthetic hydration failure");
       return matching(song);
     },
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.deepEqual(attempted, titles, "an unattempted fourth descriptor must remain available to the fallback");
   assert.equal(result.source, "artist-catalog");
   assert.equal(result.track?.title, "Aster - Recovery");
@@ -44,23 +45,23 @@ test("untrusted search proof cannot inherit a vetted catalog candidate's relatio
   const broad = { ...seed, genres: ["pop"] };
   const descriptor = { title: "Vetted Song", artist: "Vetted Artist", duration: 210 };
   const spoof = track("spoof000001", "Unrelated Artist - Unrelated", { genres: ["pop"], radioRelatedTo: broad.id });
-  const result = await selectRadio(input({ seed: broad,
+  const result = await selectRadio({ ...(input({ seed: broad,
     similar: async () => [descriptor], match: async song => ({ ...matching(song), genres: ["pop"] }),
     search: async () => [spoof],
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(result.track?.title, "Vetted Artist - Vetted Song");
   assert.equal(result.source, "catalog");
   assert.equal(result.track?.radioRelatedTo, seed.id);
   assert.equal(result.diagnostic.rejected.relationship, 2);
-  const withoutCatalog = await selectRadio(input({ seed: broad, search: async () => [spoof] }));
+  const withoutCatalog = await selectRadio({ ...(input({ seed: broad, search: async () => [spoof] })), verifyContent: fixtureRadioContent });
   assert.equal(withoutCatalog.track, null);
 });
 
 test("catalog metadata cannot authorize a mismatched raw recording", async () => {
-  const result = await selectRadio(input({
+  const result = await selectRadio({ ...(input({
     similar: async () => [{ title: "Wanted", artist: "Vetted Artist", duration: 210 }],
     match: async song => track("wrong000001", "Unrelated Artist - Different Song", { catalog: song }),
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(result.track, null);
   assert.equal(result.diagnostic.rejected["catalog-match"], 1);
   assert.equal(result.diagnostic.outcome, "filtered");
@@ -68,10 +69,10 @@ test("catalog metadata cannot authorize a mismatched raw recording", async () =>
 
 test("all media hydration and discovery failures report provider-error without private diagnostic data", async () => {
   const privateError = new Error("private title/room/query/token must not be logged");
-  const result = await selectRadio(input({
+  const result = await selectRadio({ ...(input({
     similar: async () => [{ title: "Wanted", artist: "Vetted Artist", duration: 210 }],
     match: async () => { throw privateError; }, search: async () => { throw privateError; },
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(result.diagnostic.outcome, "provider-error");
   assert.equal(result.diagnostic.failedCatalogMatches, 1);
   assert.equal(result.diagnostic.failedSearches, 2);
@@ -83,9 +84,9 @@ test("all media hydration and discovery failures report provider-error without p
 
 test("artist diagnostics retain earlier admission when the second same-source query is empty", async () => {
   const broad = { ...seed, genres: ["pop"] };
-  const result = await selectRadio(input({ seed: broad,
+  const result = await selectRadio({ ...(input({ seed: broad,
     search: async query => query.includes('audio -"') ? [track("next0000001", "Aster - Evening", { genres: ["pop"] })] : [],
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(result.source, "artist");
   assert.equal(result.diagnostic.stages.artist, "selected");
   assert.equal(result.diagnostic.searches, 2);
@@ -95,9 +96,9 @@ test("metadata and discovery pools inspect only their bounded prefixes", async (
   const broad = { ...seed, genres: ["house"] };
   const eligible = Array.from({ length: 100 }, (_, index) => track(`id${String(index).padStart(9, "0")}`, `Aster - Song ${index}`));
   const metadata = [...eligible.slice(0, 12), { ...seed, title: "Aster - Opening [Deep House]" }];
-  const result = await selectRadio(input({ seed: broad,
+  const result = await selectRadio({ ...(input({ seed: broad,
     search: async query => query.includes('"Opening"') && !query.includes('-"') ? metadata : eligible,
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(result.diagnostic.metadata, "unchanged", "the thirteenth metadata candidate is outside the budget");
   assert.equal(result.diagnostic.candidates, RADIO_LIMITS.searchResults * RADIO_LIMITS.discoverySearches);
   assert.equal(result.diagnostic.searches, 2);
@@ -139,14 +140,14 @@ test("malformed Last.fm envelopes are provider failures and are not negative cac
 });
 
 test("Core selects past an unconsumed current recording before committing a radio winner", async () => {
-  const store = new Store(":memory:"), providers = new Providers(store, {});
+  const store = new Store(":memory:"), providers = fixtureRadioOwner(new Providers(store, {}));
   const engine = new Engine(store, providers, {
     onIdle: null, onError: null, play() {}, pause() {}, resume() {}, stop() {},
     duration: () => 0, advancing: () => false, buffering: () => false,
   });
   clearInterval(engine.timer);
   try {
-    const current = track("current0001", "Current Artist - Evening", { radio: true });
+    const current = track("current0001", "Current Artist - Evening", { radio: true, radioContentChecked: 1 as const });
     const copy = track("copy0000001", "Current Artist - Evening (Official Audio)");
     const fresh = track("fresh000001", "Fresh Artist - Morning");
     engine.connected = true;
@@ -164,8 +165,8 @@ test("Core selects past an unconsumed current recording before committing a radi
 
 for (const replay of [false, true])
 test(`Core does not append an already recorded current entry to the diversity window (earlier replay: ${replay})`, async () => {
-  const store = new Store(":memory:"), providers = new Providers(store, {});
-  const current = track("current0001", "Artist E - Current", { radio: true });
+  const store = new Store(":memory:"), providers = fixtureRadioOwner(new Providers(store, {}));
+  const current = track("current0001", "Artist E - Current", { radio: true, radioContentChecked: 1 as const });
   const artistA = track("historya001", "Artist A - Earlier");
   const history = [artistA, track("historyb001", "Artist B - Earlier"),
     replay ? artistA : track("historyc001", "Artist C - Earlier"), track("historyd001", "Artist D - Earlier")];

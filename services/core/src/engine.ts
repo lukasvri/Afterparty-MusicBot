@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { randomUUID, createHash } from "node:crypto";
 import { Store } from "./store.ts";
 import { Providers } from "./providers.ts";
+import { RADIO_CONTENT_VERSION } from "./protocol.ts";
 import { canPlayRadioTrack, rankRadio, sameRadioSong, type RadioTrack } from "./radio.ts";
 import {
   Mixer,
@@ -392,6 +393,7 @@ export class Engine extends EventEmitter {
           this.queue.push({
             ...next,
             radio: true,
+            radioContentChecked: RADIO_CONTENT_VERSION,
             concert: seed.concert === true,
           });
           this.mixer?.invalidateNext();
@@ -546,6 +548,7 @@ export class Engine extends EventEmitter {
         if (!this.current && track.entryId === this.restoringEntry) {
           return canPlayRadioTrack(seed ?? track, track);
         }
+        if (track.radioContentChecked !== RADIO_CONTENT_VERSION) return false;
         if (!seed || !this.validRadioTrack(seed, track, recent)) return false;
         recent.push(track);
         return true;

@@ -1,3 +1,4 @@
+import { fixtureRadioContent, fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { selectRadio, RADIO_LIMITS, type RadioInput } from '../src/radio-pipeline.ts';
@@ -24,7 +25,7 @@ test('radio hydrates distinct artists within the existing three-match budget ins
   const descriptors = [song('Beryl', 'First'), song('Beryl', 'Second'), song('Beryl', 'Third'),
     song('Cedar', 'Style Conflict'), song('Drift', 'Fresh Evening')];
   const before = structuredClone(descriptors), attempted: string[] = [];
-  const selected = await selectRadio(input({ similar: async () => descriptors,
+  const selected = await selectRadio({ ...(input({ similar: async () => descriptors,
     match: async descriptor => {
       attempted.push(descriptor.artist);
       if (descriptor.artist === 'Beryl') throw Error('synthetic unavailable recording');
@@ -32,7 +33,7 @@ test('radio hydrates distinct artists within the existing three-match budget ins
         catalog: descriptor, genres: descriptor.artist === 'Cedar' ? ['tech house'] : ['deep house'],
       });
     }, topTracks: async () => { assert.fail('a usable similar recording leaves recovery unused'); },
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.deepEqual(attempted, ['Beryl', 'Cedar', 'Drift']);
   assert.equal(selected.track?.title, 'Drift - Fresh Evening'); assert.equal(selected.source, 'catalog');
   assert.equal(selected.diagnostic.catalogMatches, RADIO_LIMITS.similarMatches);
@@ -43,24 +44,24 @@ test('radio hydrates distinct artists within the existing three-match budget ins
 test('a diverse descriptor beyond an initial seed-artist run participates without adding hydration calls', async () => {
   const descriptors = [song('Aster', 'First'), song('Aster', 'Second'), song('Aster', 'Third'), song('Cedar', 'Morning')];
   const attempted: string[] = [];
-  const selected = await selectRadio(input({ similar: async () => descriptors, match: async descriptor => {
+  const selected = await selectRadio({ ...(input({ similar: async () => descriptors, match: async descriptor => {
     attempted.push(descriptor.artist); return track(`matched000${attempted.length}`, descriptor.artist, descriptor.title, { catalog: descriptor });
-  } }));
+  } })), verifyContent: fixtureRadioContent });
   assert.deepEqual(attempted, ['Cedar', 'Aster', 'Aster']); assert.equal(selected.track?.title, 'Cedar - Morning');
   assert.equal(selected.diagnostic.catalogMatches, 3);
 });
 
 test('Core policy and room adapter prefer an older equal-frequency artist over the immediately previous artist', async () => {
   const history = [track('heard000001', 'Beryl', 'Earlier'), track('heard000002', 'Cedar', 'Earlier'), track('heard000003', 'Drift', 'Earlier')];
-  const current = track('heard000004', 'Elm', 'Earlier', { radio: true });
+  const current = track('heard000004', 'Elm', 'Earlier', { radio: true, radioContentChecked: 1 as const });
   const repeated = track('repeat00001', 'Elm', 'Next'), varied = track('varied00001', 'Beryl', 'Next');
   const search = async () => [repeated, varied];
-  const selected = await selectRadio(input({ recent: [...history, current], search }));
+  const selected = await selectRadio({ ...(input({ recent: [...history, current], search })), verifyContent: fixtureRadioContent });
   const state = { current, radioSeed: seed, history, queue: [], radio: true }, before = structuredClone(state);
-  const room = await roomRecommendation(state, search, () => {});
+  const room = await roomRecommendation(state, search, () => {}, fixtureRadioContent);
   assert.equal(selected.track?.id, varied.id); assert.equal(room?.id, varied.id);
   assert.deepEqual(state, before);
-  const onlySafeFallback = await selectRadio(input({ recent: [...history, current], search: async () => [repeated] }));
+  const onlySafeFallback = await selectRadio({ ...(input({ recent: [...history, current], search: async () => [repeated] })), verifyContent: fixtureRadioContent });
   assert.equal(onlySafeFallback.track?.id, repeated.id, 'cooldown is a preference, never a new dead-end gate');
 });
 
@@ -105,17 +106,17 @@ test('radio explores a less exposed safe artist with the same bounded discovery 
   const repeated = track('repeat00001', 'Artist A', 'New Song');
   const fresh = track('newart00001', 'Artist G', 'New Song');
   const queries: string[] = [];
-  const result = await selectRadio(input({ recent, favorites: ['Artist A - New Song'], search: async query => {
+  const result = await selectRadio({ ...(input({ recent, favorites: ['Artist A - New Song'], search: async query => {
     queries.push(query);
     return query.endsWith('official music video') ? [] : [repeated, fresh];
-  } }));
+  } })), verifyContent: fixtureRadioContent });
   assert.equal(result.track?.id, fresh.id, 'a fully cooled-down favorite cannot hide an equally safe unheard artist');
   assert.equal(result.track?.radioRelatedTo, seed.id);
   assert.equal(result.diagnostic.searches, RADIO_LIMITS.discoverySearches);
   assert.equal(result.diagnostic.catalogMatches, 0);
   assert.equal(queries.length, RADIO_LIMITS.discoverySearches + 1, 'only the existing optional format lookup is added');
   assert.deepEqual(recent, before); assert.deepEqual(seed, original);
-  const otherRoom = await selectRadio(input({ search: async () => [repeated, fresh] }));
+  const otherRoom = await selectRadio({ ...(input({ search: async () => [repeated, fresh] })), verifyContent: fixtureRadioContent });
   assert.equal(otherRoom.track?.id, repeated.id, 'another room without this exposure history keeps its own ranking');
 });
 
@@ -123,19 +124,19 @@ test('favorites match complete artist/title identity and cannot buy incompatible
   const short = track('short000001', 'Cedar', 'Night');
   const homonym = track('other000001', 'Drift', 'Midnight');
   const favorite = track('favor000001', 'Beryl', 'Midnight');
-  const selected = await selectRadio(input({ favorites: ['BÉRYL - Midnight'], search: async () => [short, homonym, favorite] }));
+  const selected = await selectRadio({ ...(input({ favorites: ['BÉRYL - Midnight'], search: async () => [short, homonym, favorite] })), verifyContent: fixtureRadioContent });
   assert.equal(selected.track?.id, favorite.id);
   const unnamedArtist = { ...short, id: 'unnamed0001', title: 'Night', artist: 'Unverified Upload Channel' };
-  const titleOnly = await selectRadio(input({ favorites: ['Night'], search: async () => [homonym, unnamedArtist] }));
+  const titleOnly = await selectRadio({ ...(input({ favorites: ['Night'], search: async () => [homonym, unnamedArtist] })), verifyContent: fixtureRadioContent });
   assert.equal(titleOnly.track?.id, homonym.id, 'a missing artist cannot turn a title-only name into favorite proof');
-  const conflict = await selectRadio(input({ favorites: ['Beryl - Midnight'], search: async () => [
+  const conflict = await selectRadio({ ...(input({ favorites: ['Beryl - Midnight'], search: async () => [
     { ...favorite, genres: ['tech house'], radioRelatedTo: seed.id }, short,
-  ] }));
+  ] })), verifyContent: fixtureRadioContent });
   assert.equal(conflict.track?.id, short.id); assert(conflict.diagnostic.rejected.style > 0);
-  const mismatch = await selectRadio(input({ favorites: ['Beryl - Midnight'], similar: async () => [song('Beryl', 'Midnight')],
+  const mismatch = await selectRadio({ ...(input({ favorites: ['Beryl - Midnight'], similar: async () => [song('Beryl', 'Midnight')],
     match: async descriptor => track('spoof000001', 'Unrelated', 'Different', { catalog: descriptor }),
     search: async () => [short],
-  }));
+  })), verifyContent: fixtureRadioContent });
   assert.equal(mismatch.track?.id, short.id); assert.equal(mismatch.diagnostic.rejected['catalog-match'], 1);
 });
 
@@ -145,9 +146,9 @@ test('catalog ranking ignores malformed descriptor fields and copies away untrus
     { ...song('Beryl', 'Bad'), title: 'x'.repeat(321) }, { ...song('Beryl', 'Production tutorial') },
     { ...song('Beryl', 'Morning'), providerUrl: 'https://secret.example', radioRelatedTo: seed.id, nested: { token: 'secret' } },
   ];
-  const selected = await selectRadio(input({ similar: async () => supplied as CatalogSong[], match: async descriptor => {
+  const selected = await selectRadio({ ...(input({ similar: async () => supplied as CatalogSong[], match: async descriptor => {
     attempted.push(descriptor); return track('valid000001', descriptor.artist, descriptor.title, { catalog: descriptor });
-  } }));
+  } })), verifyContent: fixtureRadioContent });
   assert.deepEqual(attempted, [song('Beryl', 'Morning')]); assert.equal(selected.track?.id, 'valid000001');
   assert(!JSON.stringify(selected.diagnostic).includes('secret'));
 });
@@ -185,7 +186,7 @@ test('actual stored favorites use their recording query despite title-only or cu
     const store = new Store(':memory:'), otherStore = new Store(':memory:');
     try {
       store.favorite('synthetic-user', name, `https://www.youtube.com/watch?v=${favorite.id}`);
-      const providers = new Providers(store, {}), other = new Providers(otherStore, {});
+      const providers = fixtureRadioOwner(new Providers(store, {})), other = fixtureRadioOwner(new Providers(otherStore, {}));
       providers.search = other.search = async () => [midnight, homonym, favorite];
       assert.equal((await providers.radio(seed, []))?.id, favorite.id);
       assert.equal((await other.radio(seed, []))?.id, midnight.id, 'one guild store cannot influence another');
@@ -211,9 +212,9 @@ test('favorite identities are source qualified and reject arbitrary queries, loo
     assert.equal(favoriteRecording(query), null);
   const youtube = track(id, 'Beryl', 'Night'), soundcloud = { ...youtube, source: 'soundcloud' as const,
     url: 'https://soundcloud.com/beryl/night' };
-  const yt = await selectRadio(input({ requireEmbeddable: false, favoriteRecordings: [{ source: 'youtube', id }], search: async () => [soundcloud, youtube] }));
+  const yt = await selectRadio({ ...(input({ requireEmbeddable: false, favoriteRecordings: [{ source: 'youtube', id }], search: async () => [soundcloud, youtube] })), verifyContent: fixtureRadioContent });
   assert.equal(yt.track?.source, 'youtube');
-  const sc = await selectRadio(input({ requireEmbeddable: false,
-    favoriteRecordings: [{ source: 'soundcloud', url: 'https://soundcloud.com/beryl/night' }], search: async () => [youtube, soundcloud] }));
+  const sc = await selectRadio({ ...(input({ requireEmbeddable: false,
+    favoriteRecordings: [{ source: 'soundcloud', url: 'https://soundcloud.com/beryl/night' }], search: async () => [youtube, soundcloud] })), verifyContent: fixtureRadioContent });
   assert.equal(sc.track?.source, 'soundcloud');
 });

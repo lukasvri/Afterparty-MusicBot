@@ -31,7 +31,7 @@ function setup() {
     onIdle: null,
     onError: null,
   };
-  const e = new Engine(store, new Providers(store, {}), sink);
+  const e = new Engine(store, fixtureRadioOwner(new Providers(store, {})), sink);
   e.connected = true;
   e.current = track("current");
   e.queue = [track("one"), track("private", false), track("two")];
@@ -373,3 +373,4 @@ test('pending request admission still counts radio that remains queued',async()=
   assert.deepEqual({queue:a.e.queue,saved:a.q.read(),revision:a.q.revision()},before);
  }finally{a.close();}
 });
+import { fixtureRadioOwner } from './radio-content-fixture.ts';

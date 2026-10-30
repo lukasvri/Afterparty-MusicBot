@@ -2,6 +2,7 @@ import type { CatalogSong } from "./matching.ts";
 import { normalized, scoreMatch } from "./matching.ts";
 import type { PublicTrack, Track } from "./types.ts";
 import { metadataAiGenerated } from "./music-content.ts";
+import { verifyRadioContent, type RadioContentVerifier } from "./youtube-content.ts";
 import { matchesStationRecording, radioStation, stationSong } from "./radio-stations.ts";
 import { copyRadioDescriptor, createRecommendationRanking, type FavoriteRecording } from "./recommendation-ranking.ts";
 import {
@@ -10,7 +11,7 @@ import {
   sameRadioRecording, sameRadioSong, specificRadioGenre,
 } from "./radio.ts";
 
-export const RADIO_LIMITS = Object.freeze({ metadata: 12, descriptors: 15, similarMatches: 3,
+export const RADIO_LIMITS = Object.freeze({ contentChecks: 4, metadata: 12, descriptors: 15, similarMatches: 3,
   catalogMatches: 4, curatedMatches: 3, curatedResults: 12, searchResults: 20, discoverySearches: 2, candidates: 60, videoResults: 12 });
 export type RadioSource = "catalog" | "artist-catalog" | "curated" | "genre" | "artist";
 type Stage = "metadata" | "catalog" | "artist-catalog" | "curated" | "genre" | "artist";
@@ -24,6 +25,8 @@ export type RadioDiagnostic = {
   metadata: "unchanged" | "refined" | "unavailable";
   searches: number;
   failedSearches: number;
+  contentChecks: number;
+  contentUnavailable: number;
   musicVideo: StageResult;
   videoSearches: number;
   videoCandidates: number;
@@ -47,6 +50,7 @@ export type RadioInput = {
   favorites?: string[];
   favoriteRecordings?: FavoriteRecording[];
   diagnose?: (diagnostic: RadioDiagnostic) => void;
+  verifyContent?: RadioContentVerifier;
 };
 export type RadioSelection = { track: Track | null; source: RadioSource | null;
   diagnostic: RadioDiagnostic; error?: unknown };
@@ -59,7 +63,7 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
   const diagnostic: RadioDiagnostic = {
     version: 2, outcome: "empty", seedGenre: radioGenre(seed), artistKnown: Boolean(artist),
     musicVideo: "skipped", videoSearches: 0, videoCandidates: 0,
-    metadata: "unchanged", searches: 0, failedSearches: 0, candidates: 0, catalogMatches: 0, curatedSearches: 0, failedCatalogMatches: 0, source: null,
+    metadata: "unchanged", searches: 0, failedSearches: 0, contentChecks: 0, contentUnavailable: 0, candidates: 0, catalogMatches: 0, curatedSearches: 0, failedCatalogMatches: 0, source: null,
     stages: { metadata: "skipped", catalog: input.similar && input.match ? "skipped" : "unavailable",
       "artist-catalog": input.topTracks && input.match ? "skipped" : "unavailable", curated: station ? "skipped" : "unavailable", genre: "skipped", artist: "skipped" },
     rejected: { content: 0, visibility: 0, style: 0, relationship: 0, excluded: 0, recording: 0, "catalog-match": 0 },
@@ -238,7 +242,24 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
   }
 
   pool.sort(preferences.compare);
-  const chosen = pool[0];
+  const checks = new Map<string, boolean>();
+  const contentAllowed = async (track: Track) => {
+    const key = `${track.source ?? 'youtube'}:${track.id}`;
+    if (checks.has(key)) return checks.get(key)!;
+    if (diagnostic.contentChecks >= RADIO_LIMITS.contentChecks) return false;
+    diagnostic.contentChecks++;
+    let disclosure: Awaited<ReturnType<RadioContentVerifier>> = 'unknown';
+    try { disclosure = await (input.verifyContent ?? verifyRadioContent)(track); } catch { /* unavailable is not approval */ }
+    const allowed = disclosure === 'not-observed';
+    if (!allowed) { reject('content'); if (disclosure === 'unknown') diagnostic.contentUnavailable++; }
+    checks.set(key, allowed);
+    return allowed;
+  };
+  let chosen: typeof pool[number] | undefined;
+  for (const candidate of pool) {
+    if (await contentAllowed(candidate.track)) { chosen = candidate; break; }
+    if (diagnostic.contentChecks >= RADIO_LIMITS.contentChecks) break;
+  }
   if (chosen) {
     // Format preference is scoped to the already selected recording. A video
     // must never buy a different song a better genre/diversity/favorite rank.
@@ -276,6 +297,8 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
         diagnostic.musicVideo = "failed";
       }
     } else if (video) diagnostic.musicVideo = "selected";
+    // A preferred video is another upload and needs its own disclosure check.
+    if (video && !await contentAllowed(video)) { video = undefined; diagnostic.musicVideo = 'filtered'; }
     return finish({ ...(video ?? selected), radioRelatedTo: original.id }, chosen.source);
   }
   diagnostic.outcome = !successfulDiscovery && lastError ? "provider-error" : diagnostic.candidates ||

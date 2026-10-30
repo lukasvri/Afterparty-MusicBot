@@ -1,3 +1,4 @@
+import { fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import captured from "./fixtures/radio-artist-credits.json" with { type: "json" };
@@ -18,7 +19,7 @@ async function fixture(duration = song.duration) {
   mock.method(Date, "now", () => now);
   const store = new Store(":memory:");
   const counts = { extractor: 0, api: 0 };
-  const initial = new Providers(store, {});
+  const initial = fixtureRadioOwner(new Providers(store, {}));
   initial.youtube = async () => { throw new Error("Controlled initial API outage"); };
   initial.extract = async () => {
     counts.extractor++;
@@ -34,7 +35,7 @@ async function fixture(duration = song.duration) {
   const api: YouTubeVideo = { id: captured.id,
     snippet: { title: captured.title, channelTitle: "Oasis", categoryId: "10", liveBroadcastContent: "none" },
     contentDetails: { duration: "PT4M19S" }, status: { embeddable: true } };
-  const renewed = new Providers(store, {});
+  const renewed = fixtureRadioOwner(new Providers(store, {}));
   renewed.youtube = (async () => { counts.api++; return { items: [api] }; }) as Providers["youtube"];
   renewed.extract = async () => { assert.fail("A successful API refresh must not use the extractor"); };
   renewed.search = () => renewed.video([api.id]);

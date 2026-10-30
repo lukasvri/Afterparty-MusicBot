@@ -1,3 +1,4 @@
+import { fixtureRadioContent } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { radioArtist, radioQuery, radioTitle, radioStyleCompatible, rankRadio } from "../src/radio.ts";
@@ -44,12 +45,12 @@ test("Sam Waitin Aftermath discovers exact House across artists within the exist
       { ...fresh, id: "vlog0000001", title: "Another Artist - Fresh vlog | House" },
       { ...fresh, id: "recreate001", title: "Another Artist - Fresh (Recreation) | House" },
       { ...fresh, id: "aigenerated", aiGenerated: true }, fresh];
-  });
+  }, undefined, fixtureRadioContent);
   assert.equal(next?.id, fresh.id);
   assert.equal(next?.radioRelatedTo, original.id);
   assert.deepEqual(queries, ['SAM WAITIN "AFTERMATH"', 'house audio -"AFTERMATH"',
     'SAM WAITIN music audio', 'Another Artist "Fresh Song" official music video']);
-  assert.deepEqual(playableRoomQueue({ ...state, queue: [{ ...next!, radio: true }] }).map(song => song.id), [fresh.id]);
+  assert.deepEqual(playableRoomQueue({ ...state, queue: [{ ...next!, radio: true, radioContentChecked: 1 as const }] }).map(song => song.id), [fresh.id]);
   assert.equal(state.current.id, original.id);
 });
 
@@ -59,13 +60,13 @@ test("broad house metadata can be refined by the exact recording", async () => {
   const next = await roomRecommendation(state, async (q) => {
     queries.push(q);
     return q.includes('"Let\'s Go!"') && !q.includes('-"') ? [metadata] : [suggestion];
-  });
+  }, undefined, fixtureRadioContent);
   assert.equal(next?.id, suggestion.id);
   assert.equal(next?.radioRelatedTo, seed.id);
   assert.ok(queries[0].includes('"Let\'s Go!"'));
   assert.equal(state.radioSeed, seed, "the caller's seed is not mutated");
   assert.equal(seed.title, "Lensko - Let's Go! | House | NCS");
-  assert.deepEqual(playableRoomQueue({ ...state, queue: [{ ...next!, radio: true }] }).map(v => v.id), [suggestion.id]);
+  assert.deepEqual(playableRoomQueue({ ...state, queue: [{ ...next!, radio: true, radioContentChecked: 1 as const }] }).map(v => v.id), [suggestion.id]);
 });
 
 test("named House seeds admit exact House labels but require more evidence for a subgenre", () => {
@@ -88,7 +89,7 @@ test("failed genre search falls back to the seed artist, not unrelated results",
   const next = await roomRecommendation({ current: specific, queue: [], radio: true }, async (q) => {
     queries.push(q);
     return q.startsWith("Lensko ") ? [ownSong] : [video("wrong000001", "Unrelated - Track [Tech House]")];
-  });
+  }, undefined, fixtureRadioContent);
   assert.equal(next?.id, ownSong.id);
   assert.equal(queries.length, 3, "two discovery searches plus one format lookup");
 });
@@ -106,7 +107,7 @@ test("refinement cannot use a different recording, tutorial, cover or conflictin
   ];
   for (const candidate of unsafe) {
     const next = await roomRecommendation({ current: seed, queue: [], radio: true }, async (q) =>
-      q.includes('"Let\'s Go!"') && !q.includes('-"') ? [candidate] : [suggestion],
+      q.includes('"Let\'s Go!"') && !q.includes('-"') ? [candidate] : [suggestion], undefined, fixtureRadioContent
     );
     assert.equal(next, null, candidate.id);
   }
@@ -117,7 +118,7 @@ test("safe refinement still excludes repeated recordings and rejected suggestion
   const alternate = video("alternate01", "Another Artist - New Song (Official Audio) [Electro House]");
   const state = { current: seed, queue: [], radio: true, history: [original], radioExcluded: ["excluded001"] };
   const next = await roomRecommendation(state, async (q) =>
-    q.includes('"Let\'s Go!"') && !q.includes('-"') ? [metadata] : [alternate, { ...suggestion, id: "excluded001", title: "Another Artist - Different Song [Electro House]" }],
+    q.includes('"Let\'s Go!"') && !q.includes('-"') ? [metadata] : [alternate, { ...suggestion, id: "excluded001", title: "Another Artist - Different Song [Electro House]" }], undefined, fixtureRadioContent
   );
   assert.equal(next, null);
 });
@@ -125,8 +126,8 @@ test("safe refinement still excludes repeated recordings and rejected suggestion
 test("provider failure remains different from a successful empty search", async () => {
   const specific = video("specific002", "Lensko - Let's Go! [Electro House]");
   const state = { current: specific, queue: [], radio: true };
-  await assert.rejects(roomRecommendation(state, async () => { throw new Error("provider unavailable"); }), /provider unavailable/);
-  assert.equal(await roomRecommendation(state, async () => []), null);
+  await assert.rejects(roomRecommendation(state, async () => { throw new Error("provider unavailable"); }, undefined, fixtureRadioContent), /provider unavailable/);
+  assert.equal(await roomRecommendation(state, async () => [], undefined, fixtureRadioContent), null);
 });
 
 test("artist fallback rejects irrelevant videos and repeated recordings after an empty genre search", async () => {
@@ -146,7 +147,7 @@ test("artist fallback rejects irrelevant videos and repeated recordings after an
   const result = await roomRecommendation({ current: specific, queue: [], radio: true,
     history: [previous], radioExcluded: ["excluded001"] },
     async query => query.startsWith("Lensko ") ? unsafe : [],
-    diagnostic => diagnostics.push(diagnostic));
+    diagnostic => diagnostics.push(diagnostic), fixtureRadioContent);
   assert.equal(result, null);
   assert.deepEqual(diagnostics.map(diagnosticSummary), [{ outcome: "filtered", seedGenre: "electro house", artistKnown: true,
     metadata: "unchanged", searches: 2, failedSearches: 0, candidates: unsafe.length }]);
@@ -159,13 +160,13 @@ test("sanitized diagnostics distinguish empty searches, provider errors and miss
   const specific = video("specific004", "Lensko - Let's Go! [Electro House]");
   const diagnostics: unknown[] = [];
   const diagnose = (value: unknown) => diagnostics.push(value);
-  await roomRecommendation({ current: specific, queue: [] }, async () => [], diagnose);
+  await roomRecommendation({ current: specific, queue: [] }, async () => [], diagnose, fixtureRadioContent);
   await assert.rejects(roomRecommendation({ current: specific, queue: [] }, async () => {
     throw new Error("private provider detail must never be logged");
-  }, diagnose));
+  }, diagnose, fixtureRadioContent));
   await roomRecommendation({ current: { ...specific, title: "Unknown song", genres: ["house"] }, queue: [] }, async () => {
     assert.fail("insufficient metadata should not trigger provider searches");
-  }, diagnose);
+  }, diagnose, fixtureRadioContent);
   assert.deepEqual(diagnostics.map(diagnosticSummary), [
     { outcome: "empty", seedGenre: "electro house", artistKnown: true, metadata: "unchanged", searches: 2, failedSearches: 0, candidates: 0 },
     { outcome: "provider-error", seedGenre: "electro house", artistKnown: true, metadata: "unchanged", searches: 2, failedSearches: 2, candidates: 0 },

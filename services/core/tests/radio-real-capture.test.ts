@@ -1,3 +1,4 @@
+import { fixtureRadioContent } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import capture from "./fixtures/radio-provider-regressions.json" with { type: "json" };
@@ -21,8 +22,8 @@ test("captured official Metallica colon prefix identifies the artist and song", 
 test("captured colon seed reaches bounded selection instead of insufficient metadata", async () => {
   let calls = 0;
   const candidate = { ...track(metallicaSeed), id: "synthetic01", title: "Metallica - Synthetic next song" };
-  const result = await selectRadio({ seed: track(metallicaSeed), recent: [], excluded: [], requireEmbeddable: true,
-    search: async () => { calls++; return [candidate]; } });
+  const result = await selectRadio({ ...({ seed: track(metallicaSeed), recent: [], excluded: [], requireEmbeddable: true,
+    search: async () => { calls++; return [candidate]; } }), verifyContent: fixtureRadioContent });
   assert.equal(result.track?.id, candidate.id);
   assert(calls > 0 && calls <= 4);
 });

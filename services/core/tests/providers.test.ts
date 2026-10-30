@@ -226,6 +226,7 @@ test('public Spotify embed fallback is retained while rate limits are not retrie
 test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions and falls back on provider failure',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{LASTFM_API_KEY:'test'}),seed=track();
+  p.verifyRadioContent=fixtureRadioContent;
   p.search=async()=>[];p.recommendations.topTracks=async()=>[];
   p.recommendations.similar=async()=>[{title:'Other',artist:'Artist',duration:200},{title:'Favorite',artist:'Artist',duration:200}];
   p.matchSong=async song=>track('Artist - '+song.title,song.title==='Favorite'?'favorite001':'other000001');
@@ -240,6 +241,7 @@ test('radio uses Last.fm, prioritizes favorites, excludes skipped suggestions an
 test('concert radio falls back past incompatible recommendations to an embeddable video',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{LASTFM_API_KEY:'synthetic-key'}),seed={...track(),concert:true};
+  p.verifyRadioContent=fixtureRadioContent;
   p.recommendations.topTracks=async()=>[];
   p.recommendations.similar=async()=>[{title:'Audio only',artist:'Artist',duration:200}];
   p.matchSong=async()=>({...track('Artist - Audio only','audio'),source:'soundcloud',embeddable:false});
@@ -275,6 +277,7 @@ test('bounded extractor queue releases slots when a waiting request is cancelled
 test('radio search survives an unavailable candidate in the no-key extractor fallback',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{}),seed={...track('Syn Cole - Feel Good | Future House | NCS - Copyright Free','seed1234567'),artist:'NCS',concert:true};
+  p.verifyRadioContent=fixtureRadioContent;
   p.youtube=async()=>{throw Error('API unavailable');};
   p.extract=async args=>{
    if(args.some(arg=>arg.startsWith('ytsearch')))return {entries:[{id:'next1234567'},{id:'other123456'},{id:'blocked1234'}]};
@@ -339,3 +342,4 @@ test('video metadata retains explicit genre tags for unlabelled song titles',asy
   assert.deepEqual(video.genres,['future house']);
  }finally{t.close();}
 });
+import { fixtureRadioContent } from './radio-content-fixture.ts';

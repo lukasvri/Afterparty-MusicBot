@@ -1,3 +1,4 @@
+import { fixtureRadioOwner } from './radio-content-fixture.ts';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setImmediate as yieldTurn } from "node:timers/promises";
@@ -21,7 +22,7 @@ function extracted(id: string) {
 test("overlapping cold metadata calls hydrate each video once and isolate caller results", async () => {
   const store = new Store(":memory:"), gate = deferred<void>();
   try {
-    const providers = new Providers(store, {}), requested: string[] = [];
+    const providers = fixtureRadioOwner(new Providers(store, {})), requested: string[] = [];
     providers.youtube = async <K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) => {
       assert.equal(path, "videos"); const batch = params.id.split(","); requested.push(...batch);
       await gate.promise; return { items: batch.map(apiVideo) } as YouTubeResponses[K];
@@ -39,7 +40,7 @@ test("overlapping cold metadata calls hydrate each video once and isolate caller
 test("distinct discovery searches share overlapping metadata hydration", async () => {
   const store = new Store(":memory:"), gate = deferred<void>();
   try {
-    const providers = new Providers(store, {}); let metadataCalls = 0;
+    const providers = fixtureRadioOwner(new Providers(store, {})); let metadataCalls = 0;
     providers.youtube = async <K extends keyof YouTubeResponses>(path: K) => {
       if (path === "search") return { items: [{ id: { videoId: ids[1] } }] } as YouTubeResponses[K];
       metadataCalls++; await gate.promise; return { items: [apiVideo(ids[1])] } as YouTubeResponses[K];
@@ -56,7 +57,7 @@ test("shared fallback failures retain each caller's strictness and can recover",
   for (const tolerantFirst of [false, true]) {
     const store = new Store(":memory:"), gate = deferred<void>();
     try {
-      const providers = new Providers(store, {}); let extractions = 0;
+      const providers = fixtureRadioOwner(new Providers(store, {})); let extractions = 0;
       providers.youtube = async () => { throw new Error("Controlled unavailable API"); };
       providers.extract = async () => { extractions++; await gate.promise; throw new Error("Controlled missing metadata"); };
       const first = providers.video([ids[1]], tolerantFirst), second = providers.video([ids[1]], !tolerantFirst);
@@ -75,7 +76,7 @@ test("a fast shared fallback is not blocked by another ID's slow hydration", asy
   const store = new Store(":memory:"), gate = deferred<void>();
   const pending: Promise<unknown>[] = [];
   try {
-    const providers = new Providers(store, {});
+    const providers = fixtureRadioOwner(new Providers(store, {}));
     providers.youtube = async () => { throw new Error("Controlled unavailable API"); };
     providers.extract = async args => {
       const id = args.at(-1)!.split("=").at(-1)!;
@@ -94,7 +95,7 @@ const idAt = (index: number) => `v${String(index).padStart(10, "0")}`;
 test("large single video calls keep sequential 50-ID batches instead of a 128-input cap", async () => {
   const store = new Store(":memory:");
   try {
-    const providers = new Providers(store, {}), requested: string[][] = [];
+    const providers = fixtureRadioOwner(new Providers(store, {})), requested: string[][] = [];
     providers.youtube = async <K extends keyof YouTubeResponses>(path: K, params: Record<string, string>) => {
       assert.equal(path, "videos"); const batch = params.id.split(","); requested.push(batch);
       return { items: batch.map(apiVideo) } as YouTubeResponses[K];
@@ -109,7 +110,7 @@ test("128 pending IDs bound saturation while cached/pending joins survive and ca
   const store = new Store(":memory:"), gate = deferred<void>();
   const pending: Promise<unknown>[] = [];
   try {
-    const providers = new Providers(store, {}), requested: string[][] = [];
+    const providers = fixtureRadioOwner(new Providers(store, {})), requested: string[][] = [];
     const cachedId = "cache000001";
     store.set("metadata:v6:" + cachedId, { at: Date.now(), track: { id: cachedId, title: "Artist - Cached", artist: "Artist",
       entryId: "old-entry", duration: 210, image: "", live: false, embeddable: true } });
@@ -135,7 +136,7 @@ test("shared fallback retains three workers and independent nested catalog/genre
   const store = new Store(":memory:"), gate = deferred<void>();
   const pending: Promise<unknown>[] = [];
   try {
-    const providers = new Providers(store, {}); let active = 0, maximum = 0;
+    const providers = fixtureRadioOwner(new Providers(store, {})); let active = 0, maximum = 0;
     const counts = new Map<string, number>(), wanted = Array.from({ length: 8 }, (_, index) => idAt(index));
     providers.youtube = async () => { throw new Error("Controlled unavailable API"); };
     providers.extract = async args => {
@@ -158,7 +159,7 @@ test("shared fallback retains three workers and independent nested catalog/genre
 test("successful API omissions settle all waiters without poisoning a later retry", async () => {
   const store = new Store(":memory:"), gate = deferred<void>();
   try {
-    const providers = new Providers(store, {}); let calls = 0;
+    const providers = fixtureRadioOwner(new Providers(store, {})); let calls = 0;
     providers.youtube = async <K extends keyof YouTubeResponses>() => {
       calls++; await gate.promise; return { items: calls === 1 ? [] : [apiVideo(ids[1])] } as YouTubeResponses[K];
     };
@@ -171,7 +172,7 @@ test("successful API omissions settle all waiters without poisoning a later retr
 
 test("actual parallel radio discovery hydrates its shared candidate once and preserves private context", async () => {
   const store = new Store(":memory:"), bothSearches = deferred<void>(), metadataGate = deferred<void>();
-  const providers = new Providers(store, {}), searches: string[] = []; let metadataCalls = 0;
+  const providers = fixtureRadioOwner(new Providers(store, {})), searches: string[] = []; let metadataCalls = 0;
   const seed: Track = { id: "seed0000001", entryId: "seed-entry", title: "Seed Artist - Opening", artist: "Seed Artist - Topic",
     genres: ["deep house"], duration: 210, live: false, embeddable: true, image: "", music: true };
   const history = [{ ...seed, id: "history0001", entryId: "old-entry", title: "Earlier Artist - Earlier" }];
