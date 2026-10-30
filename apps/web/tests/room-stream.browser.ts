@@ -614,6 +614,10 @@ test(
         'manual stream retry without waiting for the ten-second timer',
       );
       assert(performance.now() - started < 5000);
+      await host.page.screenshot({
+        path: '/tmp/afterparty-manual-reconnect-pending-390.png',
+        fullPage: true,
+      });
       fixture.advance('stream00004', 'Paused during recovery', false);
       fixture.release();
       await host.page.getByText('Connected', { exact: true }).waitFor();

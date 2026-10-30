@@ -221,8 +221,8 @@
 <a class="skip-link" href="#main">Skip to music</a>
 <div
   class="app-shell app-page"
-  class:tv-mode={tv && Boolean(room)}
-  class:theater-mode={theater && !tv && Boolean(room?.current)}
+  class:tv-mode={tv && !directory && Boolean(room)}
+  class:theater-mode={theater && !directory && !tv && Boolean(room?.current)}
 >
   <AppHeader
     active={directory ? 'rooms' : 'music'}
@@ -230,23 +230,26 @@
     onMusic={goListening}
     onRooms={toggleDirectory}
     onHome={goHome}
-    hidden={tv && Boolean(room)}
+    hidden={tv && !directory && Boolean(room)}
   />
 
   <div class="workspace">
-    <main class="app-main" id="main">
+    <main class="app-main" class:directory-open={directory} id="main">
       {#if directory}
-        <RoomDirectory
-          busy={view.busy || view.connection === 'connecting'}
-          onJoin={async (code) => {
-            if (await client?.join(code)) rememberRoom();
-          }}
-          onCreate={() => {
-            directory = false;
-            leave();
-          }}
-        />
-      {:else if !room}
+        <div class="directory-panel">
+          <RoomDirectory
+            busy={view.busy || view.connection === 'connecting'}
+            onJoin={async (code) => {
+              if (await client?.join(code)) rememberRoom();
+            }}
+            onCreate={() => {
+              directory = false;
+              leave();
+            }}
+          />
+        </div>
+      {/if}
+      {#if !room && !directory}
         <PageToolbar title="Music" description="Create a listening room or join your people." />
         <section class="welcome">
           <div class="welcome-hero">
@@ -337,7 +340,7 @@
             >
           </div>
         </section>
-      {:else}
+      {:else if room}
         {#snippet roomPageActions()}
           <div class="room-actions">
             {#if room.current && !tv}<TheaterToggle
@@ -743,11 +746,15 @@
         >
       </nav>
     {/if}
-    <AppFooter hidden={tv && Boolean(room)} />
+    <AppFooter hidden={tv && !directory && Boolean(room)} />
   </div>
 </div>
 
 <style>
+  .directory-open > :global(:not(.directory-panel)) {
+    display: none;
+  }
+
   .welcome {
     max-width: none;
     padding-top: clamp(12px, 2vh, 36px);

@@ -24,10 +24,16 @@ Early skips share an in-flight radio lookup instead of starting a duplicate sear
 
 ## Start video and sound
 
-The website uses the official YouTube embed after you choose **Enable room audio**.
-Its own controls handle playback, volume, quality, captions and fullscreen. Once
-ready, the duplicate app play/seek controls disappear; **Next track** remains a
-queue action. If the player fails, the app transport becomes available again.
+The website starts the official YouTube player automatically when you join a music
+room with a video, including through a room link or reload. Adding or approving
+the first song starts an empty room on its shared clock. Later additions queue
+behind the current song and preserve its playing or paused state. Pending guest
+requests still require host approval. If your browser blocks automatic sound,
+choose **Enable audio**. Saved local volume and mute preferences still apply.
+The player's own controls handle playback, volume, quality, captions and fullscreen.
+**Next track** remains a queue action. Browsing Open rooms retains the current
+player and its local pause. Reconnect replaces a failed live stream and rereads
+room access without replaying playback commands or discarding saved ownership.
 
 Hosts can use native play/pause/seek to update the shared timeline. Shared commands
 still require current host authority and queue revisions. Native events without

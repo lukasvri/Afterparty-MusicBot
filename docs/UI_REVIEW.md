@@ -321,3 +321,35 @@ the screenshot below shows results with the suggestions closed.
 
 [Search panel](assets/ui-search-alpha14.png) ·
 [Short landscape TV layout](assets/ui-tv-short-alpha14.png)
+
+## Automatic music-room startup and explicit reconnect, 2026-10-30
+
+This source candidate follows the owner's request to start video when joining or
+adding the first song. Music rooms initialize the official player automatically,
+including room links and reloads. Public Discord concerts retain explicit local
+activation. Saved mute/volume still apply, and a browser autoplay block retains
+the existing **Enable audio** action. The join text and both privacy-policy
+representations disclose the provider request; this supersedes historical
+explicit-activation descriptions above for browser music rooms only.
+
+Core and Worker reuse `changeRoom`: the first accepted addition or host approval
+starts an empty room on the existing future-start barrier. Pending guest requests
+remain pending, and later additions preserve the current song's pause/play state.
+Code-join and first-add browser regressions initially timed out without loading
+the video. The Core first-add and approval cases initially returned `playing:
+false`. The focused automatic-start, paused-room, blocked-autoplay and manual
+reconnect browser cases pass after these changes, as do the Core/Worker contracts.
+
+An explicit **Reconnect** replaces the failed EventSource immediately, while
+rereading authenticated authority and reporting pending progress. Unit coverage
+rejects retired events/timers and public attempts to restore revoked access;
+the real-browser fixture reconnects with its HTTP read held, then retains the
+newer shared pause. Recovery does not replay mutations or discard host storage.
+The original real-world #37 disconnect remains unverified.
+
+Review additionally exposed an automatic remount resuming a guest's local pause
+after browsing Open rooms. The new regression failed on that sequence. The room
+view now remains mounted behind the directory, retaining the actual iframe and
+local pause, while its hidden keyboard shortcuts are disabled. Browser fixtures
+simulate the official player boundary, with no provider media or Discord account;
+their success does not establish real-device autoplay permission or audible quality.

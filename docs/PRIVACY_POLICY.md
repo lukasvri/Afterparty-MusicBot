@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Effective: 21 October 2026
+Effective: 30 October 2026
 
 This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is operated by Discord user **lukasvri**, who handles privacy requests through the [contact options on our support page](https://ap.openworks.no/support). Independently hosted copies are operated separately.
 
@@ -22,7 +22,7 @@ The bot uses server and voice-state events. It does not request Discord’s Mess
 
 Queues, current tracks and player messages are visible to people with access to the relevant Discord channel or shared room. Room display names, requests and votes may be visible to other participants. Rooms are private by default; choosing public visibility lists the room. Shared concert playback and concert history can appear on the public website. Ordinary Discord music and private member details are filtered from the public concert feed.
 
-Discord processes bot interactions and optional sign-in. The website hosting platform and Cloudflare provide website delivery and database infrastructure; the bot’s operator runs the audio engine and its local databases. Searches, requested links and playback requests are sent to the media or metadata providers needed for that feature, including YouTube/Google, Spotify and SoundCloud. Embedded YouTube players and thumbnails make requests from your browser. Display fonts are served by the website. Media providers may process connection data under their own policies.
+Discord processes bot interactions and optional sign-in. The website hosting platform and Cloudflare provide website delivery and database infrastructure; the bot’s operator runs the audio engine and its local databases. Searches, requested links and playback requests are sent to the media or metadata providers needed for that feature, including YouTube/Google, Spotify and SoundCloud. Embedded YouTube players and thumbnails make requests from your browser. Music rooms load the YouTube player automatically when a video is available, including when you join using a room link or add the first song. Your browser may require a further tap to allow sound. Display fonts are served by the website. Media providers may process connection data under their own policies.
 
 We do not sell personal data or use Discord API data for advertising or training AI models. Data is used to provide the requested functions, maintain security and handle support. Providers may process information in other countries under their own terms and privacy arrangements. See [Discord](https://discord.com/privacy), [the hosting platform](https://openai.com/policies/privacy-policy/), [Cloudflare](https://www.cloudflare.com/privacypolicy/), [Google](https://policies.google.com/privacy), [Spotify](https://www.spotify.com/legal/privacy-policy/) and [SoundCloud](https://soundcloud.com/pages/privacy).
 

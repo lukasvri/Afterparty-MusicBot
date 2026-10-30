@@ -30,7 +30,7 @@ const results = [
 ];
 
 test('new devices favor stable playback and retain an explicit precise preference', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     await page.getByText('Room settings', { exact: true }).click();
@@ -101,12 +101,16 @@ test('fixture teardown closes its real browser after navigation setup fails', as
 async function fixture(
   t: TestContext,
   width: number,
-  host = true,
-  initial = false,
-  manualSampling = false,
-  scheduledSeek = false,
-  options: { empty?: boolean; paused?: boolean } = {},
+  options: {
+    host?: boolean;
+    initial?: boolean;
+    manualSampling?: boolean;
+    scheduledSeek?: boolean;
+    empty?: boolean;
+    paused?: boolean;
+  } = {},
 ) {
+  const { host = true, initial = false, manualSampling = false, scheduledSeek = false } = options;
   const browser = await fixtureBrowser((cleanup) => t.after(cleanup));
   const page = await browser.newPage({
     viewport: { width, height: 1000 },
@@ -438,7 +442,7 @@ test(
   'cold catalog requests can complete after the generic twelve-second API deadline',
   { timeout: 25000 },
   async (t) => {
-    const f = await fixture(t, 390, true, true);
+    const f = await fixture(t, 390, { initial: true });
     try {
       await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
       await find(f.page, 'cold artist');
@@ -475,7 +479,7 @@ async function find(page: Page, query: string) {
 }
 
 test('joining a playing room starts the guest video without another activation or shared command', async (t) => {
-  const f = await fixture(t, 390, false);
+  const f = await fixture(t, 390, { host: false });
   try {
     await f.page.getByRole('textbox', { name: 'Room code', exact: true }).fill(code);
     await f.page.getByRole('button', { name: 'Join room', exact: true }).click();
@@ -496,7 +500,7 @@ test('joining a playing room starts the guest video without another activation o
 });
 
 test('adding the first video to an empty room starts its player without an extra activation', async (t) => {
-  const f = await fixture(t, 1920, true, true, false, false, { empty: true });
+  const f = await fixture(t, 1920, { initial: true, empty: true });
   try {
     await find(f.page, 'night');
     await f.page
@@ -520,7 +524,7 @@ test('adding the first video to an empty room starts its player without an extra
 });
 
 test('joining and adding to a paused room keeps the shared pause and current video', async (t) => {
-  const f = await fixture(t, 390, true, true, false, false, { paused: true });
+  const f = await fixture(t, 390, { initial: true, paused: true });
   try {
     await videoReady(f.page);
     await find(f.page, 'night');
@@ -553,7 +557,7 @@ test('joining and adding to a paused room keeps the shared pause and current vid
 });
 
 test('blocked automatic room playback offers a local audio retry without sending shared commands', async (t) => {
-  const f = await fixture(t, 390, false, true);
+  const f = await fixture(t, 390, { host: false, initial: true });
   try {
     await videoReady(f.page);
     await f.page.evaluate(() =>
@@ -576,7 +580,7 @@ test('blocked automatic room playback offers a local audio retry without sending
 });
 
 test('an explicit open-rooms bookmark stays in the directory after its saved room reconnects', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const reconnected = f.page.waitForResponse(
       (response) =>
@@ -831,7 +835,7 @@ for (const width of [1440, 390]) {
   });
 
   test(`${width}px: guests can add, host controls stay disabled and search recovers from empty/error`, async (t) => {
-    const f = await fixture(t, width, false, true);
+    const f = await fixture(t, width, { host: false, initial: true });
     try {
       const { page } = f;
       await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
@@ -874,7 +878,7 @@ for (const width of [1440, 390]) {
 }
 
 test('music tabs preserve searches and unfinished library inputs beside the player', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     await page.getByText('Room settings', { exact: true }).click();
@@ -930,7 +934,7 @@ test('music tabs preserve searches and unfinished library inputs beside the play
 });
 
 test('familiar navigation and player workspace fit 4K, QHD, 1080p and mobile with quick access', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     for (const [width, height] of [
@@ -998,7 +1002,7 @@ test('familiar navigation and player workspace fit 4K, QHD, 1080p and mobile wit
 });
 
 test('one invitation panel copies only the public link and offers selection after clipboard failure', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
     await page.evaluate(() =>
@@ -1053,7 +1057,7 @@ test('one invitation panel copies only the public link and offers selection afte
 });
 
 test('room browsing returns to the existing host room without issuing commands or restarting audio', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
     await videoReady(page);
@@ -1088,8 +1092,8 @@ test('room browsing returns to the existing host room without issuing commands o
             (call) => call.action === 'construct',
           ).length,
       ),
-      2,
-      'returning to the room starts a fresh local player without shared commands',
+      1,
+      'returning to the room retains its local player without shared commands',
     );
     await page.getByRole('link', { name: 'Music', exact: true }).click();
     assert.equal(
@@ -1104,9 +1108,35 @@ test('room browsing returns to the existing host room without issuing commands o
   }
 });
 
+test('a guest device pause survives browsing the room directory and returning to music', async (t) => {
+  const f = await fixture(t, 390, { host: false, initial: true });
+  try {
+    await videoReady(f.page);
+    await f.page
+      .frameLocator('.audio-stage iframe')
+      .getByRole('button', { name: 'Pause video', exact: true })
+      .click();
+    await f.page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    await f.page.getByRole('button', { name: 'Open rooms', exact: true }).click();
+    await f.page.getByRole('heading', { name: 'Open rooms', exact: true }).waitFor();
+    await f.page.getByRole('link', { name: 'Music', exact: true }).click();
+    await f.page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    assert.equal(
+      await f.page.evaluate(() =>
+        (window as unknown as { __playerState: () => number }).__playerState(),
+      ),
+      2,
+    );
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
 for (const width of [1440, 390])
   test(`queue options support keyboard reorder and removal at ${width}px`, async (t) => {
-    const f = await fixture(t, width, true, true);
+    const f = await fixture(t, width, { initial: true });
     try {
       const { page } = f;
       const second = page.locator('summary[aria-label="Track options for City after dark"]');
@@ -1151,7 +1181,7 @@ for (const width of [1440, 390])
   });
 
 test('native pause stays inaudible and reaches the room after a pending queue addition', async (t) => {
-  const f = await fixture(t, 1440, true, true);
+  const f = await fixture(t, 1440, { initial: true });
   let release = () => {};
   try {
     const { page } = f;
@@ -1194,7 +1224,7 @@ test('native pause stays inaudible and reaches the room after a pending queue ad
 });
 
 test('a completed queue action preserves focus when the host has moved to search', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
     const release = f.holdNextMutation();
@@ -1229,7 +1259,7 @@ for (const [scheduled, wasPlaying] of [
 ])
   for (const seekEvent of ['seek-event', 'seek-paused-event']) {
     test(`native scrub preserves ${wasPlaying ? 'playing' : 'paused'} video without reloading (new timeline: ${scheduled}, event: ${seekEvent})`, async (t) => {
-      const f = await fixture(t, 390, true, true, false, scheduled);
+      const f = await fixture(t, 390, { initial: true, scheduledSeek: scheduled });
       let release = () => {};
       try {
         const { page } = f;
@@ -1308,7 +1338,7 @@ for (const [scheduled, wasPlaying] of [
   }
 
 test('native pause, seek and queue-next dispatch without position polling or an acknowledgement delay', async (t) => {
-  const f = await fixture(t, 390, true, true, true);
+  const f = await fixture(t, 390, { initial: true, manualSampling: true });
   try {
     const { page } = f;
     await videoReady(page);
@@ -1431,7 +1461,7 @@ test('native pause, seek and queue-next dispatch without position polling or an 
 });
 
 test('a failed YouTube source does not lock the next valid recording or retry the failed video', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
     await videoReady(page);
@@ -1491,7 +1521,7 @@ test('a failed YouTube source does not lock the next valid recording or retry th
 });
 
 test('native guest pause stays local through room polls and resumes at the shared position', async (t) => {
-  const f = await fixture(t, 1920, false, true);
+  const f = await fixture(t, 1920, { host: false, initial: true });
   try {
     const { page } = f;
     await videoReady(page);
@@ -1521,7 +1551,7 @@ test('native guest pause stays local through room polls and resumes at the share
 });
 
 test('unactivated iframe state changes cannot send host commands', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     await videoReady(page);
@@ -1544,7 +1574,7 @@ test('unactivated iframe state changes cannot send host commands', async (t) => 
 });
 
 test('a short provider pause resumes itself without becoming a pinned local pause', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     await videoReady(page);
@@ -1588,7 +1618,7 @@ test('a short provider pause resumes itself without becoming a pinned local paus
 });
 
 test('a newer media-key pause retires Play queued behind a delayed seek receipt', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   let release = () => {};
   try {
     const { page } = f;
@@ -1653,7 +1683,7 @@ for (const [width, height] of [
     `native TV invitations and fullscreen preserve the player at ${width}x${height}`,
     { timeout: 20000 },
     async (t) => {
-      const f = await fixture(t, width, true, true);
+      const f = await fixture(t, width, { initial: true });
       try {
         await f.page.setViewportSize({ width, height });
         await videoReady(f.page);
@@ -1748,7 +1778,7 @@ for (const [width, height] of [
   );
 
 test('music tabs restore their own scroll position with a single workspace scrollbar', async (t) => {
-  const f = await fixture(t, 1440, true, true);
+  const f = await fixture(t, 1440, { initial: true });
   try {
     const { page } = f;
     const navigation = page.getByRole('navigation', { name: 'Music workspace', exact: true });
@@ -1779,7 +1809,7 @@ test('music tabs restore their own scroll position with a single workspace scrol
 });
 
 test('theater mode fills the browser tab, keeps the iframe and search draft, and stays local', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     await videoReady(page);
@@ -1855,7 +1885,7 @@ test('theater mode fills the browser tab, keeps the iframe and search draft, and
 });
 
 test('saved motion preference and system reduced motion remain independent of audio and room control', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     await f.page.evaluate(() => localStorage.setItem('afterparty-motion', 'off'));
     await f.page.reload();
@@ -1912,7 +1942,7 @@ test('saved motion preference and system reduced motion remain independent of au
 });
 
 test('two rapid native scrubs retain the last target through a delayed receipt without replacing the iframe', async (t) => {
-  const f = await fixture(t, 390, true, true, true);
+  const f = await fixture(t, 390, { initial: true, manualSampling: true });
   let release = () => {};
   try {
     const { page } = f;

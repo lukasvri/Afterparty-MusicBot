@@ -128,6 +128,7 @@
         fullscreenFallback || active === stage || Boolean(active && stage.contains(active));
     };
     const keyboard = (event: KeyboardEvent) => {
+      if (!stage?.getClientRects().length) return;
       const target = event.target;
       if (
         event.defaultPrevented ||

@@ -3,7 +3,7 @@
 </script>
 
 <PublicPage title="Privacy Policy">
-  <p class="service-date">Effective: 21 October 2026</p>
+  <p class="service-date">Effective: 30 October 2026</p>
   <p>
     This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is
     operated by Discord user <strong>lukasvri</strong>, who handles privacy requests through the
