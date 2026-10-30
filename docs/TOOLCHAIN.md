@@ -41,7 +41,7 @@ The native website is the sole source implementation. Installed revisions and ru
 | Vitest | Preferred for new Svelte component/unit tests when it gives useful framework integration. Do not replace all existing tests or add it before needed. | **Not yet adopted** |
 | Vite | Use the toolchain integrated with the chosen framework. | Used by the sole native SvelteKit build; no production cutover is implied |
 | ESLint | Retain existing checks and zero-warning discipline. | Already configured |
-| Knip | Review unused module files with explicit framework, manual test and operational entry points. | Pinned at 6.43.0; `npm run audit:unused` runs in local checks and CI. Findings require source verification before deletion. |
+| Knip | Review unused module files with explicit framework, manual test and operational entry points. | Pinned at 6.44.0; `npm run audit:unused` runs in local checks and CI. Findings require source verification before deletion. |
 | Prettier | Scope formatting to the new Svelte candidate with the Svelte plugin. | Adopted in `apps/web/` only; legacy formatting remains unchanged |
 | Wrangler and Cloudflare | Validate the actual target Workers/D1 build locally in isolation; do not enable deployment or modify secrets/DNS. | Cloudflare tooling already present; production cutover not established |
 | Drizzle ORM | Retain typed schema/data access where already suitable. Test migrations against synthetic data only. | Already present |
@@ -70,12 +70,73 @@ Practical standards:
 
 ## Local Worker preview stability
 
-The website pins Wrangler 4.132.0 in `apps/web/package.json` and its lockfile.
+The website pins Wrangler 4.156.0 in `apps/web/package.json` and its lockfile.
 This includes the upstream transient-request dev-server fix from 4.129.1 and the
 original-cause error reporting fix from 4.132.0. The SvelteKit adapter peer range
 remains satisfied. See the [CI investigation](OPTIMIZATION_REVIEW.md#consolidated-checks-and-conservative-browser-scope-2026-10-26)
 for evidence and the distinct package-download bottleneck. This tooling update
 is separate from application-framework or production-host runtime promotion.
+
+## Compatible toolchain refresh, 30 October 2026
+
+The maintained source candidate updates the three locked dependency trees,
+including SvelteKit 3.1.1, Svelte 5.57.3, the Cloudflare adapter 8.0.2,
+Wrangler 4.156.0, Playwright 1.64.1, ESLint 10.14.0,
+typescript-eslint 8.72.1, Knip 6.44.0, Sentry 11.10.0 and Drizzle ORM 0.45.4.
+Core's extractor pin advances to yt-dlp 2026.10.26. Exact direct and transitive
+versions remain recorded in the package manifests and lockfiles.
+
+Registry metadata establishes these compatibility limits:
+
+- TypeScript stays at 6.0.3. The latest 7.0.2 is outside
+  typescript-eslint 8.72.1's supported `>=4.8.4 <6.1.0` peer range and
+  SvelteKit 3.1.1's `^6.0.0` peer range.
+- Node type definitions use 24.19.2 across all trees to retain the recorded
+  Node 24 fallback API floor. This does not change Core's Node 26.13.0 base.
+- Miniflare uses 5.20261023.3-beta, the exact dependency selected by stable
+  Wrangler 4.156.0. Its older `latest` dist-tag is not a reason to downgrade
+  that matched runtime. Existing direct Worker fixtures use the SDK's exported
+  `convertV4MiniflareOptions` adapter, preserving outbound restrictions and D1.
+- The 11 existing versioned third-party GitHub Action pins already match their
+  latest release revisions at this check and are unchanged.
+
+Primary package metadata: [SvelteKit](https://registry.npmjs.org/@sveltejs%2fkit/3.1.1),
+[typescript-eslint](https://registry.npmjs.org/typescript-eslint/8.72.1),
+[Wrangler](https://registry.npmjs.org/wrangler/4.156.0),
+[TypeScript](https://registry.npmjs.org/typescript), and
+[yt-dlp](https://pypi.org/pypi/yt-dlp/2026.10.26/json).
+
+Local `npm run check:all` passes: lint, unused-file audit, strict types,
+107 Python, 237 shared/Worker, 801 Core with real FFmpeg, 185 native web tests,
+formatting and production build/Worker dry-run. All 108 browser cases,
+eight startup scenarios and two isolated real Worker/D1 stack cases pass.
+Browser checks use system Chromium through the updated Playwright SDK;
+the matching bundled browser download is unavailable under this environment's
+network policy. Published CI must verify that browser separately.
+
+`npm audit` reports no findings for root or Core. The web tree reports four
+low-severity package entries for the same unpatched transitive `deepmerge` 4.3.1
+advisory through the Svelte build plugin, Kit and adapter:
+[GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4).
+Registry and advisory metadata expose no patched release. The suggested ancient
+framework downgrade is not applied, and the advisory is not suppressed.
+Actual exploitability in Afterparty has not been established.
+
+A clean tracked-source `linux/amd64` image of `d544111` passes strict types and
+all 801 Core tests. Its final unprivileged UID 1000 process passes source/license
+readability, voice imports, ESM worker and FFmpeg probes with no network and a
+read-only filesystem. yt-dlp reports 2026.10.26. The existing offline audio probe
+passes at 1, 4 and 8 generated streams with 701 Opus packets per stream under
+1.5 CPUs and 768 MiB; it is unpaced compute, not live listening or host capacity.
+[Distinct source/image identities and raw probe results](assets/toolchain-qualification-20261030.json)
+record the limits, temporary CA-secret build adaptation and initial full-disk
+build failure followed by a successful rebuild. Saved-archive packaging is not
+repeated for this refreshed graph.
+
+The earlier Node LTS image evidence below belongs to its recorded source and
+lockfile. It must not be reused as proof of this refreshed extractor/dependency
+graph. No host, production data, real account, publication or deployment is
+changed by this local source refresh.
 
 ## Official website addresses
 
