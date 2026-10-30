@@ -878,16 +878,24 @@ for (const width of [1440, 390]) {
 }
 
 for (const width of [1440, 390]) {
-  for (const timeout of ['browser', 'gateway']) {
+  for (const timeout of ['browser', 'gateway', 'HTML gateway', 'empty gateway']) {
     test(`${width}px: ${timeout} search timeout explains retry while the paused room stays connected`, async (t) => {
       const f = await fixture(t, width, { host: true, initial: true, paused: true });
       try {
         const { page } = f;
         await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
-        if (timeout === 'gateway') {
+        if (timeout !== 'browser') {
           await page.route('**/api/search?*', async (route) => {
             await page.unroute('**/api/search?*');
-            await route.fulfill({ status: 504, json: { error: 'signal timed out' } });
+            await route.fulfill(
+              timeout === 'gateway'
+                ? { status: 504, json: { error: 'signal timed out' } }
+                : {
+                    status: 504,
+                    contentType: 'text/html',
+                    body: timeout === 'HTML gateway' ? '<html>Gateway timeout</html>' : '',
+                  },
+            );
           });
         } else {
           await page.evaluate(() => {

@@ -13,6 +13,7 @@ const hook = registerHooks({
   },
 });
 const { createRoomClient } = await import('../src/lib/rooms/room-client.ts');
+const { request: actualBrowserRequest } = await import('../../../lib/browser-api.ts');
 hook.deregister();
 
 const room = (code = 'ROOM0001', version = 1, isHost = true): Room => ({
@@ -354,6 +355,64 @@ for (const timeout of ['browser', 'gateway']) {
     }
   });
 }
+
+for (const body of ['', '<html>Gateway timeout</html>']) {
+  test(`${body ? 'HTML' : 'empty'} gateway timeout survives the actual browser response parser and explicit retry`, async (t) => {
+    let fail = true,
+      searches = 0,
+      writes = 0;
+    t.mock.method(globalThis, 'fetch', async (input, init) => {
+      if (init?.method === 'POST') writes++;
+      if (!String(input).startsWith('/api/search')) return json(room());
+      searches++;
+      return fail
+        ? new Response(body, { status: 504, headers: { 'Content-Type': 'text/html' } })
+        : json({ videos: [room().current] });
+    });
+    const f = fixture(async () => assert.fail('Use the actual browser response parser.'), {
+      request: actualBrowserRequest,
+    });
+    try {
+      await f.client.join('ROOM0001');
+      await f.client.search('Synthetic music');
+      assert.equal(f.state.searchError, 'Music search took too long. Try again.');
+      assert.equal(f.state.error, '');
+      assert.equal(f.state.connection, 'connected');
+      assert.equal(searches, 1);
+      fail = false;
+      await f.client.search('Synthetic music');
+      assert.equal(f.state.searchError, '');
+      assert.equal(f.state.results.length, 1);
+      assert.equal(searches, 2);
+      assert.equal(writes, 0);
+    } finally {
+      f.client.destroy();
+    }
+  });
+}
+
+test('the browser response parser preserves non-JSON error status without exposing its body', async (t) => {
+  for (const status of [401, 403, 404, 429, 503, 504]) {
+    t.mock.method(
+      globalThis,
+      'fetch',
+      async () => new Response('<html>Private upstream detail</html>', { status }),
+    );
+    await assert.rejects(
+      actualBrowserRequest('/api/search'),
+      (error: unknown) =>
+        error instanceof Error &&
+        (error as Error & { status?: number }).status === status &&
+        error.message === 'Tjenesten svarer ikke. Prøv igjen.',
+    );
+  }
+  t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 200 }));
+  await assert.rejects(
+    actualBrowserRequest('/api/search'),
+    (error: unknown) =>
+      error instanceof Error && (error as Error & { status?: number }).status === undefined,
+  );
+});
 
 test('non-timeout search failures retain their access, quota and availability guidance', async () => {
   for (const [status, error] of [

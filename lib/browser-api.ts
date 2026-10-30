@@ -18,7 +18,8 @@ export async function request<T>(
   try {
     data = await response.json();
   } catch {
-    throw new Error("Tjenesten svarer ikke. Prøv igjen.");
+    throw Object.assign(new Error("Tjenesten svarer ikke. Prøv igjen."),
+      response.ok ? {} : { status: response.status });
   }
   if (!response.ok)
     throw Object.assign(new Error(data.error ?? "Tjenesten svarer ikke. Prøv igjen."), { status: response.status });
