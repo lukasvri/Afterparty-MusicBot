@@ -1165,6 +1165,7 @@ test('explicit reconnect reports progress, preserves ownership and cannot regain
     sources[0].fail();
     const reconnect = f.client.refresh();
     assert.equal(f.state.busy, true);
+    assert.equal(f.state.connection, 'connecting');
     assert.match(f.state.error, /Reconnecting/);
     assert.equal(sources[0].closed, true);
     await f.client.refresh();

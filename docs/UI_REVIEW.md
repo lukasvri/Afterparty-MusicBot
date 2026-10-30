@@ -359,3 +359,19 @@ behind the directory. The focused browser case reproduced `overflow: hidden` wit
 the theater view suppressed. Unmounting only the theater toggle while browsing
 retires its focus/scroll effect without discarding the player; returning restores
 the saved theater preference.
+
+Full local `check:all` passes 107 Python recovery, 237 shared, 801 Core with real
+FFmpeg and 185 native website cases, static/type/unused-file/format gates and the
+production build/dry-run. The first full 108-case browser run passes 107 cases;
+its lease-loss case detects an ambiguous reconnect label during a held music
+command. The follow-up distinguishes an explicit connecting attempt from a busy
+music mutation; original playback safety assertions are retained. Final rerun
+results are recorded in the PR. Both local Worker/D1/Core stack cases pass;
+their browser boundary aborts the two expected official iframe-API requests
+on room entry/reload and verifies the local recovery action, without contacting
+YouTube.
+
+Visual review covers the generated automatic-start and pending-reconnect mobile
+screens, 4K TV player/QR/controls and 1080p theater. Automated layouts additionally
+cover QHD and mobile. Empty video surfaces and test buttons are the deliberate
+synthetic iframe boundary, not evidence of playable provider media.

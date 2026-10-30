@@ -717,7 +717,7 @@
               disabled={view.busy}
               >{view.connection === 'connected'
                 ? 'Refresh room'
-                : view.busy
+                : view.busy && view.connection === 'connecting'
                   ? 'Reconnecting…'
                   : 'Reconnect'}</button
             >{/if}

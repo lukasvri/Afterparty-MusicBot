@@ -666,6 +666,11 @@ for (const authority of [false, true])
         await page.goto(`${origin}/?room=${room.code}`);
         assert.equal(page.url(), `${origin}/?room=${room.code}`);
         await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
+        await page
+          .getByText('The audio source could not load. Check your connection and try again.', {
+            exact: true,
+          })
+          .waitFor();
         assert.equal(await page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
         await page.getByRole('button', { name: 'Search', exact: true }).click();
         await page
@@ -686,6 +691,7 @@ for (const authority of [false, true])
         assert.equal(browserCheckpoint.isHost, false);
         await page.reload();
         await page.getByRole('heading', { name: track.title, exact: true }).waitFor();
+        await page.getByRole('button', { name: 'Enable audio', exact: true }).waitFor();
         assert.equal(await page.getByRole('button', { name: 'Next track' }).isEnabled(), true);
 
         await page.goto(`${origin}/?room=D0ABC123&view=concert#bookmark`);
@@ -699,7 +705,12 @@ for (const authority of [false, true])
           await page.setViewportSize({ width, height: 1000 });
           assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         }
-        assert.deepEqual(external, []);
+        // Automatic local startup attempts only the official API. The fixture
+        // still aborts every external request and verifies its recovery action.
+        assert.deepEqual(external, [
+          'https://www.youtube.com/iframe_api',
+          'https://www.youtube.com/iframe_api',
+        ]);
       } finally {
         await browser.close();
       }

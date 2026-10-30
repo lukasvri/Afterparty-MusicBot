@@ -707,7 +707,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       // An explicit retry replaces the failed transport now, while retaining
       // the room identity, saved ownership and current shared playback intent.
       stopStream(target);
-      publish({ busy: true, error: 'Reconnecting to the room…' });
+      publish({ busy: true, connection: 'connecting', error: 'Reconnecting to the room…' });
       startStream(target);
       try {
         await read(target, true, true);
