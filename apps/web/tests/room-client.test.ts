@@ -361,14 +361,18 @@ for (const body of ['', '<html>Gateway timeout</html>']) {
     let fail = true,
       searches = 0,
       writes = 0;
-    t.mock.method(globalThis, 'fetch', async (input, init) => {
-      if (init?.method === 'POST') writes++;
-      if (!String(input).startsWith('/api/search')) return json(room());
-      searches++;
-      return fail
-        ? new Response(body, { status: 504, headers: { 'Content-Type': 'text/html' } })
-        : json({ videos: [room().current] });
-    });
+    t.mock.method(
+      globalThis,
+      'fetch',
+      async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        if (init?.method === 'POST') writes++;
+        if (!String(input).startsWith('/api/search')) return json(room());
+        searches++;
+        return fail
+          ? new Response(body, { status: 504, headers: { 'Content-Type': 'text/html' } })
+          : json({ videos: [room().current] });
+      },
+    );
     const f = fixture(async () => assert.fail('Use the actual browser response parser.'), {
       request: actualBrowserRequest,
     });
