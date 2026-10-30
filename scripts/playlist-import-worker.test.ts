@@ -6,7 +6,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { Miniflare, Response as WorkerResponse, type Request as WorkerRequest } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions, Response as WorkerResponse, type Request as WorkerRequest } from 'miniflare';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const key = 'synthetic-playlist-worker-bridge', site = 'https://site.example';
@@ -24,7 +24,7 @@ test('playlist Worker preserves public metadata jobs, private capabilities and b
   const videos = Array.from({ length: 134 }, (_, i) => ({ id: 'fixture' + String(i).padStart(4, '0'), title: `Public festival set ${i + 1}`, artist: 'Fixture DJ',
     image: `https://i.ytimg.com/vi/fixture${String(i).padStart(4, '0')}/hqdefault.jpg`, duration: 3600, live: false, embeddable: true }));
   let redirect = 0;
-  const worker = new Miniflare({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
+  const worker = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
     d1Databases: ['DB'], bindings: { GUTTA_CORE_PUBLIC_URL: 'https://core.example', ADMIN_BRIDGE_KEY: key },
     outboundService: async (request: WorkerRequest) => {
       const url = new URL(request.url);
@@ -52,7 +52,7 @@ test('playlist Worker preserves public metadata jobs, private capabilities and b
         skipped: complete && job.source === 'spotify' ? 2 : 0, limited: complete && job.source === 'spotify',
         ...(failed ? { error: 'The playlist could not be imported. It may be private or unavailable.' } : {}) });
     },
-  });
+  }));
   let disabled: Miniflare | undefined;
   try {
     const db = await worker.getD1Database('DB');
@@ -131,8 +131,8 @@ test('playlist Worker preserves public metadata jobs, private capabilities and b
     });
     await t.test('an unconfigured Core reports 503 without outbound requests', async () => {
       let outbound = 0;
-      disabled = new Miniflare({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
-        d1Databases: ['DB'], outboundService: () => { outbound++; return WorkerResponse.json({}); } });
+      disabled = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-05-15', compatibilityFlags: ['nodejs_compat'],
+        d1Databases: ['DB'], outboundService: () => { outbound++; return WorkerResponse.json({}); } }));
       const response = await disabled.dispatchFetch(site + '/api/playlists', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: site }, body: JSON.stringify({ action: 'start', url: youtube }) });
       assert.equal(response.status, 503); assert.match((await response.json() as { error: string }).error, /connected, updated Core/); assert.equal(outbound, 0);
     });

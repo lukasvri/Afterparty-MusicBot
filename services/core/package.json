@@ -21,8 +21,8 @@
   },
   "devDependencies": {
     "typescript": "6.0.3",
-    "@types/node": "24.10.0",
-    "@types/ws": "8.18.1"
+    "@types/node": "24.19.2",
+    "@types/ws": "8.18.2"
   },
   "license": "MIT",
   "overrides": {

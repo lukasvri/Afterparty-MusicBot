@@ -88,6 +88,8 @@ test("real SDK sampling does not consume the five-event transport limit", async 
   t.mock.method(Math, "random", () => acceptSample ? 0.01 : 0.9);
   const client = new BrowserClient({
     ...errorReportingOptions(dsn, "classic"),
+    // BrowserClient takes a resolved URL; the policy enables no SDK tunnel.
+    tunnel: undefined,
     stackParser: defaultStackParser,
     integrations: [],
     transport: () => errorReportingTransport({
