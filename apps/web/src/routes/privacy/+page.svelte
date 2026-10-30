@@ -3,7 +3,7 @@
 </script>
 
 <PublicPage title="Privacy Policy">
-  <p class="service-date">Effective: 21 October 2026</p>
+  <p class="service-date">Effective: 30 October 2026</p>
   <p>
     This policy describes the hosted Afterparty Discord bot and Afterparty website. The service is
     operated by Discord user <strong>lukasvri</strong>, who handles privacy requests through the
@@ -68,9 +68,11 @@
     Cloudflare provide website delivery and database infrastructure; the bot’s operator runs the
     audio engine and its local databases. Searches, requested links and playback requests are sent
     to the media or metadata providers needed for that feature, including YouTube/Google, Spotify
-    and SoundCloud. Embedded YouTube players and thumbnails make requests from your browser. Display
-    fonts are served by the website. Media providers may process connection data under their own
-    policies.
+    and SoundCloud. Embedded YouTube players and thumbnails make requests from your browser. Music
+    rooms load the YouTube player automatically when a video is available, including when you join
+    using a room link or add the first song. Your browser may require a further tap to allow sound.
+    Display fonts are served by the website. Media providers may process connection data under their
+    own policies.
   </p>
   <p>
     We do not sell personal data or use Discord API data for advertising or training AI models. Data

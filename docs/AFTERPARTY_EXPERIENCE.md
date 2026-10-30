@@ -56,7 +56,11 @@ private recovery-link download; reloading still requires that recovery link.
 ## Native player and the shared clock
 
 The official YouTube iframe owns visible playback, volume, captions, quality and
-fullscreen controls after explicit audio activation. The app retains one queue-next
+fullscreen controls. Browser music rooms start the local player automatically
+when a current video is available; public Discord concerts retain explicit audio
+activation. Browser autoplay restrictions can still require **Enable audio**.
+The first accepted song starts an empty room on the shared clock; later additions
+preserve the current playback or pause. The app retains one queue-next
 action. Healthy players have no duplicate play/pause, seek, volume or fullscreen
 controls, including before activation. Public concerts expose a collapsed Discord
 pause/resume recovery control only when browser playback is missing or has failed.

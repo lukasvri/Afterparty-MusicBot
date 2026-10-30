@@ -30,7 +30,7 @@ const results = [
 ];
 
 test('new devices favor stable playback and retain an explicit precise preference', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     await page.getByText('Room settings', { exact: true }).click();
@@ -101,11 +101,16 @@ test('fixture teardown closes its real browser after navigation setup fails', as
 async function fixture(
   t: TestContext,
   width: number,
-  host = true,
-  initial = false,
-  manualSampling = false,
-  scheduledSeek = false,
+  options: {
+    host?: boolean;
+    initial?: boolean;
+    manualSampling?: boolean;
+    scheduledSeek?: boolean;
+    empty?: boolean;
+    paused?: boolean;
+  } = {},
 ) {
+  const { host = true, initial = false, manualSampling = false, scheduledSeek = false } = options;
   const browser = await fixtureBrowser((cleanup) => t.after(cleanup));
   const page = await browser.newPage({
     viewport: { width, height: 1000 },
@@ -120,15 +125,17 @@ async function fixture(
     roomReads = 0,
     failedReads = 0,
     version = 1,
-    playing = true,
+    playing = !options.paused,
     position = 12;
   let playbackKey = 'initial-instance';
   let startsAt: number | undefined;
-  let nowPlaying = current;
-  let queue = [
-    video('queued00001', 'Stay a little longer', 'Common Ground'),
-    video('queued00002', 'City after dark', 'Night Bus'),
-  ];
+  let nowPlaying: Video | null = options.empty ? null : current;
+  let queue = options.empty
+    ? []
+    : [
+        video('queued00001', 'Stay a little longer', 'Common Ground'),
+        video('queued00002', 'City after dark', 'Night Bus'),
+      ];
   let heldMutation: Promise<void> | null = null;
   const snapshot = (isHost: boolean): Room => ({
     code,
@@ -195,12 +202,18 @@ async function fixture(
 
             const events = options.events as {
               onReady: () => void;
+              onAutoplayBlocked?: () => void;
               onStateChange?: (event: { data: number }) => void;
               onError?: (event: { data: number }) => void;
             };
             (
               window as typeof window & { emitPlayerError: (code: number) => void }
             ).emitPlayerError = (code) => events.onError?.({ data: code });
+            (window as typeof window & { blockRoomAutoplay: () => void }).blockRoomAutoplay =
+              () => {
+                this.state = 2;
+                events.onAutoplayBlocked?.();
+              };
             this.emit = (state) => {
               this.state = state;
               events.onStateChange?.({ data: state });
@@ -352,7 +365,11 @@ async function fixture(
       if (input.action === 'add') {
         const selected = results.find((item) => item.id === input.videoId);
         assert(selected);
-        queue = [...queue, selected];
+        if (!nowPlaying) {
+          nowPlaying = selected;
+          position = 0;
+          playing = true;
+        } else queue = [...queue, selected];
       } else if (input.action === 'pause') playing = false;
       else if (input.action === 'play') playing = true;
       else if (input.action === 'seek') {
@@ -425,7 +442,7 @@ test(
   'cold catalog requests can complete after the generic twelve-second API deadline',
   { timeout: 25000 },
   async (t) => {
-    const f = await fixture(t, 390, true, true);
+    const f = await fixture(t, 390, { initial: true });
     try {
       await f.page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
       await find(f.page, 'cold artist');
@@ -442,6 +459,18 @@ test(
   },
 );
 
+async function videoReady(page: Page) {
+  await page.locator('.audio-stage iframe').waitFor();
+  await page.waitForFunction(() => {
+    const calls = (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls;
+    const created = calls.findLastIndex((call) => call.action === 'construct');
+    return (
+      created >= 0 &&
+      calls.slice(created).some((call) => call.action === 'load' || call.action === 'cue')
+    );
+  });
+}
+
 async function find(page: Page, query: string) {
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   const input = page.getByRole('textbox', { name: 'Search songs or artists' });
@@ -449,8 +478,109 @@ async function find(page: Page, query: string) {
   await input.press('Enter');
 }
 
+test('joining a playing room starts the guest video without another activation or shared command', async (t) => {
+  const f = await fixture(t, 390, { host: false });
+  try {
+    await f.page.getByRole('textbox', { name: 'Room code', exact: true }).fill(code);
+    await f.page.getByRole('button', { name: 'Join room', exact: true }).click();
+    await f.page.waitForFunction(() =>
+      (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
+        (call) => call.action === 'load',
+      ),
+    );
+    assert.equal(
+      await f.page.getByRole('button', { name: 'Enable room audio', exact: true }).count(),
+      0,
+    );
+    assert.deepEqual(f.writes, [], 'joining only starts this device, never shared playback');
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('adding the first video to an empty room starts its player without an extra activation', async (t) => {
+  const f = await fixture(t, 1920, { initial: true, empty: true });
+  try {
+    await find(f.page, 'night');
+    await f.page
+      .getByRole('button', { name: `Add ${results[0].title} to queue`, exact: true })
+      .click();
+    await f.page.waitForFunction(
+      (id) =>
+        (
+          window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
+        ).__audioCalls.some((call) => call.action === 'load' && call.videoId === id),
+      results[0].id,
+    );
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['add'],
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('joining and adding to a paused room keeps the shared pause and current video', async (t) => {
+  const f = await fixture(t, 390, { initial: true, paused: true });
+  try {
+    await videoReady(f.page);
+    await find(f.page, 'night');
+    await f.page
+      .getByRole('button', { name: `Add ${results[0].title} to queue`, exact: true })
+      .click();
+    await f.page
+      .locator('.player-status')
+      .filter({ hasText: 'Shared playback is paused' })
+      .waitFor();
+    const calls = await f.page.evaluate(
+      () =>
+        (window as unknown as { __audioCalls: { action: string; videoId?: string }[] })
+          .__audioCalls,
+    );
+    assert.equal(calls.filter((call) => call.action === 'construct').length, 1);
+    assert(calls.some((call) => call.action === 'cue' && call.videoId === 'current0001'));
+    assert.equal(
+      calls.filter((call) => call.action === 'play' || call.action === 'load').length,
+      0,
+    );
+    assert.deepEqual(
+      f.writes.map((write) => write.action),
+      ['add'],
+    );
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('blocked automatic room playback offers a local audio retry without sending shared commands', async (t) => {
+  const f = await fixture(t, 390, { host: false, initial: true });
+  try {
+    await videoReady(f.page);
+    await f.page.evaluate(() =>
+      (window as typeof window & { blockRoomAutoplay: () => void }).blockRoomAutoplay(),
+    );
+    await f.page
+      .getByText('Your browser paused audio. Press Enable audio to listen.', { exact: true })
+      .waitFor();
+    await f.page.getByRole('button', { name: 'Enable audio', exact: true }).click();
+    await f.page.waitForFunction(
+      () => (window as unknown as { __playerState: () => number }).__playerState() === 1,
+    );
+    assert.equal(await f.page.locator('.audio-message').count(), 0);
+    assert.deepEqual(f.writes, []);
+    await f.page.screenshot({ path: '/tmp/afterparty-room-autostart-390.png', fullPage: true });
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
 test('an explicit open-rooms bookmark stays in the directory after its saved room reconnects', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const reconnected = f.page.waitForResponse(
       (response) =>
@@ -574,12 +704,15 @@ for (const width of [1440, 390]) {
         displayName: 'Guest',
       });
       await noOverflow(page);
-      assert.deepEqual(f.external, [], 'no remote content is requested before audio consent');
+      assert.deepEqual(f.external, [], 'the provider boundary stays synthetic');
       assert.equal(
         await page.evaluate(
-          () => (window as unknown as { __audioCalls: unknown[] }).__audioCalls.length,
+          () =>
+            (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+              (call) => call.action === 'construct',
+            ).length,
         ),
-        0,
+        1,
       );
       await page.evaluate(() => {
         (document.activeElement as HTMLElement | null)?.blur();
@@ -589,7 +722,7 @@ for (const width of [1440, 390]) {
         path: `/tmp/afterparty-v3-${width === 1440 ? 'desktop' : 'mobile'}.png`,
         fullPage: true,
       });
-      await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+      await videoReady(page);
       await page.waitForFunction(() =>
         (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
           (call) => call.action === 'load',
@@ -674,7 +807,7 @@ for (const width of [1440, 390]) {
         true,
         'joining again restores saved host permissions',
       );
-      await page.getByRole('button', { name: 'Enable room audio', exact: true }).waitFor();
+      await videoReady(page);
       assert.equal(
         await page.evaluate(
           () =>
@@ -682,8 +815,8 @@ for (const width of [1440, 390]) {
               (call) => call.action === 'construct',
             ).length,
         ),
-        1,
-        'joining again requires fresh local audio consent',
+        2,
+        'joining again starts the video in a new local player',
       );
       await page.evaluate(() =>
         (window as unknown as { __emitLastPlayerEnded: () => void }).__emitLastPlayerEnded(),
@@ -702,7 +835,7 @@ for (const width of [1440, 390]) {
   });
 
   test(`${width}px: guests can add, host controls stay disabled and search recovers from empty/error`, async (t) => {
-    const f = await fixture(t, width, false, true);
+    const f = await fixture(t, width, { host: false, initial: true });
     try {
       const { page } = f;
       await page.getByRole('heading', { name: 'Friday, after hours', exact: true }).waitFor();
@@ -745,7 +878,7 @@ for (const width of [1440, 390]) {
 }
 
 test('music tabs preserve searches and unfinished library inputs beside the player', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     await page.getByText('Room settings', { exact: true }).click();
@@ -801,7 +934,7 @@ test('music tabs preserve searches and unfinished library inputs beside the play
 });
 
 test('familiar navigation and player workspace fit 4K, QHD, 1080p and mobile with quick access', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
     for (const [width, height] of [
@@ -869,7 +1002,7 @@ test('familiar navigation and player workspace fit 4K, QHD, 1080p and mobile wit
 });
 
 test('one invitation panel copies only the public link and offers selection after clipboard failure', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
     await page.evaluate(() =>
@@ -924,10 +1057,10 @@ test('one invitation panel copies only the public link and offers selection afte
 });
 
 test('room browsing returns to the existing host room without issuing commands or restarting audio', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     await page.waitForFunction(() =>
       (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
         (call) => call.action === 'load',
@@ -949,8 +1082,8 @@ test('room browsing returns to the existing host room without issuing commands o
       true,
     );
     assert.equal(
-      await page.getByRole('button', { name: 'Enable room audio', exact: true }).isVisible(),
-      true,
+      await page.getByRole('button', { name: 'Enable room audio', exact: true }).count(),
+      0,
     );
     assert.equal(
       await page.evaluate(
@@ -960,7 +1093,7 @@ test('room browsing returns to the existing host room without issuing commands o
           ).length,
       ),
       1,
-      'navigation does not automatically grant audio consent',
+      'returning to the room retains its local player without shared commands',
     );
     await page.getByRole('link', { name: 'Music', exact: true }).click();
     assert.equal(
@@ -975,9 +1108,58 @@ test('room browsing returns to the existing host room without issuing commands o
   }
 });
 
+test('a guest device pause survives browsing the room directory and returning to music', async (t) => {
+  const f = await fixture(t, 390, { host: false, initial: true });
+  try {
+    await videoReady(f.page);
+    await f.page
+      .frameLocator('.audio-stage iframe')
+      .getByRole('button', { name: 'Pause video', exact: true })
+      .click();
+    await f.page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    await f.page.getByRole('button', { name: 'Open rooms', exact: true }).click();
+    await f.page.getByRole('heading', { name: 'Open rooms', exact: true }).waitFor();
+    await f.page.getByRole('link', { name: 'Music', exact: true }).click();
+    await f.page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
+    assert.equal(
+      await f.page.evaluate(() =>
+        (window as unknown as { __playerState: () => number }).__playerState(),
+      ),
+      2,
+    );
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test('a saved theater preference does not trap focus or scrolling in the room directory', async (t) => {
+  const f = await fixture(t, 390, { initial: true });
+  try {
+    await f.page.evaluate(() => localStorage.setItem('afterparty-theater', 'on'));
+    await f.page.goto(`${origin}/?room=${code}&view=rooms`);
+    await f.page.getByRole('heading', { name: 'Open rooms', exact: true }).waitFor();
+    const filter = f.page.getByLabel('Find an open room', { exact: true });
+    await filter.focus();
+    assert.equal(await filter.evaluate((node) => node === document.activeElement), true);
+    assert.notEqual(
+      await f.page.evaluate(() => getComputedStyle(document.documentElement).overflow),
+      'hidden',
+    );
+    await f.page.getByRole('link', { name: 'Music', exact: true }).click();
+    await f.page.locator('.app-shell.theater-mode').waitFor();
+    await f.page.getByRole('button', { name: 'Exit theater mode', exact: true }).click();
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.close();
+  }
+});
+
 for (const width of [1440, 390])
   test(`queue options support keyboard reorder and removal at ${width}px`, async (t) => {
-    const f = await fixture(t, width, true, true);
+    const f = await fixture(t, width, { initial: true });
     try {
       const { page } = f;
       const second = page.locator('summary[aria-label="Track options for City after dark"]');
@@ -1022,11 +1204,11 @@ for (const width of [1440, 390])
   });
 
 test('native pause stays inaudible and reaches the room after a pending queue addition', async (t) => {
-  const f = await fixture(t, 1440, true, true);
+  const f = await fixture(t, 1440, { initial: true });
   let release = () => {};
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     await find(page, 'night');
     await page.getByRole('status').filter({ hasText: '3 results' }).waitFor();
     release = f.holdNextMutation();
@@ -1065,7 +1247,7 @@ test('native pause stays inaudible and reaches the room after a pending queue ad
 });
 
 test('a completed queue action preserves focus when the host has moved to search', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
     const release = f.holdNextMutation();
@@ -1100,11 +1282,11 @@ for (const [scheduled, wasPlaying] of [
 ])
   for (const seekEvent of ['seek-event', 'seek-paused-event']) {
     test(`native scrub preserves ${wasPlaying ? 'playing' : 'paused'} video without reloading (new timeline: ${scheduled}, event: ${seekEvent})`, async (t) => {
-      const f = await fixture(t, 390, true, true, false, scheduled);
+      const f = await fixture(t, 390, { initial: true, scheduledSeek: scheduled });
       let release = () => {};
       try {
         const { page } = f;
-        await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+        await videoReady(page);
         const native = page.frameLocator('.audio-stage iframe');
         await native.getByRole('button', { name: 'Pause video', exact: true }).waitFor();
         if (!wasPlaying) {
@@ -1179,10 +1361,10 @@ for (const [scheduled, wasPlaying] of [
   }
 
 test('native pause, seek and queue-next dispatch without position polling or an acknowledgement delay', async (t) => {
-  const f = await fixture(t, 390, true, true, true);
+  const f = await fixture(t, 390, { initial: true, manualSampling: true });
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     const native = page.frameLocator('.audio-stage iframe');
     await native.getByRole('button', { name: 'Pause video', exact: true }).waitFor();
     const releasePause = f.holdNextMutation();
@@ -1302,10 +1484,10 @@ test('native pause, seek and queue-next dispatch without position polling or an 
 });
 
 test('a failed YouTube source does not lock the next valid recording or retry the failed video', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     await page
       .frameLocator('.audio-stage iframe')
       .getByRole('button', { name: 'Pause video' })
@@ -1362,10 +1544,10 @@ test('a failed YouTube source does not lock the next valid recording or retry th
 });
 
 test('native guest pause stays local through room polls and resumes at the shared position', async (t) => {
-  const f = await fixture(t, 1920, false, true);
+  const f = await fixture(t, 1920, { host: false, initial: true });
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     const native = page.frameLocator('.audio-stage iframe');
     await native.getByRole('button', { name: 'Pause video', exact: true }).click();
     await page.locator('.player-status').filter({ hasText: 'Paused on this device' }).waitFor();
@@ -1392,10 +1574,10 @@ test('native guest pause stays local through room polls and resumes at the share
 });
 
 test('unactivated iframe state changes cannot send host commands', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     await page.waitForFunction(() =>
       (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
         (call) => call.action === 'load',
@@ -1415,10 +1597,10 @@ test('unactivated iframe state changes cannot send host commands', async (t) => 
 });
 
 test('a short provider pause resumes itself without becoming a pinned local pause', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     await page.waitForFunction(
       () => (window as unknown as { __playerState: () => number }).__playerState() === 1,
     );
@@ -1459,11 +1641,11 @@ test('a short provider pause resumes itself without becoming a pinned local paus
 });
 
 test('a newer media-key pause retires Play queued behind a delayed seek receipt', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   let release = () => {};
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     const native = page.frameLocator('.audio-stage iframe');
     await native.getByRole('button', { name: 'Seek video', exact: true }).evaluate((button) => {
       (button as HTMLElement).dataset.action = 'seek-event';
@@ -1524,10 +1706,10 @@ for (const [width, height] of [
     `native TV invitations and fullscreen preserve the player at ${width}x${height}`,
     { timeout: 20000 },
     async (t) => {
-      const f = await fixture(t, width, true, true);
+      const f = await fixture(t, width, { initial: true });
       try {
         await f.page.setViewportSize({ width, height });
-        await f.page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+        await videoReady(f.page);
         await f.page.waitForFunction(() =>
           (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
             (call) => call.action === 'load',
@@ -1619,7 +1801,7 @@ for (const [width, height] of [
   );
 
 test('music tabs restore their own scroll position with a single workspace scrollbar', async (t) => {
-  const f = await fixture(t, 1440, true, true);
+  const f = await fixture(t, 1440, { initial: true });
   try {
     const { page } = f;
     const navigation = page.getByRole('navigation', { name: 'Music workspace', exact: true });
@@ -1650,10 +1832,10 @@ test('music tabs restore their own scroll position with a single workspace scrol
 });
 
 test('theater mode fills the browser tab, keeps the iframe and search draft, and stays local', async (t) => {
-  const f = await fixture(t, 1920, true, true);
+  const f = await fixture(t, 1920, { initial: true });
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     await page.waitForFunction(() =>
       (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.some(
         (call) => call.action === 'load',
@@ -1718,7 +1900,7 @@ test('theater mode fills the browser tab, keeps the iframe and search draft, and
     assert.equal(await page.evaluate(() => localStorage.getItem('afterparty-theater')), 'on');
     await page.reload();
     await page.locator('.app-shell.theater-mode').waitFor();
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).waitFor();
+    await videoReady(page);
     assert.deepEqual(f.errors, []);
   } finally {
     await f.close();
@@ -1726,7 +1908,7 @@ test('theater mode fills the browser tab, keeps the iframe and search draft, and
 });
 
 test('saved motion preference and system reduced motion remain independent of audio and room control', async (t) => {
-  const f = await fixture(t, 390, true, true);
+  const f = await fixture(t, 390, { initial: true });
   try {
     await f.page.evaluate(() => localStorage.setItem('afterparty-motion', 'off'));
     await f.page.reload();
@@ -1766,11 +1948,15 @@ test('saved motion preference and system reduced motion remain independent of au
     assert.equal(await animation(), 'none');
     assert.equal(await f.page.evaluate(() => localStorage.getItem('afterparty-motion')), 'off');
     assert.deepEqual(f.writes, []);
+    await videoReady(f.page);
     assert.equal(
       await f.page.evaluate(
-        () => (window as unknown as { __audioCalls: unknown[] }).__audioCalls.length,
+        () =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.filter(
+            (call) => call.action === 'construct',
+          ).length,
       ),
-      0,
+      1,
     );
     assert.deepEqual(f.errors, []);
   } finally {
@@ -1779,11 +1965,11 @@ test('saved motion preference and system reduced motion remain independent of au
 });
 
 test('two rapid native scrubs retain the last target through a delayed receipt without replacing the iframe', async (t) => {
-  const f = await fixture(t, 390, true, true, true);
+  const f = await fixture(t, 390, { initial: true, manualSampling: true });
   let release = () => {};
   try {
     const { page } = f;
-    await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+    await videoReady(page);
     const native = page.frameLocator('.audio-stage iframe');
     await native.getByRole('button', { name: 'Seek video', exact: true }).waitFor();
     await page.waitForTimeout(1100);

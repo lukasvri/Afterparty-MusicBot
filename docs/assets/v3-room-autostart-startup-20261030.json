@@ -1,0 +1,70 @@
+{
+  "label": "room-autostart-20261030",
+  "metric": "Decoded successful first-party script responses; external requests are aborted and excluded. Gzip is recomputed per response, not measured wire transfer, full provider startup or field performance.",
+  "results": [
+    {
+      "viewport": 1440,
+      "scenario": "welcome",
+      "blockedProviderRequests": 0,
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 227650,
+      "sumIndividualGzipBytes": 83953
+    },
+    {
+      "viewport": 1440,
+      "scenario": "joined-room",
+      "blockedProviderRequests": 0,
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 227650,
+      "sumIndividualGzipBytes": 83953
+    },
+    {
+      "viewport": 1440,
+      "scenario": "playing-room",
+      "blockedProviderRequests": 1,
+      "scriptRequests": 20,
+      "decodedJavaScriptBytes": 207269,
+      "sumIndividualGzipBytes": 78000
+    },
+    {
+      "viewport": 1440,
+      "scenario": "games",
+      "blockedProviderRequests": 0,
+      "scriptRequests": 15,
+      "decodedJavaScriptBytes": 152519,
+      "sumIndividualGzipBytes": 57653
+    },
+    {
+      "viewport": 390,
+      "scenario": "welcome",
+      "blockedProviderRequests": 0,
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 227650,
+      "sumIndividualGzipBytes": 83953
+    },
+    {
+      "viewport": 390,
+      "scenario": "joined-room",
+      "blockedProviderRequests": 0,
+      "scriptRequests": 21,
+      "decodedJavaScriptBytes": 227650,
+      "sumIndividualGzipBytes": 83953
+    },
+    {
+      "viewport": 390,
+      "scenario": "playing-room",
+      "blockedProviderRequests": 1,
+      "scriptRequests": 20,
+      "decodedJavaScriptBytes": 207269,
+      "sumIndividualGzipBytes": 78000
+    },
+    {
+      "viewport": 390,
+      "scenario": "games",
+      "blockedProviderRequests": 0,
+      "scriptRequests": 15,
+      "decodedJavaScriptBytes": 152519,
+      "sumIndividualGzipBytes": 57653
+    }
+  ]
+}

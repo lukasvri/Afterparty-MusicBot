@@ -321,3 +321,57 @@ the screenshot below shows results with the suggestions closed.
 
 [Search panel](assets/ui-search-alpha14.png) ·
 [Short landscape TV layout](assets/ui-tv-short-alpha14.png)
+
+## Automatic music-room startup and explicit reconnect, 2026-10-30
+
+This source candidate follows the owner's request to start video when joining or
+adding the first song. Music rooms initialize the official player automatically,
+including room links and reloads. Public Discord concerts retain explicit local
+activation. Saved mute/volume still apply, and a browser autoplay block retains
+the existing **Enable audio** action. The join text and both privacy-policy
+representations disclose the provider request; this supersedes historical
+explicit-activation descriptions above for browser music rooms only.
+
+Core and Worker reuse `changeRoom`: the first accepted addition or host approval
+starts an empty room on the existing future-start barrier. Pending guest requests
+remain pending, and later additions preserve the current song's pause/play state.
+Code-join and first-add browser regressions initially timed out without loading
+the video. The Core first-add and approval cases initially returned `playing:
+false`. The focused automatic-start, paused-room, blocked-autoplay and manual
+reconnect browser cases pass after these changes, as do the Core/Worker contracts.
+
+An explicit **Reconnect** replaces the failed EventSource immediately, while
+rereading authenticated authority and reporting pending progress. Unit coverage
+rejects retired events/timers and public attempts to restore revoked access;
+the real-browser fixture reconnects with its HTTP read held, then retains the
+newer shared pause. Recovery does not replay mutations or discard host storage.
+The original real-world #37 disconnect remains unverified.
+
+Review additionally exposed an automatic remount resuming a guest's local pause
+after browsing Open rooms. The new regression failed on that sequence. The room
+view now remains mounted behind the directory, retaining the actual iframe and
+local pause, while its hidden keyboard shortcuts are disabled. Browser fixtures
+simulate the official player boundary, with no provider media or Discord account;
+their success does not establish real-device autoplay permission or audible quality.
+
+The retained view also exposed a saved theater mode locking document scrolling
+behind the directory. The focused browser case reproduced `overflow: hidden` with
+the theater view suppressed. Unmounting only the theater toggle while browsing
+retires its focus/scroll effect without discarding the player; returning restores
+the saved theater preference.
+
+Full local `check:all` passes 107 Python recovery, 237 shared, 801 Core with real
+FFmpeg and 185 native website cases, static/type/unused-file/format gates and the
+production build/dry-run. The first full 108-case browser run passes 107 cases;
+its lease-loss case detects an ambiguous reconnect label during a held music
+command. The follow-up distinguishes an explicit connecting attempt from a busy
+music mutation; original playback safety assertions are retained. The final full browser rerun
+passes all 108 cases with no failures or skips. Both local Worker/D1/Core stack cases pass;
+their browser boundary aborts the two expected official iframe-API requests
+on room entry/reload and verifies the local recovery action, without contacting
+YouTube.
+
+Visual review covers the generated automatic-start and pending-reconnect mobile
+screens, 4K TV player/QR/controls and 1080p theater. Automated layouts additionally
+cover QHD and mobile. Empty video surfaces and test buttons are the deliberate
+synthetic iframe boundary, not evidence of playable provider media.

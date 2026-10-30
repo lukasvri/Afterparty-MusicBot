@@ -44,11 +44,11 @@ test('room adds preserve eligible radio and FIFO order without changing current 
  assert.throws(()=>changeRoom(state,{action:'add',video:first},true,12),/already/);
  assert.throws(()=>changeRoom(state,{action:'add',video:current},true,12),/already/);
 });
-test('empty room selects its first track without playing, then appends later requests and approvals',()=>{
+test('empty room starts its first track, then appends later requests and approvals',()=>{
  const first=syntheticSong(1,{radio:false}),second=syntheticSong(2,{radio:false}),third=syntheticSong(3,{radio:false});
  let state:RoomPlayback={current:null,queue:[],radio:false,playing:false,position:0};
  state=changeRoom(state,{action:'add',video:first},true,0);
- assert.equal(state.current?.id,first.id);assert.equal(state.playing,false);assert.deepEqual(state.queue,[]);
+ assert.equal(state.current?.id,first.id);assert.equal(state.playing,true);assert.deepEqual(state.queue,[]);
  state=changeRoom(state,{action:'add',video:second},true,0);
  state=changeRoom({...state,approvalRequired:true},{action:'add',video:third},false,0);
  state=changeRoom(state,{action:'approve',videoId:third.id},true,0);

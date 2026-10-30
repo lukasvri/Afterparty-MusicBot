@@ -34,7 +34,7 @@ flowchart LR
 | Capability | Native owner and preserved behavior |
 | --- | --- |
 | Listening rooms | `rooms/`: creation, discovery, joining, shared queue, votes, host/cohost controls, ownership transfer, guest approval and radio |
-| Playback | `RoomAudio.svelte`: explicit audio consent, shared clock, local volume/mute, keyboard controls, native/Safari fullscreen, viewport fallback and saved motion preferences |
+| Playback | `RoomAudio.svelte`: automatic local startup in music rooms, explicit activation in public concerts, browser-blocked sound recovery, shared clock, local volume/mute, keyboard controls, native/Safari fullscreen, viewport fallback and saved motion preferences |
 | Sharing and TV | `RoomSharing.svelte`: locally generated public QR/link with no host credential; TV view retains the player and provides an explicit exit |
 | Recovery | Room/concert clients retain epoch/revision/lease handling; game reconnect can explicitly rejoin after lost Core membership without replaying a command |
 | Saved music | `library/`: existing favorites/evenings, local backup/import, bounded playlist previews and festival catalog |

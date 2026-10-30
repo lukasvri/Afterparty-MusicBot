@@ -15,6 +15,43 @@ const video = {
   embeddable: true,
 };
 
+test("the first approved room addition starts on the shared clock without resuming an existing pause", () => {
+  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  try {
+    rooms.import({ code: "TESTROOM", name: "Test", owner_hash: "a".repeat(64),
+      state: { current: null, queue: [], position: 0, playing: false },
+      version: 1, updated_at: 10000, expires_at: 100000 });
+    const added = rooms.mutate("TESTROOM", { action: "add", version: 1, video, actorHash: "a".repeat(64) });
+    assert.equal(added.current?.id, video.id);
+    assert.equal(added.playing, true);
+    assert.equal(added.startsAt, 11500);
+    const paused = rooms.mutate("TESTROOM", { action: "pause", version: added.version, actorHash: "a".repeat(64) });
+    const queued = rooms.mutate("TESTROOM", { action: "add", version: paused.version,
+      video: { ...video, id: "nextclip001" }, actorHash: "a".repeat(64) });
+    assert.equal(queued.current?.id, video.id);
+    assert.equal(queued.playing, false);
+    assert.equal(queued.queue.length, 1);
+  } finally { rooms.dispose(); store.close(); }
+});
+
+test("a guest request in an empty room waits for host approval before starting", () => {
+  const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
+  try {
+    rooms.import({ code: "TESTROOM", name: "Test", owner_hash: "a".repeat(64),
+      state: { current: null, queue: [], position: 0, playing: false, approvalRequired: true },
+      version: 1, updated_at: 10000, expires_at: 100000 });
+    const requested = rooms.mutate("TESTROOM", { action: "add", version: 1, video, actorHash: "b".repeat(64) });
+    assert.equal(requested.current, null);
+    assert.equal(requested.playing, false);
+    assert.equal(requested.requests?.length, 1);
+    const approved = rooms.mutate("TESTROOM", { action: "approve", videoId: video.id,
+      version: requested.version, actorHash: "a".repeat(64) });
+    assert.equal(approved.current?.id, video.id);
+    assert.equal(approved.playing, true);
+    assert.equal(approved.startsAt, 11500);
+  } finally { rooms.dispose(); store.close(); }
+});
+
 test("native transport receipts identify a committed revision and deduplicate without undoing a newer pause", () => {
   const store = new Store(":memory:"), rooms = new Rooms(store, () => 10000);
   try {

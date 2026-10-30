@@ -1109,6 +1109,84 @@ test('room changes close streams and late frames cannot affect the replacement r
   f.client.destroy();
 });
 
+test('explicit reconnect replaces a failed live stream immediately and retires its pending retries', async () => {
+  const f = streamFixture();
+  try {
+    await f.client.join('ROOM0001');
+    const old = f.sources[0];
+    old.open();
+    await flush();
+    old.send({ ...f.snapshot, version: 2, serverTime: 1100 });
+    old.fail(true);
+    const retiredCallbacks = f.scheduled.slice();
+    assert.equal(f.state.connection, 'reconnecting');
+    f.snapshot = { ...f.snapshot, version: 3, serverTime: 1200, playing: false };
+    await f.client.refresh();
+    assert.equal(f.sources.length, 2, 'the user does not have to wait for the stream retry timer');
+    assert.equal(f.state.connection, 'connected');
+    assert.equal(f.client.playback()?.playing, false, 'reconnect respects the current pause');
+    old.send({ ...f.snapshot, version: 99, serverTime: 1400, playing: true });
+    retiredCallbacks.forEach((callback) => callback());
+    await flush();
+    assert.equal(f.sources.length, 2, 'retired timers cannot open a duplicate stream');
+    assert.equal(f.state.room?.version, 3);
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+    assert.equal(f.data.get('afterparty-visitor'), 'a'.repeat(32));
+  } finally {
+    f.client.destroy();
+  }
+});
+
+test('explicit reconnect reports progress, preserves ownership and cannot regain revoked access from public frames', async () => {
+  const pending = deferred<Response>();
+  const sources: SyntheticStream[] = [];
+  let reads = 0;
+  const snapshot: Room = {
+    ...room(),
+    playing: true,
+    syncSource: 'live',
+    syncEpoch: 'epoch-one',
+    syncValidForMs: 5000,
+  };
+  const f = fixture(async () => (++reads === 1 ? json(snapshot) : pending.promise), {
+    eventSource: () => {
+      const source = new SyntheticStream();
+      sources.push(source);
+      return source as unknown as EventSource;
+    },
+    clockRequest: async () => json({ serverTime: 1001 }),
+  });
+  try {
+    f.data.set('afterparty-host:ROOM0001', 'b'.repeat(64));
+    await f.client.join('ROOM0001');
+    sources[0].open();
+    await flush();
+    sources[0].send({ ...snapshot, version: 2, serverTime: 1100 });
+    sources[0].fail();
+    const reconnect = f.client.refresh();
+    assert.equal(f.state.busy, true);
+    assert.equal(f.state.connection, 'connecting');
+    assert.match(f.state.error, /Reconnecting/);
+    assert.equal(sources[0].closed, true);
+    await f.client.refresh();
+    assert.equal(reads, 2, 'repeated presses do not start overlapping retries');
+    pending.resolve(json({ error: 'Room access has expired.' }, 403));
+    await reconnect;
+    sources[1].open();
+    await flush();
+    sources[1].send({ ...snapshot, version: 99, serverTime: 1200, isHost: true });
+    assert.equal(f.state.busy, false);
+    assert.equal(f.state.connection, 'reconnecting');
+    assert.equal(f.state.error, 'Room access has expired.');
+    assert.equal(f.state.room?.version, 2);
+    assert.equal(f.client.playback()?.playing, false);
+    assert.equal(f.data.get('afterparty-host:ROOM0001'), 'b'.repeat(64));
+    assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+  } finally {
+    f.client.destroy();
+  }
+});
+
 test('invalid, wrong-room, expired and Discord stream frames never replace a validated browser timeline', async () => {
   const f = streamFixture();
   await f.client.join('ROOM0001');

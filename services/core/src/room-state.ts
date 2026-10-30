@@ -211,7 +211,7 @@ export function changeRoom(
         state.current = track;
         state.radioSeed = structuredClone(track);
         state.position = 0;
-        state.playing = false;
+        state.playing = true;
         state.playbackKey = crypto.randomUUID();
       } else {
         state.queue.push(track);
@@ -259,7 +259,7 @@ export function changeRoom(
         state.current = track;
         state.radioSeed = structuredClone(track);
         state.position = 0;
-        state.playing = false;
+        state.playing = true;
         state.playbackKey = crypto.randomUUID();
       } else {
         state.queue.push(track);

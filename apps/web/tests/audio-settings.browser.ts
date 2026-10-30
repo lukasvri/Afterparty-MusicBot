@@ -264,7 +264,14 @@ for (const mode of ['room', 'discord'] as const) {
           setInterval(emit, 1000);
         }, state);
       }
-      await page.getByRole('button', { name: 'Enable room audio', exact: true }).waitFor();
+      if (mode === 'discord')
+        await page.getByRole('button', { name: 'Enable room audio', exact: true }).waitFor();
+      else
+        await page.waitForFunction(() =>
+          (window as unknown as ProbeWindow).__audioSettings.calls.some(
+            (call) => call.action === 'cue',
+          ),
+        );
       await page
         .getByText(mode === 'room' ? 'Room settings' : 'Playback settings', { exact: true })
         .click();
@@ -285,22 +292,26 @@ for (const mode of ['room', 'discord'] as const) {
       );
       assert.equal(
         await page.getByRole('button', { name: 'Sync now', exact: true }).isDisabled(),
-        true,
+        mode === 'discord',
       );
       assert.equal(
         await page.getByRole('button', { name: 'Reload video', exact: true }).isDisabled(),
-        true,
+        mode === 'discord',
       );
-      assert.equal(
-        await page.evaluate(() => (window as unknown as ProbeWindow).__audioSettings.calls.length),
-        0,
-        'preferences do not enable audio',
-      );
-      assert.equal(
-        await page.evaluate(() => (window as unknown as ProbeWindow).__audioSettings.audioReads),
-        0,
-      );
-      await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+      if (mode === 'discord') {
+        assert.equal(
+          await page.evaluate(
+            () => (window as unknown as ProbeWindow).__audioSettings.calls.length,
+          ),
+          0,
+          'preferences do not enable audio',
+        );
+        assert.equal(
+          await page.evaluate(() => (window as unknown as ProbeWindow).__audioSettings.audioReads),
+          0,
+        );
+        await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+      }
       const initialPosition = mode === 'discord' ? 41.2 : 40;
       await page.waitForFunction(
         (position) =>
