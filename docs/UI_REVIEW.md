@@ -1,5 +1,47 @@
 # Afterparty interface review
 
+## Correlated browser-room transport receipts, 30 October 2026
+
+Native play/pause/seek commands now carry an opaque UUID and the current Core
+epoch. A fresh, calibrated room stream can settle a pending gesture only when
+its receipt matches the room, epoch, exact committed revision, recording,
+playback identity and expected playing intent, with current known host access.
+The existing HTTP response remains the fallback for older Core builds, missing
+or ambiguous receipts and stream outages. Late HTTP replies cannot replace a
+newer stream pause. Server authorization and stale-command protection remain in
+place for every following command.
+
+Core and the Worker share bounded deduplication in `room-state.ts`: the latest
+32 commands are retained privately per room, with identity scoped to the actor
+and original request. Only the current revision's opaque ID/version is exposed.
+A duplicate cannot repeat a seek over a newer pause, changed payloads are
+rejected, and old epochs cannot acknowledge a new Core session. Existing data
+needs no migration; clients without IDs retain the normal revisioned behavior.
+
+The built Chromium loopback regression holds both HTTP mutation replies while
+the second native seek reaches the fixture. On the isolated local run the time
+from immediately before the second Playwright click to fixture dispatch was
+**35.2 ms**. This includes local browser automation and application dispatch;
+it excludes real provider buffering, real network conditions and audible
+Discord output. This single synthetic observation is not a field latency claim.
+The same case delivers a newer shared pause before releasing both older HTTP
+replies and verifies that playback stays paused without another mutation.
+The existing uncorrelated held-reply cases retain HTTP recovery coverage.
+
+The full CI browser run exposed an additional held-HTTP fallback defect: RTT
+compensation caps at 1.5 seconds, so an old reply sampled just after a stream
+frame could incorrectly renew playback after the stream lease expired. A
+focused client regression reproduces that timing deterministically. Native HTTP
+receipts now use the existing authoritative sample and monotonic elapsed time
+to preserve the actual remaining lease and reject an expired timeline as a new
+playback lease while still acknowledging the committed gesture. The shared
+delivery projection accepts this known age instead of the capped RTT estimate;
+near-expiry coverage verifies that a 4900 ms-old sample has only 100 ms left. A fresh authenticated poll restores playback. The
+original lease-expiry browser assertion remains unchanged.
+
+These source checks do not resolve the owner's separate Start a room lost
+connection/re-entry report in the existing live-stability issue.
+
 ## Playback review corrections, 2026-10-25
 
 Authenticated room access failures (401/403/404) remain latched through later
