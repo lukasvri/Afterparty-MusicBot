@@ -176,6 +176,10 @@ async function liveFixture() {
     get streams() {
       return streams.size;
     },
+    recoverStreams() {
+      acceptStreams = true;
+      broadcast = true;
+    },
     get clockReads() {
       return clockReads;
     },
@@ -393,7 +397,7 @@ async function prepare(context: BrowserContext, owner: boolean, origin: string) 
   );
   await page.goto(`${origin}/?room=${code}`);
   await page.getByRole('heading', { name: 'Synthetic live listening', exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Enable room audio', exact: true }).click();
+  await page.locator('.audio-stage iframe').waitFor();
   return { page, errors };
 }
 async function waitFor(predicate: () => boolean, description: string) {
@@ -575,6 +579,61 @@ test('the loopback SSE fixture rejects external request targets before forwardin
   }
   assert.deepEqual(fixture.errors, []);
 });
+
+test(
+  'Reconnect replaces a closed stream immediately while the authenticated read is still pending',
+  { timeout: 30000 },
+  async () => {
+    const fixture = await liveFixture();
+    const browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.CHROMIUM_PATH,
+      args: ['--no-sandbox'],
+    });
+    try {
+      fixture.advance('stream00004', 'Before manual recovery', true);
+      const host = await prepare(
+        await browser.newContext({ viewport: { width: 390, height: 844 } }),
+        true,
+        fixture.origin,
+      );
+      await played(host.page, 'stream00004');
+      fixture.failReads(503);
+      fixture.disconnect();
+      const retry = host.page.getByRole('button', { name: 'Reconnect', exact: true });
+      await retry.waitFor();
+      await waitFor(() => fixture.streams === 0, 'old stream closed');
+      fixture.failReads(0);
+      fixture.hold();
+      fixture.recoverStreams();
+      await retry.click();
+      await host.page.getByRole('button', { name: 'Reconnecting…', exact: true }).waitFor();
+      const started = performance.now();
+      await waitFor(
+        () => fixture.streams === 1 && fixture.heldReads > 0,
+        'manual stream retry without waiting for the ten-second timer',
+      );
+      assert(performance.now() - started < 5000);
+      fixture.advance('stream00004', 'Paused during recovery', false);
+      fixture.release();
+      await host.page.getByText('Connected', { exact: true }).waitFor();
+      await host.page
+        .locator('.player-status')
+        .filter({ hasText: 'Shared playback is paused' })
+        .waitFor();
+      assert.equal(fixture.writes.length, 0, 'reconnect never replays playback commands');
+      assert.deepEqual(host.errors, []);
+      assert.deepEqual(fixture.errors, []);
+      await host.page.screenshot({
+        path: '/tmp/afterparty-manual-reconnect-390.png',
+        fullPage: true,
+      });
+    } finally {
+      await browser.close();
+      await fixture.close();
+    }
+  },
+);
 
 test(
   'a temporary status outage keeps the live video and recovers controls without rejoin',

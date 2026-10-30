@@ -145,6 +145,23 @@ const seed = {
   embeddable: true,
 };
 const next = { ...seed, id: "next1234567", title: "Other Artist - Synthetic next | Future House" };
+
+test("D1 starts the first room addition on the shared clock without a separate play command", async (t) => {
+  let now = 1000000;
+  t.mock.method(Date, "now", () => now);
+  const f = fixture();
+  try {
+    await f.save("TESTROOM", { current: null, queue: [], position: 0, playing: false, radio: false });
+    const added = (await mutate(f.request, "TESTROOM", { action: "add", version: 1, videoId: next.id })).room;
+    assert.equal(added.current?.id, next.id);
+    assert.equal(added.playing, true);
+    assert.equal(added.startsAt, 1001500);
+    now += 2000;
+    assert.equal((await publicRoom(f.request, f.roomRow(), false, false)).position, 0.5);
+    const paused = (await mutate(f.request, "TESTROOM", { action: "pause", version: added.version })).room;
+    assert.equal(paused.playing, false);
+  } finally { f.close(); }
+});
 function fixture() {
   const sqlite = new DatabaseSync(":memory:");
   for (const file of readdirSync(new URL("../drizzle/", import.meta.url))

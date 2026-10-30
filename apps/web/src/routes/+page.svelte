@@ -310,7 +310,7 @@
                 }}
               >
                 <h2>Already invited?</h2>
-                <p>Your room code gets you straight to the music.</p>
+                <p>Join to start the room’s YouTube video on this device.</p>
                 <label for="room-code">Room code</label><input
                   id="room-code"
                   bind:value={roomCode}
@@ -558,6 +558,7 @@
               {/snippet}
               {#key room.code}<RoomAudio
                   {room}
+                  autoStart
                   settings={roomControls}
                   settingsLabel="Room settings"
                   footer={transportFooter}

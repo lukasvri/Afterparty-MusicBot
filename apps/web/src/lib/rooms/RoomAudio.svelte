@@ -115,6 +115,7 @@
       if (adjusted && ready) sync(true);
     };
     readSync();
+    if (autoStart) void activate();
     const subscriptions = [
       browserStorage.subscribe('afterparty-audio', read),
       browserStorage.subscribe('afterparty-volume', read),
@@ -165,6 +166,7 @@
     room,
     position,
     playing,
+    autoStart = false,
     canControl = false,
     canSeek = canControl,
     controlBusy = false,
@@ -177,6 +179,7 @@
     room: Room;
     position: number;
     playing: boolean;
+    autoStart?: boolean;
     canControl?: boolean;
     canSeek?: boolean;
     controlBusy?: boolean;
@@ -769,7 +772,9 @@
   ></span>
   <span
     >{!enabled
-      ? 'Audio is off on this device'
+      ? loading
+        ? 'Starting video…'
+        : 'Audio is off on this device'
       : failedSource
         ? 'This video is unavailable on this device'
         : !ready
