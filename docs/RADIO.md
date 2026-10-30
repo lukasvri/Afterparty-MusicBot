@@ -61,6 +61,18 @@ radio discovery bypasses this ordering and retains its stricter admission,
 recording and style rules. This policy improves observable result ordering;
 live-provider relevance and individual musical taste still require acceptance.
 
+Live-performance intent requires a trailing `live` qualifier or an explicit
+venue/version context. A studio remaster of a song named “Live Forever” therefore
+keeps its normal preference over a concert recording; adding `live` still requests
+that performance. No provider query or extra lookup is introduced.
+
+Core and the Worker share the manual search cache bounds: one hour for nonempty
+results and one minute for successful empty results. Core radio's `musicOnly`
+search deliberately does not retain successful empties, so an explicit radio
+retry can recover immediately. Errors remain retryable rather than being cached
+as successful empty searches. Search count/mode keys and per-caller copies remain
+isolated. See the [source-backed next-step review](SYNC_RADIO_SEARCH_REVIEW.md).
+
 ### NCS stations without a provider key
 
 An untagged `Janji - Heroes Tonight` or Lost Sky recording previously fell back
