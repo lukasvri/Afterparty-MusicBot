@@ -93,9 +93,25 @@ const snapshots = [
     sourceUrl: `https://www.youtube.com/playlist?list=${playlist}`,
     sha256: String(sha256),
   })),
+  ...[
+    [2019, 28, 22, 0, 'ed06d7bb2f617c1886b26f0680e1dd9ad872699afa9f59daa1ac6f82cdb2cc33'],
+    [2023, 33, 33, 0, 'da45de32b9c23fc2964c4a55e412e49ebeb0850a65db3311f058600a7972888c'],
+    [2024, 47, 46, 0, '230d1ef92a90925f1d3c4c1452e6f09a6104c57e8d8585325582de4ac506ff7b'],
+    [2025, 34, 32, 2, '59d94f7b16fc2764c12098f55fddbac54b0200ed923c33770b14c94ce109bd59'],
+    [2026, 48, 47, 0, 'cd0f8b2dccdf82336a2d441c48de59772281b74233abce4ab09bdab3f960ea89'],
+  ].map(([year, listedCount, includedCount, duplicateCount, sha256]) => ({
+    eventId: 'ultra-miami',
+    year: Number(year),
+    listedCount: Number(listedCount),
+    includedCount: Number(includedCount),
+    duplicateCount: Number(duplicateCount),
+    sha256: String(sha256),
+    sourceUrl: `https://ultramusicfestival.com/live-sets/season/${year}`,
+  })),
 ];
 
 test('festival indexes retain every checked matching-year source link', () => {
+  assert.equal(CONCERT_SOURCES.length, snapshots.length);
   for (const snapshot of snapshots) {
     const source = CONCERT_SOURCES.find(
       (item) => item.eventId === snapshot.eventId && item.year === snapshot.year,
@@ -121,7 +137,14 @@ test('festival indexes retain every checked matching-year source link', () => {
     );
     for (const id of source.videoIds)
       assert(catalogIds.has(id), `${source.eventId}/${source.year} lost ${id}`);
-    for (const excluded of source.excluded) assert(!catalogIds.has(excluded.videoId));
+    for (const excluded of source.excluded) {
+      if (excluded.videoId) assert(!catalogIds.has(excluded.videoId));
+      else {
+        assert.equal(source.eventId, 'ultra-miami');
+        assert.match(excluded.sourceUrl, /^https:\/\/(?:w\.)?soundcloud\.com\//);
+        assert.match(excluded.reason, /not supported/);
+      }
+    }
   }
 });
 
@@ -136,7 +159,7 @@ test('festival records preserve source attribution, unique recordings and origin
     assert(recording.uploaderName || recording.sourcePublisher);
     assert(recording.evidenceUrls.includes(recording.sourceUrl));
   }
-  assert.equal(CONCERT_CATALOG.length, 863);
+  assert.equal(CONCERT_CATALOG.length, 1036);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'cWJV0DgMqEA')?.year, 2023);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'jQLWYc2UrFY')?.artist, 'Westend');
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'PVh5bKxUjPo')?.artist, 'SKILAH');
@@ -173,6 +196,92 @@ test('Tomorrowland source snapshots retain outside-playlist uploads and unresolv
     'sqxFW3RXGdo',
   ])
     assert(CONCERT_CATALOG.some((item) => item.videoId === id && item.uploaderName));
+});
+
+const originalUltraIds = new Set([
+  'i_BPdQ-FidY',
+  'vBvZaydcCzc',
+  'hQ6k0_Iura0',
+  '3-ELBiUkUWc',
+  'w3zCxh-70Ms',
+  'uPhsq1msjl8',
+  'fz-3arJT8fc',
+]);
+test('Ultra expansion preserves all 863 pre-existing catalog objects and evidence', () => {
+  const groups = new Set([
+    'edc-las-vegas:2026',
+    'edc-las-vegas:2025',
+    'edc-las-vegas:2023',
+    'creamfields:2024',
+    ...[2022, 2023, 2024, 2025, 2026].map((year) => `tomorrowland-belgium:${year}`),
+  ]);
+  const indexed = new Set(
+    CONCERT_SOURCES.filter((source) => groups.has(`${source.eventId}:${source.year}`)).flatMap(
+      (source) => source.videoIds.map((id) => `${source.eventId}:${source.year}:${id}`),
+    ),
+  );
+  const retained = new Set([
+    ...originalTomorrowlandIds,
+    ...originalUltraIds,
+    'cWJV0DgMqEA',
+    'lGCo8ILvauI',
+    'CwE-haZR2fc',
+    'bVF_7IiTAsI',
+  ]);
+  const previous = CONCERT_CATALOG.filter(
+    (entry) =>
+      retained.has(entry.videoId) || indexed.has(`${entry.eventId}:${entry.year}:${entry.videoId}`),
+  ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  assert.equal(previous.length, 863);
+  assert.equal(
+    createHash('sha256').update(JSON.stringify(previous)).digest('hex'),
+    '64abce2f528c52d6de12329107339e0008450f83792804c3498476f22a16b78e',
+  );
+});
+test('Ultra snapshots distinguish unsupported audio from unresolved video metadata', () => {
+  const sources = CONCERT_SOURCES.filter((source) => source.eventId === 'ultra-miami');
+  assert.equal(sources.length, 5);
+  assert.equal(sources.flatMap((source) => source.videoIds).length, 180);
+  assert.equal(
+    sources.flatMap((source) => source.excluded).filter((entry) => !entry.videoId).length,
+    7,
+  );
+  const unresolved = sources.flatMap((source) => source.excluded).filter((entry) => entry.videoId);
+  assert.equal(unresolved.length, 1);
+  assert.equal(unresolved[0].videoId, 'QuW1fTqxXwk');
+  assert.match(unresolved[0].reason, /unresolved/);
+  assert(!/private|deleted|blocked/i.test(unresolved[0].reason));
+  const added = CONCERT_CATALOG.filter(
+    (entry) => entry.eventId === 'ultra-miami' && !originalUltraIds.has(entry.videoId),
+  );
+  assert.equal(added.length, 173);
+  assert.equal(
+    createHash('sha256')
+      .update(
+        added
+          .map((entry) => entry.videoId)
+          .sort()
+          .join('\n'),
+      )
+      .digest('hex'),
+    '6a3ef9491bc496bb178b0330ca039249613354c00aada627fd80121101895238',
+  );
+  const titles = added
+    .map((entry) => [entry.videoId, entry.title])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map((row) => row.join('\t'))
+    .join('\n');
+  assert.equal(
+    createHash('sha256').update(titles).digest('hex'),
+    'f7bb519bb47fb3f7284d97ad4e72ace237bf07487393df39af2ca362d00e820e',
+  );
+  for (const entry of added) {
+    assert.equal(entry.sourcePublisher, 'Ultra Music Festival');
+    assert.equal(entry.uploaderName, undefined);
+    assert.equal(entry.verifiedAt, '2026-10-31');
+  }
+  assert.equal(CONCERT_CATALOG.find((entry) => entry.videoId === '5yBSJ2Z6pjY')?.year, 2019);
+  assert.equal(CONCERT_CATALOG.find((entry) => entry.videoId === 'coJzawYORs0')?.year, 2024);
 });
 
 const originalTomorrowlandIds = new Set([

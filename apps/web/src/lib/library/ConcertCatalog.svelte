@@ -135,7 +135,7 @@
             : 'links were'}
           omitted: {[...new Set(coverage.excluded.map((entry) => entry.reason))].join(' ')}{/if}
         {#if coverage.duplicateCount}
-          {coverage.duplicateCount} repeated playlist entries are listed once.
+          {coverage.duplicateCount} repeated source entries are listed once.
         {/if}
       </p>{:else}<p class="coverage">
         A curated selection of official uploads. The complete source archive has not been verified.
