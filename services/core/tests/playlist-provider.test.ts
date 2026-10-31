@@ -9,6 +9,7 @@ import { Store } from '../src/store.ts';
 import type { YouTubeResponses } from '../src/external-types.ts';
 import type { Track } from '../src/types.ts';
 import { deferred } from './deferred.ts';
+import { setImmediate as yieldTurn } from 'node:timers/promises';
 
 const youtube = 'https://www.youtube.com/playlist?list=PLsynthetic_playlist_123';
 const spotify = 'https://open.spotify.com/playlist/1234567890123456789012';
@@ -22,6 +23,57 @@ function setup(t: TestContext, key = 'synthetic-key') {
   t.after(() => { store.close(); rmSync(dir, { recursive: true, force: true }); });
   return { store, provider: new Providers(store, { YOUTUBE_API_KEY: key }) };
 }
+
+test('queued playlist metadata survives two 20-second fallback waves', async t => {
+  const { provider: p } = setup(t, ''), ids = Array.from({ length: 6 }, (_, index) => videoId(index));
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  p.youtube = async () => { throw Error('synthetic unavailable API'); };
+  p.extract = async (args, signal) => {
+    if (args.includes('--flat-playlist')) return { entries: ids.map(id => ({ id })) };
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, 20_000);
+      signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+    });
+    return { title: 'Synthetic recording', uploader: 'Synthetic artist', duration: 180, playable_in_embed: true };
+  };
+  const pending = p.importPlaylist(youtube, new AbortController().signal);
+  await yieldTurn();
+  t.mock.timers.tick(20_000); await yieldTurn();
+  t.mock.timers.tick(10_000); await yieldTurn();
+  t.mock.timers.tick(10_000); await yieldTurn();
+  const result = await pending;
+  assert.deepEqual(result.videos.map(video => video.id), ids);
+  assert.equal(result.skipped, 0);
+});
+
+test('playlist cancellation retires only its metadata subscribers and cannot cache late abandoned IDs', async t => {
+  const { provider: p, store } = setup(t, ''), ids = [videoId(0), videoId(1)], gate = deferred<void>();
+  const signals = new Map<string, AbortSignal>(), controller = new AbortController();
+  let pending: Promise<unknown> | undefined, rejected: Promise<void> | undefined, survivor: Promise<Track[]> | undefined;
+  p.youtube = async () => { throw Error('synthetic unavailable API'); };
+  p.extract = async (args, signal) => {
+    if (args.includes('--flat-playlist')) return { entries: ids.map(id => ({ id })) };
+    const id = new URL(args.at(-1)!).searchParams.get('v')!;
+    assert(signal); signals.set(id, signal); await gate.promise;
+    return { title: 'Synthetic recording', uploader: 'Synthetic artist', duration: 180, playable_in_embed: true };
+  };
+  try {
+    pending = p.importPlaylist(youtube, controller.signal);
+    rejected = assert.rejects(pending, /abort|cancel/i);
+    await yieldTurn(); survivor = p.video([ids[0]]);
+    controller.abort(); await yieldTurn();
+    assert.equal(signals.get(ids[0])?.aborted, false);
+    assert.equal(signals.get(ids[1])?.aborted, true);
+    await rejected; gate.resolve();
+    assert.deepEqual((await survivor).map(video => video.id), [ids[0]]);
+    await yieldTurn();
+    assert.equal(store.get('metadata:v6:' + ids[1], null), null);
+  } finally {
+    gate.resolve();
+    await Promise.allSettled([pending, rejected, survivor].filter(value => value !== undefined));
+    await yieldTurn();
+  }
+});
 
 test('YouTube import paginates beyond the queue limit, filters private/deleted/duplicate entries and hydrates in source order', async t => {
   const { store, provider: p } = setup(t), ids = Array.from({ length: 120 }, (_, index) => videoId(index));

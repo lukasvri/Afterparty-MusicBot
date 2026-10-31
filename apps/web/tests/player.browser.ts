@@ -641,7 +641,7 @@ async function noOverflow(page: Page) {
   );
 }
 
-for (const width of [1440, 390]) {
+for (const width of [3840, 2560, 1920, 390]) {
   test(`${width}px: private creation, keyboard search, queue and synchronized host transport`, async (t) => {
     const f = await fixture(t, width);
     try {
