@@ -3,6 +3,7 @@ import { UserError } from "./types.ts";
 // Leave time for the website's 25s Core transport and 35s browser request.
 export const CORE_SEARCH_DEADLINE_MS = 24000;
 export const CORE_SEARCH_RESULTS_MS = 22000;
+export const MUSIC_REQUEST_DEADLINE_MS = 30000;
 const cancelled = () => new UserError("The request was cancelled.", 499);
 
 /** One provider job, with independently cancellable subscribers and an optional shared deadline. */
