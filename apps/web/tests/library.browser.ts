@@ -590,6 +590,7 @@ test(
     try {
       const catalog = f.page.getByRole('region', { name: 'Festival concerts', exact: true });
       await catalog.getByLabel('Festival', { exact: true }).selectOption('amsterdam-rai');
+      await catalog.getByLabel('Year', { exact: true }).selectOption('2018');
       await catalog
         .getByText(
           'A curated selection of official uploads. The complete source archive has not been verified.',
@@ -657,7 +658,7 @@ for (const width of [3840, 2560, 1920, 390])
         const coverage = catalog.locator('.coverage');
         await coverage.filter({ hasText: '17 repeated source entries are listed once.' }).waitFor();
         assert.match(await coverage.innerText(), /3 source links were\s+omitted/);
-        assert.match(await coverage.innerText(), /eligibility is unresolved/);
+        assert.match(await coverage.innerText(), /YouTube marks this video as private/);
         assert(!(await coverage.innerText()).includes('identifies a different year'));
         await catalog
           .getByLabel('Find an artist or stage', { exact: true })
@@ -740,7 +741,7 @@ for (const width of [3840, 2560, 1920, 390])
         await catalog.getByLabel('Year', { exact: true }).selectOption('2026');
         const coverage = catalog.locator('.coverage');
         assert.match(await coverage.innerText(), /1 source link was omitted/);
-        assert.match(await coverage.innerText(), /eligibility is unresolved/);
+        assert.match(await coverage.innerText(), /embedding is disabled/);
         assert(!/private|deleted|blocked/i.test(await coverage.innerText()));
         await catalog.getByLabel('Year', { exact: true }).selectOption('2019');
         assert.match(await coverage.innerText(), /6 source links were\s+omitted/);
@@ -794,6 +795,85 @@ for (const width of [3840, 2560, 1920, 390])
         assert.deepEqual(
           f.writes.map((write) => write.version),
           Array.from({ length: 49 }, (_, index) => index + 1),
+        );
+        assert(f.writes.every((write) => write.action === 'add'));
+        assert.equal(f.jobs.length, 0);
+        assert.deepEqual(f.errors, []);
+      } finally {
+        await f.close();
+      }
+    },
+  );
+
+for (const width of [3840, 2560, 1920, 390])
+  test(
+    `${width}px: RAI source boundaries preserve separate years and authorized queue additions`,
+    { timeout: 30000 },
+    async () => {
+      const f = await fixture(width);
+      try {
+        await f.page.setViewportSize({
+          width,
+          height: width === 3840 ? 2160 : width === 2560 ? 1440 : width === 1920 ? 1080 : 844,
+        });
+        const catalog = f.page.getByRole('region', { name: 'Festival concerts', exact: true });
+        await catalog.getByLabel('Festival', { exact: true }).selectOption('amsterdam-rai');
+        for (const year of [2018, 2019, 2023]) {
+          const expected = await browseFestivalYear(catalog, 'amsterdam-rai', year);
+          assert.equal(expected.length, year === 2018 ? 1 : year === 2019 ? 7 : 8);
+          assert.equal(f.writes.length, 0);
+          assert.equal(f.jobs.length, 0);
+        }
+        const coverage = catalog.locator('.coverage');
+        assert.match(await coverage.innerText(), /6 source links were\s+omitted/);
+        assert.match(await coverage.innerText(), /Amsterdam RAI 2019, not 2023/);
+        assert.equal(
+          await catalog
+            .getByRole('link', { name: 'Festival source ↗', exact: true })
+            .getAttribute('href'),
+          'https://www.youtube.com/@STMPDRCRDS/search?query=RAI',
+        );
+        await catalog.getByLabel('Year', { exact: true }).selectOption('2019');
+        assert.match(await coverage.innerText(), /Includes all 7 verified matching-year links/);
+        assert(!/omitted|unresolved/.test(await coverage.innerText()));
+        assert.equal(
+          await catalog
+            .getByRole('link', { name: 'Festival source ↗', exact: true })
+            .getAttribute('href'),
+          'https://www.youtube.com/playlist?list=PLOPmDfV0hAMbsTZQVTWiCNLcrErCDl_VO',
+        );
+        assert.equal(
+          await f.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
+          false,
+        );
+        if (process.env.FESTIVAL_SCREENSHOT_DIR) {
+          await mkdir(process.env.FESTIVAL_SCREENSHOT_DIR, { recursive: true });
+          await coverage.scrollIntoViewIfNeeded();
+          await f.page.screenshot({
+            path: join(process.env.FESTIVAL_SCREENSHOT_DIR, `rai-${width}.png`),
+          });
+        }
+        for (const year of [2019, 2023]) {
+          await catalog.getByLabel('Year', { exact: true }).selectOption(String(year));
+          await catalog
+            .getByRole('button', { name: 'Add selected year to queue', exact: true })
+            .click();
+          await f.page.waitForFunction(
+            (count) => document.querySelector('.count')?.textContent === String(count),
+            year === 2019 ? 8 : 16,
+          );
+        }
+        assert.deepEqual(
+          f.writes.map((write) => write.videoId),
+          [2019, 2023].flatMap((year) =>
+            CONCERT_CATALOG.filter(
+              (entry) => entry.eventId === 'amsterdam-rai' && entry.year === year,
+            ).map((entry) => entry.videoId),
+          ),
+        );
+        assert.deepEqual(
+          f.writes.map((write) => write.version),
+          Array.from({ length: 15 }, (_, index) => index + 1),
         );
         assert(f.writes.every((write) => write.action === 'add'));
         assert.equal(f.jobs.length, 0);

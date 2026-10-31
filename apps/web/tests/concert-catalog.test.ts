@@ -108,6 +108,22 @@ const snapshots = [
     sha256: String(sha256),
     sourceUrl: `https://ultramusicfestival.com/live-sets/season/${year}`,
   })),
+  {
+    eventId: 'amsterdam-rai',
+    year: 2019,
+    listedCount: 7,
+    includedCount: 7,
+    sourceUrl: 'https://www.youtube.com/playlist?list=PLOPmDfV0hAMbsTZQVTWiCNLcrErCDl_VO',
+    sha256: 'ac87a8bb2c6e903e19fd9f25d71b0e1fc552e72d8142e0bb2a600cd43c699711',
+  },
+  {
+    eventId: 'amsterdam-rai',
+    year: 2023,
+    listedCount: 13,
+    includedCount: 7,
+    sourceUrl: 'https://www.youtube.com/@STMPDRCRDS/search?query=RAI',
+    sha256: 'bb9bc4a8f35745acbe840cf5b99bcc13fba03a941aeeabfcf177ed6fdf4327f4',
+  },
 ];
 
 test('festival indexes retain every checked matching-year source link', () => {
@@ -159,7 +175,7 @@ test('festival records preserve source attribution, unique recordings and origin
     assert(recording.uploaderName || recording.sourcePublisher);
     assert(recording.evidenceUrls.includes(recording.sourceUrl));
   }
-  assert.equal(CONCERT_CATALOG.length, 1036);
+  assert.equal(CONCERT_CATALOG.length, 1049);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'cWJV0DgMqEA')?.year, 2023);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'jQLWYc2UrFY')?.artist, 'Westend');
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'PVh5bKxUjPo')?.artist, 'SKILAH');
@@ -169,7 +185,7 @@ test('festival records preserve source attribution, unique recordings and origin
   );
 });
 
-test('Tomorrowland source snapshots retain outside-playlist uploads and unresolved evidence', () => {
+test('Tomorrowland source snapshots retain outside-playlist uploads and checked omissions', () => {
   const years = [2022, 2023, 2024, 2025, 2026];
   const totals = [134, 97, 124, 109, 137];
   for (let index = 0; index < years.length; index++) {
@@ -184,7 +200,13 @@ test('Tomorrowland source snapshots retain outside-playlist uploads and unresolv
         .length,
       totals[index],
     );
-    for (const entry of source.excluded) assert.match(entry.reason, /unresolved|metadata/i);
+    for (const entry of source.excluded)
+      assert.equal(
+        entry.reason,
+        entry.videoId === '6OR-4ainmUY'
+          ? 'YouTube reports this video as unavailable; the cause is unspecified.'
+          : 'YouTube marks this video as private.',
+      );
   }
   for (const id of [
     '9cWsoVKpNjw',
@@ -207,6 +229,50 @@ const originalUltraIds = new Set([
   'uPhsq1msjl8',
   'fz-3arJT8fc',
 ]);
+const originalRaiIds = new Set(['cWJV0DgMqEA', 'lGCo8ILvauI', 'CwE-haZR2fc']);
+test('RAI expansion preserves all 1036 preceding catalog objects exactly', () => {
+  const previous = CONCERT_CATALOG.filter(
+    (entry) => entry.eventId !== 'amsterdam-rai' || originalRaiIds.has(entry.videoId),
+  ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  assert.equal(previous.length, 1036);
+  assert.equal(
+    createHash('sha256').update(JSON.stringify(previous)).digest('hex'),
+    'cd848bbe1e92ccfee29dd2c99251b7f6f93c120be1c817ec97c0bd07024e4b90',
+  );
+});
+test('RAI inventories retain the full captured sources without inventing separate shows', () => {
+  const sources = CONCERT_SOURCES.filter((source) => source.eventId === 'amsterdam-rai');
+  assert.deepEqual(sources.map((source) => source.year).sort(), [2019, 2023]);
+  const source2023 = sources.find((source) => source.year === 2023)!;
+  assert.equal(source2023.excluded.length, 6);
+  for (const excluded of source2023.excluded) {
+    assert.equal(excluded.reason, 'The source recording identifies Amsterdam RAI 2019, not 2023.');
+    assert(
+      CONCERT_CATALOG.some((entry) => entry.videoId === excluded.videoId && entry.year === 2019),
+    );
+  }
+  const added = CONCERT_CATALOG.filter(
+    (entry) => entry.eventId === 'amsterdam-rai' && !originalRaiIds.has(entry.videoId),
+  );
+  assert.equal(added.length, 13);
+  const titles = added
+    .map((entry) => [entry.videoId, entry.title])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map((row) => row.join('\t'))
+    .join('\n');
+  assert.equal(
+    createHash('sha256').update(titles).digest('hex'),
+    '9fa65379c07e2ad12e7ecc2ca393cc7ff756a66c458b1f8abef05d7908cffc54',
+  );
+  for (const entry of added) {
+    assert.equal(entry.verifiedAt, '2026-10-31');
+    assert.equal(entry.sourcePublisher, entry.year === 2019 ? 'Martin Garrix' : 'STMPD RCRDS');
+    assert.equal(entry.uploaderName, undefined);
+    assert(entry.title.includes(String(entry.year)));
+  }
+  assert.equal(CONCERT_CATALOG.filter((entry) => entry.eventId === 'amsterdam-rai').length, 16);
+  assert.equal(CONCERT_CATALOG.find((entry) => entry.videoId === 'cWJV0DgMqEA')?.year, 2023);
+});
 test('Ultra expansion preserves all 863 pre-existing catalog objects and evidence', () => {
   const groups = new Set([
     'edc-las-vegas:2026',
@@ -238,7 +304,7 @@ test('Ultra expansion preserves all 863 pre-existing catalog objects and evidenc
     '64abce2f528c52d6de12329107339e0008450f83792804c3498476f22a16b78e',
   );
 });
-test('Ultra snapshots distinguish unsupported audio from unresolved video metadata', () => {
+test('Ultra snapshots distinguish unsupported audio from disabled video embedding', () => {
   const sources = CONCERT_SOURCES.filter((source) => source.eventId === 'ultra-miami');
   assert.equal(sources.length, 5);
   assert.equal(sources.flatMap((source) => source.videoIds).length, 180);
@@ -246,11 +312,16 @@ test('Ultra snapshots distinguish unsupported audio from unresolved video metada
     sources.flatMap((source) => source.excluded).filter((entry) => !entry.videoId).length,
     7,
   );
-  const unresolved = sources.flatMap((source) => source.excluded).filter((entry) => entry.videoId);
-  assert.equal(unresolved.length, 1);
-  assert.equal(unresolved[0].videoId, 'QuW1fTqxXwk');
-  assert.match(unresolved[0].reason, /unresolved/);
-  assert(!/private|deleted|blocked/i.test(unresolved[0].reason));
+  const videoOmissions = sources
+    .flatMap((source) => source.excluded)
+    .filter((entry) => entry.videoId);
+  assert.equal(videoOmissions.length, 1);
+  assert.equal(videoOmissions[0].videoId, 'QuW1fTqxXwk');
+  assert.equal(
+    videoOmissions[0].reason,
+    'YouTube identifies this recording but reports that embedding is disabled.',
+  );
+  assert(!/private|deleted|blocked/i.test(videoOmissions[0].reason));
   const added = CONCERT_CATALOG.filter(
     (entry) => entry.eventId === 'ultra-miami' && !originalUltraIds.has(entry.videoId),
   );

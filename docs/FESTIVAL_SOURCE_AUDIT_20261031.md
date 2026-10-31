@@ -83,12 +83,34 @@ these fields are metadata, not a playback or full-performance verification.
 Among unique named entries, channel IDs are missing for 0, 0, 1, 4 and 100
 entries in 2022 through 2026 respectively.
 
-All 17 unresolved IDs have `title: null`, `duration: null` and
-`availability: null`, with no channel/uploader name. These observations do not
-identify why metadata is absent. Calling the videos private, deleted, region
-blocked or playable would require evidence that this audit did not obtain.
-They are excluded from named catalog candidates, with the unresolved count
-retained explicitly.
+At the flat-metadata capture, all 17 unresolved IDs had `title: null`, `duration: null` and
+`availability: null`, with no channel/uploader name. Those observations alone
+did not identify why metadata was absent. Private, deleted, region-blocked or
+playable status could not be inferred from the flat capture.
+They were excluded from named catalog candidates. The follow-up below resolves
+the public watch-page status without inferring it from the missing metadata.
+
+## Watch-page follow-up on 31 October
+
+An anonymous, bounded read of all 17 watch pages returned explicit player
+statuses. The parsed `ytInitialData.currentVideoEndpoint.watchEndpoint.videoId`
+matched the requested ID on every page. The paired `ytInitialPlayerResponse`
+reported `LOGIN_REQUIRED` with reason `Private video` for 16 entries, and `ERROR`
+with reason `Video unavailable` for the remaining entry. No scripts or media
+were executed or downloaded, and no account was used.
+
+| Edition | Watch-page sources | Checked status |
+| --- | --- | --- |
+| 2022 | [4zeEr58USQc](https://www.youtube.com/watch?v=4zeEr58USQc), [panT-4dkpbg](https://www.youtube.com/watch?v=panT-4dkpbg), [_XKx32QUEXE](https://www.youtube.com/watch?v=_XKx32QUEXE), [z5MfLu1fLxk](https://www.youtube.com/watch?v=z5MfLu1fLxk), [iIPNtJU-F1M](https://www.youtube.com/watch?v=iIPNtJU-F1M), [J_-0DIvITc4](https://www.youtube.com/watch?v=J_-0DIvITc4), [-0XcRoswgPM](https://www.youtube.com/watch?v=-0XcRoswgPM), [O3_CRdBhD2U](https://www.youtube.com/watch?v=O3_CRdBhD2U), [bwpTDcQ7yxY](https://www.youtube.com/watch?v=bwpTDcQ7yxY), [GK11ITOzpZ4](https://www.youtube.com/watch?v=GK11ITOzpZ4) | Private video, ten entries |
+| 2023 | [Bx1Cn0UaKpE](https://www.youtube.com/watch?v=Bx1Cn0UaKpE), [1rZucwCCsJM](https://www.youtube.com/watch?v=1rZucwCCsJM), [h7Rp7eqyadM](https://www.youtube.com/watch?v=h7Rp7eqyadM) | Private video, three entries |
+| 2024 | [LXXLKLqUa3Y](https://www.youtube.com/watch?v=LXXLKLqUa3Y), [-jRSJEaZ9AQ](https://www.youtube.com/watch?v=-jRSJEaZ9AQ), [Dyk5FwsCYbY](https://www.youtube.com/watch?v=Dyk5FwsCYbY) | Private video, three entries |
+| 2025 | [6OR-4ainmUY](https://www.youtube.com/watch?v=6OR-4ainmUY) | Video unavailable, unspecified cause |
+
+The catalog now records those checked omission reasons. An unavailable response
+does not establish deletion, a copyright action or regional restriction. These
+are time- and request-specific observations, not promises of future availability.
+None provides eligible public metadata to add a recording, so included IDs and
+counts remain unchanged. Current playback of included videos remains separate.
 
 ## Preservation and attribution
 

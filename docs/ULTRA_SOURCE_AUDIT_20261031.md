@@ -51,7 +51,7 @@ Use Ultra Music Festival as the publisher of this source index. Preserve the exa
 
 Public YouTube oEmbed responses already captured during this investigation illustrate the distinction: [Martin Garrix B2B Alesso 2026](https://www.youtube.com/watch?v=vBvZaydcCzc) reports author `Martin Garrix` and [Amelie Lens B2B Sara Landry 2026](https://www.youtube.com/watch?v=PmYE3d0GeLQ) reports author `Sara Landry`. Their titles identify the performance as 2026, agreeing with [Ultra's 2026 inventory](https://ultramusicfestival.com/live-sets/season/2026). Preserve the returned author name and author URL separately from the index publisher. oEmbed metadata is attribution evidence, not a verified-channel badge or a playback test.
 
-The full five-year oEmbed pass covered all 181 globally unique YouTube IDs: **180 returned HTTP 200 with title and author metadata, and one returned HTTP 401**. The unresolved ID is [`QuW1fTqxXwk`](https://www.youtube.com/watch?v=QuW1fTqxXwk), listed as `Black Tiger Sex Machine Presents Connected Fighters` by [Ultra's 2026 page](https://ultramusicfestival.com/live-sets/season/2026). The 401 is a metadata lookup failure only. It does not establish whether the video is private, deleted, region-restricted or unplayable. Keep it as one unresolved metadata omission; do not invent a title, uploader or failure reason.
+The full five-year oEmbed pass covered all 181 globally unique YouTube IDs: **180 returned HTTP 200 with title and author metadata, and one returned HTTP 401**. The latter ID is [`QuW1fTqxXwk`](https://www.youtube.com/watch?v=QuW1fTqxXwk), listed as `Black Tiger Sex Machine Presents Connected Fighters` by [Ultra's 2026 page](https://ultramusicfestival.com/live-sets/season/2026). The 401 alone left its status unresolved; it does not establish private, deleted, region-restricted or unplayable status. The follow-up below supplies the missing watch-page evidence.
 
 The title review found no conflicting performance year or event among the 180 metadata responses. Of those titles, 178 contain the expected four-digit year as a separate numeric token. Two require explicit handling rather than a strict word-boundary year expression:
 
@@ -60,11 +60,17 @@ The title review found no conflicting performance year or event among the 180 me
 
 No performance year is derived from an upload date. Preserve source-page edition evidence and video metadata together, and do not overwrite an explicit conflict with source-page grouping.
 
+## Watch-page follow-up on 31 October
+
+The oEmbed failure for [`QuW1fTqxXwk`](https://www.youtube.com/watch?v=QuW1fTqxXwk) was followed by a bounded anonymous read of its public watch page. Parsed `ytInitialData.currentVideoEndpoint.watchEndpoint.videoId` and `ytInitialPlayerResponse.videoDetails.videoId` both match the requested ID. The player metadata identifies `BTSM Live @ Ultra Music Festival 2026 (Connected Fighters)`, author Black Tiger Sex Machine, and duration 3,141 seconds. This agrees with [Ultra's 2026 season entry](https://ultramusicfestival.com/live-sets/season/2026).
+
+The same response reports playability status `OK` but **`playableInEmbed: false`**. Metadata and ordinary watch-page access therefore do not make this recording eligible for the browser's embedded player. Keep it omitted, with the checked reason that embedding is disabled, rather than continuing to call its metadata unresolved. Do not infer private/deleted status from the earlier HTTP 401 or promise global/continued availability from this response. No script or media was executed or downloaded. The included inventory remains 180 recordings and the net addition remains 173.
+
 ## Reconciliation and reproducible inventory digests
 
-An independent recount of the five season captures matched the initial enumeration. The saved HTML SHA-256 matched its capture manifest for all five years. All 181 source YouTube IDs have exactly one metadata result. Deduplicating the 2025 repeats and holding back the unresolved 2026 ID leaves the following metadata-backed candidate set:
+An independent recount of the five season captures matched the initial enumeration. The saved HTML SHA-256 matched its capture manifest for all five years. All 181 source YouTube IDs have exactly one oEmbed result. Deduplicating the 2025 repeats and holding back the 2026 video with disabled embedding leaves the following included set:
 
-| Edition | Unique source YouTube IDs | Metadata-backed candidates | Unsupported SoundCloud entries | Unresolved YouTube metadata |
+| Edition | Unique source YouTube IDs | Included YouTube recordings | Unsupported SoundCloud entries | Embedding-disabled videos |
 | --- | ---: | ---: | ---: | ---: |
 | 2019 | 22 | 22 | 6 | 0 |
 | 2023 | 33 | 33 | 0 | 0 |
@@ -95,7 +101,7 @@ Verified in this audit:
 - HTTP 200 for the five requested year pages and the unfiltered second page.
 - The matching active season, all returned media rows, provider counts and two duplicate video IDs in 2025.
 - HTTP 404 for page 2 of each requested filtered year.
-- All 181 unique source IDs reconciled against metadata, including 180 successful responses and one unresolved HTTP 401.
+- All 181 unique source IDs reconciled against oEmbed metadata, including 180 successful responses and one HTTP 401; the later watch-page follow-up identifies the latter recording and its disabled embedding.
 - Title/year review, both exceptional year formats, all seven existing IDs, the 173 net additions and independently calculated ID/title digests.
 
 Still separate from this source enumeration:
