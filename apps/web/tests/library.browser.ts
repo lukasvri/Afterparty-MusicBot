@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, type Locator } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
 import { CONCERT_CATALOG, CONCERT_PLAYLISTS } from '../../../lib/concert-catalog.ts';
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5174').origin;
@@ -25,6 +25,34 @@ const initial = video('queued00001', 'Current queue track');
 const imported = video('result00001', 'Playlist preview track');
 const jobId = '12345678-1234-1234-1234-123456789abc',
   jobToken = 'j'.repeat(40);
+async function browseFestivalYear(catalog: Locator, eventId: string, year: number) {
+  assert.equal(await catalog.getByLabel('Festival', { exact: true }).inputValue(), eventId);
+  await catalog.getByLabel('Year', { exact: true }).selectOption(String(year));
+  const expected = CONCERT_CATALOG.filter(
+    (entry) => entry.eventId === eventId && entry.year === year,
+  );
+  await catalog
+    .getByText(`${expected.length} festival sets from ${year}`, { exact: true })
+    .waitFor();
+  const found: string[] = [];
+  for (let page = 0; page < Math.ceil(expected.length / 20); page++) {
+    const links = catalog.getByRole('link', { name: 'Official video ↗', exact: true });
+    assert((await links.count()) <= 20);
+    found.push(
+      ...(await links.evaluateAll((items) =>
+        items.map((item) => (item as HTMLAnchorElement).href),
+      )),
+    );
+    if (page < Math.ceil(expected.length / 20) - 1)
+      await catalog.getByRole('button', { name: 'Next sets', exact: true }).click();
+  }
+  assert.deepEqual(
+    found,
+    expected.map((entry) => entry.sourceUrl),
+  );
+  assert.equal(new Set(found).size, found.length);
+  return expected;
+}
 async function fixture(
   width: number,
   denyLibrary = false,
@@ -621,38 +649,13 @@ for (const width of [3840, 2560, 1920, 390])
         const catalog = f.page.getByRole('region', { name: 'Festival concerts', exact: true });
         await catalog.getByLabel('Festival', { exact: true }).selectOption('tomorrowland-belgium');
         for (const year of [2022, 2023, 2024, 2025, 2026]) {
-          await catalog.getByLabel('Year', { exact: true }).selectOption(String(year));
-          const expected = CONCERT_CATALOG.filter(
-            (entry) => entry.eventId === 'tomorrowland-belgium' && entry.year === year,
-          );
-          await catalog
-            .getByText(`${expected.length} festival sets from ${year}`, { exact: true })
-            .waitFor();
-          const found: string[] = [];
-          for (let page = 0; page < Math.ceil(expected.length / 20); page++) {
-            const links = catalog.getByRole('link', { name: 'Official video ↗', exact: true });
-            assert((await links.count()) <= 20);
-            found.push(
-              ...(await links.evaluateAll((items) =>
-                items.map((item) => (item as HTMLAnchorElement).href),
-              )),
-            );
-            if (page < Math.ceil(expected.length / 20) - 1)
-              await catalog.getByRole('button', { name: 'Next sets', exact: true }).click();
-          }
-          assert.deepEqual(
-            found,
-            expected.map((entry) => entry.sourceUrl),
-          );
-          assert.equal(new Set(found).size, found.length);
+          await browseFestivalYear(catalog, 'tomorrowland-belgium', year);
           assert.equal(f.writes.length, 0);
           assert.equal(f.jobs.length, 0);
         }
         await catalog.getByLabel('Year', { exact: true }).selectOption('2024');
         const coverage = catalog.locator('.coverage');
-        await coverage
-          .filter({ hasText: '17 repeated playlist entries are listed once.' })
-          .waitFor();
+        await coverage.filter({ hasText: '17 repeated source entries are listed once.' }).waitFor();
         assert.match(await coverage.innerText(), /3 source links were\s+omitted/);
         assert.match(await coverage.innerText(), /eligibility is unresolved/);
         assert(!(await coverage.innerText()).includes('identifies a different year'));
@@ -696,6 +699,97 @@ for (const width of [3840, 2560, 1920, 390])
         assert.deepEqual(
           f.writes.map((write) => write.videoId),
           expected.slice(0, 49).map((entry) => entry.videoId),
+        );
+        assert.deepEqual(
+          f.writes.map((write) => write.version),
+          Array.from({ length: 49 }, (_, index) => index + 1),
+        );
+        assert(f.writes.every((write) => write.action === 'add'));
+        assert.equal(f.jobs.length, 0);
+        assert.deepEqual(f.errors, []);
+      } finally {
+        await f.close();
+      }
+    },
+  );
+
+for (const width of [3840, 2560, 1920, 390])
+  test(
+    `${width}px: Ultra season snapshots keep every page, provider omissions and queue revisions`,
+    { timeout: 45000 },
+    async () => {
+      const f = await fixture(width);
+      try {
+        await f.page.setViewportSize({
+          width,
+          height: width === 3840 ? 2160 : width === 2560 ? 1440 : width === 1920 ? 1080 : 844,
+        });
+        const catalog = f.page.getByRole('region', { name: 'Festival concerts', exact: true });
+        await catalog.getByLabel('Festival', { exact: true }).selectOption('ultra-miami');
+        for (const year of [2019, 2023, 2024, 2025, 2026]) {
+          await browseFestivalYear(catalog, 'ultra-miami', year);
+          assert.equal(f.writes.length, 0);
+          assert.equal(f.jobs.length, 0);
+          assert.equal(
+            await catalog
+              .getByRole('link', { name: 'Festival source ↗', exact: true })
+              .getAttribute('href'),
+            `https://ultramusicfestival.com/live-sets/season/${year}`,
+          );
+        }
+        await catalog.getByLabel('Year', { exact: true }).selectOption('2026');
+        const coverage = catalog.locator('.coverage');
+        assert.match(await coverage.innerText(), /1 source link was omitted/);
+        assert.match(await coverage.innerText(), /eligibility is unresolved/);
+        assert(!/private|deleted|blocked/i.test(await coverage.innerText()));
+        await catalog.getByLabel('Year', { exact: true }).selectOption('2019');
+        assert.match(await coverage.innerText(), /6 source links were\s+omitted/);
+        assert.match(await coverage.innerText(), /SoundCloud audio is not supported/);
+        assert.equal(
+          await catalog
+            .getByRole('button', { name: 'Preview source playlist', exact: true })
+            .count(),
+          0,
+        );
+        assert.equal(
+          await f.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
+          false,
+        );
+        if (process.env.FESTIVAL_SCREENSHOT_DIR) {
+          await mkdir(process.env.FESTIVAL_SCREENSHOT_DIR, { recursive: true });
+          await coverage.scrollIntoViewIfNeeded();
+          await f.page.screenshot({
+            path: join(process.env.FESTIVAL_SCREENSHOT_DIR, `ultra-${width}.png`),
+          });
+        }
+        const first = CONCERT_CATALOG.filter(
+          (entry) => entry.eventId === 'ultra-miami' && entry.year === 2019,
+        );
+        await catalog
+          .getByRole('button', { name: 'Add selected year to queue', exact: true })
+          .click();
+        await f.page.waitForFunction(() => document.querySelector('.count')?.textContent === '23');
+        assert.deepEqual(
+          f.writes.map((write) => write.videoId),
+          first.map((entry) => entry.videoId),
+        );
+        await catalog.getByLabel('Year', { exact: true }).selectOption('2026');
+        const next = CONCERT_CATALOG.filter(
+          (entry) => entry.eventId === 'ultra-miami' && entry.year === 2026,
+        );
+        assert.equal(
+          await catalog
+            .getByRole('button', { name: 'Add selected year to queue', exact: true })
+            .isDisabled(),
+          true,
+        );
+        await catalog
+          .getByRole('button', { name: 'Add next 27 sets from 2026', exact: true })
+          .click();
+        await f.page.waitForFunction(() => document.querySelector('.count')?.textContent === '50');
+        assert.deepEqual(
+          f.writes.slice(first.length).map((write) => write.videoId),
+          next.slice(0, 27).map((entry) => entry.videoId),
         );
         assert.deepEqual(
           f.writes.map((write) => write.version),

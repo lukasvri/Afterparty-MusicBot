@@ -1,6 +1,6 @@
 # Festival concert playlists
 
-The source candidate contains **863 source-backed recordings across five event families
+The source candidate contains **1,036 source-backed recordings across five event families
 and 17 event/year groups**. Open **Library & playlists**, choose **Festival
 concerts**, then select the festival and performance year. Search by artist,
 recording title or stage, and browse 20 sets per page. Every indexed set remains
@@ -23,11 +23,11 @@ coverage instead of duplicating the full recording inventory.
 | Tomorrowland Belgium | 2024 | 124 | All 123 unique named source entries plus one existing upload; 17 duplicate occurrences deduplicated and three unresolved entries omitted |
 | Tomorrowland Belgium | 2023 | 97 | All 96 named source entries plus one existing upload; three unresolved entries omitted |
 | Tomorrowland Belgium | 2022 | 134 | All 133 named source entries plus one existing upload; ten unresolved entries omitted |
-| Ultra Miami | 2026 | 2 | Curated selection; full official inventory not enumerated |
-| Ultra Miami | 2025 | 2 | Curated selection; full official inventory not enumerated |
-| Ultra Miami | 2024 | 1 | Curated selection; full official inventory not enumerated |
-| Ultra Miami | 2023 | 1 | Curated selection; full official inventory not enumerated |
-| Ultra Miami | 2019 | 1 | Curated selection; full official inventory not enumerated |
+| Ultra Miami | 2026 | 47 | All metadata-backed YouTube entries from the [48-row official year page](https://ultramusicfestival.com/live-sets/season/2026); one unresolved video omitted |
+| Ultra Miami | 2025 | 32 | All unique YouTube entries from the [34-row official year page](https://ultramusicfestival.com/live-sets/season/2025); two repeated links listed once |
+| Ultra Miami | 2024 | 46 | All YouTube entries from the [47-row official year page](https://ultramusicfestival.com/live-sets/season/2024); one SoundCloud audio source is outside this browser video catalog |
+| Ultra Miami | 2023 | 33 | All YouTube entries from the [33-row official year page](https://ultramusicfestival.com/live-sets/season/2023) |
+| Ultra Miami | 2019 | 22 | All YouTube entries from the [28-row official year page](https://ultramusicfestival.com/live-sets/season/2019); six SoundCloud audio sources are outside this browser video catalog |
 | Amsterdam RAI | 2023 | 1 | Official Martin Garrix IDEM recording; not a complete event archive |
 | Amsterdam RAI | 2019 | 1 | Official Martin Garrix THE ETHER recording; not a complete event archive |
 | Amsterdam RAI | 2018 | 1 | Official Martin Garrix ANIMA recording; not a complete event archive |
@@ -48,12 +48,21 @@ catalog records and their evidence remain unchanged; 573 recordings are added.
 Missing metadata leaves current availability unresolved. Playback,
 embedding and territory remain runtime checks, not claims from the playlist.
 
+The [Ultra audit](ULTRA_SOURCE_AUDIT_20261031.md) follows the official season
+routes rather than the first page of the unfiltered archive. It reconciles 190
+rows with 180 metadata-backed YouTube recordings, two repeated occurrences,
+seven unsupported SoundCloud audio sources and one unresolved video-metadata
+response. All seven earlier Ultra records remain unchanged; 173 recordings are
+added. Edition evidence comes from the explicit season and returned performance
+title/date, never an upload date. The source-audio URLs remain in the audit and
+source omissions without implying support in the YouTube room player.
+
 Creamfields' [Eli Brown 2024 page](https://creamfields.com/2024_live/friday/steel-yard/eli-brown/)
 embeds [a recording identifying 2023](https://www.youtube.com/watch?v=Bz3StgzmGos).
 It is excluded from the 2024 inventory. The additional
 [CAMELPHAT recording](https://www.youtube.com/watch?v=bVF_7IiTAsI) is published by
 Beatport and describes its Creamfields 2024 Steel Yard performance. Source-count
-and sorted-video-ID digest tests protect the nine enumerated snapshots against
+and sorted-video-ID digest tests protect the fourteen enumerated snapshots against
 accidental lost, replaced or misplaced links.
 
 ## Browse the larger Tomorrowland source playlists
@@ -98,11 +107,11 @@ The game pack remains separate: see [private quiz setup](GUESS_CATALOG_SOURCES.m
 
 ## Remaining inventory work
 
-Eight groups above still lack an enumerated official source inventory. Ultra's
-[official live-set page](https://ultramusicfestival.com/live-sets) remains a source
-to reconcile with complete recording links and performance-year mapping for the
-existing 2019/2023/2024/2025/2026 groups. Tomorrowland now has enumerated
-playlist snapshots, with 17 unresolved entries retained as explicit omissions.
+Three Amsterdam RAI groups still lack an enumerated complete official archive.
+Tomorrowland has enumerated playlist snapshots, with 17 unresolved entries
+retained as explicit omissions. Ultra has enumerated official season-page
+snapshots, with one unresolved metadata entry and seven SoundCloud audio sources
+outside the current browser video contract.
 These lists are not evidence of all performances or all separate official
 uploads; the seven existing outside-playlist recordings illustrate that limit.
 Amsterdam RAI has verified named full shows, without a complete archive of every
