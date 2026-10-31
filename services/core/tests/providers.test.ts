@@ -8,9 +8,69 @@ import {scoreMatch,mapLimited} from '../src/matching.ts';import {spotifyRef,Spot
 import {soundcloudUrl,resolveSoundcloud} from '../src/soundcloud.ts';import {Recommendations} from '../src/recommendations.ts';
 import {audioBitrate} from '../src/audio.ts';import type {Track} from '../src/types.ts';
 import {deferred} from './deferred.ts';
+import {setImmediate as yieldTurn} from 'node:timers/promises';
 const source={id:'4uLU6hMCjMI75M1A2tKUQC',isrc:'GBARL9300135',title:'Example Song',artist:'Artist',duration:200};
 const track=(title='Artist - Example Song',id='abcdefghijk'):Track=>({id,title,artist:'Artist - Topic',duration:200,entryId:id,image:'',live:false,embeddable:true,source:'youtube'});
 const setup=()=>{const dir=mkdtempSync(join(tmpdir(),'gutta-provider-'));const store=new Store(join(dir,'db.sqlite'));return {store,close:()=>{store.close();rmSync(dir,{recursive:true,force:true});}};};
+
+test('a cancelled search leaves its shared survivor alive and gives a later caller a fresh entry',async()=>{
+ const t=setup(),gate=deferred<void>();try{
+  const p=new Providers(t.store,{}),controller=new AbortController();let calls=0;
+  p.youtube=async <K extends keyof YouTubeResponses>()=>{calls++;await gate.promise;return {items:[{id:{videoId:'abcdefghijk'}}]} as YouTubeResponses[K];};
+  p.video=async()=>[track()];
+  const cancelled=p.search('shared cancellation',1,false,controller.signal);
+  const survivor=p.search('shared cancellation',1);
+  const rejection=assert.rejects(cancelled,/cancel/i);
+  controller.abort();gate.resolve();await rejection;
+  const result=await survivor;assert.equal(result[0].id,'abcdefghijk');assert.equal(calls,1);
+  assert.notEqual((await p.search('shared cancellation',1))[0].entryId,result[0].entryId);
+ }finally{gate.resolve();t.close();}
+});
+
+test('the last search cancellation aborts provider work and cannot cache a late result',async()=>{
+ const t=setup(),gate=deferred<void>();try{
+  const p=new Providers(t.store,{}),controller=new AbortController();let calls=0,sourceSignal:AbortSignal|undefined;
+  p.youtube=async <K extends keyof YouTubeResponses>(_path:K,_params:Record<string,string>,signal?:AbortSignal)=>{calls++;sourceSignal=signal;await gate.promise;return {items:[{id:{videoId:'abcdefghijk'}}]} as YouTubeResponses[K];};
+  p.video=async()=>[track()];
+  const cancelled=p.search('abandoned search',1,false,controller.signal);
+  const rejection=assert.rejects(cancelled,/cancel/i);await Promise.resolve();controller.abort();gate.resolve();await rejection;
+  assert.equal(sourceSignal?.aborted,true);
+  await p.search('abandoned search',1);assert.equal(calls,2);
+ }finally{gate.resolve();t.close();}
+});
+
+test('one search deadline covers API, fallback and hydration without resetting its budget',async context=>{
+ const t=setup(),api=deferred<void>(),extractor=deferred<void>();
+ context.mock.timers.enable({apis:['setTimeout']});
+ try{
+  const p=new Providers(t.store,{});let sourceSignal:AbortSignal|undefined,hydrations=0;
+  p.youtube=async()=>{await api.promise;throw Error('synthetic API outage');};
+  p.extract=async(_args,signal)=>{sourceSignal=signal;await extractor.promise;return {entries:[{id:'abcdefghijk'}]};};
+  p.video=async()=>{hydrations++;return [track()];};
+  const pending=p.search('slow source',1);
+  const rejected=assert.rejects(pending,error=>error instanceof UserError&&error.status===504&&/try again/i.test(error.message));
+  context.mock.timers.tick(12000);api.resolve();
+  for(let i=0;i<8;i++)await Promise.resolve();
+  context.mock.timers.tick(12000);extractor.resolve();await rejected;
+  assert.equal(sourceSignal?.aborted,true);assert.equal(hydrations,0);
+ }finally{api.resolve();extractor.resolve();context.mock.timers.reset();t.close();}
+});
+
+test('a search deadline kills its actual extractor and subsequent work still acquires a slot',async context=>{
+ const t=setup();context.mock.timers.enable({apis:['setTimeout']});
+ let subprocess:Promise<unknown>|undefined;
+ try{
+  const p=new Providers(t.store,{});p.youtube=async()=>{throw Error('synthetic API outage');};
+  p.extract=(_args,signal)=>{
+   const pending=runJson(process.execPath,['-e','setInterval(()=>{},1000)'],signal);
+   subprocess=pending.catch(()=>{});return pending;
+  };
+  const pending=p.search('hung subprocess',1);
+  const rejected=assert.rejects(pending,error=>error instanceof UserError&&error.status===504);
+  await yieldTurn();context.mock.timers.tick(24000);await rejected;await subprocess;
+  assert.deepEqual(await runJson(process.execPath,['-e',"process.stdout.write('{}')"]),{});
+ }finally{context.mock.timers.reset();t.close();}
+});
 
 test('cold video metadata skips player JavaScript without weakening source errors or stream extraction',async()=>{
  const t=setup();try{

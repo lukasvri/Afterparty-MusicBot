@@ -14,6 +14,32 @@ import {Engine} from '../src/engine.ts';
 import {Commands} from '../src/commands.ts';
 import {createServers} from '../src/server.ts';
 import type {Sink} from '../src/audio.ts';
+import {deferred} from './deferred.ts';
+import {setImmediate as yieldTurn} from 'node:timers/promises';
+
+test('disconnecting a catalog client cancels only its subscription to shared provider work',async()=>{
+ const store=new Store(':memory:'),providers=new Providers(store,{}),started=deferred<void>(),gate=deferred<void>();
+ const sink:Sink={onIdle:null,onError:null,play(){},pause(){},resume(){},stop(){},duration:()=>0,advancing:()=>false,buffering:()=>false};
+ const engine=new Engine(store,providers,sink),commands=new Commands(engine);
+ const servers=await createServers(engine,commands,{key:'synthetic-key',origin:'https://site.example',publicPort:0,host:'127.0.0.1'});
+ const base=`http://127.0.0.1:${(servers.publicServer.address() as {port:number}).port}`;
+ const controller=new AbortController();let sourceSignal:AbortSignal|undefined,calls=0;
+ providers.youtube=async(_path,_params,signal)=>{calls++;sourceSignal=signal;started.resolve();await gate.promise;return {items:[]};};
+ try{
+  const request=fetch(base+'/v1/catalog?q=shared%20disconnect',{headers:{Authorization:'Bearer synthetic-key'},signal:controller.signal});
+  const rejected=assert.rejects(request,/abort/i);await started.promise;
+  const survivor=providers.search('shared disconnect');await yieldTurn();controller.abort();await rejected;
+  for(let n=0;n<50;n++){await yieldTurn();if(sourceSignal?.aborted)break;}
+  assert.equal(sourceSignal?.aborted,false);gate.resolve();assert.deepEqual(await survivor,[]);assert.equal(calls,1);
+  const secondStarted=deferred<void>(),secondGate=deferred<void>(),second=new AbortController();
+  providers.youtube=async(_path,_params,signal)=>{sourceSignal=signal;secondStarted.resolve();await secondGate.promise;return {items:[]};};
+  const lone=fetch(base+'/v1/catalog?q=lone%20disconnect',{headers:{Authorization:'Bearer synthetic-key'},signal:second.signal});
+  const loneRejected=assert.rejects(lone,/abort/i);await secondStarted.promise;second.abort();await loneRejected;
+  // Observe the actual server-side response close, not just fetch's local rejection.
+  for(let n=0;n<100&&!sourceSignal?.aborted;n++)await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(sourceSignal?.aborted,true);secondGate.resolve();await yieldTurn();
+ }finally{controller.abort();gate.resolve();await servers.close();commands.close();engine.close();store.close();}
+});
 test('malformed WebSocket upgrade targets cannot crash Core before origin validation',()=>{
  // A child isolates an uncaught upgrade-listener exception from the test runner.
  const source=new URL('../src/',import.meta.url).href;

@@ -6,6 +6,7 @@ import { transpileFixtureModule } from "./fixture-transpile.ts";
 import { readFileSync, readdirSync } from "node:fs";
 import type { RoomState } from "../lib/types.ts";
 import { watchPage } from "../services/core/tests/youtube-watch-fixture.ts";
+import { setImmediate as yieldTurn } from "node:timers/promises";
 
 function watchFixture(url: URL, ai = false) {
   if (url.origin !== 'https://www.youtube.com') return null;
@@ -1042,6 +1043,86 @@ test('D1 user discovery returns thirty unique results in one bounded search and 
     assert.equal((await searchHandler(f.request, 'bounded discovery')).videos.length, 30);
     assert.equal(calls.length, 2, 'Repeating a search reuses metadata without fetching another page');
   } finally { f.close(); }
+});
+
+test('D1 cancelled search does not retire a shared survivor or poison its cache', async () => {
+  const f = fixture(), controller = new AbortController();
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  let sourceSignal: AbortSignal | undefined, calls = 0;
+  try {
+    globalThis.fetch = async (_target, options) => {
+      calls++; sourceSignal = options?.signal ?? undefined; started(); await gate;
+      return Response.json({ items: [] });
+    };
+    const request = new Request(f.request, { signal: controller.signal });
+    const cancelled = searchHandler(request, 'shared worker cancellation');
+    const rejected = assert.rejects(cancelled, /cancel/i);
+    const survivor = searchHandler(f.request, 'shared worker cancellation');
+    await ready; await yieldTurn(); controller.abort(); await rejected; assert.equal(sourceSignal?.aborted, false);
+    release(); assert.deepEqual((await survivor).videos, []); assert.equal(calls, 1);
+    await searchHandler(f.request, 'shared worker cancellation'); assert.equal(calls, 1);
+  } finally { release(); f.close(); }
+});
+
+test('D1 search deadline aborts a held Core read without starting a fallback or caching late success', async context => {
+  const f = fixture(); context.mock.timers.enable({ apis: ['setTimeout'] });
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  let sourceSignal: AbortSignal | undefined, calls = 0;
+  syntheticEnv.GUTTA_CORE_PUBLIC_URL = 'https://core.example'; syntheticEnv.ADMIN_BRIDGE_KEY = 'synthetic-key';
+  try {
+    globalThis.fetch = async (_target, options) => {
+      calls++; sourceSignal = options?.signal ?? undefined; started(); await gate;
+      return Response.json({ videos: [] });
+    };
+    const pending = searchHandler(f.request, 'held worker deadline');
+    const rejected = assert.rejects(pending, error => error instanceof Error && 'status' in error && error.status === 504);
+    await ready; context.mock.timers.tick(30000); await rejected;
+    assert.equal(sourceSignal?.aborted, true); release();
+    for (let n = 0; n < 20; n++) await Promise.resolve();
+    assert.equal(calls, 1, 'Expired requests must not start direct provider fallback');
+    assert.equal(f.sqlite.prepare("SELECT count(*) AS count FROM cached WHERE key LIKE 'search:%'").get()?.count, 0);
+  } finally { release(); await yieldTurn(); context.mock.timers.reset(); delete syntheticEnv.GUTTA_CORE_PUBLIC_URL; delete syntheticEnv.ADMIN_BRIDGE_KEY; f.close(); }
+});
+
+test('D1 search budget includes a held cache read and never starts a provider after expiry', async context => {
+  const f = fixture(); context.mock.timers.enable({ apis: ['setTimeout'] });
+  let release!: () => void, started!: () => void, calls = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  const prepare = syntheticEnv.DB!.prepare;
+  syntheticEnv.DB!.prepare = sql => {
+    const statement = prepare(sql);
+    if (!sql.startsWith('SELECT data FROM cached')) return statement;
+    return { bind(...args) {
+      const bound = statement.bind(...args);
+      return { ...bound, async first() { started(); await gate; return bound.first(); } };
+    } };
+  };
+  try {
+    globalThis.fetch = async () => { calls++; return Response.json({ items: [] }); };
+    const pending = searchHandler(f.request, 'held cache deadline');
+    const rejected = assert.rejects(pending, error => error instanceof Error && 'status' in error && error.status === 504);
+    await ready; context.mock.timers.tick(30000); await rejected; release(); await yieldTurn();
+    assert.equal(calls, 0); assert.equal(f.sqlite.prepare('SELECT count(*) AS count FROM cached').get()?.count, 0);
+  } finally { release(); await yieldTurn(); context.mock.timers.reset(); f.close(); }
+});
+
+test('D1 incomplete Core search results remain immediately retryable', async () => {
+  const f = fixture(); let calls = 0;
+  syntheticEnv.GUTTA_CORE_PUBLIC_URL = 'https://core.example'; syntheticEnv.ADMIN_BRIDGE_KEY = 'synthetic-key';
+  try {
+    globalThis.fetch = async () => {
+      calls++; return Response.json({ videos: calls === 1 ? [seed] : [seed, next], complete: calls > 1 });
+    };
+    assert.equal((await searchHandler(f.request, 'partial core result')).videos.length, 1);
+    assert.equal((await searchHandler(f.request, 'partial core result')).videos.length, 2);
+    assert.equal(calls, 2);
+    assert.equal((await searchHandler(f.request, 'partial core result')).videos.length, 2); assert.equal(calls, 2);
+  } finally { delete syntheticEnv.GUTTA_CORE_PUBLIC_URL; delete syntheticEnv.ADMIN_BRIDGE_KEY; f.close(); }
 });
 
 test('D1 empty searches expire after one minute and errors do not become cached empties', async () => {
