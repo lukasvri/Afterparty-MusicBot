@@ -121,17 +121,22 @@
       </div>
     </div>
     {#if coverage}<p class="coverage">
-        Includes every matching-year video linked in {coverage.publisherName}'s checked source
-        index.
+        Includes all {coverage.videoIds.length} verified matching-year links in
+        {coverage.publisherName}'s checked source snapshot. Checked {coverage.checkedAt}.{' '}
         <a
           href={coverage.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Festival source ↗">Festival source <Icon name="external" size={15} /></a
-        >
+        >{' '}
         {#if coverage.excluded.length}
-          {coverage.excluded.length} source link was omitted because its recording identifies a different
-          year.{/if}
+          {coverage.excluded.length} source {coverage.excluded.length === 1
+            ? 'link was'
+            : 'links were'}
+          omitted: {[...new Set(coverage.excluded.map((entry) => entry.reason))].join(' ')}{/if}
+        {#if coverage.duplicateCount}
+          {coverage.duplicateCount} repeated playlist entries are listed once.
+        {/if}
       </p>{:else}<p class="coverage">
         A curated selection of official uploads. The complete source archive has not been verified.
       </p>{/if}

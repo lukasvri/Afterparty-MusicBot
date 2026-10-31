@@ -1,7 +1,8 @@
 // Native library journeys use synthetic API state, isolated browser storage and no media.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
 import { CONCERT_CATALOG, CONCERT_PLAYLISTS } from '../../../lib/concert-catalog.ts';
@@ -560,14 +561,25 @@ test(
     const f = await fixture(390, false, 1, [imported], source.url);
     try {
       const catalog = f.page.getByRole('region', { name: 'Festival concerts', exact: true });
-      await catalog.getByLabel('Festival', { exact: true }).selectOption(source.eventId);
-      await catalog.getByLabel('Year', { exact: true }).selectOption(String(source.year));
+      await catalog.getByLabel('Festival', { exact: true }).selectOption('amsterdam-rai');
       await catalog
         .getByText(
           'A curated selection of official uploads. The complete source archive has not been verified.',
           { exact: true },
         )
         .waitFor();
+      await catalog.getByLabel('Festival', { exact: true }).selectOption(source.eventId);
+      await catalog.getByLabel('Year', { exact: true }).selectOption(String(source.year));
+      await catalog
+        .locator('.coverage')
+        .filter({ hasText: 'Includes all 134 verified matching-year links' })
+        .waitFor();
+      assert.equal(
+        await catalog
+          .getByRole('link', { name: 'Festival source ↗', exact: true })
+          .getAttribute('href'),
+        source.url,
+      );
       assert.equal(
         await catalog
           .getByRole('link', { name: 'Open source playlist ↗', exact: true })
@@ -594,6 +606,109 @@ test(
     }
   },
 );
+
+for (const width of [3840, 2560, 1920, 390])
+  test(
+    `${width}px: Tomorrowland source inventories keep every page, honest omissions and bounded additions`,
+    { timeout: 45000 },
+    async () => {
+      const f = await fixture(width);
+      try {
+        await f.page.setViewportSize({
+          width,
+          height: width === 3840 ? 2160 : width === 2560 ? 1440 : width === 1920 ? 1080 : 844,
+        });
+        const catalog = f.page.getByRole('region', { name: 'Festival concerts', exact: true });
+        await catalog.getByLabel('Festival', { exact: true }).selectOption('tomorrowland-belgium');
+        for (const year of [2022, 2023, 2024, 2025, 2026]) {
+          await catalog.getByLabel('Year', { exact: true }).selectOption(String(year));
+          const expected = CONCERT_CATALOG.filter(
+            (entry) => entry.eventId === 'tomorrowland-belgium' && entry.year === year,
+          );
+          await catalog
+            .getByText(`${expected.length} festival sets from ${year}`, { exact: true })
+            .waitFor();
+          const found: string[] = [];
+          for (let page = 0; page < Math.ceil(expected.length / 20); page++) {
+            const links = catalog.getByRole('link', { name: 'Official video ↗', exact: true });
+            assert((await links.count()) <= 20);
+            found.push(
+              ...(await links.evaluateAll((items) =>
+                items.map((item) => (item as HTMLAnchorElement).href),
+              )),
+            );
+            if (page < Math.ceil(expected.length / 20) - 1)
+              await catalog.getByRole('button', { name: 'Next sets', exact: true }).click();
+          }
+          assert.deepEqual(
+            found,
+            expected.map((entry) => entry.sourceUrl),
+          );
+          assert.equal(new Set(found).size, found.length);
+          assert.equal(f.writes.length, 0);
+          assert.equal(f.jobs.length, 0);
+        }
+        await catalog.getByLabel('Year', { exact: true }).selectOption('2024');
+        const coverage = catalog.locator('.coverage');
+        await coverage
+          .filter({ hasText: '17 repeated playlist entries are listed once.' })
+          .waitFor();
+        assert.match(await coverage.innerText(), /3 source links were\s+omitted/);
+        assert.match(await coverage.innerText(), /eligibility is unresolved/);
+        assert(!(await coverage.innerText()).includes('identifies a different year'));
+        await catalog
+          .getByLabel('Find an artist or stage', { exact: true })
+          .fill('Marlon Hoffstadt');
+        assert.equal(
+          await catalog.getByRole('link', { name: 'Official video ↗', exact: true }).count(),
+          1,
+        );
+        await catalog.getByLabel('Find an artist or stage', { exact: true }).fill('core');
+        assert(
+          (await catalog.getByRole('link', { name: 'Official video ↗', exact: true }).count()) >= 1,
+        );
+        await catalog.getByLabel('Find an artist or stage', { exact: true }).fill('');
+        assert.equal(
+          await f.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
+          false,
+        );
+        if (process.env.FESTIVAL_SCREENSHOT_DIR) {
+          await mkdir(process.env.FESTIVAL_SCREENSHOT_DIR, { recursive: true });
+          await coverage.scrollIntoViewIfNeeded();
+          await f.page.screenshot({
+            path: join(process.env.FESTIVAL_SCREENSHOT_DIR, `tomorrowland-${width}.png`),
+          });
+        }
+        await catalog.getByLabel('Year', { exact: true }).selectOption('2026');
+        const expected = CONCERT_CATALOG.filter(
+          (entry) => entry.eventId === 'tomorrowland-belgium' && entry.year === 2026,
+        );
+        assert.equal(
+          await catalog
+            .getByRole('button', { name: 'Add selected year to queue', exact: true })
+            .isDisabled(),
+          true,
+        );
+        await catalog
+          .getByRole('button', { name: 'Add next 49 sets from 2026', exact: true })
+          .click();
+        await f.page.waitForFunction(() => document.querySelector('.count')?.textContent === '50');
+        assert.deepEqual(
+          f.writes.map((write) => write.videoId),
+          expected.slice(0, 49).map((entry) => entry.videoId),
+        );
+        assert.deepEqual(
+          f.writes.map((write) => write.version),
+          Array.from({ length: 49 }, (_, index) => index + 1),
+        );
+        assert(f.writes.every((write) => write.action === 'add'));
+        assert.equal(f.jobs.length, 0);
+        assert.deepEqual(f.errors, []);
+      } finally {
+        await f.close();
+      }
+    },
+  );
 
 test(
   'large festival catalogs support artist and stage filtering with bounded pages',

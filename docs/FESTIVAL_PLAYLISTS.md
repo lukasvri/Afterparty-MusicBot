@@ -1,6 +1,6 @@
 # Festival concert playlists
 
-The library contains **290 source-backed recordings across five event families
+The source candidate contains **863 source-backed recordings across five event families
 and 17 event/year groups**. Open **Library & playlists**, choose **Festival
 concerts**, then select the festival and performance year. Search by artist,
 recording title or stage, and browse 20 sets per page. Every indexed set remains
@@ -10,7 +10,7 @@ reachable; the page limit is not an inventory limit.
 performance years, attribution and evidence. This document records source
 coverage instead of duplicating the full recording inventory.
 
-## Source coverage checked on 25 October 2026
+## Source coverage checked on 25 and 31 October 2026
 
 | Festival | Year | Catalog recordings | Coverage |
 | --- | --- | ---: | --- |
@@ -18,11 +18,11 @@ coverage instead of duplicating the full recording inventory.
 | EDC Las Vegas | 2025 | 86 | All 86 video links in the [official source index](https://lasvegas.edc.com/2025-sets/) |
 | EDC Las Vegas | 2023 | 26 | All 26 embedded videos in the [official source index](https://lasvegas.edc.com/2023-sets/) |
 | Creamfields | 2024 | 24 | All 23 matching-year videos in the [24-entry official index](https://creamfields.com/2024_live/all-streams/), plus the official Beatport CAMELPHAT upload |
-| Tomorrowland Belgium | 2026 | 21 | Curated selection; source playlist contents not enumerated |
-| Tomorrowland Belgium | 2025 | 1 | Curated selection; source playlist contents not enumerated |
-| Tomorrowland Belgium | 2024 | 2 | Curated selection; source playlist contents not enumerated |
-| Tomorrowland Belgium | 2023 | 3 | Curated selection; source playlist contents not enumerated |
-| Tomorrowland Belgium | 2022 | 1 | Curated selection; source playlist contents not enumerated |
+| Tomorrowland Belgium | 2026 | 137 | All 134 named source entries plus three existing uploads outside the playlist |
+| Tomorrowland Belgium | 2025 | 109 | All 108 named source entries plus one existing upload; one unresolved source entry omitted |
+| Tomorrowland Belgium | 2024 | 124 | All 123 unique named source entries plus one existing upload; 17 duplicate occurrences deduplicated and three unresolved entries omitted |
+| Tomorrowland Belgium | 2023 | 97 | All 96 named source entries plus one existing upload; three unresolved entries omitted |
+| Tomorrowland Belgium | 2022 | 134 | All 133 named source entries plus one existing upload; ten unresolved entries omitted |
 | Ultra Miami | 2026 | 2 | Curated selection; full official inventory not enumerated |
 | Ultra Miami | 2025 | 2 | Curated selection; full official inventory not enumerated |
 | Ultra Miami | 2024 | 1 | Curated selection; full official inventory not enumerated |
@@ -39,12 +39,21 @@ records identify the festival that links the recording, without inventing the
 YouTube uploader's identity. Distinct performances are retained; repeated links
 to the same recording are deduplicated within an event/year.
 
+The [31 October Tomorrowland audit](FESTIVAL_SOURCE_AUDIT_20261031.md) independently
+enumerates all five publisher playlists: 628 returned entries, including 17
+duplicate occurrences and 17 entries without title/duration. The 594 unique named
+recordings all identify the matching performance year. Existing curated entries
+take precedence, including seven recordings outside those lists. All 290 earlier
+catalog records and their evidence remain unchanged; 573 recordings are added.
+Missing metadata leaves current availability unresolved. Playback,
+embedding and territory remain runtime checks, not claims from the playlist.
+
 Creamfields' [Eli Brown 2024 page](https://creamfields.com/2024_live/friday/steel-yard/eli-brown/)
 embeds [a recording identifying 2023](https://www.youtube.com/watch?v=Bz3StgzmGos).
 It is excluded from the 2024 inventory. The additional
 [CAMELPHAT recording](https://www.youtube.com/watch?v=bVF_7IiTAsI) is published by
 Beatport and describes its Creamfields 2024 Steel Yard performance. Source-count
-and sorted-video-ID digest tests protect all four enumerated indexes against
+and sorted-video-ID digest tests protect the nine enumerated snapshots against
 accidental lost, replaced or misplaced links.
 
 ## Browse the larger Tomorrowland source playlists
@@ -56,17 +65,17 @@ Choose available entries explicitly after the preview completes.
 
 | Year | Playlist reference | Discovery evidence |
 | --- | --- | --- |
-| 2026 | [Supplied playlist](https://www.youtube.com/playlist?list=PLeeZgE3_zp1w) | Owner-supplied URL; matching playlist title exposed by YouTube |
-| 2025 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoN-uoi-Bn6R4JA8C4beRJsU) | [EDM Identity's embedded reference](https://edmidentity.com/2025/07/31/tomorrowland-2025-livesets/), matching YouTube title |
-| 2024 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoO6Y2EaUcVcBXQm7pkkY0n3) | [EDMTunes' playlist reference](https://www.edmtunes.com/2024/07/tomorrowland-over-100-liveset-videos-youtube/), matching YouTube title |
-| 2023 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoOZSSYZtdmZzagDK9kNfUsu) | [Guettapen's embedded reference](https://www.guettapen.com/2023/07/31/tomorrowland-publie-45-sets-de-son-edition-2023-sur-sa-chaine-youtube/) |
+| 2026 | [Liveset playlist](https://www.youtube.com/playlist?list=PLeeZgE3_zp1w) | 134 returned entries; Tomorrowland channel metadata and matching edition title |
+| 2025 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoN-uoi-Bn6R4JA8C4beRJsU) | 109 returned entries; Tomorrowland channel metadata and matching edition title |
+| 2024 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoO6Y2EaUcVcBXQm7pkkY0n3) | 143 returned entries; Tomorrowland channel metadata and matching edition title |
+| 2023 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoOZSSYZtdmZzagDK9kNfUsu) | 99 returned entries; Tomorrowland channel metadata and matching edition title |
 | 2022 | [Liveset playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoNFQ1nzaPy90MAt94vqJDb4) | [Official Tomorrowland press announcement](https://press.belgium.tomorrowland.com/tomorrowland-2022-full-sets-now-available), whose Livesets link resolves to this matching-year playlist |
 
-These references do not establish every playlist entry, ownership, total count,
-recording eligibility or continued availability. The source reader exposed titles
-or embed URLs, not complete contents. The importer requests up to 500 entries
-through bounded pagination, shows 20 per page and labels partial results. It does
-not silently promote imported entries into the curated catalog.
+The linked audit records title, publisher, entry counts and the returned ID
+inventory as captured on 31 October. These bounded snapshots do not establish
+every performance or continued availability. The importer still requests up to
+500 fresh entries through bounded pagination, shows 20 per page and labels
+partial results. It does not silently promote new imports into the catalog.
 
 ## Queue and playback behavior
 
@@ -89,13 +98,13 @@ The game pack remains separate: see [private quiz setup](GUESS_CATALOG_SOURCES.m
 
 ## Remaining inventory work
 
-The 13 non-indexed groups above remain incomplete as festival archives. Ultra's
-[current official live-set page](https://ultramusicfestival.com/live-sets) exposes
-artist cards through the available reader, but did not provide the complete
-canonical recording links and historical-year mapping needed for an inventory.
-Discovered third-party playlists and an unverified 2026 playlist reference are
-not treated as an official full archive. Tomorrowland playlist contents still
-need enumeration and comparison against individually eligible recordings.
+Eight groups above still lack an enumerated official source inventory. Ultra's
+[official live-set page](https://ultramusicfestival.com/live-sets) remains a source
+to reconcile with complete recording links and performance-year mapping for the
+existing 2019/2023/2024/2025/2026 groups. Tomorrowland now has enumerated
+playlist snapshots, with 17 unresolved entries retained as explicit omissions.
+These lists are not evidence of all performances or all separate official
+uploads; the seven existing outside-playlist recordings illustrate that limit.
 Amsterdam RAI has verified named full shows, without a complete archive of every
 performer or separate all-ages performance.
 
