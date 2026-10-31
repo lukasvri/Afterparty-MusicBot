@@ -3,6 +3,8 @@
 import assert from 'node:assert/strict';
 import { createServer, request as httpRequest, type ServerResponse } from 'node:http';
 import { test } from 'node:test';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import type { Room, Video } from '../../../lib/types.ts';
 
@@ -217,10 +219,10 @@ async function liveFixture() {
       }
       held.clear();
     },
-    advance(id: string, title: string, nextPlaying: boolean) {
+    advance(id: string, title: string, nextPlaying: boolean, nextPosition = 12) {
       version++;
       current = track(id, title);
-      position = 12;
+      position = nextPosition;
       playing = nextPlaying;
       updatedAt = Date.now();
       send();
@@ -249,10 +251,19 @@ async function liveFixture() {
   };
 }
 
-async function prepare(context: BrowserContext, owner: boolean, origin: string) {
+async function prepare(context: BrowserContext, owner: boolean, origin: string, clock = false) {
   const errors: string[] = [];
   const page = await context.newPage();
+  if (clock) {
+    page.setDefaultTimeout(6000);
+    page.setDefaultNavigationTimeout(10000);
+    await page.clock.install({ time: Date.now() });
+  }
   page.on('pageerror', (error) => errors.push(error.message));
+  if (clock)
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
   await page.route('**/*', (route) =>
     new URL(route.request().url()).origin === origin ? route.continue() : route.abort(),
   );
@@ -427,6 +438,118 @@ async function played(page: Page, id: string) {
     });
   }
 }
+
+for (const width of [3840, 2560, 1920, 390])
+  test(
+    `a ${width}px native room retires a discontinuous clock and reconciles current playback and roles`,
+    { timeout: 30000 },
+    async () => {
+      const fixture = await liveFixture();
+      let stage = 'launch',
+        browserErrors: string[] = [],
+        inspected: Page | undefined;
+      const browser = await chromium
+        .launch({
+          headless: true,
+          executablePath: process.env.CHROMIUM_PATH,
+          args: ['--no-sandbox'],
+        })
+        .catch(async (error) => {
+          await fixture.close();
+          throw error;
+        });
+      try {
+        stage = 'prepare';
+        const host = await prepare(
+          await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1080 } }),
+          true,
+          fixture.origin,
+          true,
+        );
+        inspected = host.page;
+        browserErrors = host.errors;
+        stage = 'initial calibration';
+        await waitFor(
+          () => fixture.streams === 1 && fixture.clockReads >= 1,
+          'initial browser stream is calibrated',
+        );
+        fixture.advance('stream00002', 'Playing before the clock gap', true);
+        stage = 'initial playback';
+        await played(host.page, 'stream00002');
+        fixture.hold();
+        // Only Date moves. The browser's monotonic clock and timers keep running.
+        // This is a clock-discontinuity fixture, not an operating-system sleep test.
+        await host.page.clock.setSystemTime(Date.now() + 60000);
+        stage = 'clock-gap pause';
+        await host.page.getByText('Reconnecting…', { exact: true }).waitFor();
+        await host.page.waitForFunction(
+          () =>
+            (window as unknown as { __streamPlayer: { state: number } }).__streamPlayer.state === 2,
+        );
+        await waitFor(
+          () => fixture.heldReads >= 1,
+          'wake recovery requires fresh authenticated authority',
+        );
+        assert.equal(
+          await host.page.getByRole('button', { name: 'Next track' }).isDisabled(),
+          true,
+        );
+        const resume = width === 1920;
+        if (!resume) fixture.revokeOwner();
+        const title = resume ? 'Playing before the clock gap' : 'Paused while recovering';
+        const id = resume ? 'stream00002' : 'stream00003';
+        fixture.advance(id, title, resume, resume ? 72 : 12);
+        fixture.release();
+        stage = 'fresh authenticated recovery';
+        await host.page.getByText('Connected', { exact: true }).waitFor();
+        await host.page.getByRole('heading', { name: title, exact: true }).waitFor();
+        stage = 'fresh player intent';
+        if (resume) {
+          await played(host.page, id);
+          await host.page.waitForFunction(() => {
+            const player = (window as unknown as { __streamPlayer: { position: number } })
+              .__streamPlayer;
+            return player.position >= 72 && player.position < 82;
+          });
+        } else
+          await host.page
+            .locator('.player-status')
+            .filter({ hasText: 'Shared playback is paused' })
+            .waitFor();
+        assert.equal(
+          await host.page.getByRole('button', { name: 'Next track' }).isDisabled(),
+          !resume,
+        );
+        assert(fixture.clockReads >= 2, 'fresh clock calibration follows the recovery read');
+        assert.equal(fixture.writes.length, 0, 'recovery never replays a transport command');
+        assert.deepEqual(host.errors, []);
+        assert.deepEqual(fixture.errors, []);
+        if (process.env.WAKE_SCREENSHOT_DIR) {
+          await mkdir(process.env.WAKE_SCREENSHOT_DIR, { recursive: true });
+          await host.page.screenshot({
+            path: join(process.env.WAKE_SCREENSHOT_DIR, `wake-${width}.png`),
+            fullPage: true,
+          });
+        }
+      } catch (error) {
+        const state = inspected
+          ? await inspected.evaluate(() => ({
+              text: document.body.innerText,
+              calls: (window as unknown as { __streamAudioCalls: string[] }).__streamAudioCalls,
+            }))
+          : null;
+        throw new Error(
+          `Clock-gap browser fixture failed at ${stage}: ${JSON.stringify({ state, browserErrors })}`,
+          {
+            cause: error,
+          },
+        );
+      } finally {
+        await browser.close();
+        await fixture.close();
+      }
+    },
+  );
 
 test(
   'native browser SSE synchronizes two clients, preserves roles and stops expired audio without replay',
