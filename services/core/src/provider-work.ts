@@ -3,22 +3,21 @@ import { UserError } from "./types.ts";
 // Leave time for the website's 25s Core transport and 35s browser request.
 export const CORE_SEARCH_DEADLINE_MS = 24000;
 export const CORE_SEARCH_RESULTS_MS = 22000;
-export const MUSIC_REQUEST_DEADLINE_MS = 30000;
 const cancelled = () => new UserError("The request was cancelled.", 499);
 
-/** One bounded provider job, with independently cancellable subscribers. */
+/** One provider job, with independently cancellable subscribers and an optional shared deadline. */
 export class ProviderWork<T> {
   private readonly controller = new AbortController();
   readonly signal = this.controller.signal;
   private subscribers = 0;
   private finished = false;
-  private timer: ReturnType<typeof setTimeout>;
+  private timer: ReturnType<typeof setTimeout> | undefined;
   private resolveResult!: (value: T) => void;
   private rejectResult!: (error: unknown) => void;
   private readonly result: Promise<T>;
   private readonly released: () => void;
 
-  constructor(milliseconds: number, released: () => void) {
+  constructor(milliseconds: number | null, released: () => void) {
     this.released = released;
     this.result = new Promise<T>((resolve, reject) => {
       this.resolveResult = resolve;
@@ -26,7 +25,7 @@ export class ProviderWork<T> {
     });
     // Reservations can be retired before their first subscriber attaches.
     void this.result.catch(() => {});
-    this.timer = setTimeout(() => this.reject(
+    this.timer = milliseconds === null ? undefined : setTimeout(() => this.reject(
       new UserError("The music source took too long. Try again shortly.", 504),
     ), milliseconds);
   }

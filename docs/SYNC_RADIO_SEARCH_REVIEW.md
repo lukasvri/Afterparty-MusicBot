@@ -114,6 +114,15 @@ metadata IDs retain batching and per-ID ownership, so a surviving lookup can
 finish even if another search expires. A disconnected catalog HTTP response
 releases its subscription. Admission/playback priority and radio policy remain.
 
+Shared metadata reservations do not impose the search deadline on queued
+playlist records. Search subscribers retain their 22/24-second budgets, while
+playlist imports retain their existing 180-second job deadline and pass its
+cancellation through metadata hydration. API/extractor execution and admission
+keep their own bounds. Cancelling an import retires only its subscribers;
+another caller's shared recording can still complete. Two queued 20-second
+fallback waves retain all six eligible recordings instead of skipping the
+second wave at 30 seconds.
+
 The first proposed 20-second all-or-nothing deadline failed two real 30-result
 cold searches in isolated Latitude staging. Five-result controls succeeded before
 and after the source change, identifying serial metadata hydration of the larger

@@ -22,7 +22,7 @@ import { selectRadio } from "./radio-pipeline.ts";
 import { favoriteRecording } from "./recommendation-ranking.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
-import { ProviderWork, CORE_SEARCH_DEADLINE_MS, CORE_SEARCH_RESULTS_MS, MUSIC_REQUEST_DEADLINE_MS } from "./provider-work.ts";
+import { ProviderWork, CORE_SEARCH_DEADLINE_MS, CORE_SEARCH_RESULTS_MS } from "./provider-work.ts";
 function extractedCatalogArtist(media: ExtractedMedia) {
   const original = media.artist ?? media.uploader ?? "YouTube";
   const artists = media.artists;
@@ -201,7 +201,9 @@ export class Providers {
             pending.push([id, Promise.reject(new UserError("The music source is busy. Try again shortly.", 503))]);
             continue;
           }
-          const shared = new ProviderWork<Track | undefined>(MUSIC_REQUEST_DEADLINE_MS, () => {
+          // Search/import subscribers own their deadlines. Metadata queued
+          // inside a batch must retain the adapter's per-execution budget.
+          const shared = new ProviderWork<Track | undefined>(null, () => {
             if (this.videoLookups.get(id) === shared) this.videoLookups.delete(id);
           });
           owned.set(id, shared);
@@ -475,7 +477,7 @@ export class Providers {
     for (let index = 0; index < ids.length; index += 50) {
       signal.throwIfAborted();
       const batch = ids.slice(index, index + 50), requested = new Set(batch);
-      const tracks = await this.video(batch, true);
+      const tracks = await this.video(batch, true, signal);
       signal.throwIfAborted();
       for (const track of tracks) if (validSearchTrack(track) && requested.has(track.id) && track.embeddable &&
         (track.source === undefined || track.source === "youtube") && !found.has(track.id)) found.set(track.id, copySearchTrack(track));
