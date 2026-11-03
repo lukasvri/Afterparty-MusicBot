@@ -108,6 +108,7 @@ async function fixture(
     scheduledSeek?: boolean;
     empty?: boolean;
     paused?: boolean;
+    stallFirstPlayer?: boolean;
   } = {},
 ) {
   const { host = true, initial = false, manualSampling = false, scheduledSeek = false } = options;
@@ -155,7 +156,7 @@ async function fixture(
   });
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(
-    ({ code, token, visitor, initial, host, manualSampling }) => {
+    ({ code, token, visitor, initial, host, manualSampling, stallFirstPlayer }) => {
       if (window !== window.top) return;
       localStorage.setItem('afterparty-visitor', visitor);
       if (initial && host) localStorage.setItem(`afterparty-host:${code}`, token);
@@ -163,6 +164,16 @@ async function fixture(
       // No provider requests or media are used.
       const calls: { action: string; position?: number; videoId?: string; at?: number }[] = [];
       (window as unknown as { __audioCalls: typeof calls }).__audioCalls = calls;
+      if (stallFirstPlayer) {
+        const timeout = window.setTimeout.bind(window);
+        let expire: (() => void) | undefined;
+        window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+          if (delay === 12000 && typeof handler === 'function') expire = () => handler(...args);
+          return timeout(handler, delay, ...args);
+        }) as typeof window.setTimeout;
+        (window as unknown as { expirePlayerStartup: () => void }).expirePlayerStartup = () =>
+          expire?.();
+      }
       if (manualSampling) {
         const interval = window.setInterval.bind(window),
           ticks: (() => void)[] = [];
@@ -251,7 +262,13 @@ async function fixture(
             // Retain the callback after destroy to model a delayed iframe event.
             (window as unknown as { __emitLastPlayerEnded: () => void }).__emitLastPlayerEnded =
               () => events.onStateChange?.({ data: 0 });
-            setTimeout(() => events.onReady(), 0);
+            if (
+              stallFirstPlayer &&
+              calls.filter((call) => call.action === 'construct').length === 1
+            )
+              (window as unknown as { releaseStalledPlayer: () => void }).releaseStalledPlayer =
+                () => events.onReady();
+            else setTimeout(() => events.onReady(), 0);
           }
           loadVideoById(value: { videoId: string; startSeconds: number }) {
             this.videoId = value.videoId;
@@ -323,7 +340,15 @@ async function fixture(
         },
       };
     },
-    { code, token, visitor, initial, host, manualSampling },
+    {
+      code,
+      token,
+      visitor,
+      initial,
+      host,
+      manualSampling,
+      stallFirstPlayer: options.stallFirstPlayer,
+    },
   );
   await page.route('**/*', async (route) => {
     const request = route.request(),
@@ -578,6 +603,65 @@ test('blocked automatic room playback offers a local audio retry without sending
     await f.close();
   }
 });
+
+for (const paused of [false, true]) {
+  test(`a player that never becomes ready times out and recovers only after explicit retry (paused: ${paused})`, async (t) => {
+    const f = await fixture(t, 390, { initial: true, stallFirstPlayer: true, paused });
+    try {
+      const { page } = f;
+      await page.locator('.audio-stage iframe').waitFor();
+      await page.getByText('Room settings', { exact: true }).click();
+      const retry = page.getByRole('button', { name: 'Reload video', exact: true });
+      assert.equal(await retry.isEnabled(), false);
+      await page.evaluate(() =>
+        (window as unknown as { expirePlayerStartup: () => void }).expirePlayerStartup(),
+      );
+      assert.equal(
+        await retry.isEnabled(),
+        true,
+        'missing iframe readiness must not disable retry forever',
+      );
+      await page.evaluate(() =>
+        (window as unknown as { releaseStalledPlayer: () => void }).releaseStalledPlayer(),
+      );
+      assert.deepEqual(
+        await page.evaluate(() =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls.map(
+            (call) => call.action,
+          ),
+        ),
+        ['construct', 'destroy'],
+        'timeout retires the old player and late readiness cannot start it',
+      );
+      assert.match(
+        await page.locator('.player-status').innerText(),
+        /The video player is unavailable/,
+      );
+      await retry.click();
+      await videoReady(page);
+      const status = paused ? 'Shared playback is paused' : 'Following the shared clock';
+      await page.locator('.player-status').filter({ hasText: status }).waitFor();
+      await page.evaluate(() =>
+        (window as unknown as { expirePlayerStartup: () => void }).expirePlayerStartup(),
+      );
+      assert.match(await page.locator('.player-status').innerText(), new RegExp(status));
+      assert.deepEqual(
+        await page.evaluate(() =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
+            .filter((call) => ['load', 'cue'].includes(call.action))
+            .map((call) => call.action),
+        ),
+        [paused ? 'cue' : 'load'],
+        'retry follows current shared pause intent without a stale deadline destroying the new player',
+      );
+      assert.deepEqual(f.writes, [], 'player recovery never changes shared playback');
+      assert.deepEqual(f.external, []);
+      assert.deepEqual(f.errors, []);
+    } finally {
+      await f.close();
+    }
+  });
+}
 
 test('an explicit open-rooms bookmark stays in the directory after its saved room reconnects', async (t) => {
   const f = await fixture(t, 390, { initial: true });
