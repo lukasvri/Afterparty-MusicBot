@@ -485,6 +485,14 @@
         message = 'Shared playback has not caught up. Try Sync now in playback settings.';
       }
       confirmedSeek = confirmed && nativePending.intent.action === 'seek';
+      if (confirmedSeek && !superseded && nativePending.source === source) {
+        // Our confirmed seek can replace the clock instance for this recording.
+        // Keep newer gestures waiting behind it scoped to that accepted timeline.
+        const previousIdentity = nativePending.identity;
+        queuedNative = queuedNative.map((item) =>
+          item.identity === previousIdentity ? { ...item, identity: key } : item,
+        );
+      }
       nativePending = null;
       if (confirmedSeek) {
         correction.reset();
