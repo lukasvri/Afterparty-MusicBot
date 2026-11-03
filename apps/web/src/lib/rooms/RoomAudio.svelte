@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onDestroy, onMount, tick as afterRender, type Snippet } from 'svelte';
-  import { loadYoutube, type Player, type PlayerEvent } from '../../../../../lib/youtube-player.ts';
+  import {
+    loadYoutube,
+    YOUTUBE_READY_TIMEOUT_MS,
+    type Player,
+    type PlayerEvent,
+  } from '../../../../../lib/youtube-player.ts';
   import {
     calibratedPlaybackPosition,
     sharedSeekPosition,
@@ -204,6 +209,11 @@
     correctedAt = -Infinity,
     settleUntil = 0,
     generation = 0;
+  let startupTimer: ReturnType<typeof setTimeout> | undefined;
+  function clearStartupTimer() {
+    clearTimeout(startupTimer);
+    startupTimer = undefined;
+  }
   const native = createPlayerIntent();
   const correction = createPlaybackCorrection();
   let localPaused = $state(false);
@@ -586,6 +596,22 @@
     if (loading) return;
     loading = true;
     const current = ++generation;
+    startupTimer = setTimeout(() => {
+      if (disposed || current !== generation || ready) return;
+      clearStartupTimer();
+      generation++;
+      loading = false;
+      const previous = player;
+      player = null;
+      try {
+        previous?.destroy();
+      } catch {
+        /* Replacing the mount also retires an unresponsive iframe. */
+      }
+      playerEpoch++;
+      onPlaybackError?.(true);
+      message = 'The video player did not respond. Enable audio to try again.';
+    }, YOUTUBE_READY_TIMEOUT_MS);
     resetPlayerError();
     onPlaybackError?.(false);
     try {
@@ -599,6 +625,7 @@
         events: {
           onReady: () => {
             if (!disposed && current === generation) {
+              clearStartupTimer();
               ready = true;
               loading = false;
               sync(true);
@@ -610,6 +637,7 @@
           },
           onError: (event: PlayerEvent) => {
             if (disposed || current !== generation) return;
+            clearStartupTimer();
             loading = false;
             failedSource = identity();
             nativePending = null;
@@ -677,6 +705,7 @@
       });
     } catch {
       if (!disposed && current === generation) {
+        clearStartupTimer();
         onPlaybackError?.(true);
         message = 'The audio source could not load. Check your connection and try again.';
         loading = false;
@@ -689,6 +718,7 @@
   }
   async function reload() {
     if (!enabled || loading || disposed) return;
+    clearStartupTimer();
     generation++;
     ready = false;
     const previous = player;
@@ -739,6 +769,7 @@
   });
   onDestroy(() => {
     disposed = true;
+    clearStartupTimer();
     onPlaybackError?.(false);
     generation++;
     try {

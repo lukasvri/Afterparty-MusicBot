@@ -29,6 +29,7 @@ declare global {
   }
 }
 let youtubeReady: Promise<void> | undefined;
+export const YOUTUBE_READY_TIMEOUT_MS = 12000;
 export function loadYoutube() {
   if (window.YT?.Player) return Promise.resolve();
   return (youtubeReady ??= new Promise<void>((resolve, reject) => {
@@ -50,7 +51,7 @@ export function loadYoutube() {
     };
     const timeout = setTimeout(
         () => finish(new Error("YouTube svarer ikke. Last videoen på nytt.")),
-        12000,
+        YOUTUBE_READY_TIMEOUT_MS,
       ),
       check = setInterval(() => {
         if (window.YT?.Player) finish();
