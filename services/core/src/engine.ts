@@ -335,12 +335,23 @@ export class Engine extends EventEmitter {
     track: Track,
     offset: number,
     signal: AbortSignal,
+    onTiming?: (reason: "source-ready" | "decoder-ready", durationMs: number) => void,
   ): Promise<Prepared> {
+    const startedAt = performance.now();
     const source = await this.providers.stream(track, signal);
     if (signal.aborted) throw new Error("Playback cancelled.");
+    onTiming?.("source-ready", performance.now() - startedAt);
     return {
       track: { ...track, duration: source.duration || track.duration },
-      decoder: new PcmDecoder(source, offset, signal),
+      decoder: new PcmDecoder(
+        source,
+        offset,
+        signal,
+        undefined,
+        onTiming ? (durationMs) => {
+          if (!signal.aborted) onTiming("decoder-ready", durationMs);
+        } : undefined,
+      ),
     };
   }
   /** Select one track early; decoding still starts near the end of the current song. */
@@ -478,7 +489,12 @@ export class Engine extends EventEmitter {
     this.checkpoint();
     this.changed();
     try {
-      const prepared = await this.prepare(track, offset, signal);
+      const prepared = await this.prepare(track, offset, signal, (reason, durationMs) => {
+        // Only current playback reports startup phases. Background prefetch and
+        // stale/cancelled preparations must not contaminate this diagnostic.
+        if (generation === this.generation && !signal.aborted)
+          this.diagnostics.note(reason, durationMs);
+      });
       if (generation !== this.generation) {
         prepared.decoder.stop();
         return;

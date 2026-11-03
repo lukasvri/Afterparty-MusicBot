@@ -1,6 +1,8 @@
 export type AudioReason =
   | "buffer-start"
   | "buffer-end"
+  | "source-ready"
+  | "decoder-ready"
   | "decoder-failure"
   | "encoder-failure"
   | "stream-stall"
