@@ -35,6 +35,8 @@ export function ffmpegReason(chunk: Buffer | string) {
         : "unknown";
 }
 export class PcmDecoder {
+  private startedAt = performance.now();
+  private onFirstFrame: ((durationMs: number) => void) | undefined;
   stderrReason = "unknown";
   child: ChildProcessWithoutNullStreams;
   ended = false;
@@ -48,7 +50,9 @@ export class PcmDecoder {
     offset: number,
     signal: AbortSignal,
     ffmpeg = process.env.FFMPEG_PATH ?? "ffmpeg",
+    onFirstFrame?: (durationMs: number) => void,
   ) {
+    this.onFirstFrame = onFirstFrame;
     const args = [
       "-hide_banner",
       "-loglevel",
@@ -138,10 +142,16 @@ export class PcmDecoder {
     if (!this.pending.length) return null;
     const frame = this.pending.subarray(0, FRAME_BYTES);
     this.pending = this.pending.subarray(FRAME_BYTES);
+    // Observe the normal decoder read without adding another reader or changing
+    // stream flow. Later frames and retired decoders cannot repeat readiness.
+    const ready = this.onFirstFrame;
+    this.onFirstFrame = undefined;
+    if (!this.disposed) ready?.(performance.now() - this.startedAt);
     return frame.length === FRAME_BYTES ? frame : pad(frame);
   }
   stop() {
     this.disposed = true;
+    this.onFirstFrame = undefined;
     this.child.stdout.destroy();
     this.child.kill("SIGKILL");
   }

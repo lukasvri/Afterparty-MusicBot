@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,dirname} from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {Store} from '../src/store.ts';
 import {Engine,positionFromSegments} from '../src/engine.ts';
 import {Commands} from '../src/commands.ts';
@@ -55,6 +56,77 @@ test('PCM fast paths preserve samples and never change the input during gain or 
  }
 });
 function setup(){const dir=mkdtempSync(join(tmpdir(),'gutta-core-')),store=new Store(join(dir,'db.sqlite')),providers=new Providers(store,{}),sink=new FakeSink(),engine=new Engine(store,providers,sink);return {store,providers,sink,engine,close:()=>{engine.close();store.close();rmSync(dir,{recursive:true,force:true});}};}
+
+test('playback preparation separates source resolution from the first decoded PCM frame',async context=>{
+ const t=setup(),controller=new AbortController(),gate=deferred<{url:string;headers:string;duration:number}>();
+ let decoder:PcmDecoder|undefined,now=100;
+ const phases:{reason:string;durationMs:number}[]=[];
+ clearInterval(t.engine.timer);
+ try{
+  const source=join(dirname(String(t.store.db.prepare('PRAGMA database_list').get()!.file)),'startup.wav');
+  const created=spawnSync(process.env.FFMPEG_PATH??'ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=0.1','-ac','2','-y',source]);
+  assert.equal(created.status,0,String(created.stderr));
+  context.mock.method(performance,'now',()=>now);
+  t.providers.stream=()=>gate.promise;
+  const preparing=t.engine.prepare(track(),0,controller.signal,(reason,durationMs)=>phases.push({reason,durationMs}));
+  assert.deepEqual(phases,[],'no timing completes while source resolution is held');
+  now=700;gate.resolve({url:source,headers:'',duration:200});
+  decoder=(await preparing).decoder;
+  assert.deepEqual(phases,[{reason:'source-ready',durationMs:600}],'source timing ends before decoding begins');
+  now=1100;assert.equal((await decoder.frame())?.length,FRAME_BYTES);
+  assert.deepEqual(phases,[{reason:'source-ready',durationMs:600},{reason:'decoder-ready',durationMs:400}]);
+  now=1500;await decoder.frame();
+  assert.equal(phases.length,2,'later frames never repeat the startup timing');
+ }finally{decoder?.stop();controller.abort();await decoder?.closed;t.close();}
+});
+
+test('current playback timings ignore retired source generations',async()=>{
+ const t=setup(),gate=deferred<Prepared>();
+ let report:((reason:'source-ready'|'decoder-ready',durationMs:number)=>void)|undefined,stopped=0;
+ let starting:Promise<void>|undefined;
+ clearInterval(t.engine.timer);
+ try{
+  t.engine.prepare=async(_track,_offset,_signal,onTiming)=>{report=onTiming;return gate.promise;};
+  starting=t.engine.startTrack(track());
+  assert.equal(typeof report,'function','current playback wires phase timing into preparation');
+  report!('source-ready',123);
+  t.engine.stop(false);
+  report!('decoder-ready',456);
+  gate.resolve({track:track(),decoder:{stop(){stopped++;}} as PcmDecoder});await starting;
+  assert.deepEqual(t.engine.diagnostics.snapshot().events.map(({reason,durationMs})=>({reason,durationMs})),[{reason:'source-ready',durationMs:123}]);
+  assert.equal(stopped,1,'retired prepared audio is still disposed');
+ }finally{t.engine.stop(false);gate.resolve({track:track(),decoder:{stop(){}} as PcmDecoder});await starting;t.close();}
+});
+
+test('cancelled or failed source resolution cannot report successful startup timings',async()=>{
+ for(const fail of [false,true]){
+  const t=setup(),controller=new AbortController(),gate=deferred<{url:string;headers:string;duration:number}>(),phases:unknown[]=[];
+  clearInterval(t.engine.timer);
+  try{
+   t.providers.stream=()=>gate.promise;
+   const preparing=t.engine.prepare(track(),0,controller.signal,(...phase)=>phases.push(phase));
+   const rejected=assert.rejects(preparing,fail?/synthetic source failure/:/Playback cancelled/);
+   if(fail)gate.reject(new Error('synthetic source failure'));
+   else{controller.abort();gate.resolve({url:'https://private.invalid/?token=synthetic',headers:'Authorization: synthetic\r\n',duration:200});}
+   await rejected;assert.deepEqual(phases,[]);
+  }finally{controller.abort();t.close();}
+ }
+});
+
+test('a failed decoder reports source timing without a false PCM-ready event or private source data',async()=>{
+ const t=setup(),controller=new AbortController(),phases:{reason:string;durationMs:number}[]=[];
+ let decoder:PcmDecoder|undefined;
+ clearInterval(t.engine.timer);
+ try{
+  const source=join(dirname(String(t.store.db.prepare('PRAGMA database_list').get()!.file)),'private-synthetic-missing.wav');
+  t.providers.stream=async()=>({url:source,headers:'',duration:200});
+  decoder=(await t.engine.prepare(track(),0,controller.signal,(reason,durationMs)=>phases.push({reason,durationMs}))).decoder;
+  await assert.rejects(decoder.frame(),/Audio decoding stopped/);
+  assert.deepEqual(phases.map(phase=>phase.reason),['source-ready']);
+  assert(phases.every(phase=>Number.isFinite(phase.durationMs)&&phase.durationMs>=0));
+  assert.equal(JSON.stringify(phases).includes('private-synthetic'),false);
+ }finally{decoder?.stop();controller.abort();await decoder?.closed;t.close();}
+});
 test('media clock uses consumed audio, including incoming crossfade offset',()=>{const segments=[{track:track(),startFrame:0,offset:10},{track:track('bcdefghijkl'),startFrame:500,offset:0}];assert.equal(positionFromSegments(segments,9000).position,19);assert.equal(positionFromSegments(segments,10000).track?.id,'bcdefghijkl');assert.equal(positionFromSegments(segments,13000).position,3);});
 test('public state excludes requester identity and private fields',()=>{const t=setup();try{t.engine.current={...track(),requestedBy:'private-member-id'};t.engine.queue=[{...track('bcdefghijkl'),requestedBy:'private-member-id'}];const text=JSON.stringify(t.engine.snapshot());assert(!text.includes('private-member-id'));assert(!text.includes('requestedBy'));}finally{t.close();}});
 test('history records actual consumed audio once, not a cue or a retry',()=>{const t=setup();try{t.engine.connected=true;t.engine.current={...track(),concert:true};t.engine.segments=[{track:t.engine.current,startFrame:0,offset:0}];t.engine.tick();assert.equal(t.store.history().length,0);t.sink.ms=20;t.engine.tick();t.engine.tick();assert.equal(t.store.history().length,1);t.engine.pause();t.engine.resume();t.engine.tick();assert.equal(t.store.history().length,1);}finally{t.close();}});

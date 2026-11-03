@@ -1,6 +1,6 @@
-# Optional browser errors and unit coverage
+# Diagnostics, browser errors and unit coverage
 
-These integrations are source configuration, not proof of an activated account,
+The optional integrations are source configuration, not proof of an activated account,
 working upload, deployed DSN or production event. Keep paid usage and automatic
 billing disabled in both providers. A client-side sampler cannot enforce an
 account-wide spending limit.
@@ -114,6 +114,32 @@ network traffic without a DSN and inspect an explicitly approved synthetic error
 through the sanitized transport before enabling a real DSN. Confirm zero-overage
 account settings and actual Codecov OIDC/report acceptance separately. Never use
 live Discord, private rooms or real user data as a test event.
+
+## Core playback startup phases
+
+The existing scoped admin response includes `audio.events`, a local ring of at
+most 50 fixed reason codes, timestamps and rounded durations. Current playback
+startup and seeking add two phase events. Background next-track preparation
+does not emit them; cancelled or replaced generations cannot report late phases.
+
+| Reason | Measured interval |
+| --- | --- |
+| `source-ready` | Current preparation through validated provider stream resolution, including extractor admission and extraction |
+| `decoder-ready` | PCM decoder construction through its first returned audio frame, including process startup, source opening, seeking and decoding |
+
+These durations use monotonic time and do not change the playback clock, PCM
+reader, frame flow, extraction or command ordering. A failed source has no ready
+event. Decoder failure can leave a source event without a decoder event. A later
+cancellation can likewise retire an unfinished phase, so do not infer a matching
+pair from nearby timestamps alone.
+
+Use the phases together with the existing `buffer-start`/`buffer-end` events in
+an authorized isolated test. First PCM readiness does not establish Opus packet
+delivery, browser responsiveness or audible voice-channel output. These timings
+do not by themselves establish the cause of a reported wait or improve latency.
+No source URL, headers, provider stderr, track or member identifiers are added.
+No external telemetry or new endpoint is introduced. Deployment and real-provider
+measurement remain separate from source validation.
 
 References: [Sentry v11 migration and data collection](https://github.com/getsentry/sentry-javascript/blob/develop/MIGRATION.md),
 [Codecov Action OIDC](https://github.com/codecov/codecov-action#using-oidc),
