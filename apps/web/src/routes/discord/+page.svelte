@@ -70,9 +70,8 @@
       view.audioRoom.current.source !== 'soundcloud',
     ),
   );
-  const controlsDisabled = $derived(
-    view.busy ||
-      !view.connected ||
+  const controlsUnavailable = $derived(
+    !view.connected ||
       !view.guildId ||
       !concert?.online ||
       !concert?.ready ||
@@ -80,6 +79,7 @@
       !concert?.current ||
       !concert?.playbackKey,
   );
+  const controlsDisabled = $derived(view.busy || controlsUnavailable);
   onMount(() => {
     tv = new URL(location.href).searchParams.get('tv') === '1';
     client = createDiscordClient();
@@ -218,8 +218,8 @@
                   room={view.audioRoom}
                   position={target.position}
                   playing={target.playing}
-                  canControl={!controlsDisabled}
-                  canSeek={!controlsDisabled && canManage}
+                  canControl={!controlsUnavailable}
+                  canSeek={!controlsUnavailable && canManage}
                   controlBusy={view.busy}
                   onPlaybackError={(failed) => (playerFailed = failed)}
                   onIntent={async (intent) => {

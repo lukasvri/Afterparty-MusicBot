@@ -2032,60 +2032,65 @@ test('saved motion preference and system reduced motion remain independent of au
   }
 });
 
-test('two rapid native scrubs retain the last target through a delayed receipt without replacing the iframe', async (t) => {
-  const f = await fixture(t, 390, { initial: true, manualSampling: true });
-  let release = () => {};
-  try {
-    const { page } = f;
-    await videoReady(page);
-    const native = page.frameLocator('.audio-stage iframe');
-    await native.getByRole('button', { name: 'Seek video', exact: true }).waitFor();
-    await page.waitForTimeout(1100);
-    await page.evaluate(() =>
-      (window as typeof window & { samplePlayer: () => void }).samplePlayer(),
-    );
-    release = f.holdNextMutation();
-    const seek = native.getByRole('button', { name: 'Seek video', exact: true });
-    for (const position of [42, 80]) {
-      await seek.evaluate(
-        (node, target) =>
-          Object.assign((node as HTMLElement).dataset, {
-            action: 'seek-event',
-            position: String(target),
-          }),
-        position,
+for (const [scheduledSeek, targets] of [
+  [false, [42, 80]],
+  [false, [70, 20]],
+  [true, [70, 20]],
+] as const) {
+  test(`two rapid native scrubs retain the last target through a delayed receipt without replacing the iframe (new timeline: ${scheduledSeek}, targets: ${targets.join(',')})`, async (t) => {
+    const f = await fixture(t, 390, { initial: true, manualSampling: true, scheduledSeek });
+    let release = () => {};
+    try {
+      const { page } = f;
+      await videoReady(page);
+      const native = page.frameLocator('.audio-stage iframe');
+      await native.getByRole('button', { name: 'Seek video', exact: true }).waitFor();
+      await page.waitForTimeout(1100);
+      await page.evaluate(() =>
+        (window as typeof window & { samplePlayer: () => void }).samplePlayer(),
       );
-      await seek.click();
+      release = f.holdNextMutation();
+      const seek = native.getByRole('button', { name: 'Seek video', exact: true });
+      for (const position of targets) {
+        await seek.evaluate(
+          (node, target) =>
+            Object.assign((node as HTMLElement).dataset, {
+              action: 'seek-event',
+              position: String(target),
+            }),
+          position,
+        );
+        await seek.click();
+      }
+      assert.equal(f.writes.length, 1, 'only one write is in flight');
+      release();
+      await page.waitForFunction(() =>
+        document
+          .querySelector('.player-status')
+          ?.textContent?.includes('Following the shared clock'),
+      );
+      assert.deepEqual(
+        f.writes.map((write) => [write.action, write.position]),
+        targets.map((position) => ['seek', position]),
+      );
+      assert.deepEqual(
+        await page.evaluate(() =>
+          (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
+            .filter((call) => ['construct', 'load', 'cue', 'destroy'].includes(call.action))
+            .map((call) => call.action),
+        ),
+        ['construct', 'load'],
+      );
+      assert.equal(
+        await page.evaluate(() =>
+          (window as unknown as { __playerState: () => number }).__playerState(),
+        ),
+        1,
+      );
+      assert.deepEqual(f.errors, []);
+    } finally {
+      release();
+      await f.close();
     }
-    assert.equal(f.writes.length, 1, 'only one write is in flight');
-    release();
-    await page.waitForFunction(() =>
-      document.querySelector('.player-status')?.textContent?.includes('Following the shared clock'),
-    );
-    assert.deepEqual(
-      f.writes.map((write) => [write.action, write.position]),
-      [
-        ['seek', 42],
-        ['seek', 80],
-      ],
-    );
-    assert.deepEqual(
-      await page.evaluate(() =>
-        (window as unknown as { __audioCalls: { action: string }[] }).__audioCalls
-          .filter((call) => ['construct', 'load', 'cue', 'destroy'].includes(call.action))
-          .map((call) => call.action),
-      ),
-      ['construct', 'load'],
-    );
-    assert.equal(
-      await page.evaluate(() =>
-        (window as unknown as { __playerState: () => number }).__playerState(),
-      ),
-      1,
-    );
-    assert.deepEqual(f.errors, []);
-  } finally {
-    release();
-    await f.close();
-  }
-});
+  });
+}

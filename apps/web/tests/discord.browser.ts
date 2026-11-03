@@ -391,6 +391,7 @@ for (const canManage of [false, true])
         external: string[] = [];
       let allowCommands = false;
       let delayedSeekRead: Promise<void> | null = null;
+      let delayedSeekResponse: Promise<void> | null = null;
       let holdAfterSeek = false;
       page.on('pageerror', (error) => errors.push(error.message));
       await page.addInitScript(() => {
@@ -567,6 +568,16 @@ for (const canManage of [false, true])
             assert.equal(input.command.playbackKey, snapshot.playbackKey);
             assert.equal(input.command.queueRevision, snapshot.queueRevision);
             snapshot.position = input.command.seconds;
+            if (delayedSeekResponse) {
+              const held = delayedSeekResponse;
+              delayedSeekResponse = null;
+              await page.evaluate(() =>
+                (window as unknown as { __calls: { action: string }[] }).__calls.push({
+                  action: 'held-seek-response',
+                }),
+              );
+              await held;
+            }
             if (delayedSeekRead) holdAfterSeek = true;
             return route.fulfill({ json: { id: input.commandId, status: 'done' } });
           }
@@ -863,6 +874,50 @@ for (const canManage of [false, true])
         await page.waitForTimeout(1100);
         // Acknowledge the synthetic API resume before later deliberate gestures.
         await native.getByRole('button', { name: 'Play video', exact: true }).click();
+        const overlap = Promise.withResolvers<void>();
+        delayedSeekResponse = overlap.promise;
+        const beforeOverlap = writes.length;
+        try {
+          const seek = native.getByRole('button', { name: 'Seek video', exact: true });
+          await seek.evaluate((node) => {
+            (node as HTMLElement).dataset.position = '70';
+          });
+          await seek.click();
+          await page.waitForFunction(() =>
+            (window as unknown as { __calls: { action: string }[] }).__calls.some(
+              (call) => call.action === 'held-seek-response',
+            ),
+          );
+          const latestSeek = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              response.request().postDataJSON()?.command?.seconds === 20,
+            { timeout: 5000 },
+          );
+          await seek.evaluate((node) => {
+            (node as HTMLElement).dataset.position = '20';
+          });
+          await seek.click();
+          await page.waitForTimeout(350);
+          assert.equal(writes.length, beforeOverlap + 1, 'only one seek is in flight');
+          overlap.resolve();
+          await emit(sequence++, true, 70);
+          await latestSeek;
+          await emit(sequence++, true, 20);
+          await page
+            .locator('.player-status')
+            .filter({ hasText: 'Following the shared clock' })
+            .waitFor();
+          assert.deepEqual(
+            writes
+              .slice(beforeOverlap)
+              .map((write) => (write.command as { seconds: number }).seconds),
+            [70, 20],
+            'a busy concert retains the latest native seek',
+          );
+        } finally {
+          overlap.resolve();
+        }
         const gate = Promise.withResolvers<void>();
         delayedSeekRead = gate.promise;
         const beforePendingSeek = writes.length;
