@@ -1,9 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {createServer} from 'node:http';
 import {Store} from '../src/store.ts';
 import {Engine,positionFromSegments} from '../src/engine.ts';
 import {Commands} from '../src/commands.ts';
@@ -126,6 +127,46 @@ test('a failed decoder reports source timing without a false PCM-ready event or 
   assert(phases.every(phase=>Number.isFinite(phase.durationMs)&&phase.durationMs>=0));
   assert.equal(JSON.stringify(phases).includes('private-synthetic'),false);
  }finally{decoder?.stop();controller.abort();await decoder?.closed;t.close();}
+});
+
+test('seeking opts into source reuse while audio recovery requires fresh resolution',async()=>{
+ const t=setup();try{
+  const reuse:(boolean|undefined)[]=[];t.engine.connected=true;t.engine.current=track();
+  t.engine.startTrack=async(_track,_offset,_paused,reuseSource)=>{reuse.push(reuseSource);};
+  await t.engine.seek(20);await t.engine.recoverAudio();
+  assert.deepEqual(reuse,[true,undefined],'only an explicit seek may reuse the current validated source');
+ }finally{t.close();}
+});
+
+test('seek preparation reaches the retained provider source while ordinary preparation remains fresh',async()=>{
+ const t=setup(),controller=new AbortController(),seeking=new AbortController();let decoder:PcmDecoder|undefined,calls=0;
+ let audio=Buffer.alloc(0),requests=0;
+ const server=createServer((request,response)=>{
+  requests++;const match=request.headers.range?.match(/^bytes=(\d+)-(\d*)$/),start=match?Number(match[1]):0,end=match?.[2]?Math.min(Number(match[2]),audio.length-1):audio.length-1;
+  if(request.headers.range&&!match||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>end||start>=audio.length){response.writeHead(416,{'Content-Range':`bytes */${audio.length}`});response.end();return;}
+  response.writeHead(match?206:200,{'Content-Type':'audio/wav','Content-Length':end-start+1,'Accept-Ranges':'bytes',...(match?{'Content-Range':`bytes ${start}-${end}/${audio.length}`} :{}),Connection:'close'});response.end(audio.subarray(start,end+1));
+ });
+ clearInterval(t.engine.timer);
+ try{
+  const source=join(dirname(String(t.store.db.prepare('PRAGMA database_list').get()!.file)),'seek.wav'),ffmpeg=process.env.FFMPEG_PATH??'ffmpeg';
+  const created=spawnSync(ffmpeg,['-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=2','-ac','2','-y',source]);
+  assert.equal(created.status,0,String(created.stderr));audio=readFileSync(source);
+  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+  const address=server.address();assert(address&&typeof address!=='string');
+  t.providers.extract=async()=>{calls++;return {url:`http://127.0.0.1:${address.port}/synthetic.wav`,duration:2};};
+  const song=track();
+  decoder=(await t.engine.prepare(song,0,controller.signal)).decoder;
+  assert.equal((await decoder.frame())?.length,FRAME_BYTES);decoder.stop();await decoder.closed;controller.abort();
+  const prepared=await t.engine.prepare(song,0.02,seeking.signal,undefined,true);decoder=prepared.decoder;
+  const frame=await decoder.frame();decoder.stop();await decoder.closed;
+  assert.equal(calls,1,'the actual prepare/provider path must skip duplicate seek extraction');
+  assert.equal(prepared.track.duration,2);
+  const expected=spawnSync(ffmpeg,['-hide_banner','-loglevel','error','-nostdin','-ss','0.02','-i',source,'-vn','-ac','2','-ar','48000','-f','s16le','pipe:1']);
+  assert.equal(expected.status,0,String(expected.stderr));assert.equal(frame?.equals(expected.stdout.subarray(0,FRAME_BYTES)),true,'reused source still decodes the requested new offset');
+  assert(requests>=2,'each preparation opens its own decoder source, including any range reads');
+  decoder=(await t.engine.prepare(song,0,seeking.signal)).decoder;decoder.stop();await decoder.closed;
+  assert.equal(calls,2,'a new playback or recovery resolves independently of the retained source');
+ }finally{decoder?.stop();controller.abort();seeking.abort();await decoder?.closed;if(server.listening)await new Promise<void>(resolve=>server.close(()=>resolve()));t.close();}
 });
 test('media clock uses consumed audio, including incoming crossfade offset',()=>{const segments=[{track:track(),startFrame:0,offset:10},{track:track('bcdefghijkl'),startFrame:500,offset:0}];assert.equal(positionFromSegments(segments,9000).position,19);assert.equal(positionFromSegments(segments,10000).track?.id,'bcdefghijkl');assert.equal(positionFromSegments(segments,13000).position,3);});
 test('public state excludes requester identity and private fields',()=>{const t=setup();try{t.engine.current={...track(),requestedBy:'private-member-id'};t.engine.queue=[{...track('bcdefghijkl'),requestedBy:'private-member-id'}];const text=JSON.stringify(t.engine.snapshot());assert(!text.includes('private-member-id'));assert(!text.includes('requestedBy'));}finally{t.close();}});

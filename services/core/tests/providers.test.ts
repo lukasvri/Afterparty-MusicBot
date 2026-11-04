@@ -93,6 +93,85 @@ test('cold video metadata skips player JavaScript without weakening source error
  }finally{t.close();}
 });
 
+test('same-entry seeking reuses a validated stream without caller mutation or persistent URLs',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),video=track(),signal=new AbortController().signal;let calls=0;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/audio?token=synthetic',http_headers:{Authorization:'synthetic'},duration:200};};
+  const first=await p.stream(video,signal);first.url='https://mutated.invalid/';first.headers='mutated';first.duration=1;
+  const seek=await p.stream(video,signal,true);
+  assert.equal(calls,1,'same-entry seek must not repeat media extraction');
+  assert.equal(seek.url,'https://media.example.test/audio?token=synthetic');assert.equal(seek.headers,'Authorization: synthetic\r\n');assert.equal(seek.duration,200);
+  seek.url='https://also-mutated.invalid/';assert.equal((await p.stream(video,signal,true)).url,'https://media.example.test/audio?token=synthetic');
+  assert(!JSON.stringify(t.store.db.prepare('SELECT value FROM kv').all()).includes('media.example.test'));
+ }finally{t.close();}
+});
+
+test('seek source retention expires after five minutes and rejects clock rollback',async context=>{
+ const t=setup();let now=1000;context.mock.method(Date,'now',()=>now);
+ try{
+  const p=new Providers(t.store,{}),video=track(),signal=new AbortController().signal;let calls=0;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/'+calls,duration:200};};
+  await p.stream(video,signal);now+=299999;await p.stream(video,signal,true);assert.equal(calls,1);
+  now++;await p.stream(video,signal,true);assert.equal(calls,2);
+  now--;await p.stream(video,signal,true);assert.equal(calls,3,'clock rollback cannot prolong source retention');
+ }finally{t.close();}
+});
+
+test('seek source retention preserves current and prefetched entries within a two-entry bound',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),signal=new AbortController().signal,a=track('a','aaaaaaaaaaa'),b=track('b','bbbbbbbbbbb'),c=track('c','ccccccccccc');let calls=0;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/'+calls,duration:200};};
+  await p.stream(a,signal);await p.stream(b,signal);await p.stream(a,signal,true);assert.equal(calls,2);
+  await p.stream(c,signal);await p.stream(a,signal,true);assert.equal(calls,3);
+  await p.stream(b,signal,true);assert.equal(calls,4,'least recently used source is retired at the bound');
+ }finally{t.close();}
+});
+
+test('seek sources stay scoped to entry, provider identity and provider instance',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),other=new Providers(t.store,{}),signal=new AbortController().signal,video=track();let calls=0;
+  p.extract=other.extract=async()=>{calls++;return {url:'https://media.example.test/'+calls,duration:200};};
+  await p.stream(video,signal);await p.stream({...video,entryId:'new-entry'},signal,true);assert.equal(calls,2);
+  await p.stream({...video,source:'soundcloud',url:'https://soundcloud.com/example/one'},signal,true);assert.equal(calls,3);
+  await other.stream(video,signal,true);assert.equal(calls,4);
+ }finally{t.close();}
+});
+
+test('fresh playback and failed or preview-only refresh never fall back to a retained seek source',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),signal=new AbortController().signal,video=track();let calls=0;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/'+calls,duration:200};};
+  await p.stream(video,signal);await p.stream(video,signal);assert.equal(calls,2,'ordinary playback resolves afresh');
+  p.extract=async()=>{throw new UserError('synthetic unavailable source',502);};
+  await assert.rejects(p.stream(video,signal),/unavailable source/);
+  await assert.rejects(p.stream(video,signal,true),/unavailable source/);
+  p.extract=async()=>({url:'https://media.example.test/preview',duration:30,is_preview:true});
+  await assert.rejects(p.stream(video,signal),/preview/);await assert.rejects(p.stream(video,signal,true),/preview/);
+ }finally{t.close();}
+});
+
+test('seek source retention honors cancellation on hits and before a late extraction can be remembered',async()=>{
+ const t=setup(),gate=deferred<void>();try{
+  const p=new Providers(t.store,{}),video=track(),signal=new AbortController().signal;let calls=0;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/'+calls,duration:200};};
+  await p.stream(video,signal);const cancelled=new AbortController();cancelled.abort();
+  await assert.rejects(p.stream(video,cancelled.signal,true),/cancel/i);assert.equal(calls,1);
+  p.extract=async()=>{calls++;await gate.promise;return {url:'https://media.example.test/late',duration:200};};
+  const late=new AbortController(),next={...video,entryId:'late-entry'},pending=p.stream(next,late.signal);
+  const rejected=assert.rejects(pending,/cancel/i);late.abort();gate.resolve();await rejected;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/fresh',duration:200};};
+  assert.equal((await p.stream(next,signal,true)).url,'https://media.example.test/fresh');assert.equal(calls,3);
+ }finally{gate.resolve();t.close();}
+});
+
+test('live streams always resolve afresh even when reuse is requested',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),video={...track(),live:true},signal=new AbortController().signal;let calls=0;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/live',duration:200};};
+  await p.stream(video,signal);await p.stream(video,signal,true);assert.equal(calls,2);
+ }finally{t.close();}
+});
+
 test('a formats-only metadata failure retries the full extractor once and then shares its verified result',async()=>{
  const t=setup();try{
   const formatError=await runJson(process.execPath,['-e',"process.stderr.write('ERROR: No video formats found!');process.exitCode=1;"]).then(()=>assert.fail('Expected a source failure'),error=>error);

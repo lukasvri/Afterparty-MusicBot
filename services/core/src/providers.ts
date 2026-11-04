@@ -101,6 +101,8 @@ const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
   ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) });
 export type PlaylistImportResult = { videos: Track[]; total?: number; skipped: number; limited: boolean };
 type SearchResult = { tracks: Track[]; complete: boolean };
+type StreamSource = { url: string; headers: string; duration: number | undefined };
+const STREAM_SOURCE_TTL_MS = 5 * 60_000;
 const importObject = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const unavailablePlaylistEntry = (entry: Record<string, unknown>) =>
   entry.is_unavailable === true || entry.availability !== undefined && !["public", "unlisted"].includes(String(entry.availability)) ||
@@ -118,6 +120,9 @@ export class Providers {
   recommendationStatus = "artist";
   private searches = new Map<string, ProviderWork<SearchResult>>();
   private videoLookups = new Map<string, ProviderWork<Track | undefined>>();
+  // Private, short-lived sources for current playback and its prefetched next
+  // entry. Only explicit same-entry seeks may reuse them; never persist URLs.
+  private streamSources = new Map<string, { at: number; source: StreamSource }>();
   constructor(store: Store, env: NodeJS.ProcessEnv = process.env) {
     this.store = store;
     this.key = env.YOUTUBE_API_KEY ?? "";
@@ -561,7 +566,23 @@ export class Providers {
     if (!found[0]) throw new UserError("No results. Try another search.");
     return [found[0]];
   }
-  async stream(track: Track, signal: AbortSignal) {
+  async stream(track: Track, signal: AbortSignal, reuseSource = false): Promise<StreamSource> {
+    if (signal.aborted) throw new UserError("The request was cancelled.");
+    const key = JSON.stringify([track.source ?? "youtube", track.id, track.entryId,
+      track.source === "soundcloud" ? track.url : null]);
+    const now = Date.now();
+    for (const [entry, retained] of this.streamSources)
+      if (now < retained.at || now - retained.at >= STREAM_SOURCE_TTL_MS)
+        this.streamSources.delete(entry);
+    const retained = !track.live && reuseSource ? this.streamSources.get(key) : undefined;
+    if (retained) {
+      this.streamSources.delete(key);
+      this.streamSources.set(key, retained);
+      return { ...retained.source };
+    }
+    // A fresh playback/recovery attempt must not leave an old source available
+    // as a fallback when its replacement fails validation or extraction.
+    this.streamSources.delete(key);
     const target =
       track.source === "soundcloud"
         ? track.url
@@ -582,6 +603,7 @@ export class Providers {
       signal,
       true,
     );
+    if (signal.aborted) throw new UserError("The request was cancelled.");
     if (
       data.is_preview ||
       (data.full_duration && Number(data.duration) < data.full_duration - 2)
@@ -593,13 +615,19 @@ export class Providers {
       .filter(([k, v]) => typeof v === "string" && !/[\r\n]/.test(k + v))
       .map(([k, v]) => `${k}: ${v}\r\n`)
       .join("");
-    return {
+    const source = {
       url: data.url,
       headers,
       duration: Number.isFinite(data.duration)
         ? Number(data.duration)
         : track.duration,
     };
+    if (!track.live) {
+      this.streamSources.set(key, { at: Date.now(), source: { ...source } });
+      while (this.streamSources.size > 2)
+        this.streamSources.delete(this.streamSources.keys().next().value!);
+    }
+    return source;
   }
   async matchSong(input: CatalogSong): Promise<Track> {
     let song = input;
