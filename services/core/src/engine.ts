@@ -336,9 +336,10 @@ export class Engine extends EventEmitter {
     offset: number,
     signal: AbortSignal,
     onTiming?: (reason: "source-ready" | "decoder-ready", durationMs: number) => void,
+    reuseSource = false,
   ): Promise<Prepared> {
     const startedAt = performance.now();
-    const source = await this.providers.stream(track, signal);
+    const source = await this.providers.stream(track, signal, reuseSource);
     if (signal.aborted) throw new Error("Playback cancelled.");
     onTiming?.("source-ready", performance.now() - startedAt);
     return {
@@ -467,7 +468,7 @@ export class Engine extends EventEmitter {
       this.paused,
     );
   }
-  async startTrack(track: Track, offset = 0, paused = false) {
+  async startTrack(track: Track, offset = 0, paused = false, reuseSource = false) {
     this.bitrate = audioBitrate(
       this.channelBitrate,
       this.settings.audioBitrateKbps,
@@ -494,7 +495,7 @@ export class Engine extends EventEmitter {
         // stale/cancelled preparations must not contaminate this diagnostic.
         if (generation === this.generation && !signal.aborted)
           this.diagnostics.note(reason, durationMs);
-      });
+      }, reuseSource);
       if (generation !== this.generation) {
         prepared.decoder.stop();
         return;
@@ -714,7 +715,7 @@ export class Engine extends EventEmitter {
     )
       throw new UserError("Invalid position.");
     this.adoptTrack(track);
-    await this.startTrack(track, seconds, this.paused);
+    await this.startTrack(track, seconds, this.paused, true);
   }
   clear() {
     this.rejectRadio(this.queue);
