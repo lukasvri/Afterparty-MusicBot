@@ -622,7 +622,7 @@ export class Providers {
         ? Number(data.duration)
         : track.duration,
     };
-    if (!track.live) {
+    if (!track.live && !data.is_live) {
       this.streamSources.set(key, { at: Date.now(), source: { ...source } });
       while (this.streamSources.size > 2)
         this.streamSources.delete(this.streamSources.keys().next().value!);

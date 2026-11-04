@@ -145,7 +145,9 @@ Explicit same-entry seeks may reuse a validated source from the same provider
 instance. Up to two sources, for current playback and prefetch, remain in memory;
 reuse eligibility lasts at most five minutes and does not extend on a hit. The
 key includes recording, queue entry and provider identity. Clock rollback,
-expiry, cancellation and live sources do not permit reuse. Expired entries are
+expiry, cancellation and live sources do not permit reuse. Live status from
+either the track or the fresh extractor result prevents retention, including
+when earlier track metadata is stale. Expired entries are
 removed when a source is requested. URLs and headers are never written to the
 database or diagnostics, and callers receive copies.
 

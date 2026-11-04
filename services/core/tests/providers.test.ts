@@ -172,6 +172,17 @@ test('live streams always resolve afresh even when reuse is requested',async()=>
  }finally{t.close();}
 });
 
+test('extractor-reported live streams bypass seek retention when track metadata is stale',async()=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),video=track(),signal=new AbortController().signal;let calls=0;
+  p.extract=async()=>{calls++;return {url:'https://media.example.test/live/'+calls,duration:200,is_live:true};};
+  assert.equal(video.live,false);
+  assert.equal((await p.stream(video,signal)).url,'https://media.example.test/live/1');
+  assert.equal((await p.stream(video,signal,true)).url,'https://media.example.test/live/2');
+  assert.equal(calls,2,'extractor-reported live sources must resolve afresh');
+ }finally{t.close();}
+});
+
 test('a formats-only metadata failure retries the full extractor once and then shares its verified result',async()=>{
  const t=setup();try{
   const formatError=await runJson(process.execPath,['-e',"process.stderr.write('ERROR: No video formats found!');process.exitCode=1;"]).then(()=>assert.fail('Expected a source failure'),error=>error);
