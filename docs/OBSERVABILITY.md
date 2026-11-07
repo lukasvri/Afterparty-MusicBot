@@ -131,6 +131,8 @@ does not emit them; cancelled or replaced generations cannot report late phases.
 
 The two extractor intervals are parts of `source-ready`. They are published
 only for a validated fresh source. Reused sources have no extractor intervals.
+When the optional startup pilot falls back, the extractor intervals describe
+the successful attempt. `source-ready` still includes the complete preparation.
 These durations use monotonic time and do not change the playback clock, PCM
 reader, frame flow, extraction or command ordering. A failed source has no ready
 event. Decoder failure can leave a source event without a decoder event. A later

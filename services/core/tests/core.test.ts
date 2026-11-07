@@ -56,7 +56,41 @@ test('PCM fast paths preserve samples and never change the input during gain or 
   assert.deepEqual(input,original);
  }
 });
-function setup(){const dir=mkdtempSync(join(tmpdir(),'gutta-core-')),store=new Store(join(dir,'db.sqlite')),providers=new Providers(store,{}),sink=new FakeSink(),engine=new Engine(store,providers,sink);return {store,providers,sink,engine,close:()=>{engine.close();store.close();rmSync(dir,{recursive:true,force:true});}};}
+function setup(env:NodeJS.ProcessEnv={}){const dir=mkdtempSync(join(tmpdir(),'gutta-core-')),store=new Store(join(dir,'db.sqlite')),providers=new Providers(store,env),sink=new FakeSink(),engine=new Engine(store,providers,sink);return {store,providers,sink,engine,close:()=>{engine.close();store.close();rmSync(dir,{recursive:true,force:true});}};}
+
+test('a fast source that fails decoding resumes through the standard resolver',async()=>{
+ const t=setup({AFTERPARTY_FAST_YOUTUBE_STARTUP:'1'}),song=track();
+ const attempts:string[]=[], output=deferred<void>();
+ let audio=Buffer.alloc(0), timer:ReturnType<typeof setTimeout>|undefined;
+ const server=createServer((request,response)=>{
+  if(request.url==='/fast'){response.writeHead(404);response.end();return;}
+  response.writeHead(200,{'Content-Type':'audio/wav','Content-Length':audio.length});
+  response.end(audio);
+ });
+ clearInterval(t.engine.timer);t.engine.connected=true;t.engine.settings.radio=false;
+ try{
+  const created=spawnSync(process.env.FFMPEG_PATH??'ffmpeg',
+   ['-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=1','-ac','2','-f','wav','pipe:1']);
+  assert.equal(created.status,0,String(created.stderr));audio=created.stdout;
+  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+  const address=server.address();assert(address&&typeof address!=='string');
+  t.providers.extract=async args=>{
+   const mode=args.includes('youtube:player_client=visionos')?'fast':'standard';
+   attempts.push(mode);
+   return {id:song.id,is_live:false,protocol:'m3u8_native',url:`http://127.0.0.1:${address.port}/${mode}`,duration:200};
+  };
+  const sink:Sink=t.sink;
+  sink.play=(stream,id)=>{
+   stream.once('error',error=>t.sink.onError?.(error,id));
+   stream.on('data',()=>output.resolve());
+  };
+  await t.engine.startTrack(song);
+  await Promise.race([output.promise,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('No recovered Opus packet')),8000);})]);
+  assert.deepEqual(attempts,['fast','standard']);
+  assert.equal(t.engine.current?.entryId,song.entryId);
+  assert(t.engine.diagnostics.snapshot().events.some(event=>event.reason==='recovery'));
+ }finally{clearTimeout(timer);t.close();if(server.listening)await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
 
 test('playback preparation separates source resolution from the first decoded PCM frame',async context=>{
  const t=setup(),controller=new AbortController(),gate=deferred<{url:string;headers:string;duration:number}>();
@@ -131,10 +165,10 @@ test('a failed decoder reports source timing without a false PCM-ready event or 
 
 test('seeking opts into source reuse while audio recovery requires fresh resolution',async()=>{
  const t=setup();try{
-  const reuse:(boolean|undefined)[]=[];t.engine.connected=true;t.engine.current=track();
+  const reuse:(string|undefined)[]=[];t.engine.connected=true;t.engine.current=track();
   t.engine.startTrack=async(_track,_offset,_paused,reuseSource)=>{reuse.push(reuseSource);};
   await t.engine.seek(20);await t.engine.recoverAudio();
-  assert.deepEqual(reuse,[true,undefined],'only an explicit seek may reuse the current validated source');
+  assert.deepEqual(reuse,['seek','standard'],'only an explicit seek may reuse the current validated source');
  }finally{t.close();}
 });
 
@@ -164,7 +198,7 @@ test('seek preparation reaches the retained provider source while ordinary prepa
   assert.deepEqual(phases.slice(0,2),[{reason:'extractor-wait',durationMs:30},{reason:'extractor-run',durationMs:40}]);
   assert.equal((await decoder.frame())?.length,FRAME_BYTES);decoder.stop();await decoder.closed;controller.abort();
   phases.length=0;
-  const prepared=await t.engine.prepare(song,0.02,seeking.signal,report,true);decoder=prepared.decoder;
+  const prepared=await t.engine.prepare(song,0.02,seeking.signal,report,'seek');decoder=prepared.decoder;
   assert.deepEqual(phases.map(({reason})=>reason),['source-ready']);
   const frame=await decoder.frame();decoder.stop();await decoder.closed;
   assert.equal(calls,1,'the actual prepare/provider path must skip duplicate seek extraction');

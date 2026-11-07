@@ -2,7 +2,7 @@ import { AudioDiagnostics, type StartupPhase } from "./audio-diagnostics.ts";
 import { EventEmitter } from "node:events";
 import { randomUUID, createHash } from "node:crypto";
 import { Store } from "./store.ts";
-import { Providers } from "./providers.ts";
+import { Providers, type PlaybackSourceMode } from "./providers.ts";
 import { RADIO_CONTENT_VERSION } from "./protocol.ts";
 import { canPlayRadioTrack, rankRadio, sameRadioSong, type RadioTrack } from "./radio.ts";
 import {
@@ -336,10 +336,10 @@ export class Engine extends EventEmitter {
     offset: number,
     signal: AbortSignal,
     onTiming?: (reason: StartupPhase, durationMs: number) => void,
-    reuseSource = false,
+    sourceMode: PlaybackSourceMode = "standard",
   ): Promise<Prepared> {
     const startedAt = performance.now();
-    const source = await this.providers.stream(track, signal, reuseSource, onTiming
+    const source = await this.providers.stream(track, signal, sourceMode, onTiming
       ? ({ waitMs, runMs }) => {
           if (signal.aborted) return;
           onTiming("extractor-wait", waitMs);
@@ -472,9 +472,10 @@ export class Engine extends EventEmitter {
       track,
       track.live ? 0 : Math.min(position, Math.max(0, track.duration - 1)),
       this.paused,
+      "standard",
     );
   }
-  async startTrack(track: Track, offset = 0, paused = false, reuseSource = false) {
+  async startTrack(track: Track, offset = 0, paused = false, sourceMode: PlaybackSourceMode = "startup") {
     this.bitrate = audioBitrate(
       this.channelBitrate,
       this.settings.audioBitrateKbps,
@@ -501,7 +502,7 @@ export class Engine extends EventEmitter {
         // stale/cancelled preparations must not contaminate this diagnostic.
         if (generation === this.generation && !signal.aborted)
           this.diagnostics.note(reason, durationMs);
-      }, reuseSource);
+      }, sourceMode);
       if (generation !== this.generation) {
         prepared.decoder.stop();
         return;
@@ -721,7 +722,7 @@ export class Engine extends EventEmitter {
     )
       throw new UserError("Invalid position.");
     this.adoptTrack(track);
-    await this.startTrack(track, seconds, this.paused, true);
+    await this.startTrack(track, seconds, this.paused, "seek");
   }
   clear() {
     this.rejectRadio(this.queue);
