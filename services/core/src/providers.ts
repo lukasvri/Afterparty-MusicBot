@@ -1,6 +1,6 @@
 import type {YouTubeResponses, ExtractedMedia} from "./external-types.ts";
 import { metadataGenres, metadataMusic, radioArtist, radioTitle, sameRadioRecording, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
-import { ExtractorFormatError, runJson, type ExtractorProfile } from "./extractor.ts";
+import { ExtractorFormatError, runJson, type ExtractorProfile, type ExtractorTiming } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
@@ -162,8 +162,14 @@ export class Providers {
     signal?.throwIfAborted();
     return value;
   }
-  async extract(args: string[], signal?: AbortSignal, priority = false, profile: ExtractorProfile = "media") {
-    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile);
+  async extract(
+    args: string[],
+    signal?: AbortSignal,
+    priority = false,
+    profile: ExtractorProfile = "media",
+    onTiming?: (timing: ExtractorTiming) => void,
+  ) {
+    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile, onTiming);
   }
   async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false): Promise<Track[]> {
     const controller = new AbortController();
@@ -577,7 +583,12 @@ export class Providers {
     if (!found[0]) throw new UserError("No results. Try another search.");
     return [found[0]];
   }
-  async stream(track: Track, signal: AbortSignal, mode: PlaybackSourceMode = "standard"): Promise<StreamSource> {
+  async stream(
+    track: Track,
+    signal: AbortSignal,
+    mode: PlaybackSourceMode = "standard",
+    onTiming?: (timing: ExtractorTiming) => void,
+  ): Promise<StreamSource> {
     if (signal.aborted) throw new UserError("The request was cancelled.");
     const key = JSON.stringify([track.source ?? "youtube", track.id, track.entryId,
       track.source === "soundcloud" ? track.url : null]);
@@ -600,6 +611,8 @@ export class Providers {
         : `https://www.youtube.com/watch?v=${track.id}`;
     const args = ["--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node"];
     let data: ExtractedMedia | undefined;
+    let timing: ExtractorTiming | undefined;
+    const recordTiming = onTiming ? (measurement: ExtractorTiming) => { timing = measurement; } : undefined;
     if (this.fastYouTubeStartup && mode === "startup" && track.source !== "soundcloud" &&
         !track.live && Number.isFinite(track.duration) && track.duration > 0) {
       const deadline = AbortSignal.timeout(FAST_YOUTUBE_SOURCE_MS);
@@ -607,7 +620,7 @@ export class Providers {
         const candidate = await this.extract([
           ...args, "--extractor-args", "youtube:player_client=visionos",
           "-f", YOUTUBE_HLS_FORMAT, target!,
-        ], AbortSignal.any([signal, deadline]), true);
+        ], AbortSignal.any([signal, deadline]), true, "media", recordTiming);
         if (!deadline.aborted && candidate.id === track.id && candidate.is_live === false &&
             Number.isFinite(candidate.duration) && Number(candidate.duration) > 0 &&
             (candidate.protocol === "m3u8" || candidate.protocol === "m3u8_native") &&
@@ -619,10 +632,13 @@ export class Providers {
       }
     }
     if (signal.aborted) throw new UserError("The request was cancelled.");
-    data ??= await this.extract([
-      ...args, "-f", track.source === "soundcloud" ? "bestaudio/best" : YOUTUBE_HLS_FORMAT + "/bestaudio/best",
-      target!,
-    ], signal, true);
+    if (!data) {
+      timing = undefined;
+      data = await this.extract([
+        ...args, "-f", track.source === "soundcloud" ? "bestaudio/best" : YOUTUBE_HLS_FORMAT + "/bestaudio/best",
+        target!,
+      ], signal, true, "media", recordTiming);
+    }
     if (signal.aborted) throw new UserError("The request was cancelled.");
     if (isPreview(data))
       throw new UserError("The source only offers a preview.");
@@ -644,6 +660,7 @@ export class Providers {
       while (this.streamSources.size > 2)
         this.streamSources.delete(this.streamSources.keys().next().value!);
     }
+    if (timing) onTiming?.(timing);
     return source;
   }
   async matchSong(input: CatalogSong): Promise<Track> {
