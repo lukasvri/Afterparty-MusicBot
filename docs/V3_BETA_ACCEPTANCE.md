@@ -1,5 +1,10 @@
 # Non-Activity concert extras acceptance
 
+This is a historical checklist for builds that show the Games & extras panel.
+Current music and concert pages omit that panel. The dedicated Guess the Song
+route remains available through Games, and existing social API and data
+contracts are retained.
+
 This checklist covers the focused non-Activity v3 source candidate targeting `main`,
 preserving the merged player/error and channel-boundary fixes from PR #84 and
 FIFO queue fixes from PR #83. It does not

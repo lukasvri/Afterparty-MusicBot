@@ -81,9 +81,12 @@ establish production deployment or restart Activity/Rust experiments.
 
 Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 and Discord Activity experiments. Stable queue and player fixes can be reviewed independently without the Activity SDK, routes or test configuration. See [release channels](docs/RELEASE_CHANNELS.md) for extraction and review boundaries.
 
-## Concert extras preview
+## Playback and games
 
-The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The `3.0.0-alpha.1` candidate includes native opt-in extras with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
+Music rooms and concerts keep the space below the player for playback controls.
+Open **Games** in the main navigation for Guess the Song. The
+[historical extras checklist](docs/V3_BETA_ACCEPTANCE.md) applies to earlier
+builds with the bingo, reactions and shared moments panel.
 
 ## Run your own Afterparty
 
