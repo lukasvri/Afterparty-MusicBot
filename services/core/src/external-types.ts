@@ -26,6 +26,7 @@ export type ExtractedMedia = {
   playable_in_embed?: boolean;
   webpage_url?: string;
   url?: string;
+  protocol?: string;
   http_headers?: Record<string, string>;
   thumbnail?: string;
   thumbnails?: {url: string}[];
