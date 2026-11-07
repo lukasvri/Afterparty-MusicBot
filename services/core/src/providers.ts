@@ -1,6 +1,6 @@
 import type {YouTubeResponses, ExtractedMedia} from "./external-types.ts";
 import { metadataGenres, metadataMusic, radioArtist, radioTitle, sameRadioRecording, RADIO_HISTORY_LIMIT, type RadioTrack } from "./radio.ts";
-import { ExtractorFormatError, runJson, type ExtractorProfile } from "./extractor.ts";
+import { ExtractorFormatError, runJson, type ExtractorProfile, type ExtractorTiming } from "./extractor.ts";
 export { runJson } from "./extractor.ts";
 import { randomUUID } from "node:crypto";
 import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
@@ -151,8 +151,14 @@ export class Providers {
     signal?.throwIfAborted();
     return value;
   }
-  async extract(args: string[], signal?: AbortSignal, priority = false, profile: ExtractorProfile = "media") {
-    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile);
+  async extract(
+    args: string[],
+    signal?: AbortSignal,
+    priority = false,
+    profile: ExtractorProfile = "media",
+    onTiming?: (timing: ExtractorTiming) => void,
+  ) {
+    return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile, onTiming);
   }
   async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false): Promise<Track[]> {
     const controller = new AbortController();
@@ -566,7 +572,12 @@ export class Providers {
     if (!found[0]) throw new UserError("No results. Try another search.");
     return [found[0]];
   }
-  async stream(track: Track, signal: AbortSignal, reuseSource = false): Promise<StreamSource> {
+  async stream(
+    track: Track,
+    signal: AbortSignal,
+    reuseSource = false,
+    onTiming?: (timing: ExtractorTiming) => void,
+  ): Promise<StreamSource> {
     if (signal.aborted) throw new UserError("The request was cancelled.");
     const key = JSON.stringify([track.source ?? "youtube", track.id, track.entryId,
       track.source === "soundcloud" ? track.url : null]);
@@ -587,6 +598,7 @@ export class Providers {
       track.source === "soundcloud"
         ? track.url
         : `https://www.youtube.com/watch?v=${track.id}`;
+    let timing: ExtractorTiming | undefined;
     const data = await this.extract(
       [
         "--no-playlist",
@@ -602,6 +614,8 @@ export class Providers {
       ],
       signal,
       true,
+      "media",
+      onTiming ? (measurement) => { timing = measurement; } : undefined,
     );
     if (signal.aborted) throw new UserError("The request was cancelled.");
     if (
@@ -627,6 +641,7 @@ export class Providers {
       while (this.streamSources.size > 2)
         this.streamSources.delete(this.streamSources.keys().next().value!);
     }
+    if (timing) onTiming?.(timing);
     return source;
   }
   async matchSong(input: CatalogSong): Promise<Track> {

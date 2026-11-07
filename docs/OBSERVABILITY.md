@@ -119,14 +119,18 @@ live Discord, private rooms or real user data as a test event.
 
 The existing scoped admin response includes `audio.events`, a local ring of at
 most 50 fixed reason codes, timestamps and rounded durations. Current playback
-startup and seeking add two phase events. Background next-track preparation
+startup and seeking add phase events. Background next-track preparation
 does not emit them; cancelled or replaced generations cannot report late phases.
 
 | Reason | Measured interval |
 | --- | --- |
+| `extractor-wait` | Time until the shared extractor grants a slot |
+| `extractor-run` | Process start through successful JSON parsing, including provider work |
 | `source-ready` | Current preparation through validated provider stream resolution, including extractor admission and extraction |
 | `decoder-ready` | PCM decoder construction through its first returned audio frame, including process startup, source opening, seeking and decoding |
 
+The two extractor intervals are parts of `source-ready`. They are published
+only for a validated fresh source. Reused sources have no extractor intervals.
 These durations use monotonic time and do not change the playback clock, PCM
 reader, frame flow, extraction or command ordering. A failed source has no ready
 event. Decoder failure can leave a source event without a decoder event. A later

@@ -140,6 +140,8 @@ test('seeking opts into source reuse while audio recovery requires fresh resolut
 
 test('seek preparation reaches the retained provider source while ordinary preparation remains fresh',async()=>{
  const t=setup(),controller=new AbortController(),seeking=new AbortController();let decoder:PcmDecoder|undefined,calls=0;
+ const phases: { reason: string; durationMs: number }[] = [];
+ const report = (reason: string, durationMs: number) => phases.push({reason,durationMs});
  let audio=Buffer.alloc(0),requests=0;
  const server=createServer((request,response)=>{
   requests++;const match=request.headers.range?.match(/^bytes=(\d+)-(\d*)$/),start=match?Number(match[1]):0,end=match?.[2]?Math.min(Number(match[2]),audio.length-1):audio.length-1;
@@ -153,11 +155,17 @@ test('seek preparation reaches the retained provider source while ordinary prepa
   assert.equal(created.status,0,String(created.stderr));audio=readFileSync(source);
   await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
   const address=server.address();assert(address&&typeof address!=='string');
-  t.providers.extract=async()=>{calls++;return {url:`http://127.0.0.1:${address.port}/synthetic.wav`,duration:2};};
+  t.providers.extract=async(_args,_signal,_priority,_profile,onTiming)=>{
+   calls++;onTiming?.({waitMs:30,runMs:40});
+   return {url:`http://127.0.0.1:${address.port}/synthetic.wav`,duration:2};
+  };
   const song=track();
-  decoder=(await t.engine.prepare(song,0,controller.signal)).decoder;
+  decoder=(await t.engine.prepare(song,0,controller.signal,report)).decoder;
+  assert.deepEqual(phases.slice(0,2),[{reason:'extractor-wait',durationMs:30},{reason:'extractor-run',durationMs:40}]);
   assert.equal((await decoder.frame())?.length,FRAME_BYTES);decoder.stop();await decoder.closed;controller.abort();
-  const prepared=await t.engine.prepare(song,0.02,seeking.signal,undefined,true);decoder=prepared.decoder;
+  phases.length=0;
+  const prepared=await t.engine.prepare(song,0.02,seeking.signal,report,true);decoder=prepared.decoder;
+  assert.deepEqual(phases.map(({reason})=>reason),['source-ready']);
   const frame=await decoder.frame();decoder.stop();await decoder.closed;
   assert.equal(calls,1,'the actual prepare/provider path must skip duplicate seek extraction');
   assert.equal(prepared.track.duration,2);

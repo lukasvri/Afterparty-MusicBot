@@ -85,7 +85,10 @@ test("a 1 GiB container admits two extractor trees and keeps playback ahead of q
   memory.mock.restore();
   const dir = await mkdtemp(join(tmpdir(), "extractor-admission-"));
   const jobs: Promise<unknown>[] = [];
-  const start = (name: string, priority = false) => {
+  let now = 100;
+  const playbackTimings: unknown[] = [];
+  t.mock.method(performance, "now", () => now);
+  const start = (name: string, priority = false, observe = false) => {
     const job = bounded(process.execPath, ["-e", `
       const fs = require('node:fs');
       const path = require('node:path');
@@ -96,7 +99,7 @@ test("a 1 GiB container admits two extractor trees and keeps playback ahead of q
           clearInterval(timer); process.stdout.write('{}');
         }
       }, 10);
-    `, dir, name], undefined, priority);
+    `, dir, name], undefined, priority, "media", observe ? (timing) => playbackTimings.push(timing) : undefined);
     jobs.push(job);
     return job;
   };
@@ -110,13 +113,18 @@ test("a 1 GiB container admits two extractor trees and keeps playback ahead of q
   try {
     start("first"); start("second");
     await Promise.all([waitFor("first"), waitFor("second")]);
-    start("search"); start("playback", true);
+    start("search"); const playback = start("playback", true, true);
     await new Promise(resolve => setTimeout(resolve, 150));
     assert.deepEqual((await readdir(dir)).sort(), ["first.started", "second.started"]);
+    now = 400;
     await writeFile(join(dir, "first.release"), "");
     await waitFor("playback");
     assert.equal((await readdir(dir)).includes("search.started"), false);
+    assert.deepEqual(playbackTimings, [], "a running extraction has no completed timing");
+    now = 900;
     await writeFile(join(dir, "playback.release"), "");
+    await playback;
+    assert.deepEqual(playbackTimings, [{ waitMs: 300, runMs: 500 }]);
     await waitFor("search");
   } finally {
     for (const name of ["first", "second", "search", "playback"])
