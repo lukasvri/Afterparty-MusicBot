@@ -1,8 +1,8 @@
+export type StartupPhase = "extractor-wait" | "extractor-run" | "source-ready" | "decoder-ready";
 export type AudioReason =
   | "buffer-start"
   | "buffer-end"
-  | "source-ready"
-  | "decoder-ready"
+  | StartupPhase
   | "decoder-failure"
   | "encoder-failure"
   | "stream-stall"

@@ -32,20 +32,25 @@ test('fast startup accepts only a matching recorded HLS source and retains it fo
  const t=setup();try{
   const p=new Providers(t.store,{AFTERPARTY_FAST_YOUTUBE_STARTUP:'1'}), video=track();
   const signal=new AbortController().signal, attempts:string[]=[];
+  const timings: {waitMs:number;runMs:number}[]=[];
+  const report=(timing:{waitMs:number;runMs:number})=>timings.push(timing);
   const valid={id:video.id,is_live:false,protocol:'m3u8_native',url:'https://media.example.test/fast',duration:200};
   let candidate={...valid};
-  p.extract=async args=>{
+  p.extract=async (args,_signal,_priority,_profile,onTiming)=>{
    const fast=args.includes('youtube:player_client=visionos');
    attempts.push(fast?'fast':'standard');
+   onTiming?.({waitMs:0,runMs:fast?20:40});
    return fast?candidate:{url:'https://media.example.test/standard',duration:200};
   };
-  assert.equal((await p.stream(video,signal,'startup')).url,valid.url);
-  assert.equal((await p.stream(video,signal,'seek')).url,valid.url);
+  assert.equal((await p.stream(video,signal,'startup',report)).url,valid.url);
+  assert.equal((await p.stream(video,signal,'seek',report)).url,valid.url);
   assert.deepEqual(attempts.splice(0),['fast']);
+  assert.deepEqual(timings.splice(0),[{waitMs:0,runMs:20}]);
   for(const replacement of [{id:'wrong-video'},{is_live:true},{protocol:'https'},{duration:0},{url:'file:///private.wav'}]){
    candidate={...valid,...replacement};
-   assert.equal((await p.stream(video,signal,'startup')).url,'https://media.example.test/standard');
+   assert.equal((await p.stream(video,signal,'startup',report)).url,'https://media.example.test/standard');
    assert.deepEqual(attempts.splice(0),['fast','standard']);
+   assert.deepEqual(timings.splice(0),[{waitMs:0,runMs:40}]);
   }
   await p.stream({...video,live:true},signal,'startup');
   await p.stream({...video,source:'soundcloud',url:'https://soundcloud.com/example/track'},signal,'startup');

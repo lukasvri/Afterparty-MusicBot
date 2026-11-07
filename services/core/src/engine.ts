@@ -1,4 +1,4 @@
-import { AudioDiagnostics } from "./audio-diagnostics.ts";
+import { AudioDiagnostics, type StartupPhase } from "./audio-diagnostics.ts";
 import { EventEmitter } from "node:events";
 import { randomUUID, createHash } from "node:crypto";
 import { Store } from "./store.ts";
@@ -335,11 +335,17 @@ export class Engine extends EventEmitter {
     track: Track,
     offset: number,
     signal: AbortSignal,
-    onTiming?: (reason: "source-ready" | "decoder-ready", durationMs: number) => void,
+    onTiming?: (reason: StartupPhase, durationMs: number) => void,
     sourceMode: PlaybackSourceMode = "standard",
   ): Promise<Prepared> {
     const startedAt = performance.now();
-    const source = await this.providers.stream(track, signal, sourceMode);
+    const source = await this.providers.stream(track, signal, sourceMode, onTiming
+      ? ({ waitMs, runMs }) => {
+          if (signal.aborted) return;
+          onTiming("extractor-wait", waitMs);
+          onTiming("extractor-run", runMs);
+        }
+      : undefined);
     if (signal.aborted) throw new Error("Playback cancelled.");
     onTiming?.("source-ready", performance.now() - startedAt);
     return {
