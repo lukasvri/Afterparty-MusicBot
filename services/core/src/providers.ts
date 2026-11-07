@@ -102,7 +102,16 @@ const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
 export type PlaylistImportResult = { videos: Track[]; total?: number; skipped: number; limited: boolean };
 type SearchResult = { tracks: Track[]; complete: boolean };
 type StreamSource = { url: string; headers: string; duration: number | undefined };
+export type PlaybackSourceMode = "standard" | "startup" | "seek";
 const STREAM_SOURCE_TTL_MS = 5 * 60_000;
+const FAST_YOUTUBE_SOURCE_MS = 4_000;
+const YOUTUBE_HLS_FORMAT = "bestaudio[protocol*=m3u8]";
+function isPreview(media: ExtractedMedia) {
+  return media.is_preview || (media.full_duration && Number(media.duration) < media.full_duration - 2);
+}
+function isStreamUrl(url: unknown): url is string {
+  return typeof url === "string" && /^https?:\/\//.test(url);
+}
 const importObject = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const unavailablePlaylistEntry = (entry: Record<string, unknown>) =>
   entry.is_unavailable === true || entry.availability !== undefined && !["public", "unlisted"].includes(String(entry.availability)) ||
@@ -123,12 +132,14 @@ export class Providers {
   // Private, short-lived sources for current playback and its prefetched next
   // entry. Only explicit same-entry seeks may reuse them; never persist URLs.
   private streamSources = new Map<string, { at: number; source: StreamSource }>();
+  private readonly fastYouTubeStartup: boolean;
   constructor(store: Store, env: NodeJS.ProcessEnv = process.env) {
     this.store = store;
     this.key = env.YOUTUBE_API_KEY ?? "";
     this.spotifyId = env.SPOTIFY_CLIENT_ID ?? "";
     this.spotifySecret = env.SPOTIFY_CLIENT_SECRET ?? "";
     this.deezerMetadata = env.DEEZER_METADATA === "1";
+    this.fastYouTubeStartup = env.AFTERPARTY_FAST_YOUTUBE_STARTUP === "1";
     this.spotifyCatalog = new SpotifyCatalog(
       this.spotifyId,
       this.spotifySecret,
@@ -566,7 +577,7 @@ export class Providers {
     if (!found[0]) throw new UserError("No results. Try another search.");
     return [found[0]];
   }
-  async stream(track: Track, signal: AbortSignal, reuseSource = false): Promise<StreamSource> {
+  async stream(track: Track, signal: AbortSignal, mode: PlaybackSourceMode = "standard"): Promise<StreamSource> {
     if (signal.aborted) throw new UserError("The request was cancelled.");
     const key = JSON.stringify([track.source ?? "youtube", track.id, track.entryId,
       track.source === "soundcloud" ? track.url : null]);
@@ -574,7 +585,7 @@ export class Providers {
     for (const [entry, retained] of this.streamSources)
       if (now < retained.at || now - retained.at >= STREAM_SOURCE_TTL_MS)
         this.streamSources.delete(entry);
-    const retained = !track.live && reuseSource ? this.streamSources.get(key) : undefined;
+    const retained = !track.live && mode === "seek" ? this.streamSources.get(key) : undefined;
     if (retained) {
       this.streamSources.delete(key);
       this.streamSources.set(key, retained);
@@ -587,29 +598,35 @@ export class Providers {
       track.source === "soundcloud"
         ? track.url
         : `https://www.youtube.com/watch?v=${track.id}`;
-    const data = await this.extract(
-      [
-        "--no-playlist",
-        "--dump-single-json",
-        "--skip-download",
-        "--js-runtimes",
-        "node",
-        "-f",
-        track.source === "soundcloud"
-          ? "bestaudio/best"
-          : "bestaudio[protocol*=m3u8]/bestaudio/best",
-        target!,
-      ],
-      signal,
-      true,
-    );
+    const args = ["--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node"];
+    let data: ExtractedMedia | undefined;
+    if (this.fastYouTubeStartup && mode === "startup" && track.source !== "soundcloud" &&
+        !track.live && Number.isFinite(track.duration) && track.duration > 0) {
+      const deadline = AbortSignal.timeout(FAST_YOUTUBE_SOURCE_MS);
+      try {
+        const candidate = await this.extract([
+          ...args, "--extractor-args", "youtube:player_client=visionos",
+          "-f", YOUTUBE_HLS_FORMAT, target!,
+        ], AbortSignal.any([signal, deadline]), true);
+        if (!deadline.aborted && candidate.id === track.id && candidate.is_live === false &&
+            Number.isFinite(candidate.duration) && Number(candidate.duration) > 0 &&
+            (candidate.protocol === "m3u8" || candidate.protocol === "m3u8_native") &&
+            !isPreview(candidate) && isStreamUrl(candidate.url)) data = candidate;
+      } catch (error) {
+        // Capacity errors and user cancellation must not enqueue a second request.
+        if (signal.aborted || (!deadline.aborted && !(error instanceof UserError && error.status === 502)))
+          throw error;
+      }
+    }
     if (signal.aborted) throw new UserError("The request was cancelled.");
-    if (
-      data.is_preview ||
-      (data.full_duration && Number(data.duration) < data.full_duration - 2)
-    )
+    data ??= await this.extract([
+      ...args, "-f", track.source === "soundcloud" ? "bestaudio/best" : YOUTUBE_HLS_FORMAT + "/bestaudio/best",
+      target!,
+    ], signal, true);
+    if (signal.aborted) throw new UserError("The request was cancelled.");
+    if (isPreview(data))
       throw new UserError("The source only offers a preview.");
-    if (typeof data.url !== "string" || !/^https?:\/\//.test(data.url))
+    if (!isStreamUrl(data.url))
       throw new UserError("The media source has no audio stream.", 502);
     const headers = Object.entries(data.http_headers ?? {})
       .filter(([k, v]) => typeof v === "string" && !/[\r\n]/.test(k + v))
