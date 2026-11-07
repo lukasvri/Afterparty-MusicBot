@@ -83,7 +83,7 @@ Use `main` for ordinary bot/web updates. The separate `beta` branch retains v3 a
 
 ## Concert extras preview
 
-The closed-by-default Games & extras submenu offers separate optional views for reactions, shared timestamp bookmarks and a host-called bingo card. It needs matching website and Core source; the website-only room fallback disables extras. These concert extras do not run a Discord Activity. The `3.0.0-alpha.1` candidate includes native opt-in extras with open live acceptance gates; see [the checklist](docs/V3_BETA_ACCEPTANCE.md).
+The closed-by-default Concert extras panel offers reactions and shared timestamp bookmarks. It needs matching website and Core source. The website-only room fallback disables extras. Open **Games** in the main navigation for Guess the Song.
 
 ## Run your own Afterparty
 

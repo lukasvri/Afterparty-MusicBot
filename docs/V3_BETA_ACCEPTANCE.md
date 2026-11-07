@@ -1,5 +1,9 @@
 # Non-Activity concert extras acceptance
 
+Bingo steps below apply to earlier builds. The current Concert extras panel
+exposes reactions and shared moments. Existing bingo data and API compatibility
+are retained.
+
 This checklist covers the focused non-Activity v3 source candidate targeting `main`,
 preserving the merged player/error and channel-boundary fixes from PR #84 and
 FIFO queue fixes from PR #83. It does not

@@ -702,14 +702,6 @@
               </MusicWorkspace>{/key}
           </div>
         </div>
-        <div class="room-tools">
-          <div class="room-bottom">
-            <span>KEEP THE GOOD MUSIC GOING.</span><a
-              href={`/games?room=${encodeURIComponent(room.code)}`}
-              >Play Guess the Song <Icon name="arrow" size={16} /></a
-            >
-          </div>
-        </div>
       {/if}
       {#if view.error}<div class="error-message" role="alert">
           <span>{view.error}</span>{#if room}<button
@@ -1250,9 +1242,6 @@
   }
   .tv-mode .section-heading,
   .tv-mode .track-meta p {
-    display: none;
-  }
-  .tv-mode .room-tools {
     display: none;
   }
   .tv-mode .track-meta {

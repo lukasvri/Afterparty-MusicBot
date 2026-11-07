@@ -710,26 +710,6 @@
     .add-track {
       background: #25252b;
     }
-    .room-bottom {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      border-top: 1px solid var(--line);
-      margin-top: 32px;
-      padding-top: 25px;
-      font-size: 11px;
-      letter-spacing: 1px;
-      color: var(--muted);
-    }
-    .room-bottom a {
-      font-size: 13px;
-      letter-spacing: 0;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      min-height: 44px;
-    }
     .footer {
       display: flex;
       align-items: center;
@@ -930,11 +910,6 @@
       .discovery {
         margin-top: 30px;
         padding-top: 27px;
-      }
-      .room-bottom {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 8px;
       }
       .footer {
         padding: 25px 22px;

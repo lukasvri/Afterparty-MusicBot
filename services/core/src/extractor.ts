@@ -10,6 +10,7 @@ const MEMORY_UNITS = Number.isFinite(memoryLimit) && memoryLimit > 0
   ? Math.max(2, Math.min(8, Math.floor(memoryLimit / (256 * 1024 * 1024))))
   : 8;
 export type ExtractorProfile = "media" | "metadata";
+export type ExtractorTiming = { waitMs: number; runMs: number };
 const MAX_WAITING = 16;
 const SOURCE_FAILURE = "Could not load the media source. Try another link.";
 /** A metadata fast path may retry only when no usable format survives. */
@@ -153,11 +154,16 @@ export async function runJson<T = Record<string, unknown>>(
   signal?: AbortSignal,
   priority = false,
   profile: ExtractorProfile = "media",
+  onTiming?: (timing: ExtractorTiming) => void,
 ) {
   const units = profile === "metadata" ? 1 : 2;
+  const queuedAt = onTiming ? performance.now() : 0;
   await acquire(units, signal, priority);
   try {
-    return await spawnJson<T>(command, args, signal);
+    const startedAt = onTiming ? performance.now() : 0;
+    const result = await spawnJson<T>(command, args, signal);
+    onTiming?.({ waitMs: startedAt - queuedAt, runMs: performance.now() - startedAt });
+    return result;
   } finally {
     active--;
     activeUnits -= units;

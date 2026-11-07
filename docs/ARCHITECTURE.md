@@ -79,7 +79,7 @@ The v3 feature folders keep each component beside its client and behavior helper
 | `concert/` | Public Discord concert client, scoped search/additions, protected seek, session history and shared-clock audio adapter |
 | `games/` | Guess the Song client, presets, ranking and game audio |
 | `library/` | Favorites/evenings, playlist import and festival catalog |
-| `social/` | Reactions, moments and host bingo |
+| `social/` | Reactions and shared moments |
 | `admin/` | Server-scoped administration client, DJ desk and pure cue/transition rules |
 | `server/` | Native API dispatch and host-transition guard |
 | `ui/` | Root-rendered global theme, shared `AppHeader.svelte`/`AppNavigation.svelte`, `PageToolbar.svelte`, `AppFooter.svelte`, device-local `TheaterToggle.svelte` (tab-sized video, exit/focus/scroll lifecycle), persistent music workspace, shared icons, public-page frame, saved motion preference, decorative concert scenery, shared search thumbnails and copyright form |
