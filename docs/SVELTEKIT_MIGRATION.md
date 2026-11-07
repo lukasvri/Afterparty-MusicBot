@@ -41,7 +41,7 @@ flowchart LR
 | Public concerts | `concert/`: server selection, protected seek, search/library/playlist additions and calibrated browser audio; ordinary Discord music remains private |
 | Administration | `admin/`: current OAuth/password authority, scoped server settings, channels, timers, saved queues, player and diagnostics |
 | Games | `games/`: hosting/invites, capacity-aware presets, private guesses/media, skip votes, scoring, hints/reveals/results and independent local game volume |
-| Social compatibility | `social/`: legacy extras client and tests; current players omit the extras panel |
+| Social | `social/`: authorized reactions and shared moments |
 | Information | Native support/install/policy/copyright/patch-note pages retain their links and release history |
 
 Storage keys, room tokens, server identities, media privacy and database tables

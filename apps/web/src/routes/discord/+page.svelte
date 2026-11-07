@@ -11,6 +11,7 @@
   import { time } from '../../../../../lib/types.ts';
   import Icon from '#lib/ui/Icon.svelte';
   import RoomAudio from '#lib/rooms/RoomAudio.svelte';
+  import RoomSocial from '#lib/social/RoomSocial.svelte';
   import RoomSharing from '#lib/rooms/RoomSharing.svelte';
   import MusicWorkspace from '#lib/ui/MusicWorkspace.svelte';
 
@@ -292,6 +293,11 @@
               Controls update the shared Discord concert. The bot must already be connected to a
               voice channel.
             </p>
+            {#if view.audioRoom?.current && view.audioLive}
+              {#key `${view.audioRoom.guildId ?? ''}:${view.audioRoom.code}`}<RoomSocial
+                  room={view.audioRoom}
+                />{/key}
+            {/if}
           {:else}
             <div class="empty-stage">
               <div class="record" aria-hidden="true"><span>ap<span class="red">.</span></span></div>

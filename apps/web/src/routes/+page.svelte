@@ -11,6 +11,7 @@
   import Icon from '#lib/ui/Icon.svelte';
   import MusicWorkspace from '#lib/ui/MusicWorkspace.svelte';
   import RoomAudio from '#lib/rooms/RoomAudio.svelte';
+  import RoomSocial from '#lib/social/RoomSocial.svelte';
   import RoomDirectory from '#lib/rooms/RoomDirectory.svelte';
   import RoomSharing from '#lib/rooms/RoomSharing.svelte';
   import RoomQueue from '#lib/rooms/RoomQueue.svelte';
@@ -595,6 +596,9 @@
                 <summary>Room settings</summary>{@render roomControls()}
               </details>
             {/if}
+            <div class="player-extras">
+              {#key room.code}<RoomSocial {room} />{/key}
+            </div>
           </section>
           <div class="room-side" id="room-workspace">
             {#key room.code}<MusicWorkspace
@@ -1111,6 +1115,20 @@
     color: var(--muted);
     font-weight: 650;
   }
+  .player-extras :global(.room-social) {
+    margin: 0;
+    padding: 18px 20px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+  }
+  .player-extras :global(.social-heading h2) {
+    font-size: 16px;
+  }
+  .player-extras :global(.social-heading .eyebrow) {
+    display: none;
+  }
   .room-side {
     min-width: 0;
     max-height: calc(100dvh - 48px);
@@ -1124,6 +1142,7 @@
     z-index: 1000;
   }
   .tv-mode .room-side,
+  .tv-mode .player-extras,
   .tv-mode .room-settings-empty {
     display: none;
   }
