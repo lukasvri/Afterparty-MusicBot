@@ -8,7 +8,7 @@ assert(['localhost', '127.0.0.1'].includes(new URL(origin).hostname));
 const code = 'TESTROOM',
   playbackKey = 'synthetic-playback';
 for (const width of [1440, 390])
-  test(`native room social reactions, moments and host bingo at ${width}px`, async () => {
+  test(`native room keeps reactions, moments and Games without player games at ${width}px`, async () => {
     const browser = await chromium.launch({
       executablePath: process.env.CHROMIUM_PATH,
       headless: true,
@@ -63,8 +63,11 @@ for (const width of [1440, 390])
       },
       { code },
     );
-    await page.route('**/api/**', (route) => {
-      const path = new URL(route.request().url()).pathname;
+    await page.route('**/*', (route) => {
+      const url = new URL(route.request().url());
+      if (url.origin !== origin) return route.abort();
+      const path = url.pathname;
+      if (!path.startsWith('/api/')) return route.continue();
       if (path === `/api/rooms/${code}`)
         return route.fulfill({
           json: {
@@ -122,12 +125,6 @@ for (const width of [1440, 390])
             at: Date.now(),
           });
           social.revision++;
-        } else if (body.action === 'bingo-start') {
-          social.bingo = { cells: body.cells as string[], marked: [], active: true };
-          social.revision++;
-        } else if (body.action === 'bingo-mark') {
-          social.bingo!.marked.push(Number(body.cell));
-          social.revision++;
         }
         return route.fulfill({ json: { social, canManage: true } });
       }
@@ -139,8 +136,16 @@ for (const width of [1440, 390])
       });
     });
     try {
-      await page.goto(`${origin}/v3?room=${code}`);
-      const section = page.getByRole('region', { name: 'Games and extras' });
+      await page.goto(`${origin}/?room=${code}`);
+      await page.getByText('Synthetic soundtrack', { exact: true }).first().waitFor();
+      const games = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', {
+        name: 'Games',
+        exact: true,
+      });
+      assert.equal(await games.getAttribute('href'), `/games?room=${code}`);
+      assert.equal(await page.getByRole('link', { name: 'Play Guess the Song' }).count(), 0);
+      assert.equal(joins, 0, 'closed extras must not request a grant');
+      const section = page.getByRole('region', { name: 'Concert extras' });
       await section.getByRole('button', { name: 'Open extras' }).click();
       await section.getByRole('button', { name: 'Fire', exact: true }).click();
       await section.getByRole('status').filter({ hasText: 'Reaction sent.' }).waitFor();
@@ -153,27 +158,16 @@ for (const width of [1440, 390])
         await moment.getAttribute('href'),
         'https://www.youtube.com/watch?v=synthetic01&t=32s',
       );
-      await section.getByRole('button', { name: 'Concert bingo', exact: true }).click();
-      await section.getByRole('button', { name: 'Create card', exact: true }).click();
-      await section.getByRole('button', { name: 'Start card', exact: true }).click();
-      await section.getByRole('button', { name: /01\s*Opening song/ }).click();
-      await page.waitForFunction(
-        () => document.querySelector('.bingo-grid button')?.getAttribute('aria-pressed') === 'true',
-      );
-      assert.equal(
-        await section.getByRole('button', { name: /Opening song/ }).getAttribute('aria-pressed'),
-        'true',
-      );
+      assert.equal(await section.getByRole('button', { name: 'Concert bingo' }).count(), 0);
       await page.waitForTimeout(1200);
       assert.equal(joins, 1, 'polling the same playback must not recreate grants');
       assert.deepEqual(
         writes.map((write) => write.action),
-        ['reaction', 'highlight', 'bingo-start', 'bingo-mark'],
+        ['reaction', 'highlight'],
       );
-      assert.equal(new Set(writes.map((write) => write.eventId)).size, 4);
+      assert.equal(new Set(writes.map((write) => write.eventId)).size, 2);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert.deepEqual(errors, []);
-      await section.screenshot({ path: `/tmp/v3-social-${width}.png` });
       await section.getByRole('button', { name: 'Close extras' }).click();
       assert.equal(await section.getByRole('button', { name: 'Fire', exact: true }).count(), 0);
     } finally {
