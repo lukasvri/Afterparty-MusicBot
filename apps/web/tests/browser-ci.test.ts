@@ -68,8 +68,7 @@ test('game, dependency, shared, workflow and unknown changes retain the full pac
 
 test('missing, empty and invalid diffs cannot reduce browser coverage', () => {
   for (const event of ['pull_request', 'push'])
-    for (const paths of [null, []])
-      assert.deepEqual(browserArguments(command, event, paths), full);
+    for (const paths of [null, []]) assert.deepEqual(browserArguments(command, event, paths), full);
   assert.equal(changedPaths('', ''), null);
   assert.equal(changedPaths('--help', 'a'.repeat(40)), null);
   assert.equal(changedPaths('a'.repeat(40), 'b'.repeat(40)), null);
