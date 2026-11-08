@@ -57,6 +57,7 @@ export async function checkConfiguredGuessSource(env: NodeJS.ProcessEnv, options
     GUESS_YOUTUBE_CLIPS: env.GUESS_YOUTUBE_CLIPS,
     GUESS_YOUTUBE_PACK: env.GUESS_YOUTUBE_PACK,
     ...(provider === 'deezer' ? { GUESS_DEEZER_INVENTORY_PATH: env.GUESS_DEEZER_INVENTORY_PATH } : {}),
+    ...(provider === 'local' ? { GUESS_LOCAL_INVENTORY_PATH: env.GUESS_LOCAL_INVENTORY_PATH } : {}),
     ...(provider === 'youtube' ? { GUESS_YOUTUBE_INVENTORY_PATH: env.GUESS_YOUTUBE_INVENTORY_PATH } : {}) };
   const lifetime = new AbortController();
   let source: Source | undefined, result: GuessCheckResult;

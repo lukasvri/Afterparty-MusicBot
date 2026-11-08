@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Guilds } from '../src/guilds.ts';
 import { Store } from '../src/store.ts';
 import { Engine } from '../src/engine.ts';
@@ -9,6 +12,7 @@ import { Commands } from '../src/commands.ts';
 import { Providers } from '../src/providers.ts';
 import { createServers } from '../src/server.ts';
 import { prepareOperatorGuessInventory, type OperatorGuessInventoryRecord } from '../src/guess-operator-inventory.ts';
+import { prepareConfiguredGuessSource } from '../src/guess-source.ts';
 import { prepareDeezerGuessInventory } from '../src/guess-deezer.ts';
 import { prepareYoutubeGuessInventory } from '../src/guess-youtube.ts';
 import { buildGuessPackInventory, getGuessPack } from '../src/guess-packs.ts';
@@ -93,9 +97,22 @@ function assertPrivate(value: unknown) {
   }
 }
 
-test('real HTTP combines authorized inventory with two concurrent scorers across distinct rounds without touching music', async t => {
+test('real HTTP serves a configured local WAV inventory to two concurrent scorers without touching music', async t => {
   let clock = Date.now(); t.mock.method(Date, 'now', () => clock);
-  const records = recordings(clock + 600_000), f = await fixture(records), before = f.state();
+  const records = recordings(clock + 600_000);
+  const directory = await mkdtemp(join(tmpdir(), 'afterparty-local-quiz-http-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const configPath = join(directory, 'inventory.local.json');
+  const manifest = await Promise.all(records.map(async ({ wav, ...record }, index) => {
+    const audioFile = `clip-${index}.wav`;
+    await writeFile(join(directory, audioFile), wav);
+    return { ...record, audioFile };
+  }));
+  await writeFile(configPath, JSON.stringify(manifest));
+  const inventory = await prepareConfiguredGuessSource({ GUESS_LOCAL_INVENTORY_PATH: configPath }, { signal: AbortSignal.timeout(30_000) });
+  assert(inventory);
+  t.after(inventory.dispose);
+  const f = await fixture(records, inventory), before = f.state();
   try {
     const catalogResponse = await f.call({ action: 'catalog' });
     assert.equal(catalogResponse.status, 200);
