@@ -22,7 +22,10 @@ import { selectRadio } from "./radio-pipeline.ts";
 import { favoriteRecording } from "./recommendation-ranking.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
-import { ProviderWork, CORE_SEARCH_DEADLINE_MS, CORE_SEARCH_RESULTS_MS } from "./provider-work.ts";
+import {
+  ProviderWork, CORE_SEARCH_DEADLINE_MS, CORE_SEARCH_RESULTS_MS,
+  CORE_SEARCH_FIRST_PAGE_SIZE, CORE_SEARCH_TAIL_MS,
+} from "./provider-work.ts";
 function extractedCatalogArtist(media: ExtractedMedia) {
   const original = media.artist ?? media.uploader ?? "YouTube";
   const artists = media.artists;
@@ -101,6 +104,7 @@ const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
   ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) });
 export type PlaylistImportResult = { videos: Track[]; total?: number; skipped: number; limited: boolean };
 type SearchResult = { tracks: Track[]; complete: boolean };
+type SearchHydrationProgress = (verified: number, initiallyCached: number) => void;
 type StreamSource = { url: string; headers: string; duration: number | undefined };
 export type PlaybackSourceMode = "standard" | "startup" | "seek";
 const STREAM_SOURCE_TTL_MS = 5 * 60_000;
@@ -171,14 +175,14 @@ export class Providers {
   ) {
     return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile, onTiming);
   }
-  async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false): Promise<Track[]> {
+  async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false, onVerified?: SearchHydrationProgress): Promise<Track[]> {
     const controller = new AbortController();
     try {
       return await this.videoResults(ids, skipUnavailable,
-        signal ? AbortSignal.any([signal, controller.signal]) : controller.signal, partial);
+        signal ? AbortSignal.any([signal, controller.signal]) : controller.signal, partial, onVerified);
     } finally { controller.abort(new UserError("The request was cancelled.", 499)); }
   }
-  private async videoResults(ids: string[], skipUnavailable: boolean, signal: AbortSignal, partial: boolean): Promise<Track[]> {
+  private async videoResults(ids: string[], skipUnavailable: boolean, signal: AbortSignal, partial: boolean, onVerified?: SearchHydrationProgress): Promise<Track[]> {
     if (!partial) signal.throwIfAborted();
     if (!ids.length) return [];
     if (ids.some((id) => !/^[\w-]{11}$/.test(id)))
@@ -194,6 +198,8 @@ export class Providers {
         found.set(id, cached.track);
       else if (!missing.includes(id)) missing.push(id);
     }
+    const initiallyCached = onVerified ? [...found.values()].filter(track => track.embeddable).length : 0;
+    let verified = initiallyCached;
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
       if (signal.aborted && partial) break;
@@ -243,7 +249,13 @@ export class Providers {
         for (const id of owned.keys()) complete(id, error instanceof Error ? error : new Error(String(error)));
       });
       await Promise.all(pending.map(async ([id, lookup]) => {
-        try { const track = await lookup; if (track) found.set(id, track); }
+        try {
+          const track = await lookup;
+          if (track) {
+            found.set(id, track);
+            if (onVerified && track.embeddable) onVerified(++verified, initiallyCached);
+          }
+        }
         catch (error) { if (signal.aborted && !partial || !skipUnavailable) throw error; }
       }));
     }
@@ -360,14 +372,24 @@ export class Providers {
         const hydration = new AbortController();
         // One soft cutoff from search start, not a new budget for each ID.
         const timer = setTimeout(() => hydration.abort(), CORE_SEARCH_RESULTS_MS);
+        let tail: ReturnType<typeof setTimeout> | undefined;
+        const onVerified: SearchHydrationProgress = (verified, initiallyCached) => {
+          // A retry with a verified first page gets the full remaining budget.
+          if (initiallyCached < CORE_SEARCH_FIRST_PAGE_SIZE &&
+              verified >= CORE_SEARCH_FIRST_PAGE_SIZE && tail === undefined)
+            tail = setTimeout(() => hydration.abort(), CORE_SEARCH_TAIL_MS);
+        };
         try {
-          const { tracks, emptySearch } = await this.searchUncached(query, count, musicOnly, signal, hydration.signal);
+          const { tracks, emptySearch } = await this.searchUncached(
+            query, count, musicOnly, signal, hydration.signal,
+            !musicOnly && count > CORE_SEARCH_FIRST_PAGE_SIZE ? onVerified : undefined,
+          );
           signal.throwIfAborted();
           const complete = !hydration.signal.aborted || musicOnly;
           if (complete && (tracks.length || emptySearch && !musicOnly))
             this.store.set(key, { at: Date.now(), tracks });
           return { tracks, complete };
-        } finally { clearTimeout(timer); }
+        } finally { clearTimeout(timer); clearTimeout(tail); }
       });
     }
     const result = await lookup.wait(signal);
@@ -379,6 +401,7 @@ export class Providers {
     musicOnly: boolean,
     signal: AbortSignal,
     hydration: AbortSignal,
+    onVerified?: SearchHydrationProgress,
   ): Promise<{ tracks: Track[]; emptySearch: boolean }> {
     let ids: string[];
     try {
@@ -408,7 +431,9 @@ export class Providers {
     }
     const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
     const partial = !musicOnly;
-    const tracks = await this.video(unique, true, partial ? AbortSignal.any([signal, hydration]) : signal, partial);
+    const tracks = await this.video(
+      unique, true, partial ? AbortSignal.any([signal, hydration]) : signal, partial, onVerified,
+    );
     signal.throwIfAborted();
     if (partial && hydration.aborted && unique.length && !tracks.length)
       throw new UserError("The music source took too long. Try again shortly.", 504);

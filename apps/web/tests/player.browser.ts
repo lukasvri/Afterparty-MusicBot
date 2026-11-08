@@ -961,6 +961,43 @@ for (const width of [3840, 2560, 1920, 390]) {
   });
 }
 
+test('a partial search keeps verified results visible while the same query retries', async (t) => {
+  const f = await fixture(t, 390, { host: true, initial: true, paused: true });
+  const retry = Promise.withResolvers<void>();
+  try {
+    const { page } = f;
+    let searches = 0;
+    await page.route('**/api/search?*', async (route) => {
+      if (++searches === 1)
+        return route.fulfill({ json: { videos: results.slice(0, 1), complete: false } });
+      await retry.promise;
+      return route.fulfill({ json: { videos: results, complete: true } });
+    });
+    await find(page, 'night');
+    const note = page.getByText(/Showing a partial list/);
+    const first = page.getByRole('button', {
+      name: `Add ${results[0].title} to queue`,
+      exact: true,
+    });
+    await note.waitFor();
+    await first.waitFor();
+    await page.getByRole('button', { name: 'Find music', exact: true }).click();
+    await page.getByRole('button', { name: 'Searching…', exact: true }).waitFor();
+    assert(await first.isVisible());
+    retry.resolve();
+    await page
+      .getByRole('button', { name: `Add ${results[1].title} to queue`, exact: true })
+      .waitFor();
+    assert.equal(await note.count(), 0);
+    assert.equal(searches, 2);
+    assert.deepEqual(f.writes, []);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    retry.resolve();
+    await f.close();
+  }
+});
+
 for (const width of [1440, 390]) {
   for (const timeout of ['browser', 'gateway', 'HTML gateway', 'empty gateway']) {
     test(`${width}px: ${timeout} search timeout explains retry while the paused room stays connected`, async (t) => {

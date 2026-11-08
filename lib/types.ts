@@ -19,6 +19,7 @@ export type Video = {
   requestedBy?: string;
   radio?: boolean;
 };
+export type MusicSearchResponse = { videos: Video[]; complete: boolean };
 export type RoomState = RoomPlayback & {
   buffering?: boolean;
   cohostHashes?: string[];

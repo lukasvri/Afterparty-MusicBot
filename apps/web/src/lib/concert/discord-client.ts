@@ -1,6 +1,6 @@
 import { request as browserRequest } from '../../../../../lib/browser-api.ts';
 import { browserStorage } from '../../../../../lib/browser-storage.ts';
-import type { DiscordState, Room, Video } from '../../../../../lib/types.ts';
+import type { DiscordState, MusicSearchResponse, Room, Video } from '../../../../../lib/types.ts';
 import { createConcertAudio, type ConcertAudioOptions } from './concert-audio.ts';
 
 export type ConcertState = DiscordState & { playbackKey?: string | null };
@@ -30,6 +30,7 @@ export type ConcertView = {
   audioPhase: string;
   adding: boolean;
   searching: boolean;
+  searchIncomplete: boolean;
   query: string;
   results: Video[];
   history: Video[];
@@ -69,6 +70,7 @@ export function createDiscordClient(options: Options = {}) {
     audioPhase: 'Connecting shared clock…',
     adding: false,
     searching: false,
+    searchIncomplete: false,
     query: '',
     results: [],
     history: [],
@@ -379,14 +381,21 @@ export function createDiscordClient(options: Options = {}) {
       if (!target || !current(target)) return;
       const controller = new AbortController();
       searchController = controller;
-      publish({ query, results: [], searching: false, error: '' });
+      const retry = view.searchIncomplete && view.query === query;
+      publish({
+        query,
+        results: retry ? view.results : [],
+        searching: false,
+        searchIncomplete: retry,
+        error: '',
+      });
       if (query.length < 2 || query.length > 120) {
         publish({ error: 'Enter between 2 and 120 characters.' });
         return;
       }
       publish({ searching: true });
       try {
-        const result = await request<{ videos: Video[] }>(
+        const result = await request<MusicSearchResponse>(
           `/api/search?q=${encodeURIComponent(query)}`,
           {
             headers: headers(),
@@ -394,7 +403,11 @@ export function createDiscordClient(options: Options = {}) {
           },
         );
         if (current(target) && serial === searchSerial)
-          publish({ results: result.videos, searching: false });
+          publish({
+            results: result.videos,
+            searching: false,
+            searchIncomplete: result.complete === false,
+          });
       } catch (error) {
         if (current(target) && serial === searchSerial)
           publish({ searching: false, error: errorText(error) });
@@ -404,7 +417,7 @@ export function createDiscordClient(options: Options = {}) {
       searchSerial++;
       searchController?.abort();
       searchController = null;
-      publish({ searching: false, query: '', results: [] });
+      publish({ searching: false, searchIncomplete: false, query: '', results: [] });
     },
     cancelAdditions() {
       additions?.abort();
