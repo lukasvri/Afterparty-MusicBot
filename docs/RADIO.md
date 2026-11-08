@@ -162,6 +162,11 @@ before they can enter matching.
 
 Last.fm's [track.getSimilar](https://www.last.fm/api/show/track.getSimilar) supplies listening-based track relationships. Its [artist.getTopTracks](https://www.last.fm/api/show/artist.getTopTracks) supplies popular tracks by the original artist as a bounded fallback. Artist popularity does not establish a relationship to an unrelated artist. Catalog matching must still identify the actual recording, and every playback result passes the same content, style, history and visibility checks. Last.fm remains optional; adapters without a configured catalog use the shared safe search stages instead. No new provider account is required.
 
+When every cached similar song is already known, Core can refresh that list in
+the background. Selection continues through the existing search stages while
+the refresh runs. At most one early refresh runs per provider instance at a
+time, with at least five minutes between early attempts for the same song.
+
 Successful nonempty recommendation results retain the 24-hour cache lifetime. Successful empty results expire after 60 seconds so later retries can recover. Errors are not recorded as successful empty results. Versioned cache keys prevent older data from bypassing the updated parser and policy.
 
 The fixed limits per selection are one metadata-refinement search inspecting at most 12 results, at most 15 descriptors per catalog source, four combined catalog/station attempts in total with at most three spent on similar tracks or station searches, and two generic discovery searches inspecting at most 20 results each. A recognized station can use the remaining budget for named themed recordings. Other seeds retain original-artist recovery. At most 60 playback candidates are admitted to inspection. These count adapter calls and candidates, not every lower-level HTTP or extractor operation inside an adapter. Named-recording hydration stays sequential. The two generic discovery pools run concurrently and share overlapping metadata lookups.

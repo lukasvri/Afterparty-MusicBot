@@ -749,7 +749,7 @@ export class Providers {
           args => runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args), 5)
         : this.search(query, 20, true),
       ...(this.recommendations.enabled ? {
-        similar: (original: Track) => this.recommendations.similar(original),
+        similar: (original: Track, alreadyKnown: (song: CatalogSong) => boolean) => this.recommendations.similar(original, alreadyKnown),
         topTracks: (original: Track) => this.recommendations.topTracks(original),
         match: (song: CatalogSong) => this.matchSong(song),
       } : {}),
