@@ -34,8 +34,11 @@ These compatibility and system boundaries remain:
   installed command names and the two tiny `.mjs` compatibility loaders remain
   supported; these are not alternate application implementations.
 
-Run `npm run check:all` to validate the website, Core, deployer and production
-build. `npm run release:check` checks the shared version and release notes.
+Run `npm run setup:cloud` to install the locked dependencies and
+`npm run check:all` to validate the website, Core, deployer and production
+build. The TypeScript runner delegates setup to the existing `install:ci`
+command. Set `PYTHON_PATH` and `FFMPEG_PATH` if those executables are outside
+`PATH`. `npm run release:check` checks the shared version and release notes.
 GitHub language percentages measure source bytes, not code quality or runtime
 performance; generated JavaScript and necessary configuration should not be
 hidden just to change those percentages.
