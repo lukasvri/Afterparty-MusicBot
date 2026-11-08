@@ -557,7 +557,7 @@ test(
             [...document.querySelectorAll('.scores li')].some(
               (row) =>
                 row.querySelector('strong')?.textContent?.startsWith('Blue') &&
-                Number(row.querySelector('b')?.textContent?.replaceAll(',', '')) === total,
+                row.querySelector('b')?.textContent === total.toLocaleString(),
             ),
           blueTotal,
         );
@@ -582,8 +582,7 @@ test(
               [...document.querySelectorAll('.scores li')].some(
                 (row) =>
                   row.querySelector('strong')?.textContent?.startsWith(name) &&
-                  Number(row.querySelector('b')?.textContent?.replaceAll(',', '')) ===
-                    [red, blue][i],
+                  row.querySelector('b')?.textContent === [red, blue][i].toLocaleString(),
               ),
             ),
           { red: redTotal, blue: blueTotal },
