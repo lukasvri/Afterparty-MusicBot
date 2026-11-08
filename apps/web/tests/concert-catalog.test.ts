@@ -29,6 +29,14 @@ const snapshots = [
   },
   {
     eventId: 'edc-las-vegas',
+    year: 2024,
+    listedCount: 55,
+    includedCount: 52,
+    sourceUrl: 'https://lasvegas.edc.com/2024-sets/',
+    sha256: 'b29691845f28c3c75cc715e52a28b9adad210b4a7e9dc6e0bb40fb4e456bc69e',
+  },
+  {
+    eventId: 'edc-las-vegas',
     year: 2023,
     listedCount: 26,
     includedCount: 26,
@@ -175,7 +183,7 @@ test('festival records preserve source attribution, unique recordings and origin
     assert(recording.uploaderName || recording.sourcePublisher);
     assert(recording.evidenceUrls.includes(recording.sourceUrl));
   }
-  assert.equal(CONCERT_CATALOG.length, 1049);
+  assert.equal(CONCERT_CATALOG.length, 1101);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'cWJV0DgMqEA')?.year, 2023);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'jQLWYc2UrFY')?.artist, 'Westend');
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'PVh5bKxUjPo')?.artist, 'SKILAH');
@@ -220,6 +228,19 @@ test('Tomorrowland source snapshots retain outside-playlist uploads and checked 
     assert(CONCERT_CATALOG.some((item) => item.videoId === id && item.uploaderName));
 });
 
+const beforeEdc2024 = CONCERT_CATALOG.filter(
+  (entry) => entry.eventId !== 'edc-las-vegas' || entry.year !== 2024,
+);
+
+test('EDC 2024 expansion preserves all 1049 preceding catalog objects exactly', () => {
+  const previous = [...beforeEdc2024].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  assert.equal(previous.length, 1049);
+  assert.equal(
+    createHash('sha256').update(JSON.stringify(previous)).digest('hex'),
+    '6ccb3ead5685590d2524290bfb1eb99b8e3a067854fae4bd69f9921ce3bae789',
+  );
+});
+
 const originalUltraIds = new Set([
   'i_BPdQ-FidY',
   'vBvZaydcCzc',
@@ -231,9 +252,9 @@ const originalUltraIds = new Set([
 ]);
 const originalRaiIds = new Set(['cWJV0DgMqEA', 'lGCo8ILvauI', 'CwE-haZR2fc']);
 test('RAI expansion preserves all 1036 preceding catalog objects exactly', () => {
-  const previous = CONCERT_CATALOG.filter(
-    (entry) => entry.eventId !== 'amsterdam-rai' || originalRaiIds.has(entry.videoId),
-  ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const previous = beforeEdc2024
+    .filter((entry) => entry.eventId !== 'amsterdam-rai' || originalRaiIds.has(entry.videoId))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   assert.equal(previous.length, 1036);
   assert.equal(
     createHash('sha256').update(JSON.stringify(previous)).digest('hex'),

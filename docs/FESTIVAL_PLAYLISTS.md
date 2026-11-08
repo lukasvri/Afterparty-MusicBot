@@ -1,7 +1,7 @@
 # Festival concert playlists
 
-The source candidate contains **1,049 source-backed recordings across five event families
-and 17 event/year groups**. Open **Library & playlists**, choose **Festival
+The source candidate contains **1,101 source-backed recordings across five event families
+and 18 event/year groups**. Open **Library & playlists**, choose **Festival
 concerts**, then select the festival and performance year. Search by artist,
 recording title or stage, and browse 20 sets per page. Every indexed set remains
 reachable; the page limit is not an inventory limit.
@@ -19,12 +19,13 @@ index, check both the publisher and representative footage. A title, thumbnail
 or verified channel alone does not establish that the upload shows the concert.
 Exclude fan uploads, mirrors, audio with a still image, trailers and recaps.
 
-## Source coverage checked on 25 and 31 October 2026
+## Source coverage checked in October and November 2026
 
 | Festival | Year | Catalog recordings | Coverage |
 | --- | --- | ---: | --- |
 | EDC Las Vegas | 2026 | 116 | All 116 video links in the [official source index](https://lasvegas.edc.com/2026-sets/) |
 | EDC Las Vegas | 2025 | 86 | All 86 video links in the [official source index](https://lasvegas.edc.com/2025-sets/) |
+| EDC Las Vegas | 2024 | 52 | Matching recordings with metadata and successful oEmbed responses from 55 entries in the [official Insomniac playlist](https://www.youtube.com/playlist?list=PLtZ1Nsu2D5r1pzumunDE64DBB6eSXmflw), checked 8 November |
 | EDC Las Vegas | 2023 | 26 | All 26 embedded videos in the [official source index](https://lasvegas.edc.com/2023-sets/) |
 | Creamfields | 2024 | 24 | All 23 matching-year videos in the [24-entry official index](https://creamfields.com/2024_live/all-streams/), plus the official Beatport CAMELPHAT upload |
 | Tomorrowland Belgium | 2026 | 137 | All 134 named source entries plus three existing uploads outside the playlist |
@@ -58,6 +59,15 @@ The 17 entries initially lacked metadata. Follow-up watch pages identify 16 as
 private and one as unavailable with an unspecified cause. Included recordings'
 playback, embedding and territory remain runtime checks, not playlist claims.
 
+The [EDC Las Vegas 2024 archive](https://lasvegas.edc.com/2024-sets/) advertises
+57 sets. The linked Insomniac playlist reported and returned 55 unique entries on
+8 November. The Dom Dolla video title identifies 2023, so the 2024 group excludes
+it. Two other entries had no title or duration and returned HTTP 403 and 404 from
+YouTube oEmbed. The 52 included entries have positive durations and successful
+oEmbed responses. Lilly Palmer's title omits the year, and the
+[published Neon Garden recording](https://music.apple.com/us/album/lilly-palmer-at-edc-las-vegas-2024-neon-garden-stage-dj-mix/1754253930)
+identifies the matching 2024 performance. Runtime playback remains a separate check.
+
 The [Ultra audit](ULTRA_SOURCE_AUDIT_20261031.md) follows the official season
 routes rather than the first page of the unfiltered archive. It reconciles 190
 rows with 180 metadata-backed YouTube recordings, two repeated occurrences,
@@ -73,7 +83,7 @@ embeds [a recording identifying 2023](https://www.youtube.com/watch?v=Bz3StgzmGo
 It is excluded from the 2024 inventory. The additional
 [CAMELPHAT recording](https://www.youtube.com/watch?v=bVF_7IiTAsI) is published by
 Beatport and describes its Creamfields 2024 Steel Yard performance. Source-count
-and sorted-video-ID digest tests protect the sixteen enumerated snapshots against
+and sorted-video-ID digest tests protect the seventeen enumerated snapshots against
 accidental lost, replaced or misplaced links.
 
 The [RAI audit](RAI_SOURCE_AUDIT_20261031.md) reconciles the complete seven-link
