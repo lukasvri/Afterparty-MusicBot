@@ -815,6 +815,92 @@ const curatedRecordings: readonly ConcertRecording[] = [
       "https://www.youtube.com/watch?v=bVF_7IiTAsI",
       "https://www.beatportal.com/articles/594895-beatport-livestream-creamfields-2024"
     ]
+  },
+  {
+    "id": "red-rocks-2026-MI-I3utRjpE",
+    "eventId": "red-rocks",
+    "eventName": "Red Rocks Amphitheatre",
+    "year": 2026,
+    "artist": "Alesso",
+    "title": "Alesso Presents \"The One\" Live @ Red Rocks Amphitheatre | Full DJ Set",
+    "videoId": "MI-I3utRjpE",
+    "uploaderName": "Alesso",
+    "uploaderUrl": "https://www.youtube.com/@alesso",
+    "sourceUrl": "https://www.youtube.com/watch?v=MI-I3utRjpE",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=MI-I3utRjpE",
+      "https://www.redrocksonline.com/events/alesso-1312610/"
+    ]
+  },
+  {
+    "id": "red-rocks-2025-J8P_X7Fc5as",
+    "eventId": "red-rocks",
+    "eventName": "Red Rocks Amphitheatre",
+    "year": 2025,
+    "artist": "Martin Garrix B2B Alesso",
+    "title": "MARTIN GARRIX B2B ALESSO LIVE @ RED ROCKS 2025",
+    "videoId": "J8P_X7Fc5as",
+    "uploaderName": "Martin Garrix",
+    "uploaderUrl": "https://www.youtube.com/@MartinGarrix",
+    "sourceUrl": "https://www.youtube.com/watch?v=J8P_X7Fc5as",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=J8P_X7Fc5as"
+    ]
+  },
+  {
+    "id": "red-rocks-2025-dLNUbE_Q-3E",
+    "eventId": "red-rocks",
+    "eventName": "Red Rocks Amphitheatre",
+    "year": 2025,
+    "artist": "Martin Garrix",
+    "title": "MARTIN GARRIX LIVE @ RED ROCKS 2025",
+    "videoId": "dLNUbE_Q-3E",
+    "uploaderName": "Martin Garrix",
+    "uploaderUrl": "https://www.youtube.com/@MartinGarrix",
+    "sourceUrl": "https://www.youtube.com/watch?v=dLNUbE_Q-3E",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=dLNUbE_Q-3E",
+      "https://www.redrocksonline.com/events/martin-garrix-10-23-868075/"
+    ]
+  },
+  {
+    "id": "tomorrowland-brasil-2025-lPLHOPVSw_Q",
+    "eventId": "tomorrowland-brasil",
+    "eventName": "Tomorrowland Brasil",
+    "year": 2025,
+    "artist": "DubVision B2B Matisse & Sadko B2B Third Party",
+    "title": "DubVision b2b Matisse & Sadko b2b Third Party | Tomorrowland Brasil 2025",
+    "videoId": "lPLHOPVSw_Q",
+    "stage": "Mainstage",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=lPLHOPVSw_Q",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=lPLHOPVSw_Q",
+      "https://www.tomorrowland.com/article/tomorrowland-brasil-2025-full-sets/"
+    ]
+  },
+  {
+    "id": "tomorrowland-brasil-2025-WCo6kS1h8aU",
+    "eventId": "tomorrowland-brasil",
+    "eventName": "Tomorrowland Brasil",
+    "year": 2025,
+    "artist": "Alesso",
+    "title": "Alesso | Tomorrowland Brasil 2025",
+    "videoId": "WCo6kS1h8aU",
+    "stage": "Mainstage",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=WCo6kS1h8aU",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=WCo6kS1h8aU",
+      "https://www.tomorrowland.com/article/tomorrowland-brasil-2025-live-info/"
+    ]
   }
 ];
 
