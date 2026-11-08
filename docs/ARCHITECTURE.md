@@ -1,6 +1,6 @@
 # How Afterparty fits together
 
-[Documentation](README.md) · [Installation](INSTALLATION.md) · [Configuration](CONFIGURATION.md)
+[Documentation](README.md) · [Installation](INSTALLATION.md) · [Configuration](CONFIGURATION.md) · [State machine map](STATE_MACHINES.md)
 
 Afterparty has a self-hosted Core service and a website. The services share state through an authenticated HTTPS connection; they do not share a database file.
 

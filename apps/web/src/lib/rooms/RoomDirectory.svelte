@@ -10,11 +10,16 @@
     onCreate,
   }: { busy: boolean; onJoin: (code: string) => void | Promise<void>; onCreate: () => void } =
     $props();
-  let rooms = $state<OpenRoom[]>([]),
-    loading = $state(true),
-    loaded = $state(false),
-    error = $state(''),
-    query = $state('');
+  type DirectoryRead =
+    { status: 'initial' | 'unavailable' } | { status: 'ready' | 'stale'; rooms: OpenRoom[] };
+
+  let read = $state.raw<DirectoryRead>({ status: 'initial' });
+  let controller = $state.raw<AbortController>();
+  let query = $state('');
+  const loading = $derived(read.status === 'initial' || controller !== undefined);
+  const snapshot = $derived('rooms' in read ? read : undefined);
+  const rooms = $derived(snapshot?.rooms ?? []);
+  const stale = $derived(read.status === 'stale');
   let filterInput: HTMLInputElement | undefined;
   function clearSearch() {
     query = '';
@@ -24,32 +29,25 @@
   const visible = $derived(
     rooms.filter((room) => !term || `${room.name} ${room.code}`.toLowerCase().includes(term)),
   );
-  let controller: AbortController | undefined;
   let disposed = false;
   async function refresh() {
     // Slow reads keep their place; manual refresh and polls cannot race them.
     if (disposed || controller) return;
     const current = new AbortController();
     controller = current;
-    loading = true;
-    error = '';
     try {
       const result = await request<{ rooms: OpenRoom[] }>('/api/rooms', {
         cache: 'no-store',
         signal: AbortSignal.any([current.signal, AbortSignal.timeout(12000)]),
       });
       if (disposed || current.signal.aborted || controller !== current) return;
-      rooms = result.rooms;
-      loaded = true;
+      read = { status: 'ready', rooms: result.rooms };
     } catch {
       if (!disposed && !current.signal.aborted && controller === current) {
-        error = loaded
-          ? 'Rooms could not refresh. Showing the last available list. Try again.'
-          : 'Open rooms could not load. Try again.';
+        read = 'rooms' in read ? { status: 'stale', rooms: read.rooms } : { status: 'unavailable' };
       }
     } finally {
       if (!disposed && controller === current) {
-        loading = false;
         controller = undefined;
       }
     }
@@ -99,30 +97,46 @@
       </div>
     </div>
     <p class="directory-count" role="status" aria-atomic="true">
-      {#if loading && !loaded}Finding open rooms…{:else if loaded}{term
-          ? `${visible.length} of ${rooms.length}`
-          : rooms.length} open {rooms.length === 1 ? 'room' : 'rooms'}{:else}Rooms are unavailable{/if}
+      {#if loading && !snapshot}Finding open rooms…{:else if snapshot}{stale
+          ? 'Last list: '
+          : ''}{term ? `${visible.length} of ${rooms.length}` : rooms.length} open {rooms.length ===
+        1
+          ? 'room'
+          : 'rooms'}{:else}Rooms are unavailable{/if}
     </p>
   </div>
-  {#if error}<div class="directory-error" role="alert">
-      <strong>{loaded ? 'The list may have changed.' : 'A little quiet on the connection.'}</strong>
-      <p>{error}</p>
+  {#if stale || read.status === 'unavailable'}<div class="directory-error" role="alert">
+      <strong>{stale ? 'The list may have changed.' : 'A little quiet on the connection.'}</strong>
+      <p>
+        {stale
+          ? 'Rooms could not refresh. Showing the last available list. Try again.'
+          : 'Open rooms could not load. Try again.'}
+      </p>
     </div>{/if}
   <div id="directory-results" aria-busy={loading}>
-    {#if !loaded && loading}<div class="directory-empty">
+    {#if !snapshot && loading}<div class="directory-empty">
         <span class="empty-symbol"><Icon name="users" size={28} /></span>
         <h2>Finding your next listening room.</h2>
         <p>Checking which hosts have opened their doors.</p>
-      </div>{:else if loaded && !rooms.length}<div class="directory-empty">
+      </div>{:else if snapshot && !rooms.length}<div class="directory-empty">
         <span class="empty-symbol"><Icon name="headphones" size={28} /></span>
-        <h2>The next great room could be yours.</h2>
-        <p>No open rooms right now. Create one and invite your people.</p>
-      </div>{:else if loaded && !visible.length}<div class="directory-empty">
+        {#if stale}
+          <h2>The last room list was empty.</h2>
+          <p>Refresh to check whether any rooms are open now.</p>
+        {:else}
+          <h2>The next great room could be yours.</h2>
+          <p>No open rooms right now. Create one and invite your people.</p>
+        {/if}
+      </div>{:else if snapshot && !visible.length}<div class="directory-empty">
         <span class="empty-symbol"><Icon name="search" size={28} /></span>
-        <h2>No rooms match your search.</h2>
-        <p>Try another name or room code, or browse every open room.</p>
+        <h2>{stale ? 'No matches in the last room list.' : 'No rooms match your search.'}</h2>
+        <p>
+          {stale
+            ? 'Try another name or room code, or refresh for the latest rooms.'
+            : 'Try another name or room code, or browse every open room.'}
+        </p>
         <button class="button secondary" onclick={clearSearch}>Show all rooms</button>
-      </div>{:else if loaded}<div class="room-cards">
+      </div>{:else if snapshot}<div class="room-cards">
         {#each visible as room (room.code)}<article aria-labelledby={`room-name-${room.code}`}>
             <div class="room-card-meta">
               <span class="open-label"><span></span>OPEN ROOM</span><span

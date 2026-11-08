@@ -39,7 +39,7 @@ async function fixture(t: TestContext, width: number) {
     fail = false,
     list = rooms;
   let release: (() => void) | undefined;
-  let hold = false;
+  let held: Promise<void> | undefined;
   await page.addInitScript(() => {
     const originalInterval = window.setInterval;
     const originalFetch = window.fetch;
@@ -66,10 +66,7 @@ async function fixture(t: TestContext, width: number) {
     if (url.pathname === '/api/rooms') {
       reads++;
       const result = list;
-      if (hold)
-        await new Promise<void>((resolve) => {
-          release = resolve;
-        });
+      if (held) await held;
       try {
         return await route.fulfill({
           status: fail ? 503 : 200,
@@ -113,7 +110,11 @@ async function fixture(t: TestContext, width: number) {
       list = value;
     },
     hold: (value: boolean) => {
-      hold = value;
+      held = value
+        ? new Promise<void>((resolve) => {
+            release = resolve;
+          })
+        : undefined;
     },
     release: () => release?.(),
   };
@@ -210,6 +211,38 @@ test('initial failure can recover to an honest empty directory and create a room
   assert.equal(await f.page.locator('.directory').count(), 0);
   assert.deepEqual(f.writes, []);
   assert.deepEqual(f.errors, []);
+});
+
+test('an empty snapshot stays stale until a successful retry confirms it', async (t) => {
+  const f = await fixture(t, 390),
+    { page } = f;
+  f.list([]);
+  await page.goto(`${origin}/?view=rooms`);
+  const empty = page.getByRole('heading', { name: 'The next great room could be yours.' });
+  await empty.waitFor();
+  const refresh = page.getByRole('button', { name: 'Refresh rooms', exact: true });
+  const alert = page.getByRole('alert').filter({ hasText: 'Showing the last available list.' });
+  f.fail(true);
+  await refresh.click();
+  await alert.waitFor();
+  assert.equal(await empty.count(), 0, 'a stale list cannot establish that no rooms are open');
+  const stale = page.getByRole('heading', { name: 'The last room list was empty.' });
+  await stale.waitFor();
+  assert.match(await page.locator('.directory-count').innerText(), /Last list: 0 open rooms/);
+
+  f.fail(false);
+  f.hold(true);
+  await refresh.click();
+  await page.getByRole('button', { name: 'Refreshing rooms…', exact: true }).waitFor();
+  assert.equal(await alert.count(), 1, 'retrying does not make the last result fresh');
+  assert.equal(await stale.count(), 1);
+  f.release();
+
+  await empty.waitFor();
+  assert.equal(await alert.count(), 0);
+  assert.equal(await stale.count(), 0);
+  assert.deepEqual(f.errors, []);
+  assert.deepEqual(f.writes, []);
 });
 
 test('pending directory refresh is single-flight, aborts on exit and cannot publish into a new visit', async (t) => {
