@@ -333,6 +333,12 @@ class CIProducer(unittest.TestCase):
         events=[]
         uploads={}
         owner=self
+        draft={'id':456,'draft':True,'tag_name':'build-'+COMMIT,'target_commitish':COMMIT,
+               'upload_url':'https://uploads.github.com/repos/example/releases/456/assets{?name,label}'}
+        def asset(name):
+            content=uploads[name]
+            return {'name':name,'state':'uploaded','size':len(content),
+                    'digest':'sha256:'+hashlib.sha256(content).hexdigest()}
         def verify(directory,commit,run_id,attempt,assets):
             owner.assertEqual((commit,run_id,attempt),(COMMIT,123,1))
             owner.assertEqual(set(assets),artifacts.ASSETS)
@@ -347,8 +353,12 @@ class CIProducer(unittest.TestCase):
                 owner.assertTrue(body['draft'])
                 owner.assertIn('/actions/runs/123',body['body'])
                 events.append('draft')
-                return {'id':456,'upload_url':'https://uploads.github.com/repos/example/releases/456/assets{?name,label}'}
+                return draft
             owner.assertEqual(path,'/releases/456')
+            if body is None:
+                owner.assertEqual(kwargs,{})
+                events.append('reconciled')
+                return {**draft,'assets':[asset(name) for name in uploads]}
             owner.assertEqual(kwargs,{'method':'PATCH'})
             owner.assertEqual(body,{'draft':False,'make_latest':'false'})
             owner.assertEqual(set(uploads),artifacts.ASSETS)
@@ -371,8 +381,9 @@ class CIProducer(unittest.TestCase):
                 owner.assertEqual(int(self.headers['Content-Length']),len(self.content))
                 uploads[self.name]=bytes(self.content)
                 events.append('upload:'+self.name)
-                return SimpleNamespace(status=201,read=lambda:json.dumps(
-                    {'digest':'sha256:'+hashlib.sha256(self.content).hexdigest()}).encode())
+                if self.name=='website.tar.gz':
+                    raise owner.producer.http.client.RemoteDisconnected()
+                return SimpleNamespace(status=201,read=lambda:json.dumps(asset(self.name)).encode())
             def close(self):
                 pass
         with self.prepared_main_release() as root:
@@ -384,7 +395,8 @@ class CIProducer(unittest.TestCase):
             self.assertEqual((root/'release.json').read_bytes(),signed_manifest)
             self.assertEqual(uploads,{name:(root/name).read_bytes() for name in artifacts.ASSETS})
         self.assertEqual(events,['verified','draft',
-                                *['upload:'+name for name in sorted(artifacts.ASSETS)],'published'])
+                                *['upload:'+name for name in sorted(artifacts.ASSETS)],
+                                'reconciled','published'])
 
     def test_existing_release_is_never_adopted_overwritten_or_republished(self):
         with self.prepared_main_release() as root:
