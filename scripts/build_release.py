@@ -1,12 +1,15 @@
 """Package CI outputs and publish commit-addressed build assets, never production."""
 import argparse
+import http.client
 import json
 import os
 from pathlib import Path
 import subprocess
 import tarfile
+import time
 import urllib.error
 import urllib.request
+from urllib.parse import quote, urlsplit
 
 from release_artifacts import REPOSITORY, ASSETS, digest, sha, validate_image, validate_website, verify_provenance
 
@@ -71,7 +74,7 @@ def api(path, token, body=None, content_type='application/json', method=None):
                  'Authorization':'Bearer '+token,'User-Agent':'Afterparty-CI',
                  'X-GitHub-Api-Version':'2022-11-28'})
     with urllib.request.urlopen(request,timeout=180) as response:
-        return json.load(response)
+        return None if response.status == 204 else json.load(response)
 
 
 def prepare(directory, commit):
@@ -93,6 +96,67 @@ def prepare(directory, commit):
                 'files':{name:{'sha256':digest(directory/name),'size':(directory/name).stat().st_size}
                          for name in ['core-image.tar.gz','website.tar.gz']}}
     (directory/'release.json').write_text(json.dumps(manifest,indent=2)+'\n')
+
+
+def send_asset(url, token, target, size):
+    # Stream large archives without reading the whole file into RAM.
+    connection = http.client.HTTPSConnection(url.hostname, timeout=180)
+    try:
+        connection.putrequest('POST', url.path+'?'+url.query)
+        connection.putheader('Authorization', 'Bearer '+token)
+        connection.putheader('Content-Type', 'application/octet-stream')
+        connection.putheader('Content-Length', str(size))
+        connection.putheader('User-Agent', 'Afterparty-CI')
+        connection.endheaders()
+        with target.open('rb') as stream:
+            while chunk := stream.read(1024*1024):
+                connection.send(chunk)
+        response = connection.getresponse()
+        return response.status, json.load(response) if response.status == 201 else None
+    finally:
+        connection.close()
+
+
+def upload_asset(release, token, target, expected_digest):
+    release_path = '/releases/'+str(release['id'])
+    upload = release['upload_url'].split('{', 1)[0]
+    url = urlsplit(upload+'?name='+quote(target.name))
+    if url.netloc != 'uploads.github.com' or url.scheme != 'https':
+        raise RuntimeError('Unexpected GitHub upload endpoint')
+    size = target.stat().st_size
+
+    def matches(asset):
+        return (asset.get('name') == target.name and asset.get('state') == 'uploaded'
+                and asset.get('size') == size and asset.get('digest') == expected_digest)
+
+    for attempt in range(1, 4):
+        try:
+            status, asset = send_asset(url, token, target, size)
+        except (ConnectionError, TimeoutError, http.client.IncompleteRead):
+            status = None
+        if status == 201 and matches(asset):
+            return
+        if status not in (None, 422, 502, 503, 504):
+            raise RuntimeError(f'GitHub did not confirm {target.name} (HTTP {status})')
+
+        # The server may have stored the file before the response was lost.
+        draft = api(release_path, token)
+        if (draft.get('draft') is not True or draft.get('tag_name') != release['tag_name']
+                or draft.get('target_commitish') != release['target_commitish']):
+            raise RuntimeError('Build draft changed during upload')
+        existing = [asset for asset in draft['assets'] if asset['name'] == target.name]
+        if len(existing) == 1 and matches(existing[0]):
+            return
+        if status == 422 or attempt == 3:
+            raise RuntimeError(f'Could not confirm upload of {target.name} (HTTP {status})')
+        if existing:
+            if len(existing) != 1 or existing[0]['state'] != 'starter' or existing[0]['size'] != 0:
+                raise RuntimeError(f'Build draft has an unexpected asset named {target.name}')
+            # GitHub can leave an empty starter asset after an upstream failure.
+            api('/releases/assets/'+str(existing[0]['id']), token, method='DELETE')
+        reason = 'connection interrupted' if status is None else f'HTTP {status}'
+        print(f'Retrying upload of {target.name} after attempt {attempt} ({reason})', flush=True)
+        time.sleep(attempt)
 
 
 def publish(directory, commit):
@@ -118,30 +182,8 @@ def publish(directory, commit):
     release = api('/releases',token,{'tag_name':tag,'target_commitish':commit,
                   'name':'Tested build '+commit[:12],'draft':True,'prerelease':True,
                   'make_latest':'false','body':'CI build assets only. No production deployment.\nWorkflow run: https://github.com/'+REPOSITORY+'/actions/runs/'+str(manifest['run_id'])})
-    # Streaming HTTP prevents a large Docker archive from being buffered in RAM.
-    import http.client
-    from urllib.parse import urlsplit, quote
-    upload = release['upload_url'].split('{',1)[0]
     for name in sorted(ASSETS):
-        url = urlsplit(upload+'?name='+quote(name))
-        if url.hostname != 'uploads.github.com' or url.scheme != 'https':
-            raise RuntimeError('Unexpected GitHub upload endpoint')
-        target = directory/name
-        connection = http.client.HTTPSConnection(url.hostname,timeout=180)
-        connection.putrequest('POST',url.path+'?'+url.query)
-        connection.putheader('Authorization','Bearer '+token)
-        connection.putheader('Content-Type','application/octet-stream')
-        connection.putheader('Content-Length',str(target.stat().st_size))
-        connection.putheader('User-Agent','Afterparty-CI')
-        connection.endheaders()
-        with target.open('rb') as stream:
-            while chunk:=stream.read(1024*1024):
-                connection.send(chunk)
-        response=connection.getresponse()
-        data=json.loads(response.read())
-        connection.close()
-        if response.status != 201 or data.get('digest') != 'sha256:'+digest(target):
-            raise RuntimeError('GitHub did not confirm the uploaded asset checksum')
+        upload_asset(release, token, directory/name, assets[name]['digest'])
     api('/releases/'+str(release['id']),token,{'draft':False,'make_latest':'false'},method='PATCH')
 
 
