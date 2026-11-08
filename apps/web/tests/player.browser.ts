@@ -1635,7 +1635,7 @@ test('native pause, seek and queue-next dispatch without position polling or an 
   }
 });
 
-test('a failed YouTube source does not lock the next valid recording or retry the failed video', async (t) => {
+test('an embedding restriction offers the original YouTube video and the next track clears it', async (t) => {
   const f = await fixture(t, 390, { initial: true });
   try {
     const { page } = f;
@@ -1654,10 +1654,13 @@ test('a failed YouTube source does not lock the next valid recording or retry th
     await page.evaluate(() =>
       (window as typeof window & { emitPlayerError: (code: number) => void }).emitPlayerError(150),
     );
-    await page
-      .locator('.audio-message')
-      .filter({ hasText: 'This source cannot play here' })
-      .waitFor();
+    const message = page.locator('.audio-message');
+    await message.getByText('YouTube restricts embedded playback for this video.').waitFor();
+    const watch = message.getByRole('link', { name: 'Watch on YouTube', exact: true });
+    assert.equal(await watch.getAttribute('href'), 'https://www.youtube.com/watch?v=current0001');
+    assert.equal(await watch.getAttribute('target'), '_blank');
+    assert.equal(await message.getByRole('button', { name: 'Enable audio' }).count(), 0);
+    assert.equal(f.writes.length, 0);
     await page.waitForTimeout(400);
     assert.equal(
       await page.evaluate(
@@ -1675,7 +1678,7 @@ test('a failed YouTube source does not lock the next valid recording or retry th
         window as unknown as { __audioCalls: { action: string; videoId?: string }[] }
       ).__audioCalls.some((call) => call.action === 'load' && call.videoId === 'queued00001'),
     );
-    assert.equal(await page.locator('.audio-message').count(), 0);
+    assert.equal(await message.count(), 0);
     assert.equal(
       await page.evaluate(
         () =>
@@ -1685,6 +1688,14 @@ test('a failed YouTube source does not lock the next valid recording or retry th
       ),
       1,
     );
+    await page.evaluate(() =>
+      (window as typeof window & { emitPlayerError: (code: number) => void }).emitPlayerError(100),
+    );
+    await message
+      .getByText('This source cannot play here. Try the next track or add another song.')
+      .waitFor();
+    assert.equal(await watch.count(), 0);
+    assert.equal(await message.getByRole('button', { name: 'Enable audio' }).count(), 1);
     assert.deepEqual(
       f.writes.map((write) => write.action),
       ['next'],
