@@ -44,7 +44,7 @@ export type RadioInput = {
   excluded: string[];
   requireEmbeddable: boolean;
   search: (query: string) => Promise<Track[]>;
-  similar?: (seed: Track) => Promise<CatalogSong[]>;
+  similar?: (seed: Track, alreadyKnown: (song: CatalogSong) => boolean) => Promise<CatalogSong[]>;
   topTracks?: (seed: Track) => Promise<CatalogSong[]>;
   match?: (song: CatalogSong) => Promise<Track>;
   favorites?: string[];
@@ -137,12 +137,16 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
   };
 
   const descriptors = new Set<string>();
+  const knownDescriptor = (song: CatalogSong) => {
+    const recording: Track = { ...original, id: "catalog", title: song.title, artist: `${song.artist} - Topic`, catalog: song };
+    return known.some(track => sameRadioSong(track, recording));
+  };
   const discoverCatalog = async (source: "catalog" | "artist-catalog", limit: number) => {
     const discover = source === "catalog" ? input.similar : input.topTracks;
     if (!discover || !input.match || !artist) return;
     let songs: CatalogSong[];
     try {
-      songs = (await discover(original)).slice(0, RADIO_LIMITS.descriptors)
+      songs = (await discover(original, knownDescriptor)).slice(0, RADIO_LIMITS.descriptors)
         .map(copyRadioDescriptor).filter((song): song is CatalogSong => song !== null);
     } catch (error) {
       lastError = error;
@@ -155,9 +159,8 @@ export async function selectRadio(input: RadioInput): Promise<RadioSelection> {
       if (!song || typeof song.title !== "string" || typeof song.artist !== "string" ||
         !song.title.trim() || !song.artist.trim() || !isRadioTitle(song.title)) return false;
       if (source === "artist-catalog" && normalized(song.artist) !== normalized(artist)) return false;
-      const recording: Track = { ...original, id: "catalog", title: song.title, artist: `${song.artist} - Topic`, catalog: song };
       const key = descriptorKey(song);
-      if (descriptors.has(key) || localDescriptors.has(key) || known.some(track => sameRadioSong(track, recording))) return false;
+      if (descriptors.has(key) || localDescriptors.has(key) || knownDescriptor(song)) return false;
       localDescriptors.add(key);
       return true;
     });

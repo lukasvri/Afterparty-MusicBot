@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { Providers } from '../src/providers.ts';
 import { Recommendations } from '../src/recommendations.ts';
 import { Store } from '../src/store.ts';
+import { deferred } from './deferred.ts';
 import { RADIO_LIMITS, type RadioDiagnostic } from '../src/radio-pipeline.ts';
 import { roomRecommendation, type RoomRadioState } from '../src/room-radio.ts';
 import type { CatalogSong } from '../src/matching.ts';
@@ -16,6 +17,72 @@ const track = (videoId: string, artist: string, title: string, extra: Partial<Tr
 });
 const seed = track('anchor00001', 'Anchor', 'Opening', { concert: true, radio: false });
 const cacheKey = 'radio-catalog:v3:' + JSON.stringify(['track.getSimilar', 'Anchor', 'Opening']);
+
+test('an exhausted similar pool refreshes once without blocking radio selection', { timeout: 5000 }, async t => {
+  let clock = 1_800_000_000_000, requests = 0;
+  t.mock.method(Date, 'now', () => clock);
+  t.mock.method(console, 'info', () => {});
+  const store = new Store(':memory:');
+  const providers = fixtureRadioOwner(new Providers(store, {}));
+  const played = track('played00001', 'Aster', 'Old Song');
+  const fresh = track('fresh000001', 'Cedar', 'New Song');
+  const pending = deferred<Response>();
+  const firstPool = [{ artist: 'Aster', title: 'Old Song', duration: 0 }];
+  providers.recommendations = new Recommendations(store, 'synthetic', async url => {
+    if (new URL(String(url)).searchParams.get('method') === 'artist.getTopTracks')
+      return Response.json({ toptracks: { track: [] } });
+    requests++;
+    return pending.promise;
+  });
+  providers.search = async () => [];
+  providers.matchSong = async song => {
+    assert.equal(song.title, 'New Song');
+    return { ...fresh, catalog: song };
+  };
+  try {
+    store.set(cacheKey, { at: clock - 240_000, songs: firstPool });
+    providers.rememberRadioTrack(played);
+    store.record('synthetic-play', publicTrack(played)!, clock - 1);
+    assert.equal(await providers.radio(seed, []), null);
+    assert.equal(requests, 0);
+    clock += 60_000;
+    assert.deepEqual(await Promise.all([providers.radio(seed, []), providers.radio(seed, [])]), [null, null]);
+    assert.equal(requests, 1, 'concurrent attempts must share one background refresh');
+    pending.resolve(Response.json({ similartracks: { track: [
+      { name: 'New Song', artist: { name: 'Cedar' }, match: '0.9' },
+    ] } }));
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal((await providers.radio(seed, []))?.id, fresh.id);
+    assert.equal(requests, 1);
+  } finally {
+    pending.resolve(new Response(null, { status: 503 }));
+    store.close();
+  }
+});
+
+test('a failed background refresh preserves cached suggestions and respects the cooldown', async t => {
+  let clock = 1_800_000_000_000, requests = 0;
+  t.mock.method(Date, 'now', () => clock);
+  const store = new Store(':memory:');
+  const songs = [{ artist: 'Aster', title: 'Old Song', duration: 0 }];
+  const recommendations = new Recommendations(store, 'synthetic', async () => {
+    requests++;
+    throw new Error('Synthetic provider failure');
+  });
+  try {
+    store.set(cacheKey, { at: clock - 600_000, songs });
+    assert.deepEqual(await recommendations.similar(seed, () => false), songs);
+    assert.equal(requests, 0, 'a pool with eligible descriptors does not refresh early');
+    assert.deepEqual(await recommendations.similar(seed, () => true), songs);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.deepEqual(await recommendations.similar(seed, () => true), songs);
+    assert.equal(requests, 1);
+    clock += 300_000;
+    assert.deepEqual(await recommendations.similar(seed, () => true), songs);
+    assert.equal(requests, 2);
+    await new Promise<void>(resolve => setImmediate(resolve));
+  } finally { store.close(); }
+});
 function invalidCandidates(round: number, skipped: Track, excluded: Track): Track[] {
   return [
     track(id('prf', round), 'Unrelated', 'Forged relationship', { genres: ['house'], radioRelatedTo: seed.id }),

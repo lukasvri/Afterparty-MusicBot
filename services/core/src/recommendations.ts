@@ -7,7 +7,10 @@ import type { Store } from "./store.ts";
 
 const POSITIVE_CACHE_MS = 86400000;
 export const NEGATIVE_RADIO_CACHE_MS = 60000;
+const EXHAUSTED_REFRESH_INTERVAL_MS = 300_000;
 const CATALOG_LIMIT = 15;
+type Method = "track.getSimilar" | "artist.getTopTracks";
+type CatalogCache = { at: number; songs: CatalogSong[]; refreshAt?: number };
 type CatalogItem = { name?: unknown; artist?: { name?: unknown } | string | null; match?: unknown };
 
 /** Last.fm supplies discovery metadata only. Playback still requires a safe matched recording. */
@@ -15,30 +18,52 @@ export class Recommendations {
   private store: Store;
   private key: string;
   private request: typeof fetch;
+  private refreshing = false;
   constructor(store: Store, key: string, request: typeof fetch = fetch) {
     this.store = store;
     this.key = key;
     this.request = request;
   }
   get enabled() { return Boolean(this.key); }
-  async similar(seed: Track): Promise<CatalogSong[]> {
-    return this.discover("track.getSimilar", seed);
+  async similar(seed: Track, alreadyKnown?: (song: CatalogSong) => boolean): Promise<CatalogSong[]> {
+    return this.discover("track.getSimilar", seed, alreadyKnown);
   }
   async topTracks(seed: Track): Promise<CatalogSong[]> {
     return this.discover("artist.getTopTracks", seed);
   }
-  private async discover(method: "track.getSimilar" | "artist.getTopTracks", seed: Track): Promise<CatalogSong[]> {
+  private async discover(method: Method, seed: Track, alreadyKnown?: (song: CatalogSong) => boolean): Promise<CatalogSong[]> {
     if (!this.key) return [];
     const artist = radioArtist(seed), title = radioTitle(seed);
     if (!artist || (method === "track.getSimilar" && !title)) return [];
     const cacheKey = "radio-catalog:v3:" + JSON.stringify([method, artist, method === "track.getSimilar" ? title : ""]);
-    const cached = this.store.get<{ at: number; songs: CatalogSong[] } | null>(cacheKey, null);
+    const cached = this.store.get<CatalogCache | null>(cacheKey, null);
     const now = Date.now();
     if (cached && Number.isFinite(cached.at) && cached.at <= now && Array.isArray(cached.songs) &&
       cached.songs.length <= CATALOG_LIMIT && cached.songs.every(song => copyRadioDescriptor(song) !== null) &&
       now - cached.at < (cached.songs.length ? POSITIVE_CACHE_MS : NEGATIVE_RADIO_CACHE_MS)) {
-      return cached.songs.map(song => copyRadioDescriptor(song)!);
+      const songs = cached.songs.map(song => copyRadioDescriptor(song)!);
+      const { refreshAt } = cached;
+      const lastAttempt = typeof refreshAt === "number" && Number.isFinite(refreshAt)
+        ? Math.max(cached.at, refreshAt) : cached.at;
+      if (alreadyKnown && songs.length && songs.every(alreadyKnown) &&
+        now - lastAttempt >= EXHAUSTED_REFRESH_INTERVAL_MS && !this.refreshing) {
+        this.store.set(cacheKey, { at: cached.at, songs, refreshAt: now });
+        this.refreshing = true;
+        // The existing search stages can still choose a track while the next pool loads.
+        void this.fetchCatalog(method, artist, title).then(fresh => {
+          const current = this.store.get<CatalogCache | null>(cacheKey, null);
+          if (fresh.length && current?.at === cached.at && current.refreshAt === now)
+            this.store.set(cacheKey, { at: Date.now(), songs: fresh });
+        }).catch(() => { /* Keep the valid cache and its retry interval on provider failure. */ })
+          .finally(() => { this.refreshing = false; });
+      }
+      return songs;
     }
+    const songs = await this.fetchCatalog(method, artist, title);
+    this.store.set(cacheKey, { at: Date.now(), songs });
+    return songs;
+  }
+  private async fetchCatalog(method: Method, artist: string, title: string): Promise<CatalogSong[]> {
     const url = new URL("https://ws.audioscrobbler.com/2.0/");
     url.search = new URLSearchParams({ method, artist,
       ...(method === "track.getSimilar" ? { track: title } : {}),
@@ -66,7 +91,6 @@ export class Recommendations {
       if (identities.has(identity)) continue;
       identities.add(identity); songs.push(song);
     }
-    this.store.set(cacheKey, { at: Date.now(), songs });
-    return songs.map(song => ({ ...song }));
+    return songs;
   }
 }
