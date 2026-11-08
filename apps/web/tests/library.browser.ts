@@ -942,6 +942,11 @@ test(
           .getAttribute('href'),
         'https://www.youtube.com/watch?v=jQLWYc2UrFY',
       );
+      await catalog.getByLabel('Find an artist or stage', { exact: true }).fill('');
+      await browseFestivalYear(catalog, 'edc-las-vegas', 2024);
+      assert(
+        await catalog.getByRole('button', { name: 'Add selected year to queue' }).isDisabled(),
+      );
       assert.equal(f.writes.length, 0);
       assert.equal(f.jobs.length, 0);
       assert.equal(
