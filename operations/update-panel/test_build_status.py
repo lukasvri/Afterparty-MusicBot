@@ -29,6 +29,15 @@ class BuildStatus(unittest.TestCase):
             result=blocked_build(Broken(),commit)
             self.assertFalse(result['ready']);self.assertNotIn('private',str(result))
 
+    def test_manual_build_is_distinct_from_manual_validation(self):
+        client=Client(status='completed',conclusion='success')
+        client.run.update(event='workflow_dispatch',display_title='Core validation')
+        self.assertEqual(blocked_build(client,COMMIT)['state'],'missing')
+        client.run.update(display_title='Publish signed build',status='in_progress')
+        result=blocked_build(client,COMMIT)
+        self.assertEqual(result['state'],'pending')
+        self.assertFalse(result['ready'])
+
 class InstallDiagnostic(unittest.TestCase):
     def test_features_patch_is_idempotent_and_rejects_unknown_code(self):
         from install import patch_features

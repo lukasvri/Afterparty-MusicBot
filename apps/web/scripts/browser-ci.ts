@@ -14,6 +14,7 @@ const independentPaths = new Set([
   'services/core/tests/rooms.test.ts',
   'apps/web/src/lib/concert/concert-audio.ts',
   'apps/web/src/lib/rooms/RoomAudio.svelte',
+  'apps/web/src/lib/rooms/RoomDirectory.svelte',
   'apps/web/src/lib/rooms/player-intent.ts',
   'apps/web/src/lib/rooms/room-client.ts',
   'apps/web/src/lib/ui/AppTheme.svelte',
@@ -24,6 +25,7 @@ const independentPaths = new Set([
   'apps/web/tests/player-intent.test.ts',
   'apps/web/tests/room-client.test.ts',
   'apps/web/tests/discord.browser.ts',
+  'apps/web/tests/directory.browser.ts',
   'apps/web/tests/player.browser.ts',
   'apps/web/tests/room-stream.browser.ts',
   'apps/web/tests/scenery.browser.ts',
@@ -37,7 +39,7 @@ export function browserArguments(command: string, event: string, paths: string[]
   if (node !== 'node' || test !== '--test' || !args.includes(extendedPack))
     throw new Error('Update the CI selector for the canonical browser test command.');
   const independent =
-    event === 'pull_request' &&
+    (event === 'pull_request' || event === 'push') &&
     paths !== null &&
     paths.length > 0 &&
     paths.every((path) => independentPaths.has(path) || path.startsWith('docs/'));
