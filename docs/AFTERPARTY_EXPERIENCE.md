@@ -142,11 +142,12 @@ Music search requests a bounded candidate pool and ranks title, artist and recor
 format without extra provider searches. Explicit remix, cover and live-set searches
 remain available. Editing the input cancels and retires the previous request, so
 old results or errors cannot replace a newer query. Cold searches have a 35-second
-browser deadline. After ten verified matches that can play in the embedded player,
-Core gives pending metadata another
-1.5 seconds to finish. The website labels partial results and lets users retry
-the same query. Cached metadata helps the retry make progress. Concert results
-page locally. Browser-room results use a bounded scroll region.
+browser deadline. After ten verified matches that can play in the embedded
+player, Core gives pending metadata another 1.5 seconds to finish. The website
+labels partial results and lets users retry the same query. Core retains the
+candidate IDs for one minute so the retry can continue from the same provider
+list. Concert results page locally. Browser-room results use a bounded scroll
+region.
 
 Radio retains its stricter independent admission policy, original manual seed and
 room history. Related candidates rotate through less recently exposed artists.

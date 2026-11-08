@@ -144,10 +144,14 @@ test('manual search returns ten verified results without waiting for a stalled m
  try {
   const provider=new Providers(fixture.store,{}),ids=Array.from({length:13},(_,i)=>String(i).padStart(11,'a'));
   const pendingSignals:AbortSignal[]=[];
+  let discoveries=0;
   provider.youtube=async()=>{throw Error('No API key');};
   provider.extract=async(args,signal)=>{
    const target=args.at(-1)!;
-   if(target.startsWith('ytsearch'))return {entries:ids.map(id=>({id}))};
+   if(target.startsWith('ytsearch')){
+    discoveries++;
+    return {entries:ids.map(id=>({id}))};
+   }
    const id=new URL(target).searchParams.get('v')!;
    if(ids.indexOf(id)>=10){pendingSignals.push(signal!);await tail[ids.indexOf(id)-10].promise;}
    return {id,title:'Artist - Result '+id,artist:'Artist',duration:180,playable_in_embed:id!==ids[0]};
@@ -183,6 +187,7 @@ test('manual search returns ten verified results without waiting for a stalled m
   const retry=await retrying;
   assert.equal(retry.complete,true);
   assert.equal(retry.tracks.length,13);
+  assert.equal(discoveries,1,'a retry must continue the original provider candidate list');
  } finally {
   tail.forEach(gate=>gate.resolve());await yieldTurn();context.mock.timers.reset();fixture.close();
  }

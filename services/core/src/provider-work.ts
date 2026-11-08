@@ -5,6 +5,7 @@ export const CORE_SEARCH_DEADLINE_MS = 24000;
 export const CORE_SEARCH_RESULTS_MS = 22000;
 export const CORE_SEARCH_FIRST_PAGE_SIZE = 10;
 export const CORE_SEARCH_TAIL_MS = 1500;
+export const CORE_SEARCH_RETRY_MS = 60000;
 export const MUSIC_REQUEST_DEADLINE_MS = 30000;
 const cancelled = () => new UserError("The request was cancelled.", 499);
 
