@@ -187,8 +187,9 @@ from 15 through 30. Omitted values use offset zero and duration 30. Categories
 are `2010s` and `edm-classics`. Duplicate video IDs are rejected before any
 extraction. Do not commit the filled inventory, answers, recordings or agreements.
 
-Enable only one of `GUESS_YOUTUBE_CLIPS`, `GUESS_DEEZER_PREVIEWS` and
-`GUESS_SYNTHETIC_TEST`. Run `npm run guess:check` with the intended configuration
+Use one explicit source. Keep `GUESS_DEEZER_PREVIEWS` and `GUESS_SYNTHETIC_TEST`
+off and leave `GUESS_LOCAL_INVENTORY_PATH` empty for this pilot. Run
+`npm run guess:check` with the intended configuration
 before starting Core; its `youtube` result reports capacity without answers or
 source URLs. yt-dlp and FFmpeg must be installed locally, as they already are in
 the Core image. The adapter ignores yt-dlp configuration and supplies no cookies,
@@ -345,6 +346,50 @@ or less if a recording approval expires. An eight-round, two-player generated
 30-second match with lobby and reveal pauses is tested across the former
 five-minute boundary. Expiry and disposal still revoke pending and future media
 reads. There is no automatic refresh or promise of uninterrupted indefinite play.
+
+## Private WAV inventory
+
+Set `GUESS_LOCAL_INVENTORY_PATH` to the absolute path of a private JSON
+manifest. An explicit local inventory takes precedence over alpha auto mode.
+Leave the Deezer and synthetic flags off and set `GUESS_YOUTUBE_CLIPS=0`.
+Core rejects conflicting explicit sources. Place the manifest and clips in the
+same private directory outside the checkout. Mount that directory read-only
+when using Docker.
+
+Each of the one to eight entries uses this shape. Use your own track metadata,
+approved category, evidence reference and future approval expiry.
+
+```json
+[
+  {
+    "audioFile": "clip-001.wav",
+    "song": { "id": "track-001", "title": "Example Song", "artist": "Example Artist", "aliases": [] },
+    "categoryIds": ["edm-classics"],
+    "permission": {
+      "approved": true,
+      "reference": "https://evidence.example.test/private-record",
+      "expiresAt": 1924992000000
+    }
+  }
+]
+```
+
+Use unique filenames starting with `clip-` and containing lowercase ASCII
+letters, digits, underscores or hyphens before `.wav`. Each file must contain
+15 to 30 seconds of mono 16 kHz signed 16-bit PCM in a WAV with no metadata or
+extra chunks. For an already approved input, FFmpeg can prepare a 30-second
+clip starting at 30 seconds.
+
+```sh
+ffmpeg -ss 30 -i approved-input.wav -t 30 -map_metadata -1 -vn -ac 1 -ar 16000 -c:a pcm_s16le -bitexact clip-001.wav
+```
+
+Run `npm --prefix services/core run guess:check` with the same private
+configuration before starting Core. It reports category capacity without
+disclosing track names or approval references. Core reads the local files
+without contacting a media provider. The snapshot expires after at most 30
+minutes or when the earliest approval expires. This source uses the existing
+private round media endpoint. Keep the audio and approval records out of Git.
 
 ## Reload without restarting music
 
