@@ -10,6 +10,15 @@ reachable; the page limit is not an inventory limit.
 performance years, attribution and evidence. This document records source
 coverage instead of duplicating the full recording inventory.
 
+## Recording eligibility
+
+Include only official video recordings that show the performance at the listed
+event and year. Verify the source through the artist, the festival, or an
+authorized broadcast partner. For additions outside an official concert video
+index, check both the publisher and representative footage. A title, thumbnail
+or verified channel alone does not establish that the upload shows the concert.
+Exclude fan uploads, mirrors, audio with a still image, trailers and recaps.
+
 ## Source coverage checked on 25 and 31 October 2026
 
 | Festival | Year | Catalog recordings | Coverage |
@@ -126,7 +135,10 @@ sources. Complete event archives beyond these bounded sources remain unproven.
 Tomorrowland has enumerated playlist snapshots, with 16 private videos and one
 unavailable video retained as explicit omissions. Ultra has enumerated official
 season-page snapshots, with one video whose embedding is disabled and seven
-SoundCloud audio sources outside the current browser video contract.
+SoundCloud audio sources outside the concert video catalog. The [official 3LAU
+2019 YouTube upload](https://www.youtube.com/watch?v=Ny5IG2kXg88) is also excluded.
+Its sampled storyboard frames repeat the same image, so the upload does not
+establish concert footage.
 These lists are not evidence of all performances or all separate official
 uploads; the seven existing outside-playlist recordings illustrate that limit.
 Complete those source inventories before claiming every set from every existing
