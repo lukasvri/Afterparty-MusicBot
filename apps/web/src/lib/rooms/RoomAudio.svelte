@@ -201,7 +201,7 @@
     loading = $state(false),
     enabled = $state(false),
     message = $state(''),
-    failedSource = $state('');
+    failedSource = $state<{ key: string; watchUrl: string | null } | null>(null);
   let disposed = false,
     loaded = '',
     loadedSource = '',
@@ -418,7 +418,7 @@
     )
       nativePending = { ...nativePending, transportSuperseded: true };
     if (nativePending?.transportSuperseded && queuedNative.length) queuedNative = [];
-    if (failedSource === key) return;
+    if (failedSource?.key === key) return;
     if (native.hasPendingLocalPause()) {
       if (loaded !== key) {
         // A new shared recording must not resume a possible device pause.
@@ -432,7 +432,7 @@
       }
     }
     if (failedSource) {
-      failedSource = '';
+      failedSource = null;
       message = '';
       resetPlayerError();
       onPlaybackError?.(false);
@@ -639,12 +639,23 @@
             if (disposed || current !== generation) return;
             clearStartupTimer();
             loading = false;
-            failedSource = identity();
+            const code = Number(event.data),
+              track = room.current;
+            const watchUrl =
+              (code === 101 || code === 150) &&
+              track &&
+              track.source !== 'soundcloud' &&
+              /^[A-Za-z0-9_-]{11}$/.test(track.id)
+                ? `https://www.youtube.com/watch?v=${track.id}`
+                : null;
+            failedSource = { key: identity(), watchUrl };
             nativePending = null;
             queuedNative = [];
             onPlaybackError?.(true);
-            notePlayerError(Number(event.data));
-            message = 'This source cannot play here. Try the next track or add another song.';
+            notePlayerError(code);
+            message = watchUrl
+              ? 'YouTube restricts embedded playback for this video.'
+              : 'This source cannot play here. Try the next track or add another song.';
           },
           onPlaybackRateChange: (event: PlayerEvent) => {
             if (
@@ -656,7 +667,7 @@
               player?.setPlaybackRate(1);
           },
           onStateChange: (event: PlayerEvent) => {
-            if (disposed || current !== generation || failedSource === identity()) return;
+            if (disposed || current !== generation || failedSource?.key === identity()) return;
             if (typeof event.data !== 'number' || !Number.isFinite(event.data)) return;
             const recoveredFromBuffer = bufferingAt !== null && event.data === 1;
             if (event.data === 3 && bufferingAt === null) {
@@ -730,7 +741,7 @@
     }
     loaded = '';
     loadedSource = '';
-    failedSource = '';
+    failedSource = null;
     onPlaybackError?.(false);
     nativePending = null;
     queuedNative = [];
@@ -921,7 +932,16 @@
 {#if message}
   <div class="audio-message" role="status">
     <p>{message}</p>
-    <button class="button secondary" onclick={activate}>Enable audio</button>
+    {#if failedSource?.key === identity() && failedSource.watchUrl}
+      <a
+        class="button secondary"
+        href={failedSource.watchUrl}
+        target="_blank"
+        rel="noopener noreferrer">Watch on YouTube</a
+      >
+    {:else}
+      <button class="button secondary" onclick={activate}>Enable audio</button>
+    {/if}
   </div>
 {/if}
 
