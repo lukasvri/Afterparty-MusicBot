@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { prepareConfiguredGuessSource } from '../src/guess-source.ts';
+import { checkConfiguredGuessSource } from '../src/guess-check.ts';
 import { guessWave, GUESS_AUDIO_RATE } from '../src/guess-audio-format.ts';
 import { getGuessPackClips } from '../src/guess-packs.ts';
 
@@ -18,6 +19,63 @@ async function directory(t: { after(fn: () => Promise<void>): void }) {
   const dir = await mkdtemp(join(tmpdir(), 'afterparty-guess-config-'));
   t.after(() => rm(dir, { recursive: true, force: true })); return dir;
 }
+
+const localRecord = () => ({
+  audioFile: 'clip-fixture.wav',
+  song: { id: 'fixture', title: 'Fictional Signal', artist: 'Fictional Performer', aliases: [] },
+  categoryIds: ['2010s'],
+  permission: record().permission,
+});
+
+test('local approved WAVs override the automatic alpha pack and pass isolated readiness checks', async t => {
+  const dir = await directory(t), path = join(dir, 'inventory.local.json');
+  const wav = guessWave(new Uint8Array(GUESS_AUDIO_RATE * 2 * 15).fill(1));
+  await writeFile(join(dir, 'clip-fixture.wav'), wav);
+  await writeFile(path, JSON.stringify([localRecord()]));
+  const env = { GUESS_LOCAL_INVENTORY_PATH: path };
+  const lifetime = new AbortController();
+  const noProvider = async () => assert.fail('local quiz must not contact a provider');
+  const options = { signal: lifetime.signal, fetcher: noProvider, youtube: { extract: noProvider } };
+  const source = await prepareConfiguredGuessSource(env, options);
+  assert(source); t.after(source.dispose);
+  const song = source.catalog.select('2010s', { exclude: [], durationSeconds: 15 });
+  assert.deepEqual(await source.media.read(song.mediaKey, signal()), wav);
+  const report = await checkConfiguredGuessSource(env, options);
+  assert.equal(report.provider, 'local');
+  assert.equal(report.status, 'ready');
+  assert.deepEqual(report.categories.find(category => category.id === '2010s')?.durations, [{ seconds: 15, count: 1 }]);
+  assert.doesNotMatch(JSON.stringify(report), /Fictional|private-approval|clip-fixture/);
+  lifetime.abort();
+  assert(source.catalog.categories().every(category => !category.available));
+  await assert.rejects(source.media.read(song.mediaKey, signal()), { status: 503 });
+});
+
+test('local source rejects conflicts, traversal, malformed audio and unapproved inventories', async t => {
+  const dir = await directory(t), path = join(dir, 'inventory.local.json'), audio = join(dir, 'clip-fixture.wav');
+  const env = { GUESS_LOCAL_INVENTORY_PATH: path }, options = { signal: signal() };
+  const wav = guessWave(new Uint8Array(GUESS_AUDIO_RATE * 2 * 15));
+  await writeFile(audio, wav);
+  const original = localRecord();
+  for (const rows of [
+    [{ ...original, audioFile: '../clip-fixture.wav' }],
+    [original, { ...original, song: { ...original.song, id: 'duplicate' } }],
+    [{ ...original, permission: { ...original.permission, approved: false } }],
+  ]) {
+    await writeFile(path, JSON.stringify(rows));
+    await assert.rejects(prepareConfiguredGuessSource(env, options), unavailable);
+  }
+  await writeFile(path, JSON.stringify([original]));
+  for (const flag of ['GUESS_DEEZER_PREVIEWS', 'GUESS_YOUTUBE_CLIPS', 'GUESS_SYNTHETIC_TEST'])
+    await assert.rejects(prepareConfiguredGuessSource({ ...env, [flag]: '1' }, options), unavailable);
+  await writeFile(audio, 'not a WAV');
+  await assert.rejects(prepareConfiguredGuessSource(env, options), unavailable);
+  if (process.platform !== 'win32') {
+    await writeFile(audio, wav);
+    await symlink(audio, join(dir, 'clip-link.wav'));
+    await writeFile(path, JSON.stringify([{ ...original, audioFile: 'clip-link.wav' }]));
+    await assert.rejects(prepareConfiguredGuessSource(env, options), unavailable);
+  }
+});
 
 test('Deezer preview startup is default-off and independent from normal playback metadata', async () => {
   const fetcher: typeof fetch = async () => { throw Error('must not fetch'); };
