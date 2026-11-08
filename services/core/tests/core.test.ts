@@ -418,6 +418,34 @@ test('pause checkpoints pair the consumed crossfade entry with its offset before
  }finally{restored?.close();t.close();}
 });
 
+test('shutdown preserves the pending paused checkpoint until voice playback can be restored', () => {
+  const t = setup();
+  let restored: Engine | undefined;
+  try {
+    const song = track();
+    const checkpoint = { track: song, position: 61.25, paused: true };
+    t.store.set('recovery', checkpoint);
+
+    for (let restart = 0; restart < 2; restart++) {
+      restored = new Engine(t.store, t.providers, new FakeSink());
+      assert.equal(restored.queue[0].offset, checkpoint.position);
+      assert.equal(restored.current, null);
+      restored.checkpoint();
+      restored.close();
+      restored = undefined;
+      assert.deepEqual(t.store.get('recovery', null), checkpoint);
+    }
+
+    restored = new Engine(t.store, t.providers, new FakeSink());
+    restored.stop();
+    restored.checkpoint();
+    assert.equal(t.store.get('recovery', null), null);
+  } finally {
+    restored?.close();
+    t.close();
+  }
+});
+
 for(const consumed of [9980,10000,12000])test(`seek targets the consumed recording at crossfade boundary ${consumed} ms`,async()=>{
  const t=setup(),pending=deferred<Prepared>();let seeking:Promise<void>|undefined;
  try{

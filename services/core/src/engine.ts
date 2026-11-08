@@ -247,6 +247,8 @@ export class Engine extends EventEmitter {
   }
   checkpoint() {
     const clock = this.playbackClock(), track = clock.track ?? this.current;
+    // An empty voice channel can leave recovery queued across multiple restarts.
+    if (!track && this.restoringEntry && this.queue.some((entry) => entry.entryId === this.restoringEntry)) return;
     this.store.set(
       "recovery",
       track

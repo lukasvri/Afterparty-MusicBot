@@ -4,6 +4,29 @@ import assert from 'node:assert/strict';
 import {DiscordBot} from '../src/discord.ts';
 import {PlayerMessage,playerEmbed,playerComponents,playerMoreComponents,formatTime,progressBar} from '../src/player-message.ts';
 
+test('voice recovery passes the saved pause intent before starting the track', async () => {
+  for (const paused of [true, false]) {
+    const calls: unknown[] = [];
+    const channel = {
+      isVoiceBased: () => true,
+      members: [{ user: { bot: false } }],
+    };
+    const engine = {
+      store: { get: (key: string) => key === 'voice-channel' ? 'voice' : { paused } },
+      queue: [{}],
+      current: {},
+      startNext: async (startPaused = false) => { calls.push(['start', startPaused]); },
+      pause: () => { calls.push('pause'); },
+    };
+    const bot = { engine, join: async () => { calls.push('join'); } };
+    const guild = { channels: { fetch: async () => channel } };
+
+    await DiscordBot.prototype.restore.call(bot as never, guild as never);
+
+    assert.deepEqual(calls, ['join', ['start', paused]]);
+  }
+});
+
 test('konsert queues the exact video for Discord and Afterparty, then publishes as bot',async()=>{
  const calls:unknown[]=[];
  const bot={engine:{},site:'https://example.test',sameVoice:async()=>calls.push('voice'),commands:{add:async(...args:unknown[])=>calls.push(args)},playerMessage:{confirmQueue:async()=>calls.push('confirmation')},updateMessage:async(force:boolean)=>calls.push(['message',force])};
