@@ -99,6 +99,21 @@ class Bundle(unittest.TestCase):
         self.assertEqual(result['image_id'],self.manifest['image_id'])
         self.assertEqual(artifacts.digest(self.destination/'website.tar.gz'),self.manifest['files']['website.tar.gz']['sha256'])
 
+    def test_manual_bundle_requires_matching_signed_trigger_and_manual_job_names(self):
+        self.run['event']='workflow_dispatch'
+        with self.assertRaises(artifacts.ReleaseError):
+            self.client.describe(COMMIT,self.destination)
+        cert=self.proof[0]['verificationResult']['signature']['certificate']
+        cert['buildTrigger']='workflow_dispatch'
+        with self.assertRaisesRegex(artifacts.ReleaseError, 'manual / deployer'):
+            self.client.describe(COMMIT,self.destination)
+        for job in self.jobs['jobs']:
+            job['name']='manual / '+job['name']
+        self.client.describe(COMMIT,self.destination)
+        self.jobs['jobs'][-1]['conclusion']='skipped'
+        with self.assertRaisesRegex(artifacts.ReleaseError, 'manual / release'):
+            self.client.describe(COMMIT,self.destination)
+
     def test_ref_qualified_workflow_paths_accept_only_trusted_main(self):
         for path in (artifacts.WORKFLOW, artifacts.WORKFLOW+'@main', artifacts.WORKFLOW+'@refs/heads/main'):
             self.run['path']=path
@@ -306,11 +321,16 @@ class CIProducer(unittest.TestCase):
         with patch.dict(sys.modules,{'release_artifacts':artifacts}):
             self.producer=module('ci_producer_fixture',SCRIPTS/'build_release.py')
 
-    def test_pr_and_fork_can_never_publish_release_assets(self):
-        for values in ({'GITHUB_REPOSITORY':artifacts.REPOSITORY,'GITHUB_EVENT_NAME':'pull_request',
-                        'GITHUB_REF':'refs/pull/1/merge','GITHUB_SHA':COMMIT},
-                       {'GITHUB_REPOSITORY':'example/fork','GITHUB_EVENT_NAME':'push',
-                        'GITHUB_REF':'refs/heads/main','GITHUB_SHA':COMMIT}):
+    def test_only_explicit_canonical_main_dispatch_can_publish_release_assets(self):
+        approved={'GITHUB_REPOSITORY':artifacts.REPOSITORY,'GITHUB_EVENT_NAME':'workflow_dispatch',
+                  'AFTERPARTY_PUBLISH_BUILD':'true','GITHUB_REF':'refs/heads/main','GITHUB_SHA':COMMIT}
+        for change in ({'GITHUB_EVENT_NAME':'pull_request','GITHUB_REF':'refs/pull/1/merge'},
+                       {'GITHUB_REPOSITORY':'example/fork'},
+                       {'GITHUB_REF':'refs/heads/beta'},
+                       {'GITHUB_EVENT_NAME':'push'},
+                       {'AFTERPARTY_PUBLISH_BUILD':'false'},
+                       {'GITHUB_SHA':'b'*40}):
+            values={**approved,**change}
             with patch.dict(os.environ,values,clear=True),patch.object(self.producer,'api') as api:
                 with self.assertRaises(RuntimeError):
                     self.producer.publish(self.fixture.root,COMMIT)
@@ -321,7 +341,8 @@ class CIProducer(unittest.TestCase):
         root=self.fixture.root
         metadata={key:self.fixture.manifest[key] for key in ('commit','image_tag','image_id','platform')}
         (root/'core.json').write_text(json.dumps(metadata))
-        values={'GITHUB_REPOSITORY':artifacts.REPOSITORY,'GITHUB_EVENT_NAME':'push',
+        values={'GITHUB_REPOSITORY':artifacts.REPOSITORY,'GITHUB_EVENT_NAME':'workflow_dispatch',
+                'AFTERPARTY_PUBLISH_BUILD':'true',
                 'GITHUB_REF':'refs/heads/main','GITHUB_SHA':COMMIT,
                 'GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1','GH_TOKEN':'synthetic-ci-token'}
         with patch.dict(os.environ,values,clear=True):
@@ -339,8 +360,9 @@ class CIProducer(unittest.TestCase):
             content=uploads[name]
             return {'name':name,'state':'uploaded','size':len(content),
                     'digest':'sha256:'+hashlib.sha256(content).hexdigest()}
-        def verify(directory,commit,run_id,attempt,assets):
+        def verify(directory,commit,run_id,attempt,assets,trigger):
             owner.assertEqual((commit,run_id,attempt),(COMMIT,123,1))
+            owner.assertEqual(trigger,'workflow_dispatch')
             owner.assertEqual(set(assets),artifacts.ASSETS)
             events.append('verified')
         def api(path,token,body=None,**kwargs):

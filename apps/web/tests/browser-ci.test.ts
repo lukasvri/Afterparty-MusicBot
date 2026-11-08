@@ -11,9 +11,23 @@ const command = scripts['test:browser'] as string;
 const pack = 'tests/game-pack.browser.ts';
 const full = command.trim().split(/\s+/).slice(1);
 
-test('main and manual runs always retain the canonical full browser suite', () => {
-  for (const event of ['push', 'workflow_dispatch', ''])
+test('manual runs and unknown events always retain the canonical full browser suite', () => {
+  for (const event of ['workflow_dispatch', ''])
     assert.deepEqual(browserArguments(command, event, ['docs/README.md']), full);
+});
+
+test('directory-only changes omit only the extended pack on PR and main', () => {
+  for (const event of ['pull_request', 'push']) {
+    const paths = [
+      'apps/web/src/lib/rooms/RoomDirectory.svelte',
+      'apps/web/tests/directory.browser.ts',
+    ];
+    assert.deepEqual(
+      browserArguments(command, event, paths),
+      full.filter((arg) => arg !== pack),
+    );
+    assert.deepEqual(browserArguments(command, event, [...paths, 'lib/types.ts']), full);
+  }
 });
 
 test('music presentation changes omit only the extended pack, preserving game smoke and audio', () => {
@@ -53,8 +67,8 @@ test('game, dependency, shared, workflow and unknown changes retain the full pac
 });
 
 test('missing, empty and invalid diffs cannot reduce browser coverage', () => {
-  for (const paths of [null, []])
-    assert.deepEqual(browserArguments(command, 'pull_request', paths), full);
+  for (const event of ['pull_request', 'push'])
+    for (const paths of [null, []]) assert.deepEqual(browserArguments(command, event, paths), full);
   assert.equal(changedPaths('', ''), null);
   assert.equal(changedPaths('--help', 'a'.repeat(40)), null);
   assert.equal(changedPaths('a'.repeat(40), 'b'.repeat(40)), null);

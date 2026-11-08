@@ -80,10 +80,11 @@ def api(path, token, body=None, content_type='application/json', method=None):
 def prepare(directory, commit):
     commit = sha(commit)
     if (os.environ.get('GITHUB_REPOSITORY') != REPOSITORY or
-            os.environ.get('GITHUB_EVENT_NAME') != 'push' or
+            os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch' or
+            os.environ.get('AFTERPARTY_PUBLISH_BUILD') != 'true' or
             os.environ.get('GITHUB_REF') != 'refs/heads/main' or
             os.environ.get('GITHUB_SHA') != commit):
-        raise RuntimeError('Build publication is restricted to the canonical main push')
+        raise RuntimeError('Build publication requires an explicit dispatch on canonical main')
     metadata = json.loads((directory/'core.json').read_text())
     if metadata['commit'] != commit:
         raise RuntimeError('Core build commit differs')
@@ -168,7 +169,7 @@ def publish(directory, commit):
     manifest = json.loads(signed_manifest)
     assets = {name: {'digest': 'sha256:' + digest(directory/name)} for name in ASSETS}
     verify_provenance(directory, commit, int(os.environ['GITHUB_RUN_ID']),
-                      int(os.environ['GITHUB_RUN_ATTEMPT']), assets)
+                      int(os.environ['GITHUB_RUN_ATTEMPT']), assets, 'workflow_dispatch')
     token = os.environ['GH_TOKEN']  # Supplied only to this CI job by GitHub.
     tag = 'build-'+commit
     try:

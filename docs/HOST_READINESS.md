@@ -143,7 +143,7 @@ instruction to update a live host without its owner's approval.
 2. Keep experimental qualification images separate from production. The local
    Node 26 image recorded in the toolchain guide is unsigned qualification
    evidence. Do not supply it to the production deployer or bypass the required
-   canonical main-push checks and signed build assets. Preserve the currently
+   canonical signed-build checks and assets. Preserve the currently
    installed image and runtime recorded in step 1 until the replacement is
    separately approved. A source pin or historical qualification result does
    not establish a host's current production baseline.

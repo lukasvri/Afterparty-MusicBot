@@ -1,10 +1,15 @@
 name: Core validation
+run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_build && !inputs.coverage_only && github.ref == 'refs/heads/main' && github.repository == 'lukasvri/Afterparty-MusicBot' && 'Publish signed build' || '' }}
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
+      publish_build:
+        description: Publish signed build assets for main after full validation
+        type: boolean
+        default: false
       coverage_only:
         description: Run instrumented coverage instead of normal validation
         type: boolean
@@ -15,10 +20,12 @@ on:
         default: false
 permissions:
   contents: read
+env:
+  AFTERPARTY_PUBLISH_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_build && !inputs.coverage_only && github.ref == 'refs/heads/main' && github.repository == 'lukasvri/Afterparty-MusicBot' && 'true' || 'false' }}
 concurrency:
-  # Only superseded PRs share a group. Every main push keeps its release run.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Cancel obsolete automatic validation. Manual runs keep their own group.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.event_name == 'push' && github.ref) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 jobs:
   deployer:
     name: ${{ github.event_name == 'workflow_dispatch' && 'manual / deployer' || 'deployer' }}
@@ -66,13 +73,13 @@ jobs:
           provenance: false
           sbom: false
       - name: Probe the tested final image without creating unused PR archives
-        if: github.event_name != 'push'
+        if: env.AFTERPARTY_PUBLISH_BUILD != 'true'
         run: python3 scripts/build_release.py core-probe
       - name: Probe and package the tested final image without rebuilding
-        if: github.event_name == 'push'
+        if: env.AFTERPARTY_PUBLISH_BUILD == 'true'
         run: python3 scripts/build_release.py core-package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: github.event_name == 'push'
+        if: env.AFTERPARTY_PUBLISH_BUILD == 'true'
         with:
           name: tested-core
           path: |
@@ -95,8 +102,8 @@ jobs:
       WRANGLER_LOG_PATH: /tmp/afterparty-wrangler
       PLAYWRIGHT_BROWSERS_PATH: /tmp/afterparty-playwright
       CI_EVENT_NAME: ${{ github.event_name }}
-      CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -204,10 +211,10 @@ jobs:
           retention-days: 3
           archive: true
       - name: Package the tested website output without rebuilding
-        if: github.event_name == 'push'
+        if: env.AFTERPARTY_PUBLISH_BUILD == 'true'
         run: python3 scripts/build_release.py website
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: github.event_name == 'push'
+        if: env.AFTERPARTY_PUBLISH_BUILD == 'true'
         with:
           name: tested-website
           path: release-assets/website.tar.gz
@@ -269,7 +276,7 @@ jobs:
   release:
     name: ${{ github.event_name == 'workflow_dispatch' && 'manual / release' || 'release' }}
     needs: [deployer, core, website]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'lukasvri/Afterparty-MusicBot'
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_build && !inputs.coverage_only && github.ref == 'refs/heads/main' && github.repository == 'lukasvri/Afterparty-MusicBot'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

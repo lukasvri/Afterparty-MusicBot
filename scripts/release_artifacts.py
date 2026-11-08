@@ -153,21 +153,23 @@ class Client:
         run_id, attempt = manifest.get('run_id'), manifest.get('run_attempt')
         if type(run_id) is not int or run_id <= 0 or type(attempt) is not int or attempt <= 0:
             raise ReleaseError('Missing workflow provenance')
-        verify_provenance(directory, commit, run_id, attempt, assets)
         run = self.get('/actions/runs/' + str(run_id))
+        trigger = run.get('event')
         if (run.get('head_sha') != commit or run.get('head_branch') != 'main' or
-                run.get('event') != 'push' or run.get('path') not in
+                trigger not in ('push', 'workflow_dispatch') or run.get('path') not in
                 (WORKFLOW, WORKFLOW + '@main', WORKFLOW + '@refs/heads/main') or
                 run.get('status') != 'completed' or run.get('conclusion') != 'success'):
             raise ReleaseError('Exact main commit has not passed the release workflow')
+        verify_provenance(directory, commit, run_id, attempt, assets, trigger)
         jobs = self.get('/actions/runs/' + str(run_id) + '/attempts/' + str(attempt) + '/jobs?per_page=100')
         rows = jobs.get('jobs', [])
         if jobs.get('total_count') != len(rows) or len({j.get('name') for j in rows}) != len(rows):
             raise ReleaseError('Incomplete or ambiguous workflow job coverage')
         indexed = {j.get('name'): j for j in rows}
+        prefix = 'manual / ' if trigger == 'workflow_dispatch' else ''
         for name in ('deployer', 'core', 'website', 'release'):
-            if indexed.get(name, {}).get('conclusion') != 'success':
-                raise ReleaseError('Required CI job did not succeed: ' + name)
+            if indexed.get(prefix + name, {}).get('conclusion') != 'success':
+                raise ReleaseError('Required CI job did not succeed: ' + prefix + name)
         for name in ('core-image.tar.gz', 'website.tar.gz'):
             recorded = manifest.get('files', {}).get(name, {})
             asset = assets[name]
@@ -195,7 +197,7 @@ class Client:
         return manifest
 
 
-def verify_provenance(directory, commit, run_id, attempt, assets):
+def verify_provenance(directory, commit, run_id, attempt, assets, trigger):
     """Verify the signed manifest and every asset digest before image import.
 
     GitHub's CLI verifies Sigstore signatures, transparency evidence and the
@@ -242,7 +244,7 @@ def verify_provenance(directory, commit, run_id, attempt, assets):
                     cert.get('sourceRepositoryDigest') == commit and
                     cert.get('buildSignerDigest') == commit and
                     cert.get('runInvocationURI') == invocation and
-                    cert.get('buildTrigger') == 'push' and
+                    cert.get('buildTrigger') == trigger and
                     cert.get('runnerEnvironment') == 'github-hosted' and
                     statement.get('predicateType') == 'https://slsa.dev/provenance/v1' and
                     len(subjects) == len(expected) and

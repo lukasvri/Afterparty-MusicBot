@@ -12,7 +12,7 @@ on the bot host. Tests and production builds run once in GitHub Actions.
    Local edits, staged files, untracked files and ignored configuration are not
    exported or mounted in tests. The working branch and local files stay unchanged.
    If a production commit is recorded, the fetched commit must descend from it.
-3. Requires the exact commit's successful canonical main-push workflow, including
+3. Requires the exact commit's successful canonical signed-build workflow, including
    the Core, website, deployer and release jobs. Downloads its commit-addressed
    build assets and verifies GitHub's asset digests, the manifest, image ID,
    revision label, platform and runtime user. Classic config IDs and containerd
@@ -141,8 +141,16 @@ update. Do not run `docker compose down -v`.
 
 ## Build availability and first rollout
 
-The release job runs only after all three CI validation jobs succeed on a push
-to canonical main. It publishes a prerelease named `build-<full commit SHA>`
+In GitHub Actions, select **Core validation**, choose **Run workflow** on
+canonical `main`, and select **publish_build** with **coverage_only** clear.
+With GitHub CLI, the equivalent is:
+
+```bash
+gh workflow run core.yml --ref main -f publish_build=true
+```
+
+The workflow runs the full validation suite for the selected main commit. The
+release job then publishes a prerelease named `build-<full commit SHA>`
 containing `core-image.tar.gz`, `website.tar.gz`, `release.json` and
 `provenance.json`. The signed Sigstore bundle covers all three payload digests.
 The publisher verifies it before upload; consumers verify it before trusting
@@ -151,8 +159,8 @@ public, secret-free build assets, not a production deployment or an application
 release announcement. The release is excluded from GitHub's latest-release
 selection. Published assets are never overwritten by this workflow.
 
-Pull requests run validation and upload temporary workflow artifacts, but do not
-publish build releases or deploy anything. A host needs no GitHub token to read
+Pull requests, main pushes and manual runs without the publication option
+perform validation without publishing build releases. A host needs no GitHub token to read
 the public build releases. Missing assets, failed/pending CI, wrong revisions,
 partial job results and checksum failures stop before playback or Core is touched.
 Any existing build release requires manual review rather than automatic
@@ -162,10 +170,10 @@ expected size and digest in the draft created by that job. If the asset is
 missing, the job retries at most twice. GitHub's empty upload placeholder can
 be cleared from that draft before retrying.
 
-After merging this workflow change, wait for its first main-push run and build
-release to succeed. Verify the pinned host consumer and GitHub CLI prerequisite
-first. Older commits have no signed reusable build assets and are
-deliberately unavailable to the new update path. Reinstall all three pinned
-deployer files together. For development changes, `npm run setup:cloud` followed
+Before consuming a manually published build, install the updated pinned host
+consumer and verify the GitHub CLI prerequisite. Reinstall all three pinned
+deployer files together. Previously signed main-push builds remain accepted.
+Commits without published signed assets remain unavailable to the updater.
+For development changes, `npm run setup:cloud` followed
 by `npm run check:all` remains the full validation workflow; production hosts do
 not repeat it.

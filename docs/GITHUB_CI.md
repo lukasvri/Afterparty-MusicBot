@@ -8,13 +8,18 @@ separate owner-approved local operation.
 
 - `deployer` runs the Python failure, recovery and release-verification tests.
 - `core` builds the final Linux amd64 image through the Dockerfile's validation
-  stage, reuses GitHub Actions build-cache layers, then probes and packages that
-  exact loaded image. Packaging does not rebuild it or connect to Discord.
-- `website` runs lint, typechecks, application tests and the production build,
-  then packages that existing build output.
-- `release` runs only after all three jobs succeed on canonical `main`. It signs
-  the manifest and both payload digests and publishes commit-addressed build
-  assets. It is intentionally skipped on PRs and must not be a required PR check.
+  stage, reuses GitHub Actions build-cache layers, then probes that exact loaded
+  image. `website` runs lint, typechecks, application tests and the production build.
+- PRs and `main` pushes run validation without packaging release archives. A
+  known independent playback, presentation or documentation diff may omit only
+  the extended eight-round quiz. Game, shared, dependency, workflow, unknown and
+  incomplete diffs retain the full browser suite. Manual validation and signed
+  builds always run the full suite.
+- To publish signed, commit-addressed build assets, dispatch **Core validation**
+  on canonical `main` with **publish_build** selected and **coverage_only** clear.
+  The validation jobs package their exact outputs and the release job signs and
+  publishes them only after all three jobs pass. Manual jobs retain the
+  `manual / ` prefix, separate from required PR checks.
 
 The job names and workflow path are part of the host's provenance policy. Keep
 these identities stable or update and test that policy in the same reviewed
@@ -24,8 +29,8 @@ Actions use full commit SHAs and Node.js 24 runtimes. Jobs use `ubuntu-24.04` so
 change to `ubuntu-latest` does not silently change the build environment. Ordinary
 jobs get read-only repository access; only `release` receives the write and OIDC
 permissions needed for publication and attestation. Checkout does not retain
-credentials. New PR commits cancel older runs for that PR; main push runs are
-not canceled by a later push.
+credentials. New PR commits and main pushes cancel superseded validation for
+that PR or main respectively. Manual builds are independent of those runs.
 
 Temporary workflow artifacts expire after three days. They contain compressed
 payloads, so artifact transport uses compression level zero. Published releases
