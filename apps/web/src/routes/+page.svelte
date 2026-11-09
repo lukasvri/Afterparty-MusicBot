@@ -25,6 +25,7 @@
     busy: false,
     error: '',
     searching: false,
+    searchIncomplete: false,
     searchError: '',
     results: [],
     query: '',
@@ -644,6 +645,8 @@
                             ? `${view.results.length} results for “${view.query}”`
                             : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
                           YouTube and add a track to the shared queue.{/if}
+                        {#if view.searchIncomplete && !view.searching}
+                          Showing a partial list. Search again for more.{/if}
                       </div>{/if}
                     {#if view.results.length}<ul class="search-results">
                         {#each view.results as video, index (`${video.id}:${index}`)}<li>

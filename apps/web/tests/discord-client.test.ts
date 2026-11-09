@@ -99,10 +99,11 @@ test('late concert searches cannot populate another selected server', async () =
     await f.client.connect(guildA);
     const search = f.client.search('slow search');
     await f.client.connect(guildB);
-    finish({ videos: [video()] });
+    finish({ videos: [video()], complete: false });
     await search;
     assert.equal(f.view.guildId, guildB);
     assert.deepEqual(f.view.results, []);
+    assert.equal(f.view.searchIncomplete, false);
     assert.equal(f.view.searching, false);
     assert.equal(
       f.calls.find((call) => call.path.startsWith('/api/search'))!.init.signal?.aborted,

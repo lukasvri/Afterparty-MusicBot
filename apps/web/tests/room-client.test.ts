@@ -329,7 +329,7 @@ for (const timeout of ['browser', 'gateway']) {
     const snapshot = room();
     const f = fixture(async (path) => {
       if (!path.startsWith('/api/search')) return json(snapshot);
-      if (!fail) return json({ videos: [snapshot.current] });
+      if (!fail) return json({ videos: [snapshot.current], complete: false });
       if (timeout === 'browser') throw new DOMException('signal timed out', 'TimeoutError');
       return json({ error: 'signal timed out' }, 504);
     });
@@ -349,8 +349,11 @@ for (const timeout of ['browser', 'gateway']) {
       assert.equal(f.state.searchError, '');
       assert.equal(f.state.error, '');
       assert.equal(f.state.results[0]?.id, snapshot.current?.id);
+      assert.equal(f.state.searchIncomplete, true);
       assert.equal(f.calls.filter((call) => call.path.startsWith('/api/search')).length, 2);
       assert.equal(f.calls.filter((call) => call.init.method === 'POST').length, 0);
+      f.client.cancelSearch();
+      assert.equal(f.state.searchIncomplete, false);
     } finally {
       f.client.destroy();
     }
@@ -546,6 +549,7 @@ test('leave cancels reads, searches and polling, clears the view and preserves o
     busy: false,
     error: '',
     searching: false,
+    searchIncomplete: false,
     searchError: '',
     results: [],
     query: '',
