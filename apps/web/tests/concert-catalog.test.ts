@@ -175,7 +175,7 @@ test('festival records preserve source attribution, unique recordings and origin
     assert(recording.uploaderName || recording.sourcePublisher);
     assert(recording.evidenceUrls.includes(recording.sourceUrl));
   }
-  assert.equal(CONCERT_CATALOG.length, 1049);
+  assert.equal(CONCERT_CATALOG.length, 1054);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'cWJV0DgMqEA')?.year, 2023);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'jQLWYc2UrFY')?.artist, 'Westend');
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'PVh5bKxUjPo')?.artist, 'SKILAH');
@@ -230,14 +230,30 @@ const originalUltraIds = new Set([
   'fz-3arJT8fc',
 ]);
 const originalRaiIds = new Set(['cWJV0DgMqEA', 'lGCo8ILvauI', 'CwE-haZR2fc']);
+const extraVenues = new Set(['red-rocks', 'tomorrowland-brasil']);
 test('RAI expansion preserves all 1036 preceding catalog objects exactly', () => {
   const previous = CONCERT_CATALOG.filter(
-    (entry) => entry.eventId !== 'amsterdam-rai' || originalRaiIds.has(entry.videoId),
+    (entry) =>
+      !extraVenues.has(entry.eventId) &&
+      (entry.eventId !== 'amsterdam-rai' || originalRaiIds.has(entry.videoId)),
   ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   assert.equal(previous.length, 1036);
   assert.equal(
     createHash('sha256').update(JSON.stringify(previous)).digest('hex'),
     'cd848bbe1e92ccfee29dd2c99251b7f6f93c120be1c817ec97c0bd07024e4b90',
+  );
+});
+test('selected Red Rocks and Tomorrowland Brasil sets retain their performance years and uploaders', () => {
+  const sets = CONCERT_CATALOG.filter((entry) => extraVenues.has(entry.eventId));
+  assert.deepEqual(
+    sets.map(({ eventId, year, videoId, uploaderName }) => [eventId, year, videoId, uploaderName]),
+    [
+      ['red-rocks', 2026, 'MI-I3utRjpE', 'Alesso'],
+      ['red-rocks', 2025, 'J8P_X7Fc5as', 'Martin Garrix'],
+      ['red-rocks', 2025, 'dLNUbE_Q-3E', 'Martin Garrix'],
+      ['tomorrowland-brasil', 2025, 'lPLHOPVSw_Q', 'Tomorrowland'],
+      ['tomorrowland-brasil', 2025, 'WCo6kS1h8aU', 'Tomorrowland'],
+    ],
   );
 });
 test('RAI inventories retain the full captured sources without inventing separate shows', () => {
