@@ -134,8 +134,7 @@ export class DiscordBot {
             this.engine.changed();
             return;
         }
-        await this.engine.startNext(); if (recovery?.paused && this.engine.current)
-        this.engine.pause(); }
+        await this.engine.startNext(recovery?.paused === true); }
     async diagnostic() { if (this.engine.current || this.engine.queue.length || this.engine.connected)
         throw new UserError('The test requires an idle bot with an empty queue.'); const guild = await this.client.guilds.fetch(this.guildId); const channels = await guild.channels.fetch(); const channel = channels.find(c => c?.type === ChannelType.GuildVoice && !c.members.some(m => !m.user.bot) && c.permissionsFor(guild.members.me!).has([PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])); if (!channel?.isVoiceBased())
         throw new UserError('No empty voice channel is available for the test.'); this.testing = true; const settings = this.engine.settings; try {
