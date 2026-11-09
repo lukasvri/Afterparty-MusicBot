@@ -175,7 +175,7 @@ test('festival records preserve source attribution, unique recordings and origin
     assert(recording.uploaderName || recording.sourcePublisher);
     assert(recording.evidenceUrls.includes(recording.sourceUrl));
   }
-  assert.equal(CONCERT_CATALOG.length, 1054);
+  assert.equal(CONCERT_CATALOG.length, 1061);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'cWJV0DgMqEA')?.year, 2023);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'jQLWYc2UrFY')?.artist, 'Westend');
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'PVh5bKxUjPo')?.artist, 'SKILAH');
@@ -235,6 +235,7 @@ test('RAI expansion preserves all 1036 preceding catalog objects exactly', () =>
   const previous = CONCERT_CATALOG.filter(
     (entry) =>
       !extraVenues.has(entry.eventId) &&
+      entry.eventId !== 'tomorrowland-winter' &&
       (entry.eventId !== 'amsterdam-rai' || originalRaiIds.has(entry.videoId)),
   ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   assert.equal(previous.length, 1036);
@@ -254,6 +255,42 @@ test('selected Red Rocks and Tomorrowland Brasil sets retain their performance y
       ['tomorrowland-brasil', 2025, 'lPLHOPVSw_Q', 'Tomorrowland'],
       ['tomorrowland-brasil', 2025, 'WCo6kS1h8aU', 'Tomorrowland'],
     ],
+  );
+});
+test('selected Winter sets retain their official editions and every previous catalog record', () => {
+  const winter = CONCERT_CATALOG.filter((entry) => entry.eventId === 'tomorrowland-winter');
+  assert.deepEqual(
+    winter.map(({ year, videoId }) => [year, videoId]),
+    [
+      [2026, 'Hwdz8PNVj04'],
+      [2026, 'YLhLDGXPjJ8'],
+      [2026, '-etxOvF1ZN0'],
+      [2026, 'AhH2-pfvAfw'],
+      [2025, 'amJ8uKUU_fE'],
+      [2025, '7eAPdPGdyhg'],
+      [2025, 'PHxI6mtscOw'],
+    ],
+  );
+  for (const entry of winter) {
+    assert.equal(entry.uploaderName, 'Tomorrowland');
+    assert.equal(entry.eventName, 'Tomorrowland Winter');
+    assert(entry.title.endsWith(`Tomorrowland Winter ${entry.year}`));
+    assert(
+      entry.evidenceUrls.includes(
+        'https://www.youtube.com/playlist?list=' +
+          (entry.year === 2026
+            ? 'PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB'
+            : 'PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1'),
+      ),
+    );
+  }
+  const prior = CONCERT_CATALOG.filter((entry) => entry.eventId !== 'tomorrowland-winter').sort(
+    (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  assert.equal(prior.length, 1054);
+  assert.equal(
+    createHash('sha256').update(JSON.stringify(prior)).digest('hex'),
+    '8130aa0de9fee436b68a3b820a98ee07173320922258f6ffa5439008ce1922cd',
   );
 });
 test('RAI inventories retain the full captured sources without inventing separate shows', () => {
