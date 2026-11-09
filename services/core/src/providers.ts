@@ -107,7 +107,7 @@ type SearchResult = { tracks: Track[]; complete: boolean };
 type SearchHydrationProgress = (verified: number) => void;
 const MAX_SEARCH_JOBS = 64;
 type StreamSource = { url: string; headers: string; duration: number | undefined };
-export type PlaybackSourceMode = "standard" | "startup" | "seek";
+export type PlaybackSourceMode = "standard" | "startup" | "seek" | "skip";
 const STREAM_SOURCE_TTL_MS = 5 * 60_000;
 const FAST_YOUTUBE_SOURCE_MS = 4_000;
 const YOUTUBE_HLS_FORMAT = "bestaudio[protocol*=m3u8]";
@@ -626,7 +626,9 @@ export class Providers {
     for (const [entry, retained] of this.streamSources)
       if (now < retained.at || now - retained.at >= STREAM_SOURCE_TTL_MS)
         this.streamSources.delete(entry);
-    const retained = !track.live && mode === "seek" ? this.streamSources.get(key) : undefined;
+    const retained = !track.live && (mode === "seek" || mode === "skip")
+      ? this.streamSources.get(key)
+      : undefined;
     if (retained) {
       this.streamSources.delete(key);
       this.streamSources.set(key, retained);
@@ -643,7 +645,7 @@ export class Providers {
     let data: ExtractedMedia | undefined;
     let timing: ExtractorTiming | undefined;
     const recordTiming = onTiming ? (measurement: ExtractorTiming) => { timing = measurement; } : undefined;
-    if (this.fastYouTubeStartup && mode === "startup" && track.source !== "soundcloud" &&
+    if (this.fastYouTubeStartup && (mode === "startup" || mode === "skip") && track.source !== "soundcloud" &&
         !track.live && Number.isFinite(track.duration) && track.duration > 0) {
       const deadline = AbortSignal.timeout(FAST_YOUTUBE_SOURCE_MS);
       try {
