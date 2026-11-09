@@ -30,6 +30,7 @@
     audioPhase: 'Connecting shared clock…',
     adding: false,
     searching: false,
+    searchIncomplete: false,
     query: '',
     results: [],
     history: [],
@@ -365,6 +366,8 @@
                       : view.query
                         ? `${view.results.length} results for “${view.query}”`
                         : 'Search YouTube and add music to this server’s concert queue.'}
+                    {#if view.searchIncomplete && !view.searching}
+                      Showing a partial list. Search again for more.{/if}
                   </p>
                   {#if shownResults.length}<ul class="search-results">
                       {#each shownResults as video, index (`${video.id}:${index}`)}<li>

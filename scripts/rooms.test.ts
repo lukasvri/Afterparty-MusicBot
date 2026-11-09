@@ -1118,8 +1118,12 @@ test('D1 incomplete Core search results remain immediately retryable', async () 
     globalThis.fetch = async () => {
       calls++; return Response.json({ videos: calls === 1 ? [seed] : [seed, next], complete: calls > 1 });
     };
-    assert.equal((await searchHandler(f.request, 'partial core result')).videos.length, 1);
-    assert.equal((await searchHandler(f.request, 'partial core result')).videos.length, 2);
+    const first = await searchHandler(f.request, 'partial core result');
+    assert.equal(first.videos.length, 1);
+    assert.equal(first.complete, false);
+    const retry = await searchHandler(f.request, 'partial core result');
+    assert.equal(retry.videos.length, 2);
+    assert.equal(retry.complete, true);
     assert.equal(calls, 2);
     assert.equal((await searchHandler(f.request, 'partial core result')).videos.length, 2); assert.equal(calls, 2);
   } finally { delete syntheticEnv.GUTTA_CORE_PUBLIC_URL; delete syntheticEnv.ADMIN_BRIDGE_KEY; f.close(); }

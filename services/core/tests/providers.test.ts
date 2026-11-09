@@ -138,6 +138,61 @@ test('a search deadline kills its actual extractor and subsequent work still acq
  }finally{context.mock.timers.reset();t.close();}
 });
 
+test('manual search returns ten verified results without waiting for a stalled metadata tail', async context => {
+ const fixture=setup(),tail=[deferred<void>(),deferred<void>(),deferred<void>()];
+ context.mock.timers.enable({apis:['setTimeout']});
+ try {
+  const provider=new Providers(fixture.store,{}),ids=Array.from({length:13},(_,i)=>String(i).padStart(11,'a'));
+  const pendingSignals:AbortSignal[]=[];
+  let discoveries=0;
+  provider.youtube=async()=>{throw Error('No API key');};
+  provider.extract=async(args,signal)=>{
+   const target=args.at(-1)!;
+   if(target.startsWith('ytsearch')){
+    discoveries++;
+    return {entries:ids.map(id=>({id}))};
+   }
+   const id=new URL(target).searchParams.get('v')!;
+   if(ids.indexOf(id)>=10){pendingSignals.push(signal!);await tail[ids.indexOf(id)-10].promise;}
+   return {id,title:'Artist - Result '+id,artist:'Artist',duration:180,playable_in_embed:id!==ids[0]};
+  };
+  let settled=false;
+  const search=provider.searchResult('cold results',30).then(result=>{settled=true;return result;});
+  await yieldTurn();
+  assert.equal(pendingSignals.length,3);
+  context.mock.timers.tick(1500);
+  await yieldTurn();
+  assert.equal(settled,false,'a result that cannot play in the site does not fill the first page');
+  tail[0].resolve();
+  await yieldTurn();
+  context.mock.timers.tick(1499);
+  await yieldTurn();
+  assert.equal(settled,false);
+  context.mock.timers.tick(1);
+  await yieldTurn();
+  assert.equal(settled,true,'a full first page should not wait for the 22-second cutoff');
+  const first=await search;
+  assert.equal(first.complete,false);
+  assert.deepEqual(new Set(first.tracks.map(item=>item.id)),new Set(ids.slice(0,11)));
+  assert(pendingSignals.slice(1).every(signal=>signal.aborted));
+  let retrySettled=false;
+  const retrying=provider.searchResult('cold results',30).then(result=>{retrySettled=true;return result;});
+  await yieldTurn();
+  tail[1].resolve();
+  await yieldTurn();
+  context.mock.timers.tick(1500);
+  await yieldTurn();
+  assert.equal(retrySettled,false,'a retry with ten cached tracks keeps its full metadata budget');
+  tail[2].resolve();
+  const retry=await retrying;
+  assert.equal(retry.complete,true);
+  assert.equal(retry.tracks.length,13);
+  assert.equal(discoveries,1,'a retry must continue the original provider candidate list');
+ } finally {
+  tail.forEach(gate=>gate.resolve());await yieldTurn();context.mock.timers.reset();fixture.close();
+ }
+});
+
 test('cold video metadata skips player JavaScript without weakening source errors or stream extraction',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{});p.youtube=async()=>{throw Error('Unavailable API')};
@@ -180,6 +235,24 @@ test('seek source retention expires after five minutes and rejects clock rollbac
   await p.stream(video,signal);now+=299999;await p.stream(video,signal,'seek');assert.equal(calls,1);
   now++;await p.stream(video,signal,'seek');assert.equal(calls,2);
   now--;await p.stream(video,signal,'seek');assert.equal(calls,3,'clock rollback cannot prolong source retention');
+ }finally{t.close();}
+});
+
+test('a prefetched skip respects source expiry and keeps the configured cold startup path',async context=>{
+ const t=setup();let now=1000;context.mock.method(Date,'now',()=>now);
+ try{
+  const p=new Providers(t.store,{AFTERPARTY_FAST_YOUTUBE_STARTUP:'1'}),video=track(),signal=new AbortController().signal;
+  const clients:string[]=[];
+  p.extract=async args=>{
+   clients.push(args.includes('youtube:player_client=visionos')?'fast':'standard');
+   return {id:video.id,is_live:false,protocol:'m3u8_native',url:'https://media.example.test/'+clients.length,duration:200};
+  };
+  assert.equal((await p.stream(video,signal)).url,'https://media.example.test/1');
+  now+=299999;
+  assert.equal((await p.stream(video,signal,'skip')).url,'https://media.example.test/1');
+  now++;
+  assert.equal((await p.stream(video,signal,'skip')).url,'https://media.example.test/2');
+  assert.deepEqual(clients,['standard','fast']);
  }finally{t.close();}
 });
 

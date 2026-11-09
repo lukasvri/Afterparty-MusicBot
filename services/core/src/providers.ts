@@ -22,7 +22,10 @@ import { selectRadio } from "./radio-pipeline.ts";
 import { favoriteRecording } from "./recommendation-ranking.ts";
 import { Store } from "./store.ts";
 import { UserError, publicTrack, type Track } from "./types.ts";
-import { ProviderWork, CORE_SEARCH_DEADLINE_MS, CORE_SEARCH_RESULTS_MS } from "./provider-work.ts";
+import {
+  ProviderWork, CORE_SEARCH_DEADLINE_MS, CORE_SEARCH_RESULTS_MS,
+  CORE_SEARCH_FIRST_PAGE_SIZE, CORE_SEARCH_TAIL_MS, CORE_SEARCH_RETRY_MS,
+} from "./provider-work.ts";
 function extractedCatalogArtist(media: ExtractedMedia) {
   const original = media.artist ?? media.uploader ?? "YouTube";
   const artists = media.artists;
@@ -101,8 +104,10 @@ const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
   ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) });
 export type PlaylistImportResult = { videos: Track[]; total?: number; skipped: number; limited: boolean };
 type SearchResult = { tracks: Track[]; complete: boolean };
+type SearchHydrationProgress = (verified: number) => void;
+const MAX_SEARCH_JOBS = 64;
 type StreamSource = { url: string; headers: string; duration: number | undefined };
-export type PlaybackSourceMode = "standard" | "startup" | "seek";
+export type PlaybackSourceMode = "standard" | "startup" | "seek" | "skip";
 const STREAM_SOURCE_TTL_MS = 5 * 60_000;
 const FAST_YOUTUBE_SOURCE_MS = 4_000;
 const YOUTUBE_HLS_FORMAT = "bestaudio[protocol*=m3u8]";
@@ -128,6 +133,7 @@ export class Providers {
   recommendations: Recommendations;
   recommendationStatus = "artist";
   private searches = new Map<string, ProviderWork<SearchResult>>();
+  private searchContinuations = new Map<string, { at: number; ids: string[] }>();
   private videoLookups = new Map<string, ProviderWork<Track | undefined>>();
   // Private, short-lived sources for current playback and its prefetched next
   // entry. Only explicit same-entry seeks may reuse them; never persist URLs.
@@ -171,14 +177,14 @@ export class Providers {
   ) {
     return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile, onTiming);
   }
-  async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false): Promise<Track[]> {
+  async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false, onVerified?: SearchHydrationProgress): Promise<Track[]> {
     const controller = new AbortController();
     try {
       return await this.videoResults(ids, skipUnavailable,
-        signal ? AbortSignal.any([signal, controller.signal]) : controller.signal, partial);
+        signal ? AbortSignal.any([signal, controller.signal]) : controller.signal, partial, onVerified);
     } finally { controller.abort(new UserError("The request was cancelled.", 499)); }
   }
-  private async videoResults(ids: string[], skipUnavailable: boolean, signal: AbortSignal, partial: boolean): Promise<Track[]> {
+  private async videoResults(ids: string[], skipUnavailable: boolean, signal: AbortSignal, partial: boolean, onVerified?: SearchHydrationProgress): Promise<Track[]> {
     if (!partial) signal.throwIfAborted();
     if (!ids.length) return [];
     if (ids.some((id) => !/^[\w-]{11}$/.test(id)))
@@ -194,6 +200,7 @@ export class Providers {
         found.set(id, cached.track);
       else if (!missing.includes(id)) missing.push(id);
     }
+    let verified = onVerified ? [...found.values()].filter(track => track.embeddable).length : 0;
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
       if (signal.aborted && partial) break;
@@ -243,7 +250,13 @@ export class Providers {
         for (const id of owned.keys()) complete(id, error instanceof Error ? error : new Error(String(error)));
       });
       await Promise.all(pending.map(async ([id, lookup]) => {
-        try { const track = await lookup; if (track) found.set(id, track); }
+        try {
+          const track = await lookup;
+          if (track) {
+            found.set(id, track);
+            if (onVerified && track.embeddable) onVerified(++verified);
+          }
+        }
         catch (error) { if (signal.aborted && !partial || !skipUnavailable) throw error; }
       }));
     }
@@ -349,7 +362,10 @@ export class Providers {
       return { tracks: cached.tracks.map(copySearchTrack), complete: true };
     let lookup = this.searches.get(key);
     if (!lookup) {
-      if (this.searches.size >= 64) throw new UserError("The music source is busy. Try again shortly.", 503);
+      if (this.searches.size >= MAX_SEARCH_JOBS) throw new UserError("The music source is busy. Try again shortly.", 503);
+      const retained = this.searchContinuations.get(key);
+      const continuation = retained && retained.at <= now && now - retained.at < CORE_SEARCH_RETRY_MS ? retained : undefined;
+      if (!continuation) this.searchContinuations.delete(key);
       const shared = new ProviderWork<SearchResult>(CORE_SEARCH_DEADLINE_MS, () => {
         if (this.searches.get(key) === shared) this.searches.delete(key);
       });
@@ -360,26 +376,48 @@ export class Providers {
         const hydration = new AbortController();
         // One soft cutoff from search start, not a new budget for each ID.
         const timer = setTimeout(() => hydration.abort(), CORE_SEARCH_RESULTS_MS);
+        let tail: ReturnType<typeof setTimeout> | undefined;
+        const onVerified: SearchHydrationProgress = (verified) => {
+          if (verified >= CORE_SEARCH_FIRST_PAGE_SIZE && tail === undefined)
+            tail = setTimeout(() => hydration.abort(), CORE_SEARCH_TAIL_MS);
+        };
         try {
-          const { tracks, emptySearch } = await this.searchUncached(query, count, musicOnly, signal, hydration.signal);
+          const ids = continuation?.ids ?? await this.discoverSearchIds(query, count, musicOnly, signal);
+          const partial = !musicOnly;
+          const verified = await this.video(
+            ids, true, partial ? AbortSignal.any([signal, hydration.signal]) : signal, partial,
+            partial && !continuation && count > CORE_SEARCH_FIRST_PAGE_SIZE ? onVerified : undefined,
+          );
           signal.throwIfAborted();
-          const complete = !hydration.signal.aborted || musicOnly;
-          if (complete && (tracks.length || emptySearch && !musicOnly))
-            this.store.set(key, { at: Date.now(), tracks });
+          const complete = !hydration.signal.aborted || !partial;
+          if (!complete && ids.length && !verified.length)
+            throw new UserError("The music source took too long. Try again shortly.", 504);
+          const tracks = musicOnly ? verified : rankMusicSearch(query, verified);
+          if (complete) {
+            this.searchContinuations.delete(key);
+            // Only empty discovery proves a negative cache entry is safe.
+            if (tracks.length || !ids.length && partial)
+              this.store.set(key, { at: Date.now(), tracks });
+          } else if (!continuation && tracks.length) {
+            // Preserve the candidate order across a retry. Provider rankings can change
+            // between requests. Keep only IDs in memory and write only completed results to the cache.
+            this.searchContinuations.set(key, { at: Date.now(), ids });
+            if (this.searchContinuations.size > MAX_SEARCH_JOBS)
+              this.searchContinuations.delete(this.searchContinuations.keys().next().value!);
+          }
           return { tracks, complete };
-        } finally { clearTimeout(timer); }
+        } finally { clearTimeout(timer); clearTimeout(tail); }
       });
     }
     const result = await lookup.wait(signal);
     return { tracks: result.tracks.map(copySearchTrack), complete: result.complete };
   }
-  private async searchUncached(
+  private async discoverSearchIds(
     query: string,
     count: number,
     musicOnly: boolean,
     signal: AbortSignal,
-    hydration: AbortSignal,
-  ): Promise<{ tracks: Track[]; emptySearch: boolean }> {
+  ): Promise<string[]> {
     let ids: string[];
     try {
       const data = await this.youtube("search", {
@@ -406,15 +444,7 @@ export class Providers {
         .map((t) => t?.id)
         .filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id));
     }
-    const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
-    const partial = !musicOnly;
-    const tracks = await this.video(unique, true, partial ? AbortSignal.any([signal, hydration]) : signal, partial);
-    signal.throwIfAborted();
-    if (partial && hydration.aborted && unique.length && !tracks.length)
-      throw new UserError("The music source took too long. Try again shortly.", 504);
-    // Hydration deliberately tolerates unavailable IDs. Only an empty discovery
-    // result proves a negative cache entry is safe; failed hydration must retry.
-    return { tracks: musicOnly ? tracks : rankMusicSearch(query, tracks), emptySearch: unique.length === 0 };
+    return [...new Set(ids.filter((id): id is string => typeof id === "string" && /^[\w-]{11}$/.test(id)))].slice(0, count);
   }
   /** Metadata-only import. Its 500-entry budget is independent of ordinary queue settings. */
   async importPlaylist(input: string, signal: AbortSignal): Promise<PlaylistImportResult> {
@@ -596,7 +626,9 @@ export class Providers {
     for (const [entry, retained] of this.streamSources)
       if (now < retained.at || now - retained.at >= STREAM_SOURCE_TTL_MS)
         this.streamSources.delete(entry);
-    const retained = !track.live && mode === "seek" ? this.streamSources.get(key) : undefined;
+    const retained = !track.live && (mode === "seek" || mode === "skip")
+      ? this.streamSources.get(key)
+      : undefined;
     if (retained) {
       this.streamSources.delete(key);
       this.streamSources.set(key, retained);
@@ -613,7 +645,7 @@ export class Providers {
     let data: ExtractedMedia | undefined;
     let timing: ExtractorTiming | undefined;
     const recordTiming = onTiming ? (measurement: ExtractorTiming) => { timing = measurement; } : undefined;
-    if (this.fastYouTubeStartup && mode === "startup" && track.source !== "soundcloud" &&
+    if (this.fastYouTubeStartup && (mode === "startup" || mode === "skip") && track.source !== "soundcloud" &&
         !track.live && Number.isFinite(track.duration) && track.duration > 0) {
       const deadline = AbortSignal.timeout(FAST_YOUTUBE_SOURCE_MS);
       try {

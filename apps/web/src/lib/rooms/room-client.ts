@@ -15,7 +15,7 @@ import {
   roomPollUpdate,
   transportChanged,
 } from '../../../../../lib/playback-sync.ts';
-import type { Room, Video } from '../../../../../lib/types.ts';
+import type { MusicSearchResponse, Room, Video } from '../../../../../lib/types.ts';
 import type { PlayerIntent, PlayerIntentReceipt } from './player-intent.ts';
 
 export type RoomAction =
@@ -50,6 +50,7 @@ export type RoomClientState = {
   busy: boolean;
   error: string;
   searching: boolean;
+  searchIncomplete: boolean;
   searchError: string;
   results: Video[];
   query: string;
@@ -122,6 +123,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     busy: false,
     error: '',
     searching: false,
+    searchIncomplete: false,
     searchError: '',
     results: [],
     query: '',
@@ -202,7 +204,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
     publish({
       ...(recovering
         ? { room: state.room ? { ...state.room, isHost: false, isOwner: false } : null }
-        : { room: null, results: [], query: '', receivedAt: 0 }),
+        : { room: null, results: [], searchIncomplete: false, query: '', receivedAt: 0 }),
       connection: recovering ? 'reconnecting' : 'connecting',
       busy: false,
       error: recovering ? 'Reconnecting to the room…' : '',
@@ -805,21 +807,32 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       searchController?.abort();
       const controller = new AbortController();
       searchController = controller;
-      publish({ query, results: [], searching: false, searchError: '' });
+      const retry = state.searchIncomplete && state.query === query;
+      publish({
+        query,
+        results: retry ? state.results : [],
+        searching: false,
+        searchIncomplete: retry,
+        searchError: '',
+      });
       if (query.length < 2 || query.length > 120) {
         publish({ searchError: 'Enter between 2 and 120 characters.' });
         return;
       }
       publish({ searching: true });
       try {
-        const result = await request<{ videos: Video[] }>(
+        const result = await request<MusicSearchResponse>(
           `/api/search?q=${encodeURIComponent(query)}`,
           // Preserve the existing cold-provider budget instead of the generic
           // twelve-second API deadline. Editing or leaving still aborts promptly.
           { headers: headers(), signal: signal(controller, 35000) },
         );
         if (!destroyed && serial === searchSerial && roomGeneration === generation)
-          publish({ results: result.videos, searching: false });
+          publish({
+            results: result.videos,
+            searching: false,
+            searchIncomplete: result.complete === false,
+          });
       } catch (error) {
         if (!destroyed && serial === searchSerial && roomGeneration === generation) {
           const timedOut =
@@ -837,7 +850,13 @@ export function createRoomClient(options: RoomClientOptions = {}) {
       searchSerial++;
       searchController?.abort();
       searchController = null;
-      publish({ searching: false, results: [], query: '', searchError: '' });
+      publish({
+        searching: false,
+        searchIncomplete: false,
+        results: [],
+        query: '',
+        searchError: '',
+      });
     },
     add(videoId: string) {
       return mutate('add', { videoId });
@@ -926,6 +945,7 @@ export function createRoomClient(options: RoomClientOptions = {}) {
         busy: false,
         error: '',
         searching: false,
+        searchIncomplete: false,
         searchError: '',
         results: [],
         query: '',
