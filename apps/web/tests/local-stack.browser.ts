@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import type { Room, Video } from '../../../lib/types.ts';
+import type { MusicSearchResponse, Room, Video } from '../../../lib/types.ts';
 import { visitorSQL } from '../../../lib/room-visitors.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -163,11 +163,14 @@ for (const authority of [false, true])
           meta?: { rows_read?: number; rows_written?: number };
         }[];
       };
-      const rows = [`videos:v5:${track.id}`, 'search:v6:user:synthetic afterparty'];
+      const rows = [
+        [`videos:v5:${track.id}`, [track]],
+        ['search:v7:user:synthetic afterparty', { videos: [track], complete: true }],
+      ] as const;
       const sql = rows
         .map(
-          (key) =>
-            `INSERT INTO cached(key,data,expires_at) VALUES(${sqlValue(key)},${sqlValue(JSON.stringify([track]))},${Date.now() + 3600000}) ON CONFLICT(key) DO UPDATE SET data=excluded.data,expires_at=excluded.expires_at;`,
+          ([key, data]) =>
+            `INSERT INTO cached(key,data,expires_at) VALUES(${sqlValue(key)},${sqlValue(JSON.stringify(data))},${Date.now() + 3600000}) ON CONFLICT(key) DO UPDATE SET data=excluded.data,expires_at=excluded.expires_at;`,
         )
         .join('\n');
       const legacyRooms = [
@@ -553,9 +556,10 @@ for (const authority of [false, true])
       });
       assert.equal(result.status, 200);
       room = result.data.room;
-      const search = await api<{ videos: Video[] }>('/api/search?q=synthetic%20afterparty');
+      const search = await api<MusicSearchResponse>('/api/search?q=synthetic%20afterparty');
       assert.equal(search.status, 200);
       assert.equal(search.data.videos[0].id, track.id);
+      assert.equal(search.data.complete, true);
       result = await api(path, token, { action: 'add', version: room.version, videoId: track.id });
       assert.equal(result.status, 200);
       room = result.data.room;

@@ -7,7 +7,7 @@ import { ProviderWork, MUSIC_REQUEST_DEADLINE_MS } from "../services/core/src/pr
 import { visitorIdentity } from "./visitor-identity.ts";
 import { visitorSQL } from "./room-visitors.ts";
 import { env as cloudEnv } from "cloudflare:workers";
-import type { Video, RoomState, Room } from "./types";
+import type { Video, RoomState, Room, MusicSearchResponse } from "./types";
 import { hasPasswordSession } from "./admin-session";
 import { coreUrl, coreRequest, corePresence } from "./core-server";
 import { recordPlay } from "./party";
@@ -343,30 +343,28 @@ export async function search(request: Request, query: string) {
 }
 /** Only room handlers can select the internal radio mode; public search has a fixed budget. */
 async function searchVideos(request: Request, query: string, radio: boolean) {
-  const job = new ProviderWork<{ videos: Video[] }>(MUSIC_REQUEST_DEADLINE_MS, () => {});
+  const job = new ProviderWork<MusicSearchResponse>(MUSIC_REQUEST_DEADLINE_MS, () => {});
   job.run(signal => searchWithinDeadline(request, query, radio, signal));
   return job.wait(request.signal);
 }
-async function searchWithinDeadline(request: Request, query: string, radio: boolean, signal: AbortSignal) {
+async function searchWithinDeadline(request: Request, query: string, radio: boolean, signal: AbortSignal): Promise<MusicSearchResponse> {
   query = query.trim();
   if (query.length < 2 || query.length > 120)
     fail(400, "Skriv mellom 2 og 120 tegn.");
   await limit(request, radio ? "radio-visitor" : "search-visitor", radio ? 120 : 20, 600000);
   signal.throwIfAborted();
   if (/^https?:\/\//.test(query))
-    return { videos: await videos(request, [videoId(query)], signal) };
+    return { videos: await videos(request, [videoId(query)], signal), complete: true };
   const count = radio ? 20 : 30;
-  let complete = true;
-  const result = await cached(`search:v6:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async signal => {
+  return cached<MusicSearchResponse>(`search:v7:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async signal => {
     if (coreUrl()) {
       try {
         const response = await coreRequest<{ videos: Video[]; complete?: boolean }>(
             "/v1/catalog?q=" + encodeURIComponent(query) + (radio ? "&mode=radio" : ""),
             "GET", undefined, {}, signal,
           );
-        complete = response.complete !== false;
         const result = response.videos.slice(0, count);
-        return radio ? result : rankMusicSearch(query, result);
+        return { videos: radio ? result : rankMusicSearch(query, result), complete: response.complete !== false };
       } catch {
         signal.throwIfAborted();
         /* retain the direct metadata API */
@@ -387,9 +385,8 @@ async function searchWithinDeadline(request: Request, query: string, radio: bool
       [...new Set(data.items.map((v) => v.id.videoId).filter(id => /^[\w-]{11}$/.test(id)))].slice(0, count),
       signal,
     );
-    return radio ? result : rankMusicSearch(query, result);
-  }, videos => complete ? videos.length ? MUSIC_SEARCH_CACHE_MS : EMPTY_MUSIC_SEARCH_CACHE_MS : null, signal);
-  return { videos: result };
+    return { videos: radio ? result : rankMusicSearch(query, result), complete: true };
+  }, result => result.complete ? result.videos.length ? MUSIC_SEARCH_CACHE_MS : EMPTY_MUSIC_SEARCH_CACHE_MS : null, signal);
 }
 type Row = {
   is_public?: number;

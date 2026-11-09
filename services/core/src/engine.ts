@@ -682,11 +682,15 @@ export class Engine extends EventEmitter {
       ...(this.current?.radio && this.snapshot().position < 60 ? [this.current] : []),
       ...requested.filter((track) => track.entryId !== next?.entryId),
     ]);
+    const mixer = this.mixer;
+    // Reuse the exact next source only once its prefetch has delivered audio.
+    const prefetched = next && mixer?.nextPrepared?.track.entryId === next.entryId &&
+      mixer.nextFrames.length > 0 && !mixer.nextFailed;
     this.stop(false);
     const consumed = new Set([...requested.map((track) => track.entryId), ...(next ? [next.entryId] : [])]);
     this.queue = this.queue.filter((track) => !consumed.has(track.entryId));
     this.persist();
-    if (next) await this.startTrack(next, next.offset ?? 0);
+    if (next) await this.startTrack(next, next.offset ?? 0, false, prefetched ? "skip" : "startup");
     else this.changed();
   }
   stop(clear = true) {
