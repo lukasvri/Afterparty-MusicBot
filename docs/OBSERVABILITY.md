@@ -147,19 +147,22 @@ No source URL, headers, provider stderr, track or member identifiers are added.
 No external telemetry or new endpoint is introduced. Deployment and real-provider
 measurement remain separate from source validation.
 
-Explicit same-entry seeks may reuse a validated source from the same provider
-instance. Up to two sources, for current playback and prefetch, remain in memory;
-reuse eligibility lasts at most five minutes and does not extend on a hit. The
-key includes recording, queue entry and provider identity. Clock rollback,
+Explicit same-entry seeks and skips to the exact prefetched queue entry may
+reuse a validated source from the same provider instance. A skip can reuse the
+source once its prefetch has delivered PCM. Up to two sources, for current
+playback and prefetch, remain in memory. Reuse eligibility lasts at most five
+minutes and does not extend on a hit. The key includes recording, queue entry
+and provider identity. Clock rollback,
 expiry, cancellation and live sources do not permit reuse. Live status from
 either the track or the fresh extractor result prevents retention, including
 when earlier track metadata is stale. Expired entries are
 removed when a source is requested. URLs and headers are never written to the
 database or diagnostics, and callers receive copies.
 
-New playback and audio recovery still resolve afresh. A failed fresh resolution
-or rejected preview cannot fall back to an earlier retained source. If a CDN
-invalidates a previously usable URL, the existing bounded audio recovery path
+Cold starts, skips without a usable prefetched source and audio recovery resolve
+afresh. A failed fresh resolution or rejected preview cannot fall back to an
+earlier retained source. If a CDN invalidates a previously usable URL, the
+existing bounded audio recovery path
 performs fresh resolution rather than replaying the retained URL. The readiness
 events above report source-preparation and PCM-readiness time; their durations
 alone do not prove a reuse hit, guarantee CDN availability or establish a real

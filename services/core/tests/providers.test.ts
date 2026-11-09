@@ -183,6 +183,24 @@ test('seek source retention expires after five minutes and rejects clock rollbac
  }finally{t.close();}
 });
 
+test('a prefetched skip respects source expiry and keeps the configured cold startup path',async context=>{
+ const t=setup();let now=1000;context.mock.method(Date,'now',()=>now);
+ try{
+  const p=new Providers(t.store,{AFTERPARTY_FAST_YOUTUBE_STARTUP:'1'}),video=track(),signal=new AbortController().signal;
+  const clients:string[]=[];
+  p.extract=async args=>{
+   clients.push(args.includes('youtube:player_client=visionos')?'fast':'standard');
+   return {id:video.id,is_live:false,protocol:'m3u8_native',url:'https://media.example.test/'+clients.length,duration:200};
+  };
+  assert.equal((await p.stream(video,signal)).url,'https://media.example.test/1');
+  now+=299999;
+  assert.equal((await p.stream(video,signal,'skip')).url,'https://media.example.test/1');
+  now++;
+  assert.equal((await p.stream(video,signal,'skip')).url,'https://media.example.test/2');
+  assert.deepEqual(clients,['standard','fast']);
+ }finally{t.close();}
+});
+
 test('seek source retention preserves current and prefetched entries within a two-entry bound',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{}),signal=new AbortController().signal,a=track('a','aaaaaaaaaaa'),b=track('b','bbbbbbbbbbb'),c=track('c','ccccccccccc');let calls=0;

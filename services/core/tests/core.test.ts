@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {createServer} from 'node:http';
+import {createServer,type IncomingMessage,type ServerResponse} from 'node:http';
 import {Store} from '../src/store.ts';
 import {Engine,positionFromSegments} from '../src/engine.ts';
 import {Commands} from '../src/commands.ts';
@@ -57,6 +57,18 @@ test('PCM fast paths preserve samples and never change the input during gain or 
  }
 });
 function setup(env:NodeJS.ProcessEnv={}){const dir=mkdtempSync(join(tmpdir(),'gutta-core-')),store=new Store(join(dir,'db.sqlite')),providers=new Providers(store,env),sink=new FakeSink(),engine=new Engine(store,providers,sink);return {store,providers,sink,engine,close:()=>{engine.close();store.close();rmSync(dir,{recursive:true,force:true});}};}
+
+function serveWave(audio:Buffer,request:IncomingMessage,response:ServerResponse){
+ const range=request.headers.range?.match(/^bytes=(\d+)-(\d*)$/);
+ const start=range?Number(range[1]):0;
+ const end=range?.[2]?Math.min(Number(range[2]),audio.length-1):audio.length-1;
+ if((request.headers.range&&!range)||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>end||start>=audio.length){
+  response.writeHead(416,{'Content-Range':`bytes */${audio.length}`});response.end();return;
+ }
+ response.writeHead(range?206:200,{'Content-Type':'audio/wav','Content-Length':end-start+1,
+  'Accept-Ranges':'bytes',...(range?{'Content-Range':`bytes ${start}-${end}/${audio.length}`}:{}),Connection:'close'});
+ response.end(audio.subarray(start,end+1));
+}
 
 test('a fast source that fails decoding resumes through the standard resolver',async()=>{
  const t=setup({AFTERPARTY_FAST_YOUTUBE_STARTUP:'1'}),song=track();
@@ -115,6 +127,55 @@ test('playback preparation separates source resolution from the first decoded PC
  }finally{decoder?.stop();controller.abort();await decoder?.closed;t.close();}
 });
 
+test('skipping to the prefetched next song plays audio without repeating source extraction',async()=>{
+ const t=setup(),first={...track('abcdefghijk'),concert:true},next={...track('lmnopqrstuv'),concert:true,offset:1};
+ const commands=new Commands(t.engine);
+ const extracted:string[]=[],output=deferred<void>();
+ let audio=Buffer.alloc(0),timer:ReturnType<typeof setTimeout>|undefined;
+ const server=createServer((request,response)=>{
+  if(request.url===`/${first.id}`){
+   // Keep the outgoing track alive until skip so an early EOF cannot promote the warm track.
+   response.writeHead(200,{'Content-Type':'audio/wav','Content-Length':audio.length});
+   response.write(audio.subarray(0,64*1024));return;
+  }
+  serveWave(audio,request,response);
+ });
+ clearInterval(t.engine.timer);t.engine.connected=true;t.engine.settings.radio=false;
+ try{
+  const source=join(dirname(String(t.store.db.prepare('PRAGMA database_list').get()!.file)),'skip.wav');
+  const generated=spawnSync(process.env.FFMPEG_PATH??'ffmpeg',
+   ['-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=2','-ac','2','-y',source]);
+  assert.equal(generated.status,0,String(generated.stderr));audio=readFileSync(source);
+  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+  const address=server.address();assert(address&&typeof address!=='string');
+  t.providers.extract=async args=>{
+   const id=new URL(args.at(-1)!).searchParams.get('v')!;
+   extracted.push(id);
+   return {id,is_live:false,url:`http://127.0.0.1:${address.port}/${id}`,duration:200};
+  };
+  t.engine.queue=[next];
+  await t.engine.startTrack(first);
+  const old=t.engine.mixer!;
+  old.prepare();await old.preparing;await old.nextRead;
+  assert(old.nextFrames.length>0,'the queued source must deliver PCM before skip');
+  assert.deepEqual(extracted,[first.id,next.id]);
+  const sink:Sink=t.sink;
+  sink.play=(stream,id)=>{
+   stream.once('error',error=>t.sink.onError?.(error,id));
+   stream.once('data',()=>output.resolve());
+   stream.resume();
+  };
+  await commands.execute({action:'skip',playbackKey:'core:'+first.entryId,queueRevision:t.engine.revision()},'public');
+  await Promise.race([output.promise,new Promise<never>((_,reject)=>{
+   timer=setTimeout(()=>reject(new Error('No Opus from the skipped-to track')),8000);
+  })]);
+  assert.equal(t.engine.current?.entryId,next.entryId);
+  assert.equal(t.engine.snapshot().position,1);
+  assert.deepEqual(t.engine.queue,[]);
+  assert.deepEqual(extracted,[first.id,next.id],'the ready next source must not be extracted twice');
+ }finally{clearTimeout(timer);commands.close();t.close();server.closeAllConnections();if(server.listening)await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
+
 test('current playback timings ignore retired source generations',async()=>{
  const t=setup(),gate=deferred<Prepared>();
  let report:((reason:'source-ready'|'decoder-ready',durationMs:number)=>void)|undefined,stopped=0;
@@ -168,7 +229,7 @@ test('seeking opts into source reuse while audio recovery requires fresh resolut
   const reuse:(string|undefined)[]=[];t.engine.connected=true;t.engine.current=track();
   t.engine.startTrack=async(_track,_offset,_paused,reuseSource)=>{reuse.push(reuseSource);};
   await t.engine.seek(20);await t.engine.recoverAudio();
-  assert.deepEqual(reuse,['seek','standard'],'only an explicit seek may reuse the current validated source');
+  assert.deepEqual(reuse,['seek','standard'],'audio recovery always resolves a fresh source');
  }finally{t.close();}
 });
 
@@ -178,9 +239,7 @@ test('seek preparation reaches the retained provider source while ordinary prepa
  const report = (reason: string, durationMs: number) => phases.push({reason,durationMs});
  let audio=Buffer.alloc(0),requests=0;
  const server=createServer((request,response)=>{
-  requests++;const match=request.headers.range?.match(/^bytes=(\d+)-(\d*)$/),start=match?Number(match[1]):0,end=match?.[2]?Math.min(Number(match[2]),audio.length-1):audio.length-1;
-  if(request.headers.range&&!match||!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>end||start>=audio.length){response.writeHead(416,{'Content-Range':`bytes */${audio.length}`});response.end();return;}
-  response.writeHead(match?206:200,{'Content-Type':'audio/wav','Content-Length':end-start+1,'Accept-Ranges':'bytes',...(match?{'Content-Range':`bytes ${start}-${end}/${audio.length}`} :{}),Connection:'close'});response.end(audio.subarray(start,end+1));
+  requests++;serveWave(audio,request,response);
  });
  clearInterval(t.engine.timer);
  try{
