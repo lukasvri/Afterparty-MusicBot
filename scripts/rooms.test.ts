@@ -1115,6 +1115,8 @@ test('D1 incomplete Core search results remain immediately retryable', async () 
   const f = fixture(); let calls = 0;
   syntheticEnv.GUTTA_CORE_PUBLIC_URL = 'https://core.example'; syntheticEnv.ADMIN_BRIDGE_KEY = 'synthetic-key';
   try {
+    f.sqlite.prepare("INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)")
+      .run('search:v7:user:partial core result', JSON.stringify({ videos: [seed], complete: true }), Date.now() + 60_000);
     globalThis.fetch = async () => {
       calls++; return Response.json({ videos: calls === 1 ? [seed] : [seed, next], complete: calls > 1 });
     };
