@@ -11,6 +11,7 @@ import { prepareConfiguredGuessSource } from '../src/guess-source.ts';
 import { UnavailableGuessCatalog, type GuessCategorySummary } from '../src/guess-catalog.ts';
 import { deferred } from './deferred.ts';
 import { getGuessPackClips } from '../src/guess-packs.ts';
+import { writeGuessPackApprovals } from './guess-pack-approvals.ts';
 import { GUESS_AUDIO_RATE, guessWave } from '../src/guess-audio-format.ts';
 
 const env = { GUESS_DEEZER_PREVIEWS: '1', GUESS_DEEZER_INVENTORY_PATH: '/private/synthetic-inventory.json' };
@@ -60,9 +61,13 @@ test('YouTube preflight forwards only its private configuration and reports boun
   assert.equal(f.disposed(), 1); assert(!JSON.stringify(result).includes('/private/'));
 });
 
-test('unconfigured alpha preflight prepares the bundled eight-track source and reports capacity without approvals or private answers', async () => {
+test('alpha preflight prepares the approved eight-track preset and keeps approvals and answers private', async t => {
   const clips = getGuessPackClips('edm-festival-hits'); let extracted = 0, fetched = 0;
-  const result = await checkConfiguredGuessSource({}, {
+  const dir = await mkdtemp(join(tmpdir(), 'afterparty-guess-check-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const result = await checkConfiguredGuessSource({
+    GUESS_YOUTUBE_PACK_APPROVAL_PATH: await writeGuessPackApprovals(dir),
+  }, {
     signal: signal(), youtube: {
       extract: async args => {
         const id = new URL(args.at(-1)!).searchParams.get('v')!; assert(clips.some(clip => clip.videoId === id)); extracted++;
@@ -86,6 +91,7 @@ test('unconfigured alpha preflight prepares the bundled eight-track source and r
 test('alpha preflight and its factory share selection without consulting inactive Deezer paths', async () => {
   const f = fixture();
   const result = await checkConfiguredGuessSource({
+    GUESS_YOUTUBE_PACK_APPROVAL_PATH: '/private/approvals.json',
     get GUESS_DEEZER_INVENTORY_PATH(): string { return assert.fail('inactive Deezer paths must not be inspected or copied'); },
   }, { signal: signal() }, (config) => {
     assert(!('GUESS_DEEZER_INVENTORY_PATH' in config)); return f.source;

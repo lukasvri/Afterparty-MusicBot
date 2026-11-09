@@ -181,9 +181,15 @@ test('sixty-second preparation timeout retains single-flight capacity until the 
   assert.equal(await m.reload(), true); assert.equal(calls, 2);
 });
 
-test('alpha default selection configures the manager without fetching until an explicit reload', async t => {
+test('alpha stays disabled without an approval file and prepares a configured pack only on reload', async t => {
+  const disabled = new GuessSourceManager({ env: {}, signal: signal(),
+    prepare: () => assert.fail('an unconfigured alpha must not prepare') });
+  t.after(disabled.dispose);
+  assert.equal(disabled.configured, false);
+  assert.equal(await disabled.reload(), false);
   let calls = 0;
-  const m = new GuessSourceManager({ env: {}, signal: signal(), prepare: () => { calls++; return source(1); } }); t.after(m.dispose);
+  const m = new GuessSourceManager({ env: { GUESS_YOUTUBE_PACK_APPROVAL_PATH: '/private/approvals.json' },
+    signal: signal(), prepare: () => { calls++; return source(1); } }); t.after(m.dispose);
   assert.equal(m.configured, true); assert.equal(m.status, 'unavailable'); assert.equal(calls, 0);
   assert.equal(await m.reload(), true); assert.equal(m.status, 'ready'); assert.equal(calls, 1);
   m.dispose(); assert.equal(m.status, 'unavailable');
