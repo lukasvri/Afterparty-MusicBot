@@ -163,8 +163,10 @@ Pull requests, main pushes and manual runs without the publication option
 perform validation without publishing build releases. A host needs no GitHub token to read
 the public build releases. Missing assets, failed/pending CI, wrong revisions,
 partial job results and checksum failures stop before playback or Core is touched.
-Any existing build release requires manual review rather than automatic
-replacement or adoption, including a published release claiming the same commit.
+Any existing build release with mismatched state requires manual review rather
+than automatic replacement or adoption. A rerun can pass only when the existing
+published release for the same commit already matches every signed asset digest
+and size exactly.
 During a single publishing job, an interrupted upload is checked against the
 expected size and digest in the draft created by that job. If the asset is
 missing, the job retries at most twice. GitHub's empty upload placeholder can
