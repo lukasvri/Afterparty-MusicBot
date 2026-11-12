@@ -19,6 +19,40 @@ function extracted(id: string) {
     track: `Song ${id}`, duration: 210, categories: ["Music"], tags: ["deep house"], playable_in_embed: true };
 }
 
+test("manual search retries only the candidate whose metadata failed", async () => {
+  const store = new Store(":memory:"), providers = new Providers(store, {});
+  const calls = new Map<string, number>();
+  let discovered = 0, available = false;
+  providers.youtube = async <K extends keyof YouTubeResponses>(path: K) => {
+    if (path === "search") {
+      discovered++;
+      return { items: ids.slice(0, 2).map(videoId => ({ id: { videoId } })) } as YouTubeResponses[K];
+    }
+    throw new UserError("Temporary metadata API failure", 502);
+  };
+  providers.extract = async args => {
+    const id = new URL(args.at(-1)!).searchParams.get("v")!;
+    calls.set(id, (calls.get(id) ?? 0) + 1);
+    if (!available && id !== ids[0])
+      throw new UserError("Temporary metadata failure", 503);
+    return extracted(id);
+  };
+  try {
+    const search = () => providers.searchResult("recoverable metadata", 2);
+    const partial = await search();
+    assert.equal(partial.complete, false);
+    assert.deepEqual(partial.tracks.map(track => track.id), [ids[0]]);
+    available = true;
+    const recovered = await search();
+    assert.equal(recovered.complete, true);
+    assert.deepEqual(recovered.tracks.map(track => track.id), ids.slice(0, 2));
+    assert.equal(discovered, 1);
+    assert.deepEqual([calls.get(ids[0]), calls.get(ids[1])], [1, 2]);
+    await search();
+    assert.equal(discovered, 1, "the completed list is reusable");
+  } finally { store.close(); }
+});
+
 for (const radio of [false, true]) test(`${radio ? "radio" : "manual"} search handles a slow tail without caching an incomplete search`, async context => {
   const store = new Store(":memory:"), gate = deferred<void>();
   context.mock.timers.enable({ apis: ["setTimeout"] });
@@ -43,7 +77,7 @@ for (const radio of [false, true]) test(`${radio ? "radio" : "manual"} search ha
       const result = await pending;
       assert.equal(result.complete, false); assert.deepEqual(result.tracks.map(track => track.id), [ids[0]]);
     }
-    assert.equal(store.get(`search:v7:["slow metadata tail",2,${radio}]`, null), null);
+    assert.equal(store.get(`search:v${radio ? 7 : 8}:["slow metadata tail",2,${radio}]`, null), null);
     available = true;
     const retry = await providers.searchResult("slow metadata tail", 2, radio);
     assert.equal(retry.complete, true); assert.deepEqual(retry.tracks.map(track => track.id), ids.slice(0, 2));
@@ -69,7 +103,7 @@ test("an expired search releases its metadata subscriber while a later search st
     await yieldTurn(); context.mock.timers.tick(1000); await rejected;
     assert.equal(metadataSignal?.aborted, false, "A later metadata subscriber still needs this shared batch");
     gate.resolve(); assert.equal((await survivor)[0].id, ids[1]); assert.equal(calls, 1);
-    assert.equal(store.get('search:v7:["first cold search",1,false]', null), null);
+    assert.equal(store.get('search:v8:["first cold search",1,false]', null), null);
   } finally { gate.resolve(); context.mock.timers.reset(); store.close(); }
 });
 
