@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import type { Page } from 'playwright';
 import { Commands } from '../../../services/core/src/commands.ts';
@@ -19,6 +21,7 @@ import { decodeGuessClip } from '../../../services/core/src/guess-decode.ts';
 import { guessWaveSeconds } from '../../../services/core/src/guess-audio-format.ts';
 import type { GuessResult } from '../../../services/core/src/guess-game.ts';
 import type { Sink } from '../../../services/core/src/audio.ts';
+import { writeGuessPackApprovals } from '../../../services/core/tests/guess-pack-approvals.ts';
 const { chromium } = (await import(
   process.env.PLAYWRIGHT_MODULE ?? 'playwright'
 )) as typeof import('playwright');
@@ -58,9 +61,12 @@ async function released(page: Page) {
   });
 }
 test(
-  'alpha quiz prepares and retries its default pack, then plays eight rounds for two browsers',
+  'alpha quiz prepares and retries an approved pack, then plays eight rounds for two browsers',
   { timeout: 120000 },
-  async () => {
+  async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), 'afterparty-quiz-browser-'));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const approvalPath = await writeGuessPackApprovals(directory);
     const pack = getGuessPack('edm-festival-hits'),
       lifetime = new AbortController();
     assert.equal(pack.tracks.length, 8);
@@ -102,7 +108,7 @@ test(
     const failedPreparation = gate(),
       successfulPreparation = gate();
     const source = new GuessSourceManager({
-      env: { NODE_ENV: 'test' },
+      env: { NODE_ENV: 'test', GUESS_YOUTUBE_PACK_APPROVAL_PATH: approvalPath },
       signal: lifetime.signal,
       prepare: async (env, options) => {
         const attempt = ++attempts,

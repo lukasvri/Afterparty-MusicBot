@@ -22,6 +22,7 @@ import { createServers } from '../src/server.ts';
 import type { Sink } from '../src/audio.ts';
 import { syntheticSong } from './radio-queue-fixture.ts';
 import { deferred } from './deferred.ts';
+import { writeGuessPackApprovals } from './guess-pack-approvals.ts';
 
 const A = '100000000000000001', B = '100000000000000002', key = 'synthetic-prepare-key';
 type Context = Record<string, unknown>;
@@ -206,7 +207,7 @@ test('fresh hosts cannot bypass the global preparation budget by changing rooms'
   assert.equal(calls, 12);
 });
 
-test('actual shadow bootstrap serves HTTP while alpha-default quiz preparation is blocked and shuts down without a bot connection', async t => {
+test('actual shadow bootstrap serves HTTP while approved quiz preparation is blocked and shuts down without a bot connection', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'afterparty-quiz-bootstrap-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const reserved = createServer();
@@ -214,13 +215,15 @@ test('actual shadow bootstrap serves HTTP while alpha-default quiz preparation i
   const port = (reserved.address() as { port: number }).port;
   await new Promise<void>((resolve, reject) => reserved.close(error => error ? reject(error) : resolve()));
   const marker = join(dir, 'started'), extractor = join(dir, 'blocked-extractor.mjs');
+  const approvalPath = await writeGuessPackApprovals(dir);
   await writeFile(extractor, `#!${process.execPath}\nimport { writeFileSync } from 'node:fs';\nwriteFileSync(process.env.SYNTHETIC_STARTED, String(process.pid));\nsetInterval(() => {}, 1000);\n`, { mode: 0o700 });
   const cancellation = new AbortController(); t.after(() => cancellation.abort());
   const events = watch(dir, { signal: AbortSignal.any([cancellation.signal, AbortSignal.timeout(10_000)]) });
   const started = (async () => { for await (const event of events) if (event.filename === 'started') return Number(await readFile(marker, 'utf8')); throw Error('Synthetic extractor did not start.'); })();
   const child = spawn(process.execPath, [fileURLToPath(new URL('../src/main.ts', import.meta.url))], {
     env: { PATH: process.env.PATH, CORE_MODE: 'shadow', DATA_DIR: dir, CORE_PORT: String(port), DISCORD_GUILD_ID: A,
-      PUBLIC_SITE_ADMIN_KEY: key, PUBLIC_SITE_URL: 'https://site.example', YTDLP_PATH: extractor, SYNTHETIC_STARTED: marker },
+      PUBLIC_SITE_ADMIN_KEY: key, PUBLIC_SITE_URL: 'https://site.example', YTDLP_PATH: extractor, SYNTHETIC_STARTED: marker,
+      GUESS_YOUTUBE_PACK_APPROVAL_PATH: approvalPath },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.resume(); child.stderr.resume();
