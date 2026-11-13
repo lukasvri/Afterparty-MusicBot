@@ -901,6 +901,125 @@ const curatedRecordings: readonly ConcertRecording[] = [
       "https://www.youtube.com/watch?v=WCo6kS1h8aU",
       "https://www.tomorrowland.com/article/tomorrowland-brasil-2025-live-info/"
     ]
+  },
+  {
+    "id": "tomorrowland-winter-2026-Hwdz8PNVj04",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2026,
+    "artist": "Matisse & Sadko B2B Third Party",
+    "title": "Matisse & Sadko B2B Third Party | Tomorrowland Winter 2026",
+    "videoId": "Hwdz8PNVj04",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=Hwdz8PNVj04",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=Hwdz8PNVj04",
+      "https://www.youtube.com/playlist?list=PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB"
+    ]
+  },
+  {
+    "id": "tomorrowland-winter-2026-YLhLDGXPjJ8",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2026,
+    "artist": "Third Party",
+    "title": "Third Party | Tomorrowland Winter 2026",
+    "videoId": "YLhLDGXPjJ8",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=YLhLDGXPjJ8",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=YLhLDGXPjJ8",
+      "https://www.youtube.com/playlist?list=PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB"
+    ]
+  },
+  {
+    "id": "tomorrowland-winter-2026--etxOvF1ZN0",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2026,
+    "artist": "Axwell",
+    "title": "Axwell | Tomorrowland Winter 2026",
+    "videoId": "-etxOvF1ZN0",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=-etxOvF1ZN0",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=-etxOvF1ZN0",
+      "https://www.youtube.com/playlist?list=PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB"
+    ]
+  },
+  {
+    "id": "tomorrowland-winter-2026-AhH2-pfvAfw",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2026,
+    "artist": "Steve Angello",
+    "title": "Steve Angello | Tomorrowland Winter 2026",
+    "videoId": "AhH2-pfvAfw",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=AhH2-pfvAfw",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=AhH2-pfvAfw",
+      "https://www.youtube.com/playlist?list=PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB"
+    ]
+  },
+  {
+    "id": "tomorrowland-winter-2025-amJ8uKUU_fE",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2025,
+    "artist": "Axwell",
+    "title": "Axwell | Tomorrowland Winter 2025",
+    "videoId": "amJ8uKUU_fE",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=amJ8uKUU_fE",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=amJ8uKUU_fE",
+      "https://www.youtube.com/playlist?list=PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1"
+    ]
+  },
+  {
+    "id": "tomorrowland-winter-2025-7eAPdPGdyhg",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2025,
+    "artist": "Afrojack",
+    "title": "Afrojack | Tomorrowland Winter 2025",
+    "videoId": "7eAPdPGdyhg",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=7eAPdPGdyhg",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=7eAPdPGdyhg",
+      "https://www.youtube.com/playlist?list=PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1"
+    ]
+  },
+  {
+    "id": "tomorrowland-winter-2025-PHxI6mtscOw",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2025,
+    "artist": "W&W",
+    "title": "W&W | Tomorrowland Winter 2025",
+    "videoId": "PHxI6mtscOw",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=PHxI6mtscOw",
+    "verifiedAt": "2026-11-09",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=PHxI6mtscOw",
+      "https://www.youtube.com/playlist?list=PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1"
+    ]
   }
 ];
 

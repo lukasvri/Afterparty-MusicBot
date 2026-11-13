@@ -1,7 +1,7 @@
 # Festival concert playlists
 
-The source candidate contains **1,054 source-backed recordings across seven event or venue families
-and 20 event/year groups**. Open **Library & playlists**, choose **Festival
+The source candidate contains **1,061 source-backed recordings across eight event or venue families
+and 22 event/year groups**. Open **Library & playlists**, choose **Festival
 concerts**, then select the festival and performance year. Search by artist,
 recording title or stage, and browse 20 sets per page. Every indexed set remains
 reachable; the page limit is not an inventory limit.
@@ -26,6 +26,8 @@ Exclude fan uploads, mirrors, audio with a still image, trailers and recaps.
 | Red Rocks Amphitheatre | 2026 | 1 | [Alesso's official full set](https://www.youtube.com/watch?v=MI-I3utRjpE) |
 | Red Rocks Amphitheatre | 2025 | 2 | Martin Garrix's official solo and Alesso B2B recordings |
 | Tomorrowland Brasil | 2025 | 2 | Selected full sets by Alesso and DubVision B2B Matisse & Sadko B2B Third Party from [Tomorrowland's channel](https://www.tomorrowland.com/article/tomorrowland-brasil-2025-full-sets/) |
+| Tomorrowland Winter | 2026 | 4 | Selected official full sets by Matisse & Sadko B2B Third Party, Third Party, Axwell and Steve Angello from the [2026 livesets playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB) |
+| Tomorrowland Winter | 2025 | 3 | Selected official full sets by Axwell, Afrojack and W&W from the [2025 livesets playlist](https://www.youtube.com/playlist?list=PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1) |
 | EDC Las Vegas | 2026 | 116 | All 116 video links in the [official source index](https://lasvegas.edc.com/2026-sets/) |
 | EDC Las Vegas | 2025 | 86 | All 86 video links in the [official source index](https://lasvegas.edc.com/2025-sets/) |
 | EDC Las Vegas | 2023 | 26 | All 26 embedded videos in the [official source index](https://lasvegas.edc.com/2023-sets/) |
