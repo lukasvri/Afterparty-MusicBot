@@ -48,7 +48,7 @@ export class PcmDecoder {
   constructor(
     source: { url: string; headers: string },
     offset: number,
-    signal: AbortSignal,
+    signal: AbortSignal | undefined,
     ffmpeg = process.env.FFMPEG_PATH ?? "ffmpeg",
     onFirstFrame?: (durationMs: number) => void,
   ) {
@@ -183,8 +183,10 @@ export function mixPcm(
   return out;
 }
 export type Prepared = { track: Track; decoder: PcmDecoder };
+export type BufferedTrack = Prepared & { frames: Buffer[] };
 type MixerOptions = {
   first: Prepared;
+  initialFrames?: Buffer[];
   offset: number;
   volume: () => number;
   crossfade: () => number;
@@ -220,6 +222,7 @@ export class Mixer extends Readable {
     super({ highWaterMark: FRAME_BYTES * 6 });
     this.options = options;
     this.main = options.first;
+    this.mainFrames = options.initialFrames ?? [];
     this.offset = options.offset;
     options.onSegment(this.main.track, 0, this.offset);
   }
@@ -335,6 +338,19 @@ export class Mixer extends Readable {
     this.trackFrame = consumedFrames;
     this.fadeFrame = 0;
     this.endedPreparation = false;
+  }
+  takePrefetched(track: Track): BufferedTrack | undefined {
+    const prepared = this.nextPrepared;
+    if (this.disposed || this.fadeFrame || this.nextRead || this.nextFailed ||
+      !this.nextFrames.length || !prepared || prepared.decoder.disposed || prepared.decoder.error ||
+      prepared.track.entryId !== track.entryId || prepared.track.id !== track.id ||
+      (prepared.track.source ?? "youtube") !== (track.source ?? "youtube") ||
+      (track.source === "soundcloud" && prepared.track.url !== track.url) ||
+      (prepared.track.offset ?? 0) !== (track.offset ?? 0)) return;
+    const frames = this.nextFrames;
+    this.nextPrepared = null;
+    this.nextFrames = [];
+    return { ...prepared, frames };
   }
   invalidateNext() {
     if (this.fadeFrame) return;

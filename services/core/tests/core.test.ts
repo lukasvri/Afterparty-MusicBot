@@ -127,17 +127,20 @@ test('playback preparation separates source resolution from the first decoded PC
  }finally{decoder?.stop();controller.abort();await decoder?.closed;t.close();}
 });
 
-test('skipping to the prefetched next song plays audio without repeating source extraction',async()=>{
+for(const rejectPlayback of [false,true]) test(rejectPlayback
+ ? 'skipping to the prefetched next song releases its reused decoder when the sink fails'
+ : 'skipping to the prefetched next song plays audio without reopening the source',async context=>{
  const t=setup(),first={...track('abcdefghijk'),concert:true},next={...track('lmnopqrstuv'),concert:true,offset:1};
  const commands=new Commands(t.engine);
  const extracted:string[]=[],output=deferred<void>();
- let audio=Buffer.alloc(0),timer:ReturnType<typeof setTimeout>|undefined;
+ let audio=Buffer.alloc(0),timer:ReturnType<typeof setTimeout>|undefined,sourceRequests=0;
  const server=createServer((request,response)=>{
   if(request.url===`/${first.id}`){
    // Keep the outgoing track alive until skip so an early EOF cannot promote the warm track.
    response.writeHead(200,{'Content-Type':'audio/wav','Content-Length':audio.length});
    response.write(audio.subarray(0,64*1024));return;
   }
+  sourceRequests++;
   serveWave(audio,request,response);
  });
  clearInterval(t.engine.timer);t.engine.connected=true;t.engine.settings.radio=false;
@@ -158,21 +161,40 @@ test('skipping to the prefetched next song plays audio without repeating source 
   const old=t.engine.mixer!;
   old.prepare();await old.preparing;await old.nextRead;
   assert(old.nextFrames.length>0,'the queued source must deliver PCM before skip');
+  const warmed=old.nextPrepared!.decoder;
   assert.deepEqual(extracted,[first.id,next.id]);
+  const requestsBeforeSkip=sourceRequests;
+  assert(requestsBeforeSkip>0);
   const sink:Sink=t.sink;
   sink.play=(stream,id)=>{
+   if(rejectPlayback)throw new Error('Playback sink failed.');
    stream.once('error',error=>t.sink.onError?.(error,id));
    stream.once('data',()=>output.resolve());
    stream.resume();
   };
+  const started=performance.now();
   await commands.execute({action:'skip',playbackKey:'core:'+first.entryId,queueRevision:t.engine.revision()},'public');
+  if(rejectPlayback){
+   assert(warmed.disposed,'a failed sink must release the transferred decoder');
+   assert.equal(t.engine.mixer,null);
+   assert.equal(t.engine.runId,null);
+   assert.equal(t.engine.lastError,'Playback sink failed.');
+   await warmed.closed;
+   return;
+  }
   await Promise.race([output.promise,new Promise<never>((_,reject)=>{
    timer=setTimeout(()=>reject(new Error('No Opus from the skipped-to track')),8000);
   })]);
   assert.equal(t.engine.current?.entryId,next.entryId);
   assert.equal(t.engine.snapshot().position,1);
+  assert.equal(t.engine.mixer?.main.decoder,warmed);
   assert.deepEqual(t.engine.queue,[]);
   assert.deepEqual(extracted,[first.id,next.id],'the ready next source must not be extracted twice');
+  context.diagnostic(`First Opus after ${Math.round(performance.now()-started)} ms; source requests ${requestsBeforeSkip} before, ${sourceRequests} after skip`);
+  assert.equal(sourceRequests,requestsBeforeSkip,'skip must reuse the already-open decoder');
+  t.engine.stop();
+  await warmed.closed;
+  assert(warmed.disposed,'the new mixer must clean up the transferred decoder');
  }finally{clearTimeout(timer);commands.close();t.close();server.closeAllConnections();if(server.listening)await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
