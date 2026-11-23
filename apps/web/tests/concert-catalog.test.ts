@@ -175,7 +175,7 @@ test('festival records preserve source attribution, unique recordings and origin
     assert(recording.uploaderName || recording.sourcePublisher);
     assert(recording.evidenceUrls.includes(recording.sourceUrl));
   }
-  assert.equal(CONCERT_CATALOG.length, 1061);
+  assert.equal(CONCERT_CATALOG.length, 1063);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'cWJV0DgMqEA')?.year, 2023);
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'jQLWYc2UrFY')?.artist, 'Westend');
   assert.equal(CONCERT_CATALOG.find((item) => item.videoId === 'PVh5bKxUjPo')?.artist, 'SKILAH');
@@ -254,6 +254,7 @@ test('selected Red Rocks and Tomorrowland Brasil sets retain their performance y
       ['red-rocks', 2025, 'dLNUbE_Q-3E', 'Martin Garrix'],
       ['tomorrowland-brasil', 2025, 'lPLHOPVSw_Q', 'Tomorrowland'],
       ['tomorrowland-brasil', 2025, 'WCo6kS1h8aU', 'Tomorrowland'],
+      ['tomorrowland-brasil', 2025, 'HWv6i68UqBA', 'Tomorrowland'],
     ],
   );
 });
@@ -266,6 +267,7 @@ test('selected Winter sets retain their official editions and every previous cat
       [2026, 'YLhLDGXPjJ8'],
       [2026, '-etxOvF1ZN0'],
       [2026, 'AhH2-pfvAfw'],
+      [2026, 'VOCAVAYa79Q'],
       [2025, 'amJ8uKUU_fE'],
       [2025, '7eAPdPGdyhg'],
       [2025, 'PHxI6mtscOw'],
@@ -275,18 +277,18 @@ test('selected Winter sets retain their official editions and every previous cat
     assert.equal(entry.uploaderName, 'Tomorrowland');
     assert.equal(entry.eventName, 'Tomorrowland Winter');
     assert(entry.title.endsWith(`Tomorrowland Winter ${entry.year}`));
-    assert(
-      entry.evidenceUrls.includes(
-        'https://www.youtube.com/playlist?list=' +
+    const editionSource =
+      entry.videoId === 'VOCAVAYa79Q'
+        ? 'https://www.tomorrowland.com/article/tomorrowland-winter-2026-full-sets/'
+        : 'https://www.youtube.com/playlist?list=' +
           (entry.year === 2026
             ? 'PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB'
-            : 'PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1'),
-      ),
-    );
+            : 'PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1');
+    assert(entry.evidenceUrls.includes(editionSource));
   }
-  const prior = CONCERT_CATALOG.filter((entry) => entry.eventId !== 'tomorrowland-winter').sort(
-    (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-  );
+  const prior = CONCERT_CATALOG.filter(
+    (entry) => entry.eventId !== 'tomorrowland-winter' && entry.videoId !== 'HWv6i68UqBA',
+  ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   assert.equal(prior.length, 1054);
   assert.equal(
     createHash('sha256').update(JSON.stringify(prior)).digest('hex'),

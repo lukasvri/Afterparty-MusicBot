@@ -903,6 +903,23 @@ const curatedRecordings: readonly ConcertRecording[] = [
     ]
   },
   {
+    "id": "tomorrowland-brasil-2025-HWv6i68UqBA",
+    "eventId": "tomorrowland-brasil",
+    "eventName": "Tomorrowland Brasil",
+    "year": 2025,
+    "artist": "Axwell",
+    "title": "Axwell | Tomorrowland Brasil 2025",
+    "videoId": "HWv6i68UqBA",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=HWv6i68UqBA",
+    "verifiedAt": "2026-11-23",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=HWv6i68UqBA",
+      "https://www.tomorrowland.com/article/tomorrowland-brasil-2025-full-sets/"
+    ]
+  },
+  {
     "id": "tomorrowland-winter-2026-Hwdz8PNVj04",
     "eventId": "tomorrowland-winter",
     "eventName": "Tomorrowland Winter",
@@ -968,6 +985,23 @@ const curatedRecordings: readonly ConcertRecording[] = [
     "evidenceUrls": [
       "https://www.youtube.com/watch?v=AhH2-pfvAfw",
       "https://www.youtube.com/playlist?list=PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB"
+    ]
+  },
+  {
+    "id": "tomorrowland-winter-2026-VOCAVAYa79Q",
+    "eventId": "tomorrowland-winter",
+    "eventName": "Tomorrowland Winter",
+    "year": 2026,
+    "artist": "Afrojack B2B R3HAB",
+    "title": "Afrojack B2B R3HAB | Tomorrowland Winter 2026",
+    "videoId": "VOCAVAYa79Q",
+    "uploaderName": "Tomorrowland",
+    "uploaderUrl": "https://www.youtube.com/@tomorrowland",
+    "sourceUrl": "https://www.youtube.com/watch?v=VOCAVAYa79Q",
+    "verifiedAt": "2026-11-23",
+    "evidenceUrls": [
+      "https://www.youtube.com/watch?v=VOCAVAYa79Q",
+      "https://www.tomorrowland.com/article/tomorrowland-winter-2026-full-sets/"
     ]
   },
   {
