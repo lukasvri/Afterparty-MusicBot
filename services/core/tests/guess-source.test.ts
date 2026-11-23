@@ -8,6 +8,7 @@ import { prepareConfiguredGuessSource } from '../src/guess-source.ts';
 import { checkConfiguredGuessSource } from '../src/guess-check.ts';
 import { guessWave, GUESS_AUDIO_RATE } from '../src/guess-audio-format.ts';
 import { getGuessPackClips } from '../src/guess-packs.ts';
+import { guessPackApprovals, writeGuessPackApprovals } from './guess-pack-approvals.ts';
 
 const signal = () => new AbortController().signal;
 const unavailable = { status: 503, message: 'The configured game preview source is unavailable.' };
@@ -184,14 +185,31 @@ test('private YouTube clip configuration reaches only its adapter and expires th
   await assert.rejects(source.media.read(selected.mediaKey, signal()), { status: 503 });
 });
 
-test('unconfigured alpha Core prepares the eight-track preset with actual FFmpeg and no private approval file', async t => {
+test('an unconfigured quiz or a preset without private approvals never reaches a provider', async () => {
+  let calls = 0;
+  const options = { signal: signal(), youtube: {
+    extract: async () => { calls++; throw Error('must not extract'); },
+    fetcher: async () => { calls++; throw Error('must not download'); },
+    decode: async () => { calls++; throw Error('must not decode'); },
+  } };
+  for (const flag of [undefined, '', 'auto'])
+    assert.equal(await prepareConfiguredGuessSource({ GUESS_YOUTUBE_CLIPS: flag }, options), undefined);
+  for (const flag of [undefined, '1'])
+    await assert.rejects(prepareConfiguredGuessSource({
+      GUESS_YOUTUBE_CLIPS: flag, GUESS_YOUTUBE_PACK: 'edm-festival-hits',
+    }, options), unavailable);
+  assert.equal(calls, 0);
+});
+test('alpha Core prepares an approved eight-track preset with actual FFmpeg', async t => {
   let clock = Date.now(); t.mock.method(Date, 'now', () => clock);
   const clips = getGuessPackClips('edm-festival-hits'), lifetime = new AbortController();
   const encoded = spawnSync(process.env.FFMPEG_PATH ?? 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
     '-i', 'sine=frequency=440:duration=61', '-threads', '1', '-c:a', 'libopus', '-f', 'webm', 'pipe:1'], { maxBuffer: 8 * 1024 * 1024 });
   assert.equal(encoded.status, 0, String(encoded.stderr));
   const extracted: string[] = [], fetched: string[] = [];
-  const source = await prepareConfiguredGuessSource({}, {
+  const source = await prepareConfiguredGuessSource({
+    GUESS_YOUTUBE_PACK_APPROVAL_PATH: await writeGuessPackApprovals(await directory(t)),
+  }, {
     signal: lifetime.signal, youtube: {
       extract: async args => {
         const id = new URL(args.at(-1)!).searchParams.get('v')!;
@@ -243,6 +261,30 @@ test('explicit off or invalid YouTube flags suppress the alpha preset, and confl
   assert.equal(called, 0);
 });
 
+test('one missing, invalid or expired pack approval prevents all provider work', async t => {
+  const path = join(await directory(t), 'pack-approvals.json');
+  let calls = 0;
+  const options = { signal: signal(), youtube: {
+    extract: async () => { calls++; throw Error('must not extract'); },
+    fetcher: async () => { calls++; throw Error('must not download'); },
+    decode: async () => { calls++; throw Error('must not decode'); },
+  } };
+  const approvals = guessPackApprovals();
+  const last = approvals.at(-1)!;
+  for (const invalid of [
+    approvals.slice(0, -1),
+    [...approvals.slice(0, -1), { ...last, permission: { ...last.permission, approved: false } }],
+    [...approvals.slice(0, -1), { ...last, permission: { ...last.permission, expiresAt: Date.now() - 1 } }],
+  ]) {
+    await writeFile(path, JSON.stringify(invalid));
+    for (const config of [
+      { GUESS_YOUTUBE_PACK_APPROVAL_PATH: path },
+      { GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: 'edm-festival-hits', GUESS_YOUTUBE_PACK_APPROVAL_PATH: path },
+    ]) await assert.rejects(prepareConfiguredGuessSource(config, options), unavailable);
+  }
+  assert.equal(calls, 0);
+});
+
 test('alpha automatic mode honors an explicitly configured private inventory and fails before provider I/O if it is invalid', async t => {
   const dir = await directory(t), path = join(dir, 'invalid-private-youtube.json');
   let calls = 0;
@@ -260,6 +302,7 @@ test('switching to the YouTube preset ignores a configured private path for disa
   let inactivePathReads = 0, extractions = 0, downloads = 0;
   const configuration = {
     GUESS_YOUTUBE_CLIPS: '1', GUESS_YOUTUBE_PACK: 'edm-festival-hits', GUESS_DEEZER_PREVIEWS: '0',
+    GUESS_YOUTUBE_PACK_APPROVAL_PATH: await writeGuessPackApprovals(await directory(t)),
     get GUESS_DEEZER_INVENTORY_PATH() {
       inactivePathReads++;
       return '/private/unused-deezer-inventory-does-not-exist.json';

@@ -179,7 +179,16 @@ def publish(directory, commit):
             raise
         previous = None
     if previous:
-        raise RuntimeError('An existing build release requires manual review; never adopt or overwrite it')
+        existing_assets = {asset.get('name'): asset for asset in previous.get('assets', [])}
+        if (previous.get('draft') is False and previous.get('target_commitish') == commit
+                and set(existing_assets) == set(ASSETS)
+                and all(existing_assets[name].get('state') == 'uploaded'
+                        and existing_assets[name].get('size') == (directory/name).stat().st_size
+                        and existing_assets[name].get('digest') == assets[name]['digest']
+                        for name in ASSETS)):
+            print('Build release already exists with matching signed assets; skipping publish', flush=True)
+            return
+        raise RuntimeError('Existing build release does not match signed assets; manual review is required')
     release = api('/releases',token,{'tag_name':tag,'target_commitish':commit,
                   'name':'Tested build '+commit[:12],'draft':True,'prerelease':True,
                   'make_latest':'false','body':'CI build assets only. No production deployment.\nWorkflow run: https://github.com/'+REPOSITORY+'/actions/runs/'+str(manifest['run_id'])})
