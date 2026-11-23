@@ -502,7 +502,11 @@
       }
     }
     const audible = playing && !localPaused;
-    if (loaded !== key) {
+    const playerState = player.getPlayerState();
+    // A cued video needs one start command with the current position. Playing
+    // and then seeking while YouTube opens the source can stall the start.
+    const startFromCue = audible && !lastPlaying && (playerState === 5 || playerState === -1);
+    if (loaded !== key || startFromCue) {
       correction.reset();
       correctedAt = -Infinity;
       const replaced = loadedSource !== source;
@@ -510,7 +514,7 @@
       loadedSource = source;
       writePlayerAudio(true);
       const video = { videoId: room.current.id, startSeconds: localPosition };
-      if (replaced || (!audible && player.getPlayerState() === 5)) {
+      if (replaced || startFromCue || (!audible && playerState === 5)) {
         // A cued, never-started video needs cueVideoById to remain inaudible.
         command(audible ? 'load' : 'cue', localPosition);
         if (audible) player.loadVideoById(video);

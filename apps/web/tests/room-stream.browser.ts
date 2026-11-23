@@ -828,6 +828,51 @@ test(
   },
 );
 
+test('a shared resume starts a cued video at the current room position in one command', async () => {
+  const fixture = await liveFixture();
+  const browser = await chromium
+    .launch({
+      headless: true,
+      executablePath: process.env.CHROMIUM_PATH,
+      args: ['--no-sandbox'],
+    })
+    .catch(async (error) => {
+      await fixture.close();
+      throw error;
+    });
+  try {
+    fixture.advance('stream00004', 'Cued during recovery', false, 48);
+    const guest = await prepare(await browser.newContext(), false, fixture.origin);
+    await guest.page.waitForFunction(
+      () =>
+        (window as unknown as { __streamPlayer?: { state: number } }).__streamPlayer?.state === 5,
+    );
+    await waitFor(() => fixture.streams === 1 && fixture.clockReads > 0, 'cued client connected');
+    await guest.page.evaluate(() => {
+      (window as unknown as { __streamAudioCalls: string[] }).__streamAudioCalls.length = 0;
+    });
+    fixture.advance('stream00004', 'Resumed after recovery', true, 75);
+    await guest.page.waitForFunction(() => {
+      const player = (
+        window as unknown as {
+          __streamPlayer: { position: number; state: number };
+        }
+      ).__streamPlayer;
+      return player.state === 1 && player.position >= 74;
+    });
+    const commands = await guest.page.evaluate(
+      () => (window as unknown as { __streamAudioCalls: string[] }).__streamAudioCalls,
+    );
+    assert.deepEqual(commands, ['load:stream00004']);
+    assert.equal(fixture.writes.length, 0);
+    assert.deepEqual(guest.errors, []);
+    assert.deepEqual(fixture.errors, []);
+  } finally {
+    await browser.close();
+    await fixture.close();
+  }
+});
+
 for (const change of ['pause', 'lease'])
   test(
     `a ${change} change stops an in-flight native scrub without replaying a queued control`,
