@@ -420,16 +420,32 @@ class CIProducer(unittest.TestCase):
                                 *['upload:'+name for name in sorted(artifacts.ASSETS)],
                                 'reconciled','published'])
 
-    def test_existing_release_is_never_adopted_overwritten_or_republished(self):
+    def test_existing_matching_release_is_accepted_without_republishing(self):
         with self.prepared_main_release() as root:
-            for existing in ({'draft':False,'target_commitish':COMMIT},
-                             {'draft':True,'target_commitish':COMMIT},
-                             {'draft':False,'target_commitish':'b'*40}):
+            assets = []
+            for name in sorted(artifacts.ASSETS):
+                payload = (root / name).read_bytes()
+                assets.append({'name': name, 'state': 'uploaded', 'size': len(payload),
+                               'digest': 'sha256:' + hashlib.sha256(payload).hexdigest()})
+            existing = {'draft':False,'target_commitish':COMMIT,'assets':assets}
+            with patch.object(self.producer,'verify_provenance') as verify, \
+                    patch.object(self.producer,'api',return_value=existing) as api, \
+                    patch('http.client.HTTPSConnection') as upload:
+                self.producer.publish(root,COMMIT)
+                verify.assert_called_once()
+                api.assert_called_once_with('/releases/tags/build-'+COMMIT,'synthetic-ci-token')
+                upload.assert_not_called()
+
+    def test_existing_release_mismatch_still_requires_manual_review(self):
+        with self.prepared_main_release() as root:
+            for existing in ({'draft':False,'target_commitish':COMMIT,'assets':[]},
+                             {'draft':True,'target_commitish':COMMIT,'assets':[]},
+                             {'draft':False,'target_commitish':'b'*40,'assets':[]}):
                 with self.subTest(existing=existing), \
                         patch.object(self.producer,'verify_provenance') as verify, \
                         patch.object(self.producer,'api',return_value=existing) as api, \
                         patch('http.client.HTTPSConnection') as upload:
-                    with self.assertRaisesRegex(RuntimeError,'never adopt or overwrite'):
+                    with self.assertRaisesRegex(RuntimeError,'manual review is required'):
                         self.producer.publish(root,COMMIT)
                     verify.assert_called_once()
                     api.assert_called_once_with('/releases/tags/build-'+COMMIT,'synthetic-ci-token')
