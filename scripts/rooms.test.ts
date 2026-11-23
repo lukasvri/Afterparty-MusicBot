@@ -6,6 +6,7 @@ import { transpileFixtureModule } from "./fixture-transpile.ts";
 import { readFileSync, readdirSync } from "node:fs";
 import type { RoomState } from "../lib/types.ts";
 import { watchPage } from "../services/core/tests/youtube-watch-fixture.ts";
+import { ProviderWork } from "../services/core/src/provider-work.ts";
 import { setImmediate as yieldTurn } from "node:timers/promises";
 
 function watchFixture(url: URL, ai = false) {
@@ -1045,11 +1046,21 @@ test('D1 user discovery returns thirty unique results in one bounded search and 
   } finally { f.close(); }
 });
 
-test('D1 cancelled search does not retire a shared survivor or poison its cache', async () => {
+test('D1 cancelled search does not retire a shared survivor or poison its cache', async context => {
   const f = fixture(), controller = new AbortController();
   let release!: () => void, started!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   const ready = new Promise<void>(resolve => { started = resolve; });
+  const joined = Promise.withResolvers<void>(), jobs = new WeakSet<ProviderWork<unknown>>();
+  const wait = ProviderWork.prototype.wait;
+  context.mock.method(ProviderWork.prototype, 'wait', function (this: ProviderWork<unknown>, signal?: AbortSignal) {
+    const pending = wait.call(this, signal);
+    if (jobs.has(this)) joined.resolve();
+    jobs.add(this);
+    return pending;
+  });
+  const timeout = setTimeout(() => joined.reject(Error('Both searches did not subscribe to the same provider work')), 5000);
+  let searchesDone: Promise<unknown> | undefined;
   let sourceSignal: AbortSignal | undefined, calls = 0;
   try {
     globalThis.fetch = async (_target, options) => {
@@ -1060,10 +1071,17 @@ test('D1 cancelled search does not retire a shared survivor or poison its cache'
     const cancelled = searchHandler(request, 'shared worker cancellation');
     const rejected = assert.rejects(cancelled, /cancel/i);
     const survivor = searchHandler(f.request, 'shared worker cancellation');
-    await ready; await yieldTurn(); controller.abort(); await rejected; assert.equal(sourceSignal?.aborted, false);
+    searchesDone = Promise.allSettled([rejected, survivor]);
+    await Promise.all([ready, joined.promise]);
+    controller.abort(); await rejected; assert.equal(sourceSignal?.aborted, false);
     release(); assert.deepEqual((await survivor).videos, []); assert.equal(calls, 1);
     await searchHandler(f.request, 'shared worker cancellation'); assert.equal(calls, 1);
-  } finally { release(); f.close(); }
+  } finally {
+    clearTimeout(timeout);
+    controller.abort(); release();
+    await searchesDone;
+    f.close();
+  }
 });
 
 test('D1 search deadline aborts a held Core read without starting a fallback or caching late success', async context => {
@@ -1115,6 +1133,8 @@ test('D1 incomplete Core search results remain immediately retryable', async () 
   const f = fixture(); let calls = 0;
   syntheticEnv.GUTTA_CORE_PUBLIC_URL = 'https://core.example'; syntheticEnv.ADMIN_BRIDGE_KEY = 'synthetic-key';
   try {
+    f.sqlite.prepare("INSERT INTO cached(key,data,expires_at) VALUES(?,?,?)")
+      .run('search:v7:user:partial core result', JSON.stringify({ videos: [seed], complete: true }), Date.now() + 60_000);
     globalThis.fetch = async () => {
       calls++; return Response.json({ videos: calls === 1 ? [seed] : [seed, next], complete: calls > 1 });
     };

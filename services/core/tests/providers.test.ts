@@ -392,10 +392,10 @@ test('an empty manual result after failed metadata hydration can recover immedia
    return {items:[{id:'abcdefghijk',snippet:{title:'Example Song',channelTitle:'Artist',description:'',categoryId:'10',liveBroadcastContent:'none'},contentDetails:{duration:'PT3M'},status:{embeddable:true}}]} as YouTubeResponses[K];
   };
   p.extract=async()=>{throw Error('synthetic unavailable extractor');};
-  assert.deepEqual(await p.search('Artist Example Song',1),[]);
+  assert.deepEqual(await p.searchResult('Artist Example Song',1),{tracks:[],complete:false});
   available=true;
   assert.equal((await p.search('Artist Example Song',1))[0]?.id,'abcdefghijk');
-  assert.equal(searches,2);
+  assert.equal(searches,1);
  }finally{t.close();}
 });
 test('matching rejects different versions, substrings, wrong durations and supports ISRC metadata',()=>{

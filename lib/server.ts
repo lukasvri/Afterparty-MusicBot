@@ -2,7 +2,7 @@ import {readLiveState,liveRoom} from "./live-room.ts";
 import type {YouTubeResponses} from "@/services/core/src/external-types";
 import { metadataGenres, metadataMusic } from "../services/core/src/radio.ts";
 import { metadataAiGenerated } from "../services/core/src/music-content.ts";
-import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS } from "../services/core/src/music-search.ts";
+import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS, MANUAL_MUSIC_SEARCH_CACHE_PREFIX } from "../services/core/src/music-search.ts";
 import { ProviderWork, MUSIC_REQUEST_DEADLINE_MS } from "../services/core/src/provider-work.ts";
 import { visitorIdentity } from "./visitor-identity.ts";
 import { visitorSQL } from "./room-visitors.ts";
@@ -356,7 +356,8 @@ async function searchWithinDeadline(request: Request, query: string, radio: bool
   if (/^https?:\/\//.test(query))
     return { videos: await videos(request, [videoId(query)], signal), complete: true };
   const count = radio ? 20 : 30;
-  return cached<MusicSearchResponse>(`search:v7:${radio ? "radio" : "user"}:${query.toLowerCase()}`, async signal => {
+  const cachePrefix = radio ? "search:v7:radio:" : MANUAL_MUSIC_SEARCH_CACHE_PREFIX + "user:";
+  return cached<MusicSearchResponse>(cachePrefix + query.toLowerCase(), async signal => {
     if (coreUrl()) {
       try {
         const response = await coreRequest<{ videos: Video[]; complete?: boolean }>(

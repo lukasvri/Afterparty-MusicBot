@@ -7,7 +7,7 @@ import { SpotifyCatalog, spotifyRef, expandSpotifyLink } from "./spotify.ts";
 import { normalizePlaylistUrl } from "./playlist-url.ts";
 import { metadataAiGenerated } from "./music-content.ts";
 import { verifyRadioContent } from "./youtube-content.ts";
-import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS } from "./music-search.ts";
+import { rankMusicSearch, MUSIC_SEARCH_CACHE_MS, EMPTY_MUSIC_SEARCH_CACHE_MS, MANUAL_MUSIC_SEARCH_CACHE_PREFIX } from "./music-search.ts";
 import { deezerRef, deezerShareUrl, expandDeezerLink, loadDeezer } from "./deezer.ts";
 import { resolveSoundcloud, soundcloudUrl } from "./soundcloud.ts";
 import { Recommendations } from "./recommendations.ts";
@@ -104,7 +104,7 @@ const copySearchTrack = (t: Track): Track => ({ ...t, entryId: randomUUID(),
   ...(t.genres ? { genres: [...t.genres] } : {}), ...(t.catalog ? { catalog: { ...t.catalog } } : {}) });
 export type PlaylistImportResult = { videos: Track[]; total?: number; skipped: number; limited: boolean };
 type SearchResult = { tracks: Track[]; complete: boolean };
-type SearchHydrationProgress = (verified: number) => void;
+type SearchHydrationProgress = { verified?: (count: number) => void; failed(): void };
 const MAX_SEARCH_JOBS = 64;
 type StreamSource = { url: string; headers: string; duration: number | undefined };
 export type PlaybackSourceMode = "standard" | "startup" | "seek" | "skip";
@@ -177,14 +177,14 @@ export class Providers {
   ) {
     return runJson<ExtractedMedia>(process.env.YTDLP_PATH ?? "yt-dlp", args, signal, priority, profile, onTiming);
   }
-  async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false, onVerified?: SearchHydrationProgress): Promise<Track[]> {
+  async video(ids: string[], skipUnavailable = false, signal?: AbortSignal, partial = false, progress?: SearchHydrationProgress): Promise<Track[]> {
     const controller = new AbortController();
     try {
       return await this.videoResults(ids, skipUnavailable,
-        signal ? AbortSignal.any([signal, controller.signal]) : controller.signal, partial, onVerified);
+        signal ? AbortSignal.any([signal, controller.signal]) : controller.signal, partial, progress);
     } finally { controller.abort(new UserError("The request was cancelled.", 499)); }
   }
-  private async videoResults(ids: string[], skipUnavailable: boolean, signal: AbortSignal, partial: boolean, onVerified?: SearchHydrationProgress): Promise<Track[]> {
+  private async videoResults(ids: string[], skipUnavailable: boolean, signal: AbortSignal, partial: boolean, progress?: SearchHydrationProgress): Promise<Track[]> {
     if (!partial) signal.throwIfAborted();
     if (!ids.length) return [];
     if (ids.some((id) => !/^[\w-]{11}$/.test(id)))
@@ -200,7 +200,7 @@ export class Providers {
         found.set(id, cached.track);
       else if (!missing.includes(id)) missing.push(id);
     }
-    let verified = onVerified ? [...found.values()].filter(track => track.embeddable).length : 0;
+    let verified = progress?.verified ? [...found.values()].filter(track => track.embeddable).length : 0;
     for (let index = 0; index < missing.length; index += 50) {
       const batch = missing.slice(index, index + 50);
       if (signal.aborted && partial) break;
@@ -254,10 +254,13 @@ export class Providers {
           const track = await lookup;
           if (track) {
             found.set(id, track);
-            if (onVerified && track.embeddable) onVerified(++verified);
+            if (track.embeddable) progress?.verified?.(++verified);
           }
         }
-        catch (error) { if (signal.aborted && !partial || !skipUnavailable) throw error; }
+        catch (error) {
+          if (signal.aborted && !partial || !skipUnavailable) throw error;
+          progress?.failed();
+        }
       }));
     }
     if (!partial) signal.throwIfAborted();
@@ -344,7 +347,7 @@ export class Providers {
     if (!query || query.length > 2000 || !Number.isInteger(count) || count < 1 || count > 50 || typeof musicOnly !== "boolean")
       throw new UserError("Invalid music search.");
     const key =
-        "search:v7:" +
+        (musicOnly ? "search:v7:" : MANUAL_MUSIC_SEARCH_CACHE_PREFIX) +
         JSON.stringify([
           query.trim().normalize("NFKC").toLowerCase(),
           count,
@@ -377,7 +380,8 @@ export class Providers {
         // One soft cutoff from search start, not a new budget for each ID.
         const timer = setTimeout(() => hydration.abort(), CORE_SEARCH_RESULTS_MS);
         let tail: ReturnType<typeof setTimeout> | undefined;
-        const onVerified: SearchHydrationProgress = (verified) => {
+        let metadataFailed = false;
+        const onVerified = (verified: number) => {
           if (verified >= CORE_SEARCH_FIRST_PAGE_SIZE && tail === undefined)
             tail = setTimeout(() => hydration.abort(), CORE_SEARCH_TAIL_MS);
         };
@@ -386,25 +390,28 @@ export class Providers {
           const partial = !musicOnly;
           const verified = await this.video(
             ids, true, partial ? AbortSignal.any([signal, hydration.signal]) : signal, partial,
-            partial && !continuation && count > CORE_SEARCH_FIRST_PAGE_SIZE ? onVerified : undefined,
+            partial ? {
+              verified: !continuation && count > CORE_SEARCH_FIRST_PAGE_SIZE ? onVerified : undefined,
+              failed: () => { metadataFailed = true; },
+            } : undefined,
           );
           signal.throwIfAborted();
-          const complete = !hydration.signal.aborted || !partial;
-          if (!complete && ids.length && !verified.length)
-            throw new UserError("The music source took too long. Try again shortly.", 504);
+          const complete = !partial || (!hydration.signal.aborted && !metadataFailed);
           const tracks = musicOnly ? verified : rankMusicSearch(query, verified);
           if (complete) {
             this.searchContinuations.delete(key);
             // Only empty discovery proves a negative cache entry is safe.
             if (tracks.length || !ids.length && partial)
               this.store.set(key, { at: Date.now(), tracks });
-          } else if (!continuation && tracks.length) {
+          } else if (!continuation && ids.length) {
             // Preserve the candidate order across a retry. Provider rankings can change
             // between requests. Keep only IDs in memory and write only completed results to the cache.
             this.searchContinuations.set(key, { at: Date.now(), ids });
             if (this.searchContinuations.size > MAX_SEARCH_JOBS)
               this.searchContinuations.delete(this.searchContinuations.keys().next().value!);
           }
+          if (!complete && hydration.signal.aborted && ids.length && !tracks.length)
+            throw new UserError("The music source took too long. Try again shortly.", 504);
           return { tracks, complete };
         } finally { clearTimeout(timer); clearTimeout(tail); }
       });

@@ -55,10 +55,11 @@ export async function checkConfiguredGuessSource(env: NodeJS.ProcessEnv, options
   if (provider === 'disabled') return { provider, status: 'disabled', categories: [] };
   const config = { GUESS_DEEZER_PREVIEWS: env.GUESS_DEEZER_PREVIEWS, GUESS_SYNTHETIC_TEST: env.GUESS_SYNTHETIC_TEST,
     GUESS_YOUTUBE_CLIPS: env.GUESS_YOUTUBE_CLIPS,
-    GUESS_YOUTUBE_PACK: env.GUESS_YOUTUBE_PACK,
     ...(provider === 'deezer' ? { GUESS_DEEZER_INVENTORY_PATH: env.GUESS_DEEZER_INVENTORY_PATH } : {}),
     ...(provider === 'local' ? { GUESS_LOCAL_INVENTORY_PATH: env.GUESS_LOCAL_INVENTORY_PATH } : {}),
-    ...(provider === 'youtube' ? { GUESS_YOUTUBE_INVENTORY_PATH: env.GUESS_YOUTUBE_INVENTORY_PATH } : {}) };
+    ...(provider === 'youtube' ? { GUESS_YOUTUBE_PACK: env.GUESS_YOUTUBE_PACK,
+      GUESS_YOUTUBE_PACK_APPROVAL_PATH: env.GUESS_YOUTUBE_PACK_APPROVAL_PATH,
+      GUESS_YOUTUBE_INVENTORY_PATH: env.GUESS_YOUTUBE_INVENTORY_PATH } : {}) };
   const lifetime = new AbortController();
   let source: Source | undefined, result: GuessCheckResult;
   const released = new WeakSet<object>();
