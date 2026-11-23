@@ -2,6 +2,7 @@ import { normalized } from './matching.ts';
 
 export const MUSIC_SEARCH_CACHE_MS = 3600000;
 export const EMPTY_MUSIC_SEARCH_CACHE_MS = 60000;
+export const MANUAL_MUSIC_SEARCH_CACHE_PREFIX = 'search:v8:';
 
 type SearchRecording = {
   id: string;

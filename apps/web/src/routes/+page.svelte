@@ -640,12 +640,13 @@
                     {#if view.searchError}
                       <div role="alert" class="search-summary">{view.searchError}</div>
                     {:else}<div role="status" class="search-summary">
-                        {#if view.searching}Looking for your soundtrack…{:else if view.query}{view
+                        {#if view.searching}Looking for your soundtrack…{:else if view.searchIncomplete && !view.results.length}No
+                          results could be verified yet. Search again to retry.{:else if view.query}{view
                             .results.length
                             ? `${view.results.length} results for “${view.query}”`
                             : `No songs found for “${view.query}”. Try an artist or a different title.`}{:else}Search
                           YouTube and add a track to the shared queue.{/if}
-                        {#if view.searchIncomplete && !view.searching}
+                        {#if view.searchIncomplete && !view.searching && view.results.length}
                           Showing a partial list. Search again for more.{/if}
                       </div>{/if}
                     {#if view.results.length}<ul class="search-results">

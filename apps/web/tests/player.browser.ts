@@ -968,12 +968,15 @@ test('a partial search keeps verified results visible while the same query retri
     const { page } = f;
     let searches = 0;
     await page.route('**/api/search?*', async (route) => {
-      if (++searches === 1)
+      if (++searches === 1) return route.fulfill({ json: { videos: [], complete: false } });
+      if (searches === 2)
         return route.fulfill({ json: { videos: results.slice(0, 1), complete: false } });
       await retry.promise;
       return route.fulfill({ json: { videos: results, complete: true } });
     });
     await find(page, 'night');
+    await page.getByText('No results could be verified yet. Search again to retry.').waitFor();
+    await page.getByRole('button', { name: 'Find music', exact: true }).click();
     const note = page.getByText(/Showing a partial list/);
     const first = page.getByRole('button', {
       name: `Add ${results[0].title} to queue`,
@@ -989,7 +992,7 @@ test('a partial search keeps verified results visible while the same query retri
       .getByRole('button', { name: `Add ${results[1].title} to queue`, exact: true })
       .waitFor();
     assert.equal(await note.count(), 0);
-    assert.equal(searches, 2);
+    assert.equal(searches, 3);
     assert.deepEqual(f.writes, []);
     assert.deepEqual(f.errors, []);
   } finally {

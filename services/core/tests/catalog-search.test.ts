@@ -13,7 +13,7 @@ import { deferred } from './deferred.ts';
 const id = (index: number) => 'result'+String(index).padStart(5, '0');
 const track = (index: number): Track => ({ id: id(index), entryId: 'private-entry-'+index, title: 'Synthetic Song '+index, artist: 'Synthetic Artist', duration: 180,
   image: '', live: false, embeddable: true, source: 'youtube', requestedBy: 'private-member', genres: ['house'] });
-const key = (query: string, count: number, musicOnly: boolean) => 'search:v7:'+JSON.stringify([query.trim().normalize('NFKC').toLowerCase(), count, musicOnly]);
+const key = (query: string, count: number, musicOnly: boolean) => (musicOnly ? 'search:v7:' : 'search:v8:')+JSON.stringify([query.trim().normalize('NFKC').toLowerCase(), count, musicOnly]);
 
 test('authenticated catalog separates thirty public search results from twenty music-only radio candidates', async () => {
   const store = new Store(':memory:'), providers = new Providers(store, {});
@@ -109,7 +109,7 @@ test('fresh API and extractor metadata preserve explicit AI evidence while old c
   for (const fallback of [false, true]) {
     const store = new Store(':memory:'), p = new Providers(store, {}); let hydrated = 0;
     store.set('metadata:v5:'+id(0), { at: Date.now(), track: track(0) });
-    store.set('search:v6:'+JSON.stringify(['evidence', 30, false]), { at: Date.now(), tracks: [track(0)] });
+    store.set('search:v7:'+JSON.stringify(['evidence', 30, false]), { at: Date.now(), tracks: [track(0)] });
     p.youtube = async <K extends keyof YouTubeResponses>(path: K) => {
       if (path === 'search') return { items: [{ id: { videoId: id(0) } }] } as YouTubeResponses[K];
       hydrated++; if (fallback) throw Error('synthetic unavailable');

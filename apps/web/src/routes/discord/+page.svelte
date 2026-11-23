@@ -363,10 +363,12 @@
                   <p class="search-summary" role="status">
                     {view.searching
                       ? 'Looking for your next concert track…'
-                      : view.query
-                        ? `${view.results.length} results for “${view.query}”`
-                        : 'Search YouTube and add music to this server’s concert queue.'}
-                    {#if view.searchIncomplete && !view.searching}
+                      : view.searchIncomplete && !view.results.length
+                        ? 'No results could be verified yet. Search again to retry.'
+                        : view.query
+                          ? `${view.results.length} results for “${view.query}”`
+                          : 'Search YouTube and add music to this server’s concert queue.'}
+                    {#if view.searchIncomplete && !view.searching && view.results.length}
                       Showing a partial list. Search again for more.{/if}
                   </p>
                   {#if shownResults.length}<ul class="search-results">

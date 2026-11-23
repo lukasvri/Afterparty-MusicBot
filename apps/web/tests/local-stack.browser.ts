@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import type { MusicSearchResponse, Room, Video } from '../../../lib/types.ts';
 import { visitorSQL } from '../../../lib/room-visitors.ts';
+import { MANUAL_MUSIC_SEARCH_CACHE_PREFIX } from '../../../services/core/src/music-search.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const origin = new URL(process.env.PREVIEW_URL ?? 'http://127.0.0.1:5175').origin;
@@ -165,7 +166,10 @@ for (const authority of [false, true])
       };
       const rows = [
         [`videos:v5:${track.id}`, [track]],
-        ['search:v7:user:synthetic afterparty', { videos: [track], complete: true }],
+        [
+          `${MANUAL_MUSIC_SEARCH_CACHE_PREFIX}user:synthetic afterparty`,
+          { videos: [track], complete: true },
+        ],
       ] as const;
       const sql = rows
         .map(
