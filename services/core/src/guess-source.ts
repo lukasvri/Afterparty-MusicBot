@@ -6,7 +6,8 @@ import type { GuessCatalog } from './guess-catalog.ts';
 import type { GuessMediaSource } from './guess-media.ts';
 import { SyntheticGuessSource } from './guess-synthetic.ts';
 import { prepareDeezerGuessInventory, type DeezerGuessOptions } from './guess-deezer.ts';
-import { prepareYoutubeGuessInventory, prepareYoutubeGuessPack, type YoutubeGuessOptions } from './guess-youtube.ts';
+import { prepareYoutubeGuessInventory, type YoutubeGuessOptions } from './guess-youtube.ts';
+import { buildGuessPackInventory } from './guess-packs.ts';
 import { prepareOperatorGuessInventory, type OperatorGuessInventoryRecord } from './guess-operator-inventory.ts';
 import { selectGuessSource } from './guess-source-config.ts';
 import { UserError } from './types.ts';
@@ -57,7 +58,7 @@ async function prepareLocalGuessSource(records: readonly LocalGuessRecord[], dir
   return { ...source, dispose };
 }
 
-/** Server configuration only, including the alpha preset default. Never a browser request or public upload path. */
+/** Private server configuration only. Never a browser request or public upload path. */
 export async function prepareConfiguredGuessSource(env: NodeJS.ProcessEnv, options: GuessSourceOptions): Promise<Source | undefined> {
   try {
     const selection = selectGuessSource(env);
@@ -68,18 +69,18 @@ export async function prepareConfiguredGuessSource(env: NodeJS.ProcessEnv, optio
       return { catalog: source, media: source, dispose() {} };
     }
     const youtube = selection.provider === 'youtube';
-    if (selection.pack) {
-      return await prepareYoutubeGuessPack(selection.pack, { ...options.youtube, signal: options.signal });
-    }
     const local = selection.provider === 'local';
-    const path = local ? env.GUESS_LOCAL_INVENTORY_PATH : youtube ? env.GUESS_YOUTUBE_INVENTORY_PATH : env.GUESS_DEEZER_INVENTORY_PATH;
+    const path = local ? env.GUESS_LOCAL_INVENTORY_PATH : youtube
+      ? (selection.pack ? env.GUESS_YOUTUBE_PACK_APPROVAL_PATH : env.GUESS_YOUTUBE_INVENTORY_PATH)
+      : env.GUESS_DEEZER_INVENTORY_PATH;
     if (!path || !isAbsolute(path) || path.length > 4096 || /[\p{Cc}\p{Cf}]/u.test(path)) throw unavailable();
     const bytes = await readPrivateFile(path, 32_768, options.signal);
     const records: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     if (!Array.isArray(records) || !records.length || records.length > 8) throw unavailable();
     if (local) return await prepareLocalGuessSource(records, dirname(path), options.signal);
     return youtube
-      ? await prepareYoutubeGuessInventory(records, { ...options.youtube, signal: options.signal })
+      ? await prepareYoutubeGuessInventory(selection.pack ? buildGuessPackInventory(selection.pack, records) : records,
+        { ...options.youtube, signal: options.signal })
       : await prepareDeezerGuessInventory(records, options);
   } catch { throw unavailable(); }
 }
