@@ -4,11 +4,10 @@
 for at most eight preapproved recordings. It returns the existing `GuessCatalog`
 and `GuessMediaSource` interfaces plus `dispose()` to release the prepared bytes.
 It does not configure the application, activate a provider, download media, read
-files, expose an upload endpoint or supply a real-song inventory. The default
-application automatically selects the bundled [EDM pack](#play-the-bundled-pack)
-for alpha builds when no explicit override is present. Stable, beta and rc builds
-remain default-off; custom operator inventories retain the approval-aware path
-described below.
+files, expose an upload endpoint or supply a real-song inventory. Alpha builds
+can automatically select a configured [EDM pack](#play-the-bundled-pack) or a
+private YouTube inventory. Both require per-record approval. Stable, beta and
+rc builds require explicit enable for the YouTube source.
 
 The release target requires recognizable commercial hits. A freely licensed
 independent or classical catalog can support development, but does not replace
@@ -156,7 +155,7 @@ uses no network/file protocols and produces only the selected 15–30-second,
 the existing private round transport. The quiz uses its audio player without a
 YouTube iframe, and never plays through or alters the ordinary Discord queue.
 
-For the bundled eight-song selection, use [direct pack setup](#play-the-bundled-pack)
+For the bundled eight-song selection, use [approved pack setup](#play-the-bundled-pack)
 instead of creating a private file. For a custom selection, leave
 `GUESS_YOUTUBE_PACK` empty, keep a private inventory outside public source and point
 `GUESS_YOUTUBE_INVENTORY_PATH` at its absolute path. The regular-file, symlink and
@@ -253,11 +252,12 @@ not import these answers, clip offsets or approval references into the browser.
 
 ### Play the bundled pack
 
-Alpha builds prepare the eight-song pack automatically when no explicit quiz
-source or disable override is configured. Matching website/Core builds are still
-required, but players do not need to set environment variables or create a song
-file. Open **Games**, enter the existing room code or follow its Discord game
-link, and join with a nickname.
+Set `GUESS_YOUTUBE_PACK_APPROVAL_PATH` to the absolute path of a private JSON
+file with the [approval records below](#custom-approval-aware-inventory).
+Core checks every recording in the pack before calling the provider. The pack
+defaults to `edm-festival-hits`. Existing installations that use the bundled pack
+must supply this file for audio to become available. Open **Games**, enter the
+existing room code or follow its Discord game link, and join with a nickname.
 
 When audio is ready, the host chooses **EDM festival hits**, **Classic
 (30 seconds)**, and up to eight rounds, then saves settings and starts. The
@@ -277,14 +277,15 @@ before retrying; its old media keys cannot be resurrected.
 
 For operator overrides, `GUESS_YOUTUBE_CLIPS=0` explicitly disables the automatic
 alpha source. `GUESS_YOUTUBE_CLIPS=auto` or an unset value follows the build's
-stage: alpha uses the default pack, stable/beta/rc stays off. An explicit Deezer
+stage: alpha uses the configured approval file or inventory, stable/beta/rc
+stays off. An explicit local, Deezer
 or synthetic mode is retained. Conflicting enabled modes and pack/path selectors
 fail closed. An explicit YouTube custom inventory path retains its existing
 per-record validation. Source publication is not treated as a license or an
 invented approval record.
 
 Outside alpha, the pack can still be selected explicitly with
-`GUESS_YOUTUBE_CLIPS=1` and `GUESS_YOUTUBE_PACK=edm-festival-hits`. The isolated
+`GUESS_YOUTUBE_CLIPS=1` and the same private pack approval file. The isolated
 `node --env-file=.env src/guess-check.ts` command in `services/core/` follows the
 same effective selection as startup and reports readiness without starting the
 bot. Its temporary audio is disposed afterward; it does not change a running
@@ -335,7 +336,8 @@ operation before output. The manifest's source verification is metadata evidence
 not an approval record. The CLI does not download audio, connect to Discord or
 activate a source. Paths and answers are omitted from its status output.
 
-Leave `GUESS_YOUTUBE_PACK` empty. Set `GUESS_YOUTUBE_CLIPS=1` and the absolute generated file path as
+Leave `GUESS_YOUTUBE_PACK` and `GUESS_YOUTUBE_PACK_APPROVAL_PATH` empty. Set
+`GUESS_YOUTUBE_CLIPS=1` and the absolute generated file path as
 `GUESS_YOUTUBE_INVENTORY_PATH` on the intended local installation. Disable other
 quiz modes and run `npm --prefix services/core run guess:check` before Core starts.
 An inactive template deliberately fails this check. Actual media/provider

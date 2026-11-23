@@ -24,8 +24,10 @@ export function selectGuessSource(env: NodeJS.ProcessEnv, version = packageVersi
   const automatic = alpha && (youtube === undefined || youtube === '' || youtube === 'auto');
   if (youtube !== '1' && !automatic) return { provider: 'disabled', alphaDefault: false };
   const path = env.GUESS_YOUTUBE_INVENTORY_PATH, pack = env.GUESS_YOUTUBE_PACK;
-  if (path && pack) throw new UserError('The configured game preview source is unavailable.', 503);
-  const selectedPack = pack || (!path && alpha ? 'edm-festival-hits' : undefined);
+  const approvals = env.GUESS_YOUTUBE_PACK_APPROVAL_PATH;
+  if (path && (pack || approvals)) throw new UserError('The configured game preview source is unavailable.', 503);
+  if (automatic && !path && !pack && !approvals) return { provider: 'disabled', alphaDefault: false };
+  const selectedPack = pack || (!path && (alpha || approvals) ? 'edm-festival-hits' : undefined);
   return { provider: 'youtube', ...(selectedPack ? { pack: selectedPack } : {}),
     alphaDefault: automatic || youtube === '1' && !path && !pack && alpha };
 }

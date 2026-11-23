@@ -4,7 +4,6 @@ import { guessAbort, readGuessBytes, guessWaveSeconds, GUESS_AUDIO_MAX_BYTES, GU
 import { decodeGuessClip } from './guess-decode.ts';
 import { runJson } from './extractor.ts';
 import { prepareTrustedGuessInventory, type OperatorGuessInventoryRecord, type TrustedGuessInventoryRecord } from './guess-operator-inventory.ts';
-import { getGuessPackClips } from './guess-packs.ts';
 import { UserError } from './types.ts';
 
 /** Curated private inputs only. Approval is an operator attestation, not legal verification. */
@@ -79,14 +78,6 @@ export async function prepareYoutubeGuessInventory(records: readonly YoutubeGues
       expiresAt = Math.min(expiresAt, permission.expiresAt);
     }
     return await prepareInputs(inputs, expiresAt, options);
-  } catch { throw unavailable(); }
-}
-
-/** Explicit server-selected preset only. Source verification is metadata, never an invented permission attestation. */
-export async function prepareYoutubeGuessPack(id: string, options: YoutubeGuessOptions): Promise<Inventory> {
-  try {
-    const inputs = snapshot(getGuessPackClips(id));
-    return await prepareInputs(inputs, Date.now() + GUESS_YOUTUBE_INVENTORY_LIFETIME_MS, options);
   } catch { throw unavailable(); }
 }
 
