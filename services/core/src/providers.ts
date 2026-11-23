@@ -111,6 +111,10 @@ export type PlaybackSourceMode = "standard" | "startup" | "seek" | "skip";
 const STREAM_SOURCE_TTL_MS = 5 * 60_000;
 const FAST_YOUTUBE_SOURCE_MS = 4_000;
 const YOUTUBE_HLS_FORMAT = "bestaudio[protocol*=m3u8]";
+function streamSourceKey(track: Track) {
+  return JSON.stringify([track.source ?? "youtube", track.id, track.entryId,
+    track.source === "soundcloud" ? track.url : null]);
+}
 function isPreview(media: ExtractedMedia) {
   return media.is_preview || (media.full_duration && Number(media.duration) < media.full_duration - 2);
 }
@@ -620,6 +624,14 @@ export class Providers {
     if (!found[0]) throw new UserError("No results. Try another search.");
     return [found[0]];
   }
+  private retainedStreamSource(track: Track, key: string, now: number) {
+    if (track.live) return;
+    const retained = this.streamSources.get(key);
+    if (retained && now >= retained.at && now - retained.at < STREAM_SOURCE_TTL_MS) return retained;
+  }
+  hasReusableStreamSource(track: Track) {
+    return this.retainedStreamSource(track, streamSourceKey(track), Date.now()) !== undefined;
+  }
   async stream(
     track: Track,
     signal: AbortSignal,
@@ -627,14 +639,13 @@ export class Providers {
     onTiming?: (timing: ExtractorTiming) => void,
   ): Promise<StreamSource> {
     if (signal.aborted) throw new UserError("The request was cancelled.");
-    const key = JSON.stringify([track.source ?? "youtube", track.id, track.entryId,
-      track.source === "soundcloud" ? track.url : null]);
+    const key = streamSourceKey(track);
     const now = Date.now();
     for (const [entry, retained] of this.streamSources)
       if (now < retained.at || now - retained.at >= STREAM_SOURCE_TTL_MS)
         this.streamSources.delete(entry);
-    const retained = !track.live && (mode === "seek" || mode === "skip")
-      ? this.streamSources.get(key)
+    const retained = mode === "seek" || mode === "skip"
+      ? this.retainedStreamSource(track, key, now)
       : undefined;
     if (retained) {
       this.streamSources.delete(key);

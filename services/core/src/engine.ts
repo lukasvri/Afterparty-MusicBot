@@ -10,6 +10,7 @@ import {
   PcmDecoder,
   encodeOpus,
   audioBitrate,
+  type BufferedTrack,
   type Sink,
   type Prepared,
 } from "./audio.ts";
@@ -339,6 +340,7 @@ export class Engine extends EventEmitter {
     signal: AbortSignal,
     onTiming?: (reason: StartupPhase, durationMs: number) => void,
     sourceMode: PlaybackSourceMode = "standard",
+    decoderSignal: AbortSignal | null = signal,
   ): Promise<Prepared> {
     const startedAt = performance.now();
     const source = await this.providers.stream(track, signal, sourceMode, onTiming
@@ -355,7 +357,7 @@ export class Engine extends EventEmitter {
       decoder: new PcmDecoder(
         source,
         offset,
-        signal,
+        decoderSignal ?? undefined,
         undefined,
         onTiming ? (durationMs) => {
           if (!signal.aborted) onTiming("decoder-ready", durationMs);
@@ -441,7 +443,9 @@ export class Engine extends EventEmitter {
       ? { ...from, entryId: randomUUID() }
       : this.queue.find((t) => t.entryId !== from.entryId);
     if (!next) return null;
-    const result = await this.prepare(next, next.offset ?? 0, signal);
+    // Extraction belongs to this run. The mixer owns the decoded next source
+    // and can hand it off intact when a skip starts a new run.
+    const result = await this.prepare(next, next.offset ?? 0, signal, undefined, "standard", null);
     if (
       signal.aborted ||
       generation !== this.generation ||
@@ -477,7 +481,7 @@ export class Engine extends EventEmitter {
       "standard",
     );
   }
-  async startTrack(track: Track, offset = 0, paused = false, sourceMode: PlaybackSourceMode = "startup") {
+  async startTrack(track: Track, offset = 0, paused = false, sourceMode: PlaybackSourceMode = "startup", buffered?: BufferedTrack) {
     this.bitrate = audioBitrate(
       this.channelBitrate,
       this.settings.audioBitrateKbps,
@@ -498,8 +502,9 @@ export class Engine extends EventEmitter {
     this.persist();
     this.checkpoint();
     this.changed();
+    let activatedMixer: Mixer | undefined;
     try {
-      const prepared = await this.prepare(track, offset, signal, (reason, durationMs) => {
+      const prepared = buffered ?? await this.prepare(track, offset, signal, (reason, durationMs) => {
         // Only current playback reports startup phases. Background prefetch and
         // stale/cancelled preparations must not contaminate this diagnostic.
         if (generation === this.generation && !signal.aborted)
@@ -512,6 +517,7 @@ export class Engine extends EventEmitter {
       const mixer = new Mixer({
         onDiagnostic: (reason) => this.diagnostics.note(reason),
         first: prepared,
+        initialFrames: buffered?.frames,
         offset,
         bitrate: this.bitrate,
         volume: () =>
@@ -527,6 +533,7 @@ export class Engine extends EventEmitter {
           this.segments.push({ track: t, startFrame, offset: initial });
         },
       });
+      activatedMixer = mixer;
       this.mixer = mixer;
       this.runId = randomUUID();
       mixer.on("error", () => {});
@@ -535,6 +542,13 @@ export class Engine extends EventEmitter {
       if (this.paused) this.sink.pause();
       this.changed();
     } catch (error) {
+      if (activatedMixer) {
+        activatedMixer.destroy();
+        if (this.mixer === activatedMixer) {
+          this.mixer = null;
+          this.runId = null;
+        }
+      } else buffered?.decoder.stop();
       if (generation !== this.generation || signal.aborted) return;
       this.loading = false;
       this.current = null;
@@ -686,12 +700,20 @@ export class Engine extends EventEmitter {
     // Reuse the exact next source only once its prefetch has delivered audio.
     const prefetched = next && mixer?.nextPrepared?.track.entryId === next.entryId &&
       mixer.nextFrames.length > 0 && !mixer.nextFailed;
-    this.stop(false);
-    const consumed = new Set([...requested.map((track) => track.entryId), ...(next ? [next.entryId] : [])]);
-    this.queue = this.queue.filter((track) => !consumed.has(track.entryId));
-    this.persist();
-    if (next) await this.startTrack(next, next.offset ?? 0, false, prefetched ? "skip" : "startup");
-    else this.changed();
+    const buffered = prefetched && this.providers.hasReusableStreamSource(next)
+      ? mixer.takePrefetched(next)
+      : undefined;
+    try {
+      this.stop(false);
+      const consumed = new Set([...requested.map((track) => track.entryId), ...(next ? [next.entryId] : [])]);
+      this.queue = this.queue.filter((track) => !consumed.has(track.entryId));
+      this.persist();
+      if (next) await this.startTrack(next, next.offset ?? 0, false, prefetched ? "skip" : "startup", buffered);
+      else this.changed();
+    } catch (error) {
+      buffered?.decoder.stop();
+      throw error;
+    }
   }
   stop(clear = true) {
     this.generation++;

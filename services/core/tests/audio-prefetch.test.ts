@@ -13,6 +13,35 @@ function prepared(id: string, duration: number, read: () => Promise<Buffer | nul
     decoder: { frame: read, stop } as unknown as PcmDecoder };
 }
 
+test('skip can take the exact buffered source only before its frames enter the fade', async () => {
+  const delayed = deferred<Buffer | null>();
+  let reads = 0, stopped = false;
+  const next = prepared('next-source', 100, async () => ++reads === 1 ? frame : delayed.promise,
+    () => { stopped = true; });
+  const mixer = new Mixer({ first: prepared('current-source', 100, async () => frame), offset: 0,
+    volume: () => 100, crossfade: () => 2, bitrate: 96000, next: async () => next, onSegment() {} });
+  try {
+    mixer.prepare();
+    await mixer.preparing;
+    assert.equal(mixer.nextFrames.length, 1);
+    assert.equal(mixer.takePrefetched(next.track), undefined, 'a pending decoder read keeps ownership');
+    delayed.resolve(null);
+    await mixer.nextRead;
+    assert.equal(mixer.takePrefetched({ ...next.track, offset: 1 }), undefined);
+    assert.equal(mixer.takePrefetched({ ...next.track, entryId: 'a-different-queue-entry' }), undefined);
+    mixer.fadeFrame = 2;
+    assert.equal(mixer.takePrefetched(next.track), undefined, 'a fade may have consumed the start');
+    mixer.fadeFrame = 0;
+    assert.deepEqual(mixer.takePrefetched(next.track), { ...next, frames: [frame] });
+    mixer.destroy();
+    assert.equal(stopped, false, 'the retired mixer no longer owns the decoder');
+  } finally {
+    delayed.resolve(null);
+    mixer.destroy();
+    next.decoder.stop();
+  }
+});
+
 for (const [duration, offset, configuredFade] of [[4, 0, 12], [100, 96, 6]])
   test(`a ${duration - offset}s tail at offset ${offset} starts its ready crossfade without waiting for excess provider data`, async t => {
     const delayed = deferred<Buffer | null>();
