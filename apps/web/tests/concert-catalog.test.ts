@@ -284,7 +284,7 @@ test('selected Winter sets retain their official editions and every previous cat
           (entry.year === 2026
             ? 'PLoSIOFPSXQoMBTGDqYPiTP7CP_PlxC5jB'
             : 'PLoSIOFPSXQoOx5SBOrejTmvsC6wJhUvl1');
-    assert(entry.evidenceUrls.includes(editionSource));
+    assert(entry.evidenceUrls.some((url) => url === editionSource));
   }
   const prior = CONCERT_CATALOG.filter(
     (entry) => entry.eventId !== 'tomorrowland-winter' && entry.videoId !== 'HWv6i68UqBA',
