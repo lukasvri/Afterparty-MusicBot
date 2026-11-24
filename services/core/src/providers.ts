@@ -107,10 +107,16 @@ type SearchResult = { tracks: Track[]; complete: boolean };
 type SearchHydrationProgress = { verified?: (count: number) => void; failed(): void };
 const MAX_SEARCH_JOBS = 64;
 type StreamSource = { url: string; headers: string; duration: number | undefined };
+type RetainedStreamSource = { at: number; source: StreamSource; forStartup?: true };
 export type PlaybackSourceMode = "standard" | "startup" | "seek" | "skip";
 const STREAM_SOURCE_TTL_MS = 5 * 60_000;
 const FAST_YOUTUBE_SOURCE_MS = 4_000;
+const DIRECT_START_LOOKUP_MS = 6_000;
+const DIRECT_START_SOURCE_MS = 15_000;
 const YOUTUBE_HLS_FORMAT = "bestaudio[protocol*=m3u8]";
+const YOUTUBE_STREAM_FORMAT = YOUTUBE_HLS_FORMAT + "/bestaudio/best";
+const VIDEO_EXTRACT_ARGS = ["--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node"];
+const streamSourceTtl = (entry: RetainedStreamSource) => entry.forStartup ? DIRECT_START_SOURCE_MS : STREAM_SOURCE_TTL_MS;
 function streamSourceKey(track: Track) {
   return JSON.stringify([track.source ?? "youtube", track.id, track.entryId,
     track.source === "soundcloud" ? track.url : null]);
@@ -120,6 +126,27 @@ function isPreview(media: ExtractedMedia) {
 }
 function isStreamUrl(url: unknown): url is string {
   return typeof url === "string" && /^https?:\/\//.test(url);
+}
+function extractedYouTubeTrack(id: string, video: ExtractedMedia): Track {
+  const duration = Number(video.duration) || 0;
+  return {
+    id, genres: metadataGenres(video.description, video.tags), music: metadataMusic(undefined, video.categories),
+    title: video.title ?? "YouTube", artist: video.artist ?? video.uploader ?? "YouTube",
+    aiGenerated: metadataAiGenerated(video.title, [video.artist, video.uploader].filter(Boolean).join(" "), video.description, video.tags),
+    image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, duration,
+    live: video.is_live === true, embeddable: video.playable_in_embed === true,
+    source: "youtube", entryId: randomUUID(),
+    ...(video.artist && video.track ? { catalog: { ...extractedCatalogArtist(video), title: video.track, duration } } : {}),
+  };
+}
+function extractedStreamSource(data: ExtractedMedia, duration: number): StreamSource {
+  if (isPreview(data)) throw new UserError("The source only offers a preview.");
+  if (!isStreamUrl(data.url)) throw new UserError("The media source has no audio stream.", 502);
+  const headers = Object.entries(data.http_headers ?? {})
+    .filter(([k, v]) => typeof v === "string" && !/[\r\n]/.test(k + v))
+    .map(([k, v]) => `${k}: ${v}\r\n`)
+    .join("");
+  return { url: data.url, headers, duration: Number.isFinite(data.duration) ? Number(data.duration) : duration };
 }
 const importObject = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const unavailablePlaylistEntry = (entry: Record<string, unknown>) =>
@@ -139,9 +166,8 @@ export class Providers {
   private searches = new Map<string, ProviderWork<SearchResult>>();
   private searchContinuations = new Map<string, { at: number; ids: string[] }>();
   private videoLookups = new Map<string, ProviderWork<Track | undefined>>();
-  // Private, short-lived sources for current playback and its prefetched next
-  // entry. Only explicit same-entry seeks may reuse them; never persist URLs.
-  private streamSources = new Map<string, { at: number; source: StreamSource }>();
+  // Private same-entry sources for playback. Media URLs never enter the queue or store.
+  private streamSources = new Map<string, RetainedStreamSource>();
   private readonly fastYouTubeStartup: boolean;
   constructor(store: Store, env: NodeJS.ProcessEnv = process.env) {
     this.store = store;
@@ -312,31 +338,21 @@ export class Providers {
         if (!item || item.aborted) return;
         const itemSignal = AbortSignal.any([signal, item]);
         try {
-          const args = [
-            "--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node",
-          ], url = "https://www.youtube.com/watch?v=" + id;
+          const url = "https://www.youtube.com/watch?v=" + id;
           let v: ExtractedMedia;
           try {
             // Metadata still comes from full video/player responses. Avoid
             // resolving audio formats until playback actually needs a stream.
-            v = await this.extract([...args, "--extractor-args", "youtube:player_skip=js;skip=hls,dash",
+            v = await this.extract([...VIDEO_EXTRACT_ARGS, "--extractor-args", "youtube:player_skip=js;skip=hls,dash",
               "--no-ignore-no-formats-error", url], itemSignal, false, "metadata");
           } catch (error) {
             // Some playable videos have only JS-dependent formats. Preserve
             // their full fallback without retrying private/network/deadline errors.
             itemSignal.throwIfAborted();
             if (!active(id) || !(error instanceof ExtractorFormatError)) throw error;
-            v = await this.extract([...args, url], itemSignal);
+            v = await this.extract([...VIDEO_EXTRACT_ARGS, url], itemSignal);
           }
-          remember({
-            id, genres: metadataGenres(v.description, v.tags), music: metadataMusic(undefined, v.categories),
-            title: v.title ?? "YouTube", artist: v.artist ?? v.uploader ?? "YouTube",
-            aiGenerated: metadataAiGenerated(v.title, [v.artist, v.uploader].filter(Boolean).join(" "), v.description, v.tags),
-            image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, duration: Number(v.duration) || 0,
-            live: v.is_live === true, embeddable: v.playable_in_embed === true,
-            source: "youtube", entryId: randomUUID(),
-            ...(v.artist && v.track ? { catalog: { ...extractedCatalogArtist(v), title: v.track, duration: Number(v.duration) || 0 } } : {}),
-          });
+          remember(extractedYouTubeTrack(id, v));
           complete(id, found.get(id));
         } catch (error) { complete(id, error instanceof Error ? error : new Error(String(error))); }
       });
@@ -548,14 +564,49 @@ export class Providers {
     const videos = ids.map(id => found.get(id)).filter((track): track is Track => Boolean(track));
     return { videos, ...(total !== undefined ? { total } : {}), skipped: skipped + ids.length - videos.length, limited };
   }
-  async resolve(query: string): Promise<Track[]> {
+  private async prepareDirectStart(id: string, signal?: AbortSignal) {
+    signal?.throwIfAborted();
+    if (this.key || this.fastYouTubeStartup || this.videoLookups.has(id)) return;
+    const cached = this.store.get<{ at: number } | null>("metadata:v6:" + id, null);
+    if (cached && Date.now() - cached.at < 86400000) return;
+
+    const deadline = AbortSignal.timeout(DIRECT_START_LOOKUP_MS);
+    try {
+      const request = signal ? AbortSignal.any([deadline, signal]) : deadline;
+      const data = await this.extract([...VIDEO_EXTRACT_ARGS, "-f", YOUTUBE_STREAM_FORMAT,
+        "https://www.youtube.com/watch?v=" + id], request, true);
+      signal?.throwIfAborted();
+      if (deadline.aborted || data.id !== id || data.is_live !== false || data.playable_in_embed !== true ||
+          !Number.isFinite(data.duration) || Number(data.duration) <= 0 || typeof data.title !== "string" || !data.title.trim() ||
+          (data.availability !== undefined && !["public", "unlisted"].includes(data.availability)) ||
+          isPreview(data) || !isStreamUrl(data.url)) return;
+      const track = extractedYouTubeTrack(id, data);
+      const source = extractedStreamSource(data, track.duration);
+      const at = Date.now();
+      return { track, prime: () => this.retainStreamSource(streamSourceKey(track), { at, source, forStartup: true }) };
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (deadline.aborted || error instanceof UserError && error.status === 502) return;
+      throw error;
+    }
+  }
+  async resolve(query: string, offerStartupSource?: (prime: () => void) => void, signal?: AbortSignal): Promise<Track[]> {
     query = query.trim();
     if (!query || query.length > 2000)
       throw new UserError("Enter a search or a valid music link.");
     if (/^https:\/\/spotify\.link\//i.test(query))
       query = await expandSpotifyLink(query);
     const id = youtubeId(query);
-    if (id) return this.video([id]);
+    if (id) {
+      if (offerStartupSource) {
+        const prepared = await this.prepareDirectStart(id, signal);
+        if (prepared) {
+          offerStartupSource(prepared.prime);
+          return [prepared.track];
+        }
+      }
+      return this.video([id], false, signal);
+    }
     try {
       const url = new URL(query);
       const playlist = url.searchParams.get("list");
@@ -627,10 +678,16 @@ export class Providers {
   private retainedStreamSource(track: Track, key: string, now: number) {
     if (track.live) return;
     const retained = this.streamSources.get(key);
-    if (retained && now >= retained.at && now - retained.at < STREAM_SOURCE_TTL_MS) return retained;
+    if (retained && now >= retained.at && now - retained.at < streamSourceTtl(retained)) return retained;
   }
   hasReusableStreamSource(track: Track) {
-    return this.retainedStreamSource(track, streamSourceKey(track), Date.now()) !== undefined;
+    const retained = this.retainedStreamSource(track, streamSourceKey(track), Date.now());
+    return retained !== undefined && !retained.forStartup;
+  }
+  private retainStreamSource(key: string, entry: RetainedStreamSource) {
+    this.streamSources.set(key, entry);
+    while (this.streamSources.size > 2)
+      this.streamSources.delete(this.streamSources.keys().next().value!);
   }
   async stream(
     track: Track,
@@ -642,14 +699,12 @@ export class Providers {
     const key = streamSourceKey(track);
     const now = Date.now();
     for (const [entry, retained] of this.streamSources)
-      if (now < retained.at || now - retained.at >= STREAM_SOURCE_TTL_MS)
+      if (now < retained.at || now - retained.at >= streamSourceTtl(retained))
         this.streamSources.delete(entry);
-    const retained = mode === "seek" || mode === "skip"
-      ? this.retainedStreamSource(track, key, now)
-      : undefined;
-    if (retained) {
+    const retained = this.retainedStreamSource(track, key, now);
+    if (retained && (retained.forStartup ? mode === "startup" : mode === "seek" || mode === "skip")) {
       this.streamSources.delete(key);
-      this.streamSources.set(key, retained);
+      this.retainStreamSource(key, { at: retained.at, source: retained.source });
       return { ...retained.source };
     }
     // A fresh playback/recovery attempt must not leave an old source available
@@ -659,7 +714,6 @@ export class Providers {
       track.source === "soundcloud"
         ? track.url
         : `https://www.youtube.com/watch?v=${track.id}`;
-    const args = ["--no-playlist", "--dump-single-json", "--skip-download", "--js-runtimes", "node"];
     let data: ExtractedMedia | undefined;
     let timing: ExtractorTiming | undefined;
     const recordTiming = onTiming ? (measurement: ExtractorTiming) => { timing = measurement; } : undefined;
@@ -668,7 +722,7 @@ export class Providers {
       const deadline = AbortSignal.timeout(FAST_YOUTUBE_SOURCE_MS);
       try {
         const candidate = await this.extract([
-          ...args, "--extractor-args", "youtube:player_client=visionos",
+          ...VIDEO_EXTRACT_ARGS, "--extractor-args", "youtube:player_client=visionos",
           "-f", YOUTUBE_HLS_FORMAT, target!,
         ], AbortSignal.any([signal, deadline]), true, "media", recordTiming);
         if (!deadline.aborted && candidate.id === track.id && candidate.is_live === false &&
@@ -685,31 +739,14 @@ export class Providers {
     if (!data) {
       timing = undefined;
       data = await this.extract([
-        ...args, "-f", track.source === "soundcloud" ? "bestaudio/best" : YOUTUBE_HLS_FORMAT + "/bestaudio/best",
+        ...VIDEO_EXTRACT_ARGS, "-f", track.source === "soundcloud" ? "bestaudio/best" : YOUTUBE_STREAM_FORMAT,
         target!,
       ], signal, true, "media", recordTiming);
     }
     if (signal.aborted) throw new UserError("The request was cancelled.");
-    if (isPreview(data))
-      throw new UserError("The source only offers a preview.");
-    if (!isStreamUrl(data.url))
-      throw new UserError("The media source has no audio stream.", 502);
-    const headers = Object.entries(data.http_headers ?? {})
-      .filter(([k, v]) => typeof v === "string" && !/[\r\n]/.test(k + v))
-      .map(([k, v]) => `${k}: ${v}\r\n`)
-      .join("");
-    const source = {
-      url: data.url,
-      headers,
-      duration: Number.isFinite(data.duration)
-        ? Number(data.duration)
-        : track.duration,
-    };
-    if (!track.live && !data.is_live) {
-      this.streamSources.set(key, { at: Date.now(), source: { ...source } });
-      while (this.streamSources.size > 2)
-        this.streamSources.delete(this.streamSources.keys().next().value!);
-    }
+    const source = extractedStreamSource(data, track.duration);
+    if (!track.live && !data.is_live)
+      this.retainStreamSource(key, { at: Date.now(), source: { ...source } });
     if (timing) onTiming?.(timing);
     return source;
   }

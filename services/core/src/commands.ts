@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ConcertQueue } from './concert-queue.ts';
 import { Engine } from './engine.ts';
+import { youtubeId } from './providers.ts';
 import { UserError, type Track, type Settings, type SavedQueue } from './types.ts';
 import { validSettingValue } from './settings.ts';
 
@@ -27,13 +28,25 @@ export class Commands {
     sleep: ReturnType<typeof setTimeout> | null = null;
     sleepUntil: number | null = null;
     enqueueTail: Promise<unknown> = Promise.resolve();
+    private pendingAdds = 0;
     disconnect: (() => void) | null = null;
     diagnostic: (() => Promise<string>) | null = null;
     constructor(engine: Engine) { this.engine = engine; this.concertQueue = new ConcertQueue(engine); }
     note(text: string) { this.activity.unshift({ at: new Date().toISOString(), text }); this.activity = this.activity.slice(0, 20); }
     async add(query:string, author='website', options:{next?:boolean;immediate?:boolean;shuffle?:boolean;concert?:boolean;moderated?:boolean}={}) {
         const e=this.engine, epoch=e.queueGeneration;
-        const found=e.providers.resolve(query).then(tracks=>({tracks}),error=>({error}));
+        const coldStart = this.pendingAdds === 0 && e.connected && !e.current && !e.queue.length &&
+            !options.immediate && !options.moderated && youtubeId(query.trim());
+        const startup = coldStart ? new AbortController() : undefined;
+        const abortStopped = () => {
+            if (epoch !== e.queueGeneration || !e.connected)
+                startup?.abort(new UserError('Playback stopped before the search finished.'));
+        };
+        if (startup) e.on('state', abortStopped);
+        let prime: (() => void) | undefined;
+        const found = e.providers.resolve(query, startup ? source => { prime = source; } : undefined, startup?.signal)
+            .then(tracks => ({ tracks }), error => ({ error }));
+        this.pendingAdds++;
         const result=this.enqueueTail.catch(()=>{}).then(async()=>{
             const outcome=await found;
             if('error' in outcome)throw outcome.error;
@@ -41,12 +54,18 @@ export class Commands {
             if(options.concert&&(!tracks.length||tracks.some(t=>t.source!=='youtube'||!t.embeddable)))throw new UserError('This video cannot be shown in Afterparty. Choose another YouTube video.');
             if(epoch!==e.queueGeneration||!e.connected)throw new UserError('Playback stopped before the search finished.');
             if(options.shuffle)for(let i=tracks.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tracks[i],tracks[j]]=[tracks[j],tracks[i]];}
-            const count=options.moderated && this.concertQueue.request(tracks) ? tracks.length : e.enqueue(tracks,options.next,options.immediate);
+            const count = options.moderated && this.concertQueue.request(tracks)
+                ? tracks.length
+                : e.enqueue(tracks, options.next, options.immediate, prime);
             this.note(options.concert?'Added a concert to Discord and Afterparty':'Added music to Discord');
             return count;
         });
         this.enqueueTail=result;
-        return result;
+        try { return await result; }
+        finally {
+            if (startup) e.off('state', abortStopped);
+            this.pendingAdds--;
+        }
     }
     async execute(input: Record<string, unknown>, scope: 'public' | 'admin' | 'discord' = 'admin', author = 'website') {
         const e = this.engine, action = String(input.action);
