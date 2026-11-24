@@ -625,9 +625,14 @@ for (const canManage of [false, true])
       await page.getByRole('heading', { name: 'Synchronized concert' }).waitFor();
       await page.waitForFunction(() => Boolean((window as unknown as { __emit?: unknown }).__emit));
       assert.equal(await page.getByRole('button', { name: 'Enable room audio' }).count(), 0);
-      const emit = async (sequence: number, playing: boolean, position: number) =>
+      const emit = async (
+        sequence: number,
+        playing: boolean,
+        position: number,
+        buffering = false,
+      ) =>
         page.evaluate(
-          ({ snapshot, sequence, playing, position }) => {
+          ({ snapshot, sequence, playing, position, buffering }) => {
             (window as unknown as { __emit: (state: unknown) => void }).__emit({
               ...snapshot,
               engine: 'gutta-krutt-core',
@@ -636,10 +641,10 @@ for (const canManage of [false, true])
               playing,
               position,
               serverTime: Date.now(),
-              buffering: false,
+              buffering,
             });
           },
-          { snapshot, sequence, playing, position },
+          { snapshot, sequence, playing, position, buffering },
         );
       await emit(1, true, 25);
       await page.getByRole('button', { name: 'Enable room audio' }).waitFor();
@@ -888,6 +893,7 @@ for (const canManage of [false, true])
               (call) => call.action === 'held-seek-response',
             ),
           );
+          await emit(sequence++, true, 70, true);
           const latestSeek = page.waitForResponse(
             (response) =>
               response.request().method() === 'POST' &&
@@ -900,6 +906,9 @@ for (const canManage of [false, true])
           await seek.click();
           await page.waitForTimeout(350);
           assert.equal(writes.length, beforeOverlap + 1, 'only one seek is in flight');
+          const callsBeforeReceipt = await page.evaluate(
+            () => (window as unknown as { __calls: unknown[] }).__calls.length,
+          );
           overlap.resolve();
           await emit(sequence++, true, 70);
           await latestSeek;
@@ -914,6 +923,19 @@ for (const canManage of [false, true])
               .map((write) => (write.command as { seconds: number }).seconds),
             [70, 20],
             'a busy concert retains the latest native seek',
+          );
+          const afterReceipt = await page.evaluate(
+            (start) =>
+              (
+                window as unknown as { __calls: { action: string; position?: number }[] }
+              ).__calls.slice(start),
+            callsBeforeReceipt,
+          );
+          assert(
+            !afterReceipt.some(
+              (call) => call.action === 'seek' && Math.abs((call.position ?? 0) - 70) < 4,
+            ),
+            'the first receipt cannot seek back to 70 while the native player already holds the queued target',
           );
         } finally {
           overlap.resolve();
