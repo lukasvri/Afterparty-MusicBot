@@ -499,6 +499,19 @@
         correctedAt = performance.now();
         settleUntil = correctedAt + syncRecoveryMs(syncMode);
         force = false;
+        const next = queuedNative[0];
+        if (
+          next?.identity === key &&
+          next.intent.action === 'seek' &&
+          canSeek &&
+          loadedSource === source
+        ) {
+          // The iframe already holds the newer native seek. Submit it before
+          // resuming or aligning the player to the older acknowledged position.
+          loaded = key;
+          flushNative();
+          if (nativePending) return;
+        }
       }
     }
     const audible = playing && !localPaused;
