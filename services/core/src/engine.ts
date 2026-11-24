@@ -308,7 +308,7 @@ export class Engine extends EventEmitter {
     this.mixer?.invalidateNext();
     this.changed();
   }
-  enqueue(tracks: Track[], next = false, immediate = false) {
+  enqueue(tracks: Track[], next = false, immediate = false, primeStartupSource?: () => void) {
     if (!tracks.length) throw new UserError("No songs found.");
     const key = (t: Track) => JSON.stringify([t.concert === true, t.id]);
     const requested = new Set(tracks.map(key));
@@ -331,7 +331,10 @@ export class Engine extends EventEmitter {
     this.persist();
     this.changed();
     if (immediate) void this.skip();
-    else if (!this.current && this.connected) void this.startNext();
+    else if (!this.current && this.connected) {
+      if (this.queue[0] === tracks[0]) primeStartupSource?.();
+      void this.startNext();
+    }
     return fresh.length;
   }
   async prepare(

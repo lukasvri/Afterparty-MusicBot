@@ -70,6 +70,68 @@ function serveWave(audio:Buffer,request:IncomingMessage,response:ServerResponse)
  response.end(audio.subarray(start,end+1));
 }
 
+test('a cold direct concert uses one extraction and keeps the media URL private',async()=>{
+ const t=setup(),commands=new Commands(t.engine),song=track(),output=deferred<void>(),profiles:string[]=[];
+ let audio=Buffer.alloc(0),timer:ReturnType<typeof setTimeout>|undefined;
+ const server=createServer((request,response)=>serveWave(audio,request,response));
+ clearInterval(t.engine.timer);t.engine.connected=true;t.engine.settings.radio=false;
+ try{
+  const created=spawnSync(process.env.FFMPEG_PATH??'ffmpeg',
+   ['-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=1','-ac','2','-f','wav','pipe:1']);
+  assert.equal(created.status,0,String(created.stderr));audio=created.stdout;
+  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+  const address=server.address();assert(address&&typeof address!=='string');
+  const source='http://127.0.0.1:'+address.port+'/private-ephemeral-source';
+  t.providers.youtube=async()=>{throw new Error('No YouTube API key');};
+  t.providers.extract=async(args,_signal,_priority,profile='media')=>{
+   profiles.push(profile);
+   assert.equal(args.at(-1),'https://www.youtube.com/watch?v='+song.id);
+   return {id:song.id,title:song.title,uploader:song.artist,duration:200,is_live:false,playable_in_embed:true,url:source};
+  };
+  const sink:Sink=t.sink;
+  sink.play=(stream,id)=>{
+   stream.once('error',error=>t.sink.onError?.(error,id));
+   stream.once('data',()=>output.resolve());stream.resume();
+  };
+  await commands.execute({action:'enqueue',query:'https://www.youtube.com/watch?v='+song.id,concert:true},'admin');
+  await Promise.race([output.promise,new Promise<never>((_,reject)=>{
+   timer=setTimeout(()=>reject(new Error('No Opus from the cold concert')),8000);
+  })]);
+  assert.equal(t.engine.current?.id,song.id);
+  assert.equal(t.engine.current?.concert,true);
+  assert.deepEqual(profiles,['media']);
+  assert(!JSON.stringify(t.engine.snapshot()).includes(source));
+  assert(!JSON.stringify(t.store.get('recovery',null)).includes(source));
+ }finally{
+  clearTimeout(timer);commands.close();t.close();server.closeAllConnections();
+  if(server.listening)await new Promise<void>(resolve=>server.close(()=>resolve()));
+ }
+});
+
+test('stopping a cold direct concert aborts extraction and prevents fallback or playback',async()=>{
+ const t=setup(),commands=new Commands(t.engine),entered=deferred<AbortSignal>();
+ const stopped=deferred<never>();
+ t.engine.connected=true;
+ t.providers.extract=async(_args,signal)=>{
+  assert(signal);entered.resolve(signal);
+  signal.addEventListener('abort',()=>stopped.reject(signal.reason),{once:true});
+  return stopped.promise;
+ };
+ t.providers.video=async()=>assert.fail('Stop must retire the lookup before fallback.');
+ try{
+  const before=t.engine.listenerCount('state');
+  const opening=commands.add('https://www.youtube.com/watch?v='+track().id,'operator',{concert:true});
+  const rejected=assert.rejects(opening,/Playback stopped before the search finished/);
+  const signal=await entered.promise;
+  t.engine.stop();
+  await rejected;
+  assert(signal.aborted);
+  assert.equal(t.engine.current,null);
+  assert.deepEqual(t.engine.queue,[]);
+  assert.equal(t.engine.listenerCount('state'),before);
+ }finally{commands.close();t.close();}
+});
+
 test('a fast source that fails decoding resumes through the standard resolver',async()=>{
  const t=setup({AFTERPARTY_FAST_YOUTUBE_STARTUP:'1'}),song=track();
  const attempts:string[]=[], output=deferred<void>();

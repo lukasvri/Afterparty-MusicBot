@@ -13,6 +13,52 @@ const source={id:'4uLU6hMCjMI75M1A2tKUQC',isrc:'GBARL9300135',title:'Example Son
 const track=(title='Artist - Example Song',id='abcdefghijk'):Track=>({id,title,artist:'Artist - Topic',duration:200,entryId:id,image:'',live:false,embeddable:true,source:'youtube'});
 const setup=()=>{const dir=mkdtempSync(join(tmpdir(),'gutta-provider-'));const store=new Store(join(dir,'db.sqlite'));return {store,close:()=>{store.close();rmSync(dir,{recursive:true,force:true});}};};
 
+test('a direct startup source belongs to one entry and expires before playback',async context=>{
+ const t=setup();try{
+  const p=new Providers(t.store,{}),original=track(),signal=new AbortController().signal;
+  const query='https://www.youtube.com/watch?v='+original.id;
+  let calls=0,now=1000,prime:(()=>void)|undefined;
+  context.mock.method(Date,'now',()=>now);
+  p.extract=async()=>({id:original.id,title:original.title,is_live:false,playable_in_embed:true,
+   duration:original.duration,url:'https://media.example.test/'+ ++calls});
+  const [first]=await p.resolve(query,activate=>{prime=activate;});
+  assert(prime);prime();
+  assert.equal(p.hasReusableStreamSource(first),false);
+  assert.equal((await p.stream({...first,entryId:'a-different-entry'},signal,'startup')).url,'https://media.example.test/2');
+  assert.equal((await p.stream(first,signal,'startup')).url,'https://media.example.test/1');
+  assert.equal((await p.stream(first,signal,'seek')).url,'https://media.example.test/1');
+  assert.equal((await p.stream(first,signal,'startup')).url,'https://media.example.test/3');
+  const [later]=await p.resolve(query,activate=>{prime=activate;});
+  prime();now+=15000;
+  assert.equal((await p.stream(later,signal,'startup')).url,'https://media.example.test/5');
+ }finally{t.close();}
+});
+
+test('cold direct lookup preserves existing metadata for API keys and rejected media',async()=>{
+ const t=setup();try{
+  const original=track(),query='https://www.youtube.com/watch?v='+original.id;
+  const rejectOffer=()=>assert.fail('An unverified source was offered');
+  const api=new Providers(t.store,{YOUTUBE_API_KEY:'synthetic'});
+  api.video=async()=>[original];
+  api.extract=async()=>assert.fail('The API-backed path must use canonical metadata');
+  assert.deepEqual(await api.resolve(query,rejectOffer),[original]);
+
+  const p=new Providers(t.store,{});
+  p.video=async()=>[original];
+  const valid={id:original.id,title:original.title,is_live:false,playable_in_embed:true,
+   duration:original.duration,url:'https://media.example.test/recording'};
+  for(const patch of [{id:'wrong-recording'},{is_live:true},{playable_in_embed:false},
+    {is_preview:true},{availability:'private'},{url:'file:///invalid'}]){
+   p.extract=async()=>({...valid,...patch});
+   assert.deepEqual(await p.resolve(query,rejectOffer),[original]);
+  }
+  p.extract=async()=>{throw new UserError('Unavailable',502);};
+  assert.deepEqual(await p.resolve(query,rejectOffer),[original]);
+  p.extract=async()=>{throw new UserError('Busy',503);};
+  await assert.rejects(p.resolve(query,rejectOffer),/Busy/);
+ }finally{t.close();}
+});
+
 test('fast recorded YouTube startup falls back once when extraction fails',async()=>{
  const t=setup();try{
   const p=new Providers(t.store,{AFTERPARTY_FAST_YOUTUBE_STARTUP:'1'}), attempts:string[]=[];
